@@ -149,16 +149,46 @@ inductive red_stmt_total_single :: "'a program \<Rightarrow> conf \<Rightarrow> 
  | RedSeq2: "\<lbrakk> red_stmt_total_single Pr conf s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
                red_stmt_total_single Pr conf (Seq s1 s2) \<omega> (Inl s2, r'')"
  | RedLocalAssign: "\<lbrakk> wd_pure_exp_total Pr CInhale e \<omega>; Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t = v \<rbrakk> \<Longrightarrow> 
-               red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), (Set {\<omega>}))"
+               red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), (Set {update_store_total \<omega> x v}))"
  | RedLocalAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr CInhale e \<omega> \<rbrakk> \<Longrightarrow> red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), Failure)"
  | RedFieldAssign: "\<lbrakk> wd_pure_exp_total Pr CInhale e_r \<omega>; 
                       wd_pure_exp_total Pr CInhale e \<omega>; 
-                      Pr \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t = v_r;
+                      Pr \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t = VRef (Address addr);
                       Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t = v \<rbrakk> \<Longrightarrow> 
-               red_stmt_total_single Pr conf (FieldAssign e_r f e_p) \<omega> (Inr (), (Set {update_heap_total_full \<omega> (v_r,f) v}))"
- | RedFieldAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr CInhale e \<omega> \<rbrakk> \<Longrightarrow> red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), Failure)"
+               red_stmt_total_single Pr conf (FieldAssign e_r f e) \<omega> (Inr (), (Set {update_heap_total_full \<omega> (addr,f) v}))"
+ | RedFieldAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr CInhale e_r \<omega> \<or> \<not> wd_pure_exp_total Pr CInhale e \<omega> \<or> (Pr \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t) = (VRef Null) \<rbrakk> \<Longrightarrow> 
+               red_stmt_total_single Pr conf (FieldAssign e_r f e) \<omega> (Inr (), Failure)"
+ | RedIfTrue: "\<lbrakk> Pr \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t = VBool True \<rbrakk> \<Longrightarrow> 
+                red_stmt_total_single Pr conf (If e_b s1 s2) \<omega> (Inl s1, Set {\<omega>})"
+ | RedIfFalse: "\<lbrakk> Pr \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t = VBool False \<rbrakk> \<Longrightarrow> 
+                red_stmt_total_single Pr conf (If e_b s1 s2) \<omega> (Inl s2, Set {\<omega>})"
 
-(*| RedLocalAssignFailure: "\<lbrakk> Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] VFailure \<rbrakk> \<Longrightarrow> red_stmt conf Pr (LocalAssign x e) \<omega> Failure"*)
+
+(*
+
+type_synonym config2 = " (stmt + unit, state set)  + 'a result
+fun red_stmt_total_single_2 :: "'a program \<Rightarrow> conf \<Rightarrow> ('a stmt_config) set \<Rightarrow> ('a stmt_config) set"
+  where "red_stmt_total_single_2 Pr c W W' = 
+*)
+
+datatype 'a stmt_config_2 = Failure | Set "( (stmt + unit) \<times> 'a full_total_state) set"
+
+(*
+fun small_step_2 :: "'a program \<Rightarrow> conf \<Rightarrow> 'a stmt_config_2 \<Rightarrow> 'a stmt_config_2"
+  where 
+    "small_step_2 Pr c Failure = Failure"
+  | "small_step_2 Pr c (Set W) =
+*)
+
+(*
+inductive red_stmt_total_single_2 :: "'a program => conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+  where 
+    RedFailureProp: "red_stmt_total_single_2 Pr c (m, Failure) (Inr (), Failure)"
+  | RedFailure: "\<lbrakk> \<omega> \<in> W; red_stmt_total_single Pr c s1 \<omega> (m, Failure) \<rbrakk> \<Longrightarrow>
+                 red_stmt_total_single_2 Pr c (Inl s1, Set W) (Inr (), Failure)"
+  | RedNormal: " \<lbrakk> W' = (\<Union>\<omega>\<in>W. {W' | W'. red_stmt_total_single Pr c s1 \<omega>  (Set W')}) \<rbrakk> \<Longrightarrow>
+                red_stmt_total_single_2 Pr c (Inl s1, Set W) (Inr (), Set W')"
+*)
 (*
 inductive red_stmt_total_2 :: "'a program \<Rightarrow> conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool" where 
    RedSkip: " red_stmt_total_2 Pr conf ((Inl Skip), r) (Inr (), r)"
