@@ -7,6 +7,7 @@ datatype 'a inh_exh_result = IEFailure fail | Set "'a full_total_state set"
 
 datatype 'a result = Failure | Set (select_set: "'a full_total_state set")
 
+
 (*
 definition field_assign_virtual :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" where
   "field_assign_virtual \<phi> hl v = Abs_virtual_state (get_vm \<phi>, (get_vh \<phi>)(hl := Some v))"
@@ -15,19 +16,14 @@ fun field_assign :: "'a state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Righ
   "field_assign (\<sigma>, \<tau>, \<phi>) hl v = (\<sigma>, \<tau>, field_assign_virtual \<phi> hl v)"
 *)
 
-(*
-  Impure 'i
-  | Imp 'p "('p, 'i) assert"
-  | InhaleExhale "('p, 'i) assert" "('p, 'i) assert"
-  | Star "('p, 'i) assert" "('p, 'i) assert" (infixl "&&" 60)
-  | Wand "('p, 'i) assert" "('p, 'i) assert" (infixl "--*" 60)
-  | ForAll vtyp "('p, 'i) assert"
-*)
+fun update_store_total :: "'a full_total_state \<Rightarrow> var \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
+  where "update_store_total (\<sigma>, \<pi>, \<phi>) x v = (\<sigma>(x \<mapsto> v), \<pi>, \<phi>)"
 
-inductive red_stmt_total :: "'a program \<Rightarrow> stmt \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result \<Rightarrow> bool" where
-  RedSkip: "red_stmt_total Pr Skip \<omega> (Set {\<omega>})"
-| RedSeq: "\<lbrakk> red_stmt_total Pr s1 \<omega> (Set s) ; \<And>x. x \<in> s \<Longrightarrow> (\<exists>s'. red_stmt_total Pr s2 x (Set s') \<and> s' \<subseteq> r)  \<rbrakk> \<Longrightarrow> 
-            red_stmt_total Pr (Seq s1 s2) \<omega> (Set r)"
+definition update_heap_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a total_state"
+  where "update_heap_total mh l v = Abs_total_state ((get_mask_total mh), (get_heap_total mh)(l := v))"
+
+fun update_heap_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
+  where "update_heap_total_full (\<sigma>, \<pi>, \<phi>) l v = (\<sigma>, \<pi>, update_heap_total \<phi> l v )"
 
 
 definition singleton_total_pred :: "heap_loc \<Rightarrow> (prat \<Rightarrow> 'a val \<Rightarrow> bool) \<Rightarrow> 'a store \<Rightarrow> 'a total_trace \<Rightarrow> ('a full_total_state) set"
@@ -44,36 +40,63 @@ fun map_result :: "(('a full_total_state) \<Rightarrow> 'a result) \<Rightarrow>
     "map_result f Failure = Failure"
   | "map_result f (Set xs) = (if \<exists>x \<in> xs. f x = Failure then Failure else Set (\<Union>x \<in> xs. select_set (f x))) "
 
-fun handle_inhale :: "'a program \<Rightarrow> bool \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result"
+fun get_address_opt :: "'a val \<Rightarrow> address option"
   where 
-(** connectives **)
-    "handle_inhale Pr havoc_new (A && B) \<omega> = 
-       map_result (handle_inhale Pr havoc_new B) (handle_inhale Pr havoc_new A \<omega>)"
-  | "handle_inhale Pr havoc_new (Imp e A) \<omega> = 
-        (if (red_pure_exp_total Pr e \<omega>) = VBool True then (handle_inhale Pr havoc_new A \<omega>) else Set {\<omega>})"
-(** inhale specific **)
-  | "handle_inhale Pr havoc_new (Atomic (Acc e_r f e_p)) \<omega> =
-       (let r = the_address (red_pure_exp_total Pr e_r \<omega>);
+    "get_address_opt (VRef (Address a)) = Some a"
+  | "get_address_opt _ = None"
+
+
+fun handle_inhale :: "'a program \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result"
+  where 
+(** Connectives **)
+    "handle_inhale Pr havoc_new inh_assume (A && B) \<omega> = 
+       map_result (handle_inhale Pr havoc_new inh_assume B) (handle_inhale Pr havoc_new inh_assume A \<omega>)"
+  | "handle_inhale Pr havoc_new inh_assume (Imp e A) \<omega> = 
+        (if (red_pure_exp_total Pr e \<omega>) = VBool True then (handle_inhale Pr havoc_new inh_assume A \<omega>) else Set {\<omega>})"
+(** Inhale specific **)
+  (** Not assume **)
+  | "handle_inhale Pr havoc_new False (Atomic (Acc e_r f e_p)) \<omega> =
+       (let a_opt = get_address_opt (red_pure_exp_total Pr e_r \<omega>);
             p = (un_VPerm (red_pure_exp_total Pr e_p \<omega>))
         in 
-            (if p \<ge> 0 then 
-               Set (plus_total_set {\<omega>} 
-                      ((singleton_total havoc_new (r,f) (Abs_prat p) (get_heap_total_full \<omega> (r,f)) (get_store_total \<omega>) (get_trace_total \<omega>))))
+            (if p \<ge> 0 \<and> (wd_pure_exp_total Pr CInhale e_r \<omega>) then 
+               if a_opt \<noteq> None then
+                 Set (plus_total_set {\<omega>} 
+                        ((singleton_total havoc_new (the a_opt,f) (Abs_prat p) (get_heap_total_full \<omega> (the a_opt,f)) (get_store_total \<omega>) (get_trace_total \<omega>))))
+               else Set {}
              else Failure))"
-  | "handle_inhale Pr havoc_new (Atomic (AccWildcard e_r f)) \<omega> =
+  | "handle_inhale Pr havoc_new False (Atomic (AccWildcard e_r f)) \<omega> =
         (let r = the_address (red_pure_exp_total Pr e_r \<omega>) in
-            Set (plus_total_set {\<omega>} 
-                ((singleton_total_pred (r,f) (\<lambda>p v. (pgt p pnone) \<and> (\<not>havoc_new \<longrightarrow> v = get_heap_total_full \<omega> (r,f))) (get_store_total \<omega>) (get_trace_total \<omega>)))))"
-  | "handle_inhale Pr havoc_new (InhaleExhale A B) \<omega> = handle_inhale Pr havoc_new A \<omega>"
-  | "handle_inhale Pr havoc_new (Atomic (Pure e)) \<omega> =
+            if (wd_pure_exp_total Pr CInhale e_r \<omega>) then
+              Set (plus_total_set {\<omega>} 
+                  ((singleton_total_pred (r,f) (\<lambda>p v. (pgt p pnone) \<and> (\<not>havoc_new \<longrightarrow> v = get_heap_total_full \<omega> (r,f))) (get_store_total \<omega>) (get_trace_total \<omega>))))
+            else Failure)"
+  (** Assume **)
+  | "handle_inhale Pr havoc_new True (Atomic (Acc e_r f e_p)) \<omega> =
+       (let a_opt = get_address_opt (red_pure_exp_total Pr e_r \<omega>);
+            p = (un_VPerm (red_pure_exp_total Pr e_p \<omega>))
+        in 
+            if p \<ge> 0 \<and> (wd_pure_exp_total Pr CInhale e_r \<omega>) then
+              if a_opt \<noteq> None then
+                if ((Rep_prat (get_mask_total_full \<omega> (the a_opt,f))) \<ge> p) then Set {\<omega>} else Set {\<omega>}
+              else Set {}
+            else Failure)"
+  | "handle_inhale Pr havoc_new True (Atomic (AccWildcard e_r f)) \<omega> =
+        (let r = the_address (red_pure_exp_total Pr e_r \<omega>) in
+          if (wd_pure_exp_total Pr CInhale e_r \<omega>) then
+            if ((Rep_prat (get_mask_total_full \<omega> (r,f))) > 0) then Set {\<omega>} else Set {\<omega>}
+          else Failure)"
+  (** Same for both with and without Assume **)
+  | "handle_inhale Pr havoc_new inh_assume (InhaleExhale A B) \<omega> = handle_inhale Pr havoc_new inh_assume A \<omega>"
+  | "handle_inhale Pr havoc_new inh_assume (Atomic (Pure e)) \<omega> =
         (if wd_pure_exp_total Pr CInhale e \<omega> then  
           (if (red_pure_exp_total Pr e \<omega>) = VBool True then Set {\<omega>} else Set {})
          else Failure)"
 (* todo *)
-  | "handle_inhale Pr havoc_new (ForAll v va) \<omega> = undefined"
-  | "handle_inhale Pr havoc_new (Atomic (AccPredicate va vb vc)) \<omega> = undefined"
-  | "handle_inhale Pr havoc_new (Atomic (AccPredicateWildcard va vb)) \<omega> = undefined"
-  | "handle_inhale Pr havoc_new (A --* B) \<omega> = undefined"
+  | "handle_inhale Pr havoc_new inh_assume (ForAll v va) \<omega> = undefined"
+  | "handle_inhale Pr havoc_new inh_assume (Atomic (AccPredicate va vb vc)) \<omega> = undefined"
+  | "handle_inhale Pr havoc_new inh_assume (Atomic (AccPredicateWildcard va vb)) \<omega> = undefined"
+  | "handle_inhale Pr havoc_new inh_assume (A --* B) \<omega> = undefined"
 
 
 fun handle_exhale :: "'a program \<Rightarrow> heap_loc set \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result"
@@ -81,21 +104,21 @@ fun handle_exhale :: "'a program \<Rightarrow> heap_loc set \<Rightarrow> assert
     "handle_exhale Pr def_locs (A && B) \<omega> = 
        map_result (handle_exhale Pr def_locs B) (handle_exhale Pr def_locs A \<omega>)"
   | "handle_exhale Pr def_locs (Imp e A) \<omega> = 
-        (if (red_pure_exp_total Pr e \<omega>) = VBool True then (handle_exhale Pr def_locs A \<omega>) else Set {\<omega>})"
+       (if (red_pure_exp_total Pr e \<omega>) = VBool True then (handle_exhale Pr def_locs A \<omega>) else Set {\<omega>})"
   | "handle_exhale Pr def_locs (Atomic (Acc e_r f e_p)) \<omega> = 
-       (let r = the_address (red_pure_exp_total Pr e_r \<omega>);
+       (let a_opt = get_address_opt (red_pure_exp_total Pr e_r \<omega>);
             p = (un_VPerm (red_pure_exp_total Pr e_p \<omega>)) 
-        in 
-            if p \<ge> 0 \<and> pgte (get_mask_total_full \<omega> (r,f) ) (Abs_prat p) then
-             Set {\<omega>'| \<omega>' \<omega>_r. \<omega>_r \<in> singleton_total_only_mask (r,f) (Abs_prat p) (get_store_total \<omega>) (get_trace_total \<omega>) \<and> \<omega>' |\<oplus>|\<^sub>t \<omega>_r = Some \<omega>}
+        in            
+            if (p \<ge> 0 \<and> (wd_pure_exp_total Pr (CExhale def_locs) e_r \<omega>) \<and> a_opt \<noteq> None) \<and> pgte (get_mask_total_full \<omega> ((the a_opt),f) ) (Abs_prat p) then            
+             Set {\<omega>'| \<omega>' \<omega>_r. \<omega>_r \<in> singleton_total_only_mask ((the a_opt),f) (Abs_prat p) (get_store_total \<omega>) (get_trace_total \<omega>) \<and> \<omega>' |\<oplus>|\<^sub>t \<omega>_r = Some \<omega>}
             else 
-             Failure
-            )"
+             Failure)     
+      "
   | "handle_exhale Pr def_locs (Atomic (AccWildcard e_r f)) \<omega> =
-       (let r = the_address (red_pure_exp_total Pr e_r \<omega>)
+       (let a_opt = get_address_opt (red_pure_exp_total Pr e_r \<omega>)
         in 
-          if pgt (get_mask_total_full \<omega> (r,f) ) pnone then
-           Set {\<omega>'| \<omega>' \<omega>_r. \<omega>_r \<in> (singleton_total_pred (r,f) (\<lambda>p v. pgt ((get_mask_total_full \<omega>) (r,f)) p) (get_store_total \<omega>) (get_trace_total \<omega>)) \<and>
+          if ((wd_pure_exp_total Pr (CExhale def_locs) e_r \<omega>) \<and> a_opt \<noteq> None) \<and> pgt (get_mask_total_full \<omega> ((the a_opt),f) ) pnone then
+           Set {\<omega>'| \<omega>' \<omega>_r. \<omega>_r \<in> (singleton_total_pred (the a_opt,f) (\<lambda>p v. pgt ((get_mask_total_full \<omega>) (the a_opt,f)) p) (get_store_total \<omega>) (get_trace_total \<omega>)) \<and>
                         \<omega>' |\<oplus>|\<^sub>t \<omega>_r = Some \<omega> }
           else Failure)"
   | "handle_exhale Pr def_locs (InhaleExhale A B) \<omega> = handle_exhale Pr def_locs B \<omega>"
@@ -108,15 +131,59 @@ fun handle_exhale :: "'a program \<Rightarrow> heap_loc set \<Rightarrow> assert
   | "handle_exhale Pr def_locs (Atomic (AccPredicateWildcard va vb)) \<omega> = undefined"
   | "handle_exhale Pr def_locs (A --* B) \<omega> = undefined"
 
-(*
-inductive red_stmt :: "'a program \<Rightarrow> stmt \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result \<Rightarrow> bool" where
+record conf =
+  havoc_inhale :: bool
 
-  RedSkip: "red_stmt conf Pr Skip \<omega> (Set {\<omega>})"
+type_synonym 'a stmt_config = "(stmt+unit) \<times> ('a result)"
+
+definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
+  where "get_valid_locs \<omega> = {l |l. pgt (get_mask_total_full \<omega> l) pnone}"
+
+inductive red_stmt_total_single :: "'a program \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> 'a stmt_config \<Rightarrow> bool" where
+   RedSkip: " red_stmt_total_single Pr conf Skip \<omega> (Inr (), Set {\<omega>})"
+ | RedInhale: "red_stmt_total_single Pr conf (Inhale A) \<omega> (Inr (), (handle_inhale Pr (havoc_inhale conf) False A \<omega>))"
+ | RedAssume: "red_stmt_total_single Pr conf (Assume A) \<omega> (Inr (), (handle_inhale Pr (havoc_inhale conf) True A \<omega>))"
+ | RedExhale: "red_stmt_total_single Pr conf (Exhale A) \<omega> (Inr (), (handle_exhale Pr (get_valid_locs \<omega>) A \<omega>))"
+ | RedSeq1: "\<lbrakk> red_stmt_total_single Pr conf s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
+               red_stmt_total_single Pr conf (Seq s1 s2) \<omega> (Inl (Seq s'' s2), r'')"
+ | RedSeq2: "\<lbrakk> red_stmt_total_single Pr conf s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
+               red_stmt_total_single Pr conf (Seq s1 s2) \<omega> (Inl s2, r'')"
+ | RedLocalAssign: "\<lbrakk> wd_pure_exp_total Pr CInhale e \<omega>; Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t = v \<rbrakk> \<Longrightarrow> 
+               red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), (Set {\<omega>}))"
+ | RedLocalAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr CInhale e \<omega> \<rbrakk> \<Longrightarrow> red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), Failure)"
+ | RedFieldAssign: "\<lbrakk> wd_pure_exp_total Pr CInhale e_r \<omega>; 
+                      wd_pure_exp_total Pr CInhale e \<omega>; 
+                      Pr \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t = v_r;
+                      Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t = v \<rbrakk> \<Longrightarrow> 
+               red_stmt_total_single Pr conf (FieldAssign e_r f e_p) \<omega> (Inr (), (Set {update_heap_total_full \<omega> (v_r,f) v}))"
+ | RedFieldAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr CInhale e \<omega> \<rbrakk> \<Longrightarrow> red_stmt_total_single Pr conf (LocalAssign x e) \<omega> (Inr (), Failure)"
+
+(*| RedLocalAssignFailure: "\<lbrakk> Pr \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] VFailure \<rbrakk> \<Longrightarrow> red_stmt conf Pr (LocalAssign x e) \<omega> Failure"*)
+(*
+inductive red_stmt_total_2 :: "'a program \<Rightarrow> conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool" where 
+   RedSkip: " red_stmt_total_2 Pr conf ((Inl Skip), r) (Inr (), r)"
+ | RedInhale: "red_stmt_total_2 Pr conf (Inl (Inhale A), (Set W)) (Inr (), \<Union>\<omega> \<in> W. (handle_inhale Pr (havoc_inhale conf) A \<omega>))"
+ | RedSeq1: "\<lbrakk> red_stmt_total_2 Pr conf (Inl s1, (Set W)) (Inl s'', r'') \<rbrakk> \<Longrightarrow>
+               red_stmt_total_2 Pr conf (Inl (Seq s1 s2), (Set W)) (Inl (Seq s'' s2), r'')"
+ | RedSeq2: "\<lbrakk> red_stmt_total_2 Pr conf (Inl s1, (Set W)) (Inr (), r'') \<rbrakk> \<Longrightarrow>
+               red_stmt_total_2 Pr conf (Inl (Seq s1 s2), (Set W)) (Inl s2, r'')"
+ | RedFailure: "red_stmt_total_2 Pr conf ( (Inl s), Failure ) (Inr (), Failure)"
+*)
+
+  (* RedSeq: "red_stmt_total_2 Pr conf (Seq s1 s2) W (Set W')"*)
+
+
+inductive red_stmt_total :: "'a program \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow> 'a full_total_state \<Rightarrow> 'a result \<Rightarrow> bool" where
+  RedSkip: "red_stmt_total Pr conf Skip \<omega> (Set {\<omega>})"
 (*
 | RedAssertTrue: "\<lbrakk> wft Pr RExhale A \<omega> \<rbrakk> \<Longrightarrow> red_stmt conf Pr (Assert A) \<omega> (Set {\<omega>})"
 | RedAssertFalse: "\<lbrakk> wd_assertion Pr RExhale A \<omega> ; \<not> Pr RExhale \<Turnstile> \<langle>A; \<omega>\<rangle> \<rbrakk> \<Longrightarrow> red_stmt conf Pr (Assert A) \<omega> Failure"
 *)
-| RedInhale: "\<lbrakk> wd_assertion Pr RInhale A \<omega> \<rbrakk> \<Longrightarrow> red_stmt conf Pr (Inhale A) \<omega> (Set ({\<omega>' |\<omega>'. \<omega>' \<in> {\<omega>} \<otimes> inh Pr RInhale A}))"
+| RedInhale: "red_stmt_total Pr conf (Inhale A) \<omega> (handle_inhale Pr (havoc_inhale conf) A \<omega>)"
+| RedExhale: "red_stmt_total Pr conf (Exhale A) \<omega> (handle_exhale Pr {} A \<omega>)"
+| RedSeq: "\<lbrakk> red_stmt_total Pr conf s1 \<omega> (Set s) \<rbrakk> \<Longrightarrow> 
+             red_stmt_total Pr conf (Seq s1 s2) \<omega> (Set r)"
+
 
 (*
 | RedExhaleTrueAngelic: "\<lbrakk> angelic_exhale conf ; wft Pr RExhale A \<omega> ; a \<in> SA.under (inh Pr RExhale A) \<omega> \<rbrakk> \<Longrightarrow> red_stmt conf Pr (Exhale A) \<omega> (Set {\<omega> \<ominus> a})"
@@ -186,5 +253,5 @@ inductive red_stmt :: "'a program \<Rightarrow> stmt \<Rightarrow> 'a full_total
 definition ver :: "configuration \<Rightarrow> 'a program \<Rightarrow> stmt \<Rightarrow> 'a state \<Rightarrow> bool" where
   "ver conf Pr s \<omega> \<longleftrightarrow> (\<exists>r. red_stmt conf Pr s \<omega> (Set r))"
 *)
-*)
+
 end
