@@ -12,7 +12,7 @@ fun the_rat :: "'a val \<Rightarrow> rat" where
 | "the_rat _ = undefined"
 
 (* not sure about this notation *)
-fun red_pure_exp_total :: "'a program \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a val"
+fun red_pure_exp_total :: "program \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a val"
   ("_ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t)" [51,0,0] 81)
   where 
   "Pr \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t = (val_of_lit l)"
@@ -44,7 +44,7 @@ fun red_pure_exp_total :: "'a program \<Rightarrow> pure_exp \<Rightarrow> 'a fu
 datatype inh_exh_conf = CInhale | CExhale "heap_loc set"
 
 
-fun (sequential) wd_pure_exp_total :: "'a program \<Rightarrow> inh_exh_conf \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+fun (sequential) wd_pure_exp_total :: "program \<Rightarrow> inh_exh_conf \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where
 (* TODO *)
   "wd_pure_exp_total Pr c (ELit l) \<omega> \<longleftrightarrow> True"
