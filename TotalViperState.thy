@@ -26,6 +26,10 @@ subsection \<open>Destructors for (full) total state\<close>
 fun get_heap_total :: "'a total_state \<Rightarrow> 'a total_heap" where "get_heap_total \<phi> = snd (Rep_total_state \<phi>)"
 fun get_mask_total :: "'a total_state \<Rightarrow> mask" where "get_mask_total \<phi> = fst (Rep_total_state \<phi>)"
 
+lemma get_mask_total_wf: "wf_mask_simple (get_mask_total \<phi>)"
+  using Rep_total_state
+  by (metis get_mask_total.simps mem_Collect_eq prod.exhaust_sel wf_pre_total_state.simps)
+
 
 fun get_store_total :: "'a full_total_state \<Rightarrow> 'a store" where "get_store_total (\<sigma>,_,_) = \<sigma>"
 fun get_trace_total :: "'a full_total_state \<Rightarrow> 'a total_trace" where "get_trace_total (_,\<tau>,_) = \<tau>"
@@ -33,6 +37,10 @@ fun get_heap_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" whe
 fun get_mask_total_full :: "'a full_total_state \<Rightarrow> mask" where "get_mask_total_full (_,_,\<phi>) = get_mask_total \<phi>"
 fun get_hm_total_full :: "'a full_total_state \<Rightarrow> 'a total_state"
   where "get_hm_total_full (_,_,\<phi>) = \<phi>"
+
+lemma get_mask_total_full_wf: "wf_mask_simple (get_mask_total_full \<omega>)"
+  using get_mask_total_wf
+  by (metis get_mask_total_full.elims)
 
 subsection \<open>Addition of total states\<close>
 

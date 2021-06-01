@@ -24,11 +24,30 @@ definition update_heap_total :: "'a total_state \<Rightarrow> heap_loc \<Rightar
 definition update_mask_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> 'a total_state"
   where "update_mask_total mh m' = Abs_total_state (m', get_heap_total mh)"
 
+lemma Abs_total_state_inverse_2:
+  assumes "wf_pre_total_state (m,h)"
+  shows "Rep_total_state (Abs_total_state (m,h)) = (m,h)"
+  using assms Abs_total_state_inverse
+  by blast
+
+lemma update_mask_total_multiple: 
+  assumes "wf_mask_simple m0" and "wf_mask_simple m2"
+  shows   "update_mask_total (update_mask_total mh m0) m1 = update_mask_total mh m1"
+  unfolding update_mask_total_def  
+  using assms
+  by (simp add: Abs_total_state_inverse_2)
+
 fun update_heap_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
   where "update_heap_total_full (\<sigma>, \<pi>, \<phi>) l v = (\<sigma>, \<pi>, update_heap_total \<phi> l v )"
 
 fun update_mask_total_full :: "'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state"
-  where "update_mask_total_full (\<sigma>, \<pi>, \<phi>) m = (\<sigma>, \<pi>, update_mask_total \<phi> m)" 
+  where "update_mask_total_full (\<sigma>, \<pi>, \<phi>) m = (\<sigma>, \<pi>, update_mask_total \<phi> m)"
+
+lemma update_mask_total_full_multiple: 
+  assumes "wf_mask_simple m0"
+  shows   "update_mask_total_full (update_mask_total_full \<omega> m0) m1 = update_mask_total_full \<omega> m1"
+  using assms
+  by (metis get_mask_total_full.cases update_mask_total_full.simps update_mask_total_multiple)
 
 definition singleton_total_pred :: "heap_loc \<Rightarrow> (prat \<Rightarrow> 'a val \<Rightarrow> bool) \<Rightarrow> 'a store \<Rightarrow> 'a total_trace \<Rightarrow> ('a full_total_state) set"
   where "singleton_total_pred l P \<sigma> \<tau> = { (\<sigma>, \<tau>, Abs_total_state (m,h)) |m h. P (m l) (h l)}"
@@ -221,7 +240,7 @@ fun map_option_2 :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a opt
       
 
 (* Currently, red_stmt_total_single is a function. But if angelism is added, then it would not be a 
-function *)
+function *) (* inhale (acc(x.f) && x.f = 5 \<Longrightarrow> 0/0 = 0/0) *)
 inductive red_stmt_total_single_set :: "program \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> (stmt+unit) \<times> ('a result) \<Rightarrow> bool" where
    RedSkip: " red_stmt_total_single_set Pr conf Skip \<omega> (Inr (), Set {\<omega>})"
  | RedInhale: "red_stmt_total_single_set Pr conf (Inhale A) \<omega> (Inr (), (handle_inhale Pr (havoc_inhale conf) False A \<omega>))"
@@ -290,7 +309,7 @@ lemma havoc_equiv:
   shows "stmt_verifies_total dummy Pr \<lparr>havoc_inhale = true\<rparr> s"
   oops
 
-  subsection \<open>Backwards simulation\<close>
+subsection \<open>Backwards simulation\<close>
 
 (*definition lift_simulation_rel :: "'a simulation_rel \<Longrightarrow> *)
 
@@ -324,19 +343,52 @@ fun supported_subset :: "assertion \<Rightarrow> bool"
   | "supported_subset _ = True"
 
 
-lemma test: 
+lemma handle_inhale_sep_aux: 
   assumes "handle_inhale Pr h inh_assume (A&&B) \<omega> = Set W'" and "\<omega>' \<in> W'"
   shows "\<exists>W'' \<omega>'' W2'. handle_inhale Pr h inh_assume A \<omega> = Set W'' \<and> \<omega>'' \<in> W'' \<and> handle_inhale Pr h inh_assume B \<omega>'' = Set W2' \<and> \<omega>' \<in> W2'"
-  oops
+  sorry
+
+lemma handle_inhale_sep_aux_2:
+  assumes "handle_inhale Pr h inh_assume A \<omega> = Set WA" and "\<omega>a \<in> WA" and "handle_inhale Pr h inh_assume B \<omega>a = Set WB" and "\<omega>b \<in> WB" and
+          "handle_inhale Pr h inh_assume (A&&B) \<omega> = Set W"
+  shows "\<omega>b \<in> W"
+  sorry
+
+lemma handle_inhale_havoc_failure_preservation:
+  assumes "handle_inhale Pr True inh_assume A \<omega> = Set W'"
+  shows "\<exists>W2'. handle_inhale Pr False inh_assume A \<omega> = Set W2'"
+  sorry
 
 lemma havoc_inhale_rel:
   assumes "handle_inhale Pr True inh_assume A \<omega> = Set W'" and "\<omega>' \<in> W'" and "havoc_rel \<omega>' \<omega>2'" (*and "supported_subset A"*)
-  shows "handle_inhale Pr False inh_assume A (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = Set {\<omega>2'}"
+  shows "\<exists>W2'. handle_inhale Pr False inh_assume A (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = Set W2' \<and> \<omega>2' \<in> W2' \<and> havoc_rel \<omega> (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>))"
   using assms
 proof (induction Pr True inh_assume A \<omega> arbitrary:W' \<omega>' \<omega>2' rule: handle_inhale.induct)
   case (1 Pr inh_assume A B \<omega>)
-  from \<open>handle_inhale Pr True inh_assume (A && B) \<omega> = Set W'\<close> 
-then show ?case sorry
+  from handle_inhale_sep_aux[OF \<open>handle_inhale Pr True inh_assume (A && B) \<omega> = Set W'\<close> \<open>\<omega>' \<in> W'\<close>] obtain WA \<omega>a WB where
+    InhA:"handle_inhale Pr True inh_assume A \<omega> = Set WA" and "\<omega>a \<in> WA" and InhB:"handle_inhale Pr True inh_assume B \<omega>a = Set WB" and "\<omega>' \<in> WB"
+    by auto
+  let ?\<omega>2'B="(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>a))"
+  from 1(1)[OF InhB \<open>\<omega>' \<in> WB\<close> \<open>havoc_rel \<omega>' \<omega>2'\<close>] obtain W2B where
+    InhB2:"handle_inhale Pr False inh_assume B ?\<omega>2'B = Set W2B" and "\<omega>2' \<in> W2B" and 
+    "havoc_rel \<omega>a ?\<omega>2'B"
+    by auto
+  let ?\<omega>2'A ="(update_mask_total_full ?\<omega>2'B (get_mask_total_full \<omega>))"
+  from 1(2)[OF InhA \<open>\<omega>a \<in> WA\<close> \<open>havoc_rel \<omega>a ?\<omega>2'B\<close>]  obtain W2A where
+    InhA2:"handle_inhale Pr False inh_assume A ?\<omega>2'A = Set W2A" and "?\<omega>2'B \<in> W2A" and "havoc_rel \<omega> ?\<omega>2'A"
+    by auto
+  have "?\<omega>2'A = (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>))"
+    apply (rule update_mask_total_full_multiple)
+    by (rule get_mask_total_full_wf)
+  from \<open>handle_inhale Pr True inh_assume (A && B) \<omega> = Set W'\<close> obtain W2' where
+       "handle_inhale Pr False inh_assume (A && B) \<omega> = Set W2'"
+    using handle_inhale_havoc_failure_preservation by blast
+(*  with InhA2 InhB2 \<open>\<omega>2' \<in> W2B\<close> \<open>?\<omega>2'B \<in> W2A\<close> *)
+  hence "\<omega>2' \<in> W2'"
+    using handle_inhale_sep_aux_2[OF InhA2 \<open>?\<omega>2'B \<in> W2A\<close> InhB2 \<open>\<omega>2' \<in> W2B\<close>]
+    
+    
+  then show ?case sorry
 next
   case (2 Pr inh_assume e A \<omega>)
   then show ?case sorry
