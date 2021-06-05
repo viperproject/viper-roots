@@ -234,6 +234,7 @@ inductive red_inhale :: "program \<Rightarrow> 'a interp \<Rightarrow> bool \<Ri
        (wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>);
        \<omega>' \<in> inhale_perm_single havoc_new \<omega> (a,f) None \<rbrakk> \<Longrightarrow>
        red_inhale Pr \<Delta> havoc_new False (Atomic (AccWildcard e_r f)) \<omega> (RNormal \<omega>')"
+(* incorrect semantics of assume, since assume A && B is not the same as assume A; assume B *)
  | AssumeAccWildcard: 
     "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
       (wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>) \<rbrakk> \<Longrightarrow>
@@ -324,6 +325,96 @@ fun handle_exhale_2 :: "program \<Rightarrow> 'a full_total_state \<Rightarrow> 
   | "handle_exhale_2 Pr \<omega>_orig (A --* B) \<omega> = undefined"
 *)
 
+datatype exhale_result = ExhaleNormal mask | ExhaleFailure
+
+inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> mask \<Rightarrow> exhale_result \<Rightarrow> bool"
+  for Pr :: program and \<Delta> :: "'a interp" and \<omega>0 :: "'a full_total_state"
+  where 
+
+\<comment>\<open>exhale A && B\<close>
+   ExhSepNormal: 
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 A \<omega> (ExhaleNormal m''); 
+      red_exhale Pr \<Delta> \<omega>0 B m'' res\<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (A && B) m res"
+ | ExhSepFailureMagic: 
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 A m ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (A && B) m ExhaleFailure"
+
+\<comment>\<open>exhale A \<longrightarrow> B\<close>
+ | ExhImpTrue: 
+   "\<lbrakk> \<omega> = update_mask_total_full \<omega>_orig m;
+      wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>0)) e \<omega>; 
+      Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+      red_exhale Pr \<Delta> \<omega>0 A m res \<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (Imp e A) m res" 
+ | ExhImpFalse:  
+   "\<lbrakk> \<omega> = update_mask_total_full \<omega>_orig m;
+      wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>0)) e \<omega>; 
+      Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+      red_exhale Pr \<Delta> \<omega>0 (Imp e A) m (ExhaleNormal m)"
+ | ExhImpFailure:
+   "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>0)) e (update_mask_total_full \<omega>_orig m) \<rbrakk> \<Longrightarrow> 
+     red_exhale Pr \<Delta> \<omega>0 (Imp e A) m ExhaleFailure"
+
+\<comment>\<open>exhale acc(e.f, p)\<close>
+ | ExhAcc: 
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
+       Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)); Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
+       p \<ge> 0; 
+       pgte (m(a,f)) (Abs_prat p);
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega>;
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_p \<omega>;
+       m' = m( (a,f) := Abs_prat ( (Rep_prat (m((a, f)))) - p) ) \<rbrakk> \<Longrightarrow>
+       red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f e_p)) m (ExhaleNormal m')"
+  | ExhAccFail1: 
+    "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
+      (r = Null \<or> \<not>wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega> \<or> \<not>wd_pure_exp_total Pr \<Delta> (CExhale locs) e_p \<omega> \<or> p < 0)\<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f e_p)) m ExhaleFailure"
+  | ExhAccFail2:
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
+       Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
+       Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega>;
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_p \<omega>;
+       p \<ge> 0; 
+       \<not> (pgte (m(a,f)) (Abs_prat p)) \<rbrakk> \<Longrightarrow>
+       red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f e_p)) m ExhaleFailure"
+
+\<comment>\<open>exhale acc(e.f, wildcard)\<close>
+ \<comment>\<open>Exhaling wildcard removes some non-zero permission this is less than the current permission held\<close>
+  | ExhAccWildcard:
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
+       Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
+       p > 0; 
+       pgt (m(a,f)) (Abs_prat p);
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega>;
+       m' = m( (a,f) := Abs_prat ( (Rep_prat (m((a, f)))) - p) ) \<rbrakk> \<Longrightarrow>
+       red_exhale Pr \<Delta> \<omega>0 (Atomic (AccWildcard e_r f)) m (ExhaleNormal m')"
+  | ExhAccWildcardFail1:
+    "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
+      (r = Null \<or> \<not>wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega>)\<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (Atomic (AccWildcard e_r f)) m ExhaleFailure"
+  | ExhAccWildcardFail2:
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
+       Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e_r \<omega>;
+       (m(a,f)) = pnone \<rbrakk> \<Longrightarrow>
+      red_exhale Pr \<Delta> \<omega>0 (Atomic (AccWildcard e_r f)) m ExhaleFailure"
+ 
+\<comment>\<open>exhale other cases\<close>
+  | ExhInhaleExhale: 
+    "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 B \<omega> res \<rbrakk> \<Longrightarrow> 
+       red_exhale Pr \<Delta> \<omega>0 (InhaleExhale A B) m res"  
+  | ExhPure:
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m; 
+       wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>;  
+       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+       red_exhale Pr \<Delta> \<omega>0 (Atomic (Pure e)) m (if b then ExhaleNormal m else ExhaleFailure)"
+  | ExhPureFail:
+    "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m; 
+       \<not> (wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>) \<rbrakk> \<Longrightarrow>
+       red_exhale Pr \<Delta> \<omega>0 (Atomic (Pure e)) m ExhaleFailure"
+
 record conf =
   havoc_inhale :: bool
 
@@ -352,39 +443,58 @@ fun map_option_2 :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a opt
 function *) (* inhale (acc(x.f) && x.f = 5 \<Longrightarrow> 0/0 = 0/0) *)
 inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> (stmt+unit) \<times> ('a standard_result) \<Rightarrow> bool"
   for Pr :: program and \<Delta> :: "'a interp" and conf :: conf where
-   RedSkip: " red_stmt_total_single_set Pr \<Delta> conf Skip \<omega> (Inr (), RNormal \<omega>)"
- (*| RedInhale: "red_stmt_total_single_set Pr conf (Inhale A) \<omega> (Inr (), (handle_inhale Pr (havoc_inhale conf) False A \<omega>))"*)
- | RedInhale: "\<lbrakk> red_inhale Pr \<Delta> (havoc_inhale conf) False A \<omega> res \<rbrakk> \<Longrightarrow>
-                 red_stmt_total_single_set Pr \<Delta> conf (Inhale A) \<omega> (Inr (), res)"
+   RedSkip: " red_stmt_total_single_set Pr \<Delta> conf Skip \<omega> (Inr (), RNormal \<omega>)" 
+ | RedInhale: 
+   "\<lbrakk> red_inhale Pr \<Delta> (havoc_inhale conf) False A \<omega> res \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Inhale A) \<omega> (Inr (), res)"
+ | RedExhale: 
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_mask_total_full \<omega>) (ExhaleNormal m');
+      \<omega>' \<in> exhale_state \<omega> m' \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Exhale A) \<omega> (Inr (), RNormal \<omega>')"
+ | RedExhaleFailure:
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_mask_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Exhale A) \<omega> (Inr (), RFailure)"
+ | RedAssert:
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_mask_total_full \<omega>) (ExhaleNormal m') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Assert A) \<omega> (Inr (), RNormal \<omega>)"
+ | RedAssertFailure:
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_mask_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Assert A) \<omega> (Inr (), RFailure)"
+\<comment>\<open>TODO: Add semantics for \<^term>\<open>Assume A\<close>. Should be the same as \<^term>\<open>Assert A\<close>, except that 
+        \<^term>\<open>Assert A\<close> goes to failure iff \<^term>\<open>Assume A\<close> goes to magic. The back-ends implement it
+        differently correctly. \<close>
  (*| RedAssume: "red_stmt_total_single_set Pr conf (Assume A) \<omega> (Inr (), (handle_inhale Pr (havoc_inhale conf) True A \<omega>))"*)
 (* | RedExhale: "red_stmt_total_single_set Pr conf (Exhale A) \<omega> 
                      (Inr (), map_option_2 (\<lambda>xs. Set (\<Union>m \<in> xs. exhale_state \<omega> m)) Failure (handle_exhale_2 Pr \<omega> A (get_total_mask_full \<omega>)))"*)
- | RedSeq1: "\<lbrakk> red_stmt_total_single_set Pr \<Delta> conf s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
-               red_stmt_total_single_set Pr \<Delta> conf (Seq s1 s2) \<omega> (Inl (Seq s'' s2), r'')"
- | RedSeq2: "\<lbrakk> red_stmt_total_single_set Pr \<Delta> conf s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
-               red_stmt_total_single_set Pr \<Delta> conf (Seq s1 s2) \<omega> (Inl s2, r'')"
- | RedLocalAssign: "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<rbrakk> \<Longrightarrow> 
-               red_stmt_total_single_set Pr \<Delta> conf (LocalAssign x e) \<omega> (Inr (), (RNormal (update_store_total \<omega> x v)))"
- | RedLocalAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<rbrakk> \<Longrightarrow> red_stmt_total_single_set Pr \<Delta> conf (LocalAssign x e) \<omega> (Inr (), RFailure)"
- | RedFieldAssign: "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>; 
-                      wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; 
-                      Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
-                      Pr, \<Delta>  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
-               red_stmt_total_single_set Pr \<Delta> conf (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_heap_total_full \<omega> (addr,f) v)))"
- | RedFieldAssignFailure: "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega> \<or> \<not> wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<or> (Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null)) \<rbrakk> \<Longrightarrow> 
-               red_stmt_total_single_set Pr \<Delta> conf (FieldAssign e_r f e) \<omega> (Inr (), RFailure)"
- | RedIfTrue: "\<lbrakk> Pr,\<Delta> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
-                red_stmt_total_single_set Pr \<Delta> conf (If e_b s1 s2) \<omega> (Inl s1, RNormal \<omega>)"
- | RedIfFalse: "\<lbrakk> Pr,\<Delta> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-                red_stmt_total_single_set Pr \<Delta> conf (If e_b s1 s2) \<omega> (Inl s2, RNormal \<omega>)"
-
-(* datatype 'a stmt_config_2 = Failure2 | Normal "((stmt + unit) \<times> 'a full_total_state) set" *)
-
-
-(*datatype 'a single_result = Normal "(stmt + unit) \<times> 'a full_total_state" | MagicSingle | FailureSingle*)
+ | RedLocalAssign:
+   "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<rbrakk> \<Longrightarrow> 
+     red_stmt_total_single_set Pr \<Delta> conf (LocalAssign x e) \<omega> (Inr (), (RNormal (update_store_total \<omega> x v)))"
+ | RedLocalAssignFailure: 
+   "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<rbrakk> \<Longrightarrow> 
+   red_stmt_total_single_set Pr \<Delta> conf (LocalAssign x e) \<omega> (Inr (), RFailure)"
+ | RedFieldAssign: 
+   "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>; 
+      wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; 
+      Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
+      Pr, \<Delta>  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set Pr \<Delta> conf (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_heap_total_full \<omega> (addr,f) v)))"
+ | RedFieldAssignFailure: 
+   "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega> \<or> \<not> wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<or> (Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null)) \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set Pr \<Delta> conf (FieldAssign e_r f e) \<omega> (Inr (), RFailure)"
+ | RedIfTrue: 
+   "\<lbrakk> Pr,\<Delta> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set Pr \<Delta> conf (If e_b s1 s2) \<omega> (Inl s1, RNormal \<omega>)"
+ | RedIfFalse: 
+   "\<lbrakk> Pr,\<Delta> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set Pr \<Delta> conf (If e_b s1 s2) \<omega> (Inl s2, RNormal \<omega>)"
+ | RedSeq1:
+   "\<lbrakk> red_stmt_total_single_set Pr \<Delta> conf s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Seq s1 s2) \<omega> (Inl (Seq s'' s2), r'')"
+ | RedSeq2: 
+   "\<lbrakk> red_stmt_total_single_set Pr \<Delta> conf s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set Pr \<Delta> conf (Seq s1 s2) \<omega> (Inl s2, r'')"
 
 type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a standard_result"
-
 
 inductive red_stmt_total_single :: "program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
   where 
@@ -399,6 +509,9 @@ definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
 
 fun is_failure_config :: "'a stmt_config \<Rightarrow> bool"
   where "is_failure_config config \<longleftrightarrow> (snd config) = RFailure"
+
+fun is_normal_config :: "'a stmt_config \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "is_normal_config config \<omega> \<longleftrightarrow> (snd config) = RNormal \<omega>"
 
 (* todo: incorporate precondition *)
 (* first argument is just there to fix 'a *)
@@ -433,8 +546,8 @@ lemma backwards_simulation:
   assumes initial_rel: "\<And> \<omega> \<omega>2. is_empty_total \<omega> \<Longrightarrow> R \<omega> \<omega>2 \<Longrightarrow> is_empty_total \<omega>2" and
           total_rel: "\<forall>\<omega>. \<exists> \<omega>'. R \<omega> \<omega>'" and
           step:"\<And> s \<omega> w. red_stmt_total_single Pr \<Delta> conf (Inl s, RNormal \<omega>) r \<Longrightarrow>
-                (is_failure_config r  \<longrightarrow> (\<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Normal (Inl s, \<omega>2)) FailureSingle)) \<and>
-                (\<forall> s' \<omega>' \<omega>2'. (r = (m, RNormal \<omega>') \<longrightarrow> R \<omega>' \<omega>2' \<longrightarrow>
+                (is_failure_config r  \<longrightarrow> (\<exists>\<omega>2 w2'. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Normal (Inl s, \<omega>2)) w2' \<and> is_failure_config w2')) \<and>
+                (\<forall> s' \<omega>' \<omega>2'. (is_normal_config r \<omega>' \<longrightarrow> R \<omega>' \<omega>2' \<longrightarrow>
                                (\<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Normal (Inl s, \<omega>2)) (Normal (Inl s', \<omega>2')))))"
         assumes "stmt_verifies_total dummy Pr2 \<Delta> conf2 s"
  shows "stmt_verifies_total dummy Pr \<Delta> conf s"
@@ -563,22 +676,6 @@ lemma havoc_rel_wd_same:
            apply (simp add: havoc_rel_expr_eval_same havoc_rel_same_mask)
          apply clarsimp+
   done
-
-lemma handle_inhale_sep_aux: 
-  assumes "handle_inhale Pr h inh_assume (A&&B) \<omega> = Set W'" and "\<omega>' \<in> W'"
-  shows "\<exists>W'' \<omega>'' W2'. handle_inhale Pr h inh_assume A \<omega> = Set W'' \<and> \<omega>'' \<in> W'' \<and> handle_inhale Pr h inh_assume B \<omega>'' = Set W2' \<and> \<omega>' \<in> W2'"
-  sorry
-
-lemma handle_inhale_sep_aux_2:
-  assumes "handle_inhale Pr h inh_assume A \<omega> = Set WA" and "\<omega>a \<in> WA" and "handle_inhale Pr h inh_assume B \<omega>a = Set WB" and "\<omega>b \<in> WB" and
-          "handle_inhale Pr h inh_assume (A&&B) \<omega> = Set W"
-  shows "\<omega>b \<in> W"
-  sorry
-
-lemma handle_inhale_havoc_failure_preservation:
-  assumes "handle_inhale Pr True inh_assume A \<omega> = Set W'"
-  shows "\<exists>W2'. handle_inhale Pr False inh_assume A \<omega> = Set W2'"
-  sorry
 
 lemma havoc_rel_backwards:
   assumes "\<omega>' \<in> inhale_perm_single True \<omega> (a, f) p_opt" and 
@@ -813,57 +910,23 @@ next
 qed (auto)
 
 lemma step_havoc_rel:
-  assumes "red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=True\<rparr> (Normal (Inl s, \<omega>)) w"
-  shows   "(w = RFailure \<longrightarrow> (\<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=False\<rparr> (RNormal (Inl s, \<omega>2)) R)) \<and>
-                (\<forall> s' \<omega>' \<omega>2'. (w = RNormal (Inl s', \<omega>') \<longrightarrow> R \<omega>' \<omega>2' \<longrightarrow>
-                               (\<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr \<lparr>havoc_inhale=False\<rparr> (RNormal (Inl s, \<omega>2)) (RNormal (Inl s', \<omega>2')))))"
+  assumes "red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=True\<rparr> (Inl s,  RNormal \<omega>) w'"
+  shows   "(is_failure_config w' \<longrightarrow> (\<exists>\<omega>2 w2'. havoc_rel \<omega> \<omega>2 \<and> red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=False\<rparr> (Inl s, RNormal \<omega>2) w2' \<and> is_failure_config w2')) \<and>
+                (\<forall> s' \<omega>' \<omega>2'. is_normal_config w' \<omega>' \<longrightarrow> havoc_rel \<omega>' \<omega>2' \<longrightarrow>
+                               (\<exists>\<omega>2. havoc_rel \<omega> \<omega>2 \<and> red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=False\<rparr> (Inl s, RNormal \<omega>2) (Inl s', RNormal \<omega>2')))"
   using assms
-proof (cases)
-  case (NormalSingleStep m' W' \<omega>')
-  from NormalSingleStep(2) show ?thesis 
-  proof cases
-  case RedSkip
-  show ?thesis
-    by (simp add: local.NormalSingleStep(1) local.RedSkip(2))
-  next
-    case (RedInhale A)
-    then show ?thesis sorry
-  next
-  case (RedAssume A)
-    then show ?thesis sorry
-  next
-    case (RedExhale A get_total_mask_full)
-    then show ?thesis sorry
-  next
-  case (RedSeq1 s1 s'' s2)
-  then show ?thesis sorry
-  next
-  case (RedSeq2 s1 s2)
-  then show ?thesis sorry
-  next
-    case (RedLocalAssign e v x)
-    then show ?thesis sorry
-  next
-  case (RedFieldAssign e_r e addr v f)
-    then show ?thesis sorry
-  next
-    case (RedIfTrue e_b s1 s2)
-    then show ?thesis sorry
-  next
-    case (RedIfFalse e_b s1 s2)
-    then show ?thesis sorry
-  qed
-next
-  case (FailureSingleStep m')
-  then show ?thesis sorry
+  proof (cases)
+    case NormalSingleStep
+    then show ?thesis
+      sorry
 qed
+
 
 lemma havoc_conf_equiv:
   assumes "stmt_verifies_total dummy Pr \<lparr>havoc_inhale=False\<rparr> s"
   shows "stmt_verifies_total dummy Pr \<lparr>havoc_inhale=True\<rparr> s"
 proof (rule backwards_simulation)
-  
-  
+
 
 
 
