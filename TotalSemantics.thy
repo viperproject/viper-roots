@@ -501,8 +501,8 @@ inductive red_stmt_total_single :: "program \<Rightarrow> 'a interp \<Rightarrow
     NormalSingleStep: "\<lbrakk> red_stmt_total_single_set Pr \<Delta> conf s \<omega> res \<rbrakk> \<Longrightarrow> 
        red_stmt_total_single Pr \<Delta> conf ((Inl s, RNormal \<omega>)) res"
 
-definition red_stmt_total_multi :: "program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
-  where "red_stmt_total_multi Pr \<Delta> conf = rtranclp (red_stmt_total_single Pr \<Delta> conf)"
+abbreviation red_stmt_total_multi :: "program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+  where "red_stmt_total_multi Pr \<Delta> conf \<equiv> rtranclp (red_stmt_total_single Pr \<Delta> conf)"
 
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_mask_total_full \<omega> = zero_mask"
@@ -515,7 +515,7 @@ fun is_normal_config :: "'a stmt_config \<Rightarrow> 'a full_total_state \<Righ
 
 (* todo: incorporate precondition *)
 (* first argument is just there to fix 'a *)
-definition stmt_verifies_total :: "'a full_total_state \<Rightarrow> program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow>  bool"
+definition stmt_verifies_total :: "'a \<Rightarrow> program \<Rightarrow> 'a interp \<Rightarrow> conf \<Rightarrow> stmt \<Rightarrow>  bool"
   where "stmt_verifies_total dummy Pr \<Delta> conf s \<equiv> 
          \<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
            red_stmt_total_multi Pr \<Delta> conf ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r"
@@ -542,16 +542,118 @@ subsection \<open>Backwards simulation\<close>
 
 (*definition lift_simulation_rel :: "'a simulation_rel \<Longrightarrow> *)
 
+definition lift_sim_rel :: "'a simulation_rel \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+  where "lift_sim_rel R w1 w2 \<equiv>
+            (is_failure_config w1 \<and> is_failure_config w2) \<or>
+            (\<exists>\<omega>1 \<omega>2. is_normal_config w1 \<omega>1 \<and> is_normal_config w2 \<omega>2 \<and> R \<omega>1 \<omega>2 \<and> fst w1 = fst w2)"
+
+lemma lift_sim_rel_fail: "lift_sim_rel R w1 w2 \<Longrightarrow> is_failure_config w1 \<Longrightarrow> is_failure_config w2"
+  by (simp add: lift_sim_rel_def)
+
+lemma red_stmt_total_start_normal:
+  assumes "red_stmt_total_single Pr \<Delta> conf w1 w2"
+  shows "\<exists>\<omega>. is_normal_config w1 \<omega>"
+  using assms
+  by (cases) auto
+
+lemma backwards_simulation_aux:
+  assumes "red_stmt_total_multi Pr \<Delta> conf ((Inl s, RNormal \<omega>)) w" and
+          single_step:"\<And> s \<omega> w' w2'. red_stmt_total_single Pr \<Delta> conf (Inl s, RNormal \<omega>) w' \<Longrightarrow> lift_sim_rel R w' w2' \<Longrightarrow>                               
+                      \<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Inl s, RNormal \<omega>2) w2'"
+ shows "\<And>w2'. lift_sim_rel R w w2' \<Longrightarrow> \<exists> \<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_multi Pr2 \<Delta> conf2 (Inl s, RNormal \<omega>2) w2'"
+using assms(1)
+proof (induction rule: rtranclp_induct)
+  case base   
+    from this obtain \<omega>2' where "w2' = (Inl s, RNormal \<omega>2')" and "R \<omega> \<omega>2'"
+    unfolding lift_sim_rel_def
+    by (metis fstI is_failure_config.elims(2) is_normal_config.elims(2) prod.collapse snd_conv standard_result.distinct(5) standard_result.inject)
+  show ?case
+    apply (rule exI)
+    apply (rule conjI[OF \<open>R \<omega> \<omega>2'\<close>])
+    by (simp add: \<open>w2' = _\<close>)        
+next
+  case (step y z)
+  from this obtain s'' \<omega>'' where "y = (Inl s'', RNormal \<omega>'')"
+    by (meson red_stmt_total_single.cases)
+  with step.hyps step.prems single_step obtain \<omega>2'' where "R \<omega>'' \<omega>2''" and
+    RedW2'':"red_stmt_total_single Pr2 \<Delta> conf2 (Inl s'', RNormal \<omega>2'') w2'"
+    by blast
+  hence "lift_sim_rel R y (Inl s'', RNormal \<omega>2'')"
+    unfolding lift_sim_rel_def
+    using \<open>y = _\<close>
+    by simp
+  with step.IH obtain \<omega>2 where "R \<omega> \<omega>2" and 
+    "red_stmt_total_multi Pr2 \<Delta> conf2 (Inl s, RNormal \<omega>2) (Inl s'', RNormal \<omega>2'')"
+    by blast
+  then show ?case
+    using RedW2''
+    by fastforce
+qed
+
+lemma result_normal_exhaust: 
+   "w \<noteq> RMagic \<Longrightarrow> w \<noteq> RFailure \<Longrightarrow> \<exists>\<omega>. w = RNormal \<omega>"
+  apply (cases w)
+  by auto
+
+lemma stmt_config_normal_exhaust:
+  assumes "\<not>is_failure_config w" and "snd w \<noteq> RMagic"
+  shows "\<exists>\<omega>. is_normal_config w \<omega>"
+proof -
+  from assms have "\<exists>\<omega>. snd w = RNormal \<omega>"
+    using result_normal_exhaust
+    by auto
+  thus ?thesis
+    by simp
+qed
+
+lemma lift_total_rel: 
+  assumes "\<forall>\<omega>. \<exists> \<omega>'. R \<omega> \<omega>'"
+  shows "\<forall>w :: 'a stmt_config. snd w \<noteq> RMagic \<longrightarrow> (\<exists>w'. lift_sim_rel R w w')"
+proof (rule allI, rule impI)+
+  fix w :: "'a stmt_config"
+  assume *:"snd w \<noteq> RMagic"
+  show "\<exists>w'. lift_sim_rel R w w'"
+  proof (cases "is_failure_config w")
+    case False   
+    from stmt_config_normal_exhaust[OF False *] obtain \<omega> where NormW:"is_normal_config w \<omega>"
+      by auto
+    moreover obtain \<omega>' where "R \<omega> \<omega>'" using assms 
+      by blast
+    show ?thesis 
+      apply (rule exI[where ?x="(fst w, RNormal \<omega>')"])
+      apply (unfold lift_sim_rel_def)
+      using NormW \<open>R \<omega> \<omega>'\<close>
+      by auto
+  qed (auto simp: lift_sim_rel_def)
+qed   
+
 lemma backwards_simulation:
   assumes initial_rel: "\<And> \<omega> \<omega>2. is_empty_total \<omega> \<Longrightarrow> R \<omega> \<omega>2 \<Longrightarrow> is_empty_total \<omega>2" and
           total_rel: "\<forall>\<omega>. \<exists> \<omega>'. R \<omega> \<omega>'" and
-          step:"\<And> s \<omega> w. red_stmt_total_single Pr \<Delta> conf (Inl s, RNormal \<omega>) r \<Longrightarrow>
-                (is_failure_config r  \<longrightarrow> (\<exists>\<omega>2 w2'. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Normal (Inl s, \<omega>2)) w2' \<and> is_failure_config w2')) \<and>
-                (\<forall> s' \<omega>' \<omega>2'. (is_normal_config r \<omega>' \<longrightarrow> R \<omega>' \<omega>2' \<longrightarrow>
-                               (\<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Normal (Inl s, \<omega>2)) (Normal (Inl s', \<omega>2')))))"
-        assumes "stmt_verifies_total dummy Pr2 \<Delta> conf2 s"
- shows "stmt_verifies_total dummy Pr \<Delta> conf s"
- sorry
+          single_step:"\<And> s \<omega> w' w2'. red_stmt_total_single Pr \<Delta> conf (Inl s, RNormal \<omega>) w' \<Longrightarrow> lift_sim_rel R w' w2' \<Longrightarrow>                               
+                      \<exists>\<omega>2. R \<omega> \<omega>2 \<and> red_stmt_total_single Pr2 \<Delta> conf2 (Inl s, RNormal \<omega>2) w2'" and
+        verif:"stmt_verifies_total (dummy :: 'a) Pr2 \<Delta> conf2 s"
+ shows "stmt_verifies_total (dummy :: 'a) Pr \<Delta> conf s"
+  unfolding stmt_verifies_total_def    
+proof ( (rule allI | rule impI) +)
+  fix \<omega>::"'a full_total_state" and w'
+  assume "is_empty_total \<omega>" and Red:"red_stmt_total_multi Pr \<Delta> conf (Inl s, RNormal \<omega>) w'"
+  show "\<not> (is_failure_config w')"
+  proof (cases "snd w' \<noteq> RMagic")
+    case True
+    from this obtain w2 where RelResult:"lift_sim_rel R w' w2" using lift_total_rel[OF assms(2)]
+      by blast
+    from this Red obtain \<omega>2 where "R \<omega> \<omega>2" and "red_stmt_total_multi Pr2 \<Delta> conf2 (Inl s, RNormal \<omega>2) w2"
+      using backwards_simulation_aux single_step
+      by blast
+    then show ?thesis
+      using verif initial_rel[OF \<open>is_empty_total \<omega>\<close> \<open>R \<omega> \<omega>2\<close>] RelResult lift_sim_rel_fail
+      unfolding stmt_verifies_total_def
+      by blast      
+  qed (simp)
+qed
+
+
 
 definition havoc_rel :: "'a simulation_rel"
   where "havoc_rel \<omega> \<omega>' \<equiv> get_mask_total_full \<omega> = get_mask_total_full \<omega>' \<and> 
