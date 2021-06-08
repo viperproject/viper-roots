@@ -41,6 +41,22 @@ fun get_hm_total_full :: "'a full_total_state \<Rightarrow> 'a total_state"
 fun get_heap_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" where "get_heap_total_full \<omega> = get_heap_total (get_hm_total_full \<omega>)"
 fun get_mask_total_full :: "'a full_total_state \<Rightarrow> mask" where "get_mask_total_full \<omega> = get_mask_total (get_hm_total_full \<omega>)"
 
+lemma total_state_eq:
+  assumes "get_mask_total \<phi> = get_mask_total \<phi>'" and
+          "get_heap_total \<phi> = get_heap_total \<phi>'"
+  shows "\<phi> = \<phi>'"
+  using assms
+  by (metis Rep_total_state_inverse get_heap_total.simps get_mask_total.simps surjective_pairing)
+
+lemma full_total_state_eq: 
+  assumes "get_store_total \<omega> = get_store_total \<omega>'" and
+          "get_trace_total \<omega> = get_trace_total \<omega>'" and 
+          "get_heap_total_full \<omega> = get_heap_total_full \<omega>'" and
+          "get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
+        shows "\<omega> = \<omega>'"
+  using assms
+  by (metis Rep_total_state_inject get_heap_total.elims get_heap_total_full.elims get_hm_total_full.elims get_mask_total.elims get_mask_total_full.elims get_store_total.elims get_trace_total.elims prod.expand) 
+
 lemma get_hm_total_full_comp: "Rep_total_state (get_hm_total_full \<omega>) = (get_mask_total_full \<omega>, get_heap_total_full \<omega>)"
   by simp
 
