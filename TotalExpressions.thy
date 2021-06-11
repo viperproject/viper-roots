@@ -13,6 +13,7 @@ fun the_rat :: "'a val \<Rightarrow> rat" where
 
 inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a extended_val \<Rightarrow> bool"
   ("_, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,0,51,51] 81)
+  for Pr :: program and \<Delta> :: "'a interp"
   where
 (* Independent of SA *)
   RedLit: "Pr, \<Delta> \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
@@ -54,7 +55,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> p
 | RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>  Pr, \<Delta> \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 
 (* Dependent on the SA *)
-| RedField: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; get_heap_total_full \<phi> (a, f) = v \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+| RedField: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; get_heap_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 | RedPerm: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat (get_mask_total_full \<omega> (a, f))))"
 (*
 (* perm(P(...)) = 0 if equirecursive *)
@@ -89,8 +90,10 @@ fun wd_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> inh_exh_
 | "wd_pure_exp_total Pr \<Delta> CInhale (FieldAcc e f) \<omega> \<longleftrightarrow> 
     wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<and> (\<forall>l. (Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address l))) \<longrightarrow> (pgt (get_mask_total_full \<omega> (l,f)) pnone))"
 | "wd_pure_exp_total Pr \<Delta> (CExhale locs) (FieldAcc e f) \<omega> \<longleftrightarrow> 
+    wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega> \<and>
     (\<forall>l. ( (Pr,\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address l))) \<longrightarrow> (l,f) \<in> locs))"
-| "wd_pure_exp_total Pr \<Delta> c (Perm e f) \<omega> \<longleftrightarrow> wd_pure_exp_total Pr \<Delta> c e \<omega> \<and> (\<forall>r. (Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)) \<longrightarrow> r \<noteq> Null)"
+| "wd_pure_exp_total Pr \<Delta> c (Perm e f) \<omega> \<longleftrightarrow> 
+     wd_pure_exp_total Pr \<Delta> c e \<omega> \<and> (\<forall>r. (Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)) \<longrightarrow> r \<noteq> Null)"
 | "wd_pure_exp_total Pr \<Delta> c _ _  \<longleftrightarrow> False"
 
 (* TODO *)

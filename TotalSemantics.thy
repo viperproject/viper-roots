@@ -21,6 +21,21 @@ lemma update_store_total_heap_same: "get_heap_total_full (update_store_total \<o
 lemma update_store_total_mask_same: "get_mask_total_full (update_store_total \<omega> x v) = get_mask_total_full \<omega>"
   by simp
 
+fun update_trace_total :: "'a full_total_state \<Rightarrow> 'a total_trace \<Rightarrow> 'a full_total_state"
+  where "update_trace_total \<omega> \<pi> = (get_store_total \<omega>, \<pi>, get_hm_total_full \<omega>)"
+
+lemma update_trace_total_store_same: "get_store_total (update_trace_total \<omega> \<pi>) = get_store_total \<omega>"
+  by simp
+
+lemma update_trace_total_hm_same: "get_hm_total_full (update_trace_total \<omega> \<pi>) = get_hm_total_full \<omega>"
+  by simp
+
+lemma update_trace_total_heap_same: "get_heap_total_full (update_trace_total \<omega> \<pi>) = get_heap_total_full \<omega>"
+  by simp
+
+lemma update_trace_total_mask_same: "get_mask_total_full (update_trace_total \<omega> \<pi>) = get_mask_total_full \<omega>"
+  by simp
+
 definition update_heap_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a total_state"
   where "update_heap_total mh l v = Abs_total_state ((get_mask_total mh), (get_heap_total mh)(l := v))"
 
@@ -222,31 +237,31 @@ definition inhale_perm_single :: "bool \<Rightarrow>'a full_total_state \<Righta
        }"
 
 
-inductive red_inhale :: "program \<Rightarrow> 'a interp \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow>  'a standard_result \<Rightarrow> bool"
+inductive red_inhale :: "program \<Rightarrow> 'a interp \<Rightarrow> bool \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow>  'a standard_result \<Rightarrow> bool"
   for Pr :: program and \<Delta> :: "'a interp" and havoc_new :: bool
   where 
   (** sep. conj **)
    InhSepNormal: 
-   "\<lbrakk> red_inhale Pr \<Delta> havoc_new inh_assume A \<omega> (RNormal \<omega>''); 
-      red_inhale Pr \<Delta> havoc_new inh_assume B \<omega>'' res\<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (A && B) \<omega> res"
+   "\<lbrakk> red_inhale Pr \<Delta> havoc_new A \<omega> (RNormal \<omega>''); 
+      red_inhale Pr \<Delta> havoc_new B \<omega>'' res\<rbrakk> \<Longrightarrow>
+      red_inhale Pr \<Delta> havoc_new (A && B) \<omega> res"
  | InhSepFailureMagic: 
-   "\<lbrakk> red_inhale Pr \<Delta> havoc_new inh_assume A \<omega> resA; 
+   "\<lbrakk> red_inhale Pr \<Delta> havoc_new A \<omega> resA; 
       resA = RFailure \<or> resA = RMagic \<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (A && B) \<omega> resA"
+      red_inhale Pr \<Delta> havoc_new (A && B) \<omega> resA"
   (** if-else **)
  | InhImpTrue: 
    "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; 
       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
-      red_inhale Pr \<Delta> havoc_new inh_assume A \<omega> res \<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (Imp e A) \<omega> res" 
+      red_inhale Pr \<Delta> havoc_new A \<omega> res \<rbrakk> \<Longrightarrow>
+      red_inhale Pr \<Delta> havoc_new (Imp e A) \<omega> res" 
  | InhImpFalse:  
    "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e \<omega>; 
       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-      red_inhale Pr \<Delta> havoc_new inh_assume (Imp e A) \<omega> (RNormal \<omega>)"
+      red_inhale Pr \<Delta> havoc_new (Imp e A) \<omega> (RNormal \<omega>)"
  | InhImpFailure: 
    "\<lbrakk> \<not> wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<rbrakk> \<Longrightarrow> 
-     red_inhale Pr \<Delta> havoc_new inh_assume (Imp e A) \<omega>  RFailure"
+     red_inhale Pr \<Delta> havoc_new (Imp e A) \<omega>  RFailure"
 (** inhale/assume acc(e.f, p) **) (* Pr, \<Delta> \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l) *)
 (* \<omega>' \<in> plus_total_full_set {\<omega>} 
                         ((singleton_total havoc_new (a,f) (Abs_prat p) (get_heap_total_full \<omega> (a,f)) (get_store_total \<omega>) (get_trace_total \<omega>)))*)
@@ -255,21 +270,14 @@ inductive red_inhale :: "program \<Rightarrow> 'a interp \<Rightarrow> bool \<Ri
        wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>;
        wd_pure_exp_total Pr \<Delta> CInhale e_p \<omega>;
        \<omega>' \<in> inhale_perm_single havoc_new \<omega> (a,f) (Some (Abs_prat p))\<rbrakk> \<Longrightarrow>
-       red_inhale Pr \<Delta> havoc_new False (Atomic (Acc e_r f e_p)) \<omega> (RNormal \<omega>')"
- | AssumeAcc: 
-    "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a))); 
-       Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)); 
-       p \<ge> 0; 
-       wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>;
-       wd_pure_exp_total Pr \<Delta> CInhale e_p \<omega> \<rbrakk> \<Longrightarrow>
-    red_inhale Pr \<Delta> havoc_new True (Atomic (Acc e_r f e_p)) \<omega> (if ((Rep_prat (get_mask_total_full \<omega> (a,f))) \<ge> p) then RNormal \<omega> else RMagic)"
+       red_inhale Pr \<Delta> havoc_new (Atomic (Acc e_r f e_p)) \<omega> (RNormal \<omega>')"
  | InhAssumeAccFail1: 
     "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
-      red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (Acc e_r f e_p)) \<omega> RMagic"
+      red_inhale Pr \<Delta> havoc_new (Atomic (Acc e_r f e_p)) \<omega> RMagic"
  | InhAssumeAccFail2: 
     "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)); Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
       (\<not>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega> \<or> \<not>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega> \<or> p < 0)\<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (Acc e_r f e_p)) \<omega> RFailure"
+      red_inhale Pr \<Delta> havoc_new (Atomic (Acc e_r f e_p)) \<omega> RFailure"
 (** inhale/assume acc(e.f, wildcard) **)
 (*  \<omega>' \<in> plus_total_full_set {\<omega>} 
         singleton_total_wildcard havoc_new (r,f) (get_heap_total_full \<omega> (r,f)) (get_store_total \<omega>) (get_trace_total \<omega>)) *)
@@ -277,55 +285,31 @@ inductive red_inhale :: "program \<Rightarrow> 'a interp \<Rightarrow> bool \<Ri
     "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
        (wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>);
        \<omega>' \<in> inhale_perm_single havoc_new \<omega> (a,f) None \<rbrakk> \<Longrightarrow>
-       red_inhale Pr \<Delta> havoc_new False (Atomic (AccWildcard e_r f)) \<omega> (RNormal \<omega>')"
-(* incorrect semantics of assume, since assume A && B is not the same as assume A; assume B *)
- | AssumeAccWildcard: 
-    "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
-      (wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>) \<rbrakk> \<Longrightarrow>
-    red_inhale Pr \<Delta> havoc_new True (Atomic (AccWildcard e_r f)) \<omega> (if (pgt (get_mask_total_full \<omega> (a,f)) pnone) then RNormal \<omega> else RMagic)"
+       red_inhale Pr \<Delta> havoc_new (Atomic (AccWildcard e_r f)) \<omega> (RNormal \<omega>')"
   | InhAssumeAccWildcardFail1: 
     "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
-    red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (AccWildcard e_r f)) \<omega> RMagic"
+    red_inhale Pr \<Delta> havoc_new (Atomic (AccWildcard e_r f)) \<omega> RMagic"
  | InhAssumeAccWildcardFail2: 
      "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)); 
         Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
        \<not>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>\<rbrakk> \<Longrightarrow>
-    red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (AccWildcard e_r f)) \<omega> RFailure"
+    red_inhale Pr \<Delta> havoc_new (Atomic (AccWildcard e_r f)) \<omega> RFailure"
 (** others **)
  | InhInhaleExhale: 
-    "\<lbrakk> red_inhale Pr \<Delta> havoc_new inh_assume A \<omega> res \<rbrakk> \<Longrightarrow> 
-       red_inhale Pr \<Delta> havoc_new inh_assume (InhaleExhale A B) \<omega> res"
+    "\<lbrakk> red_inhale Pr \<Delta> havoc_new A \<omega> res \<rbrakk> \<Longrightarrow> 
+       red_inhale Pr \<Delta> havoc_new (InhaleExhale A B) \<omega> res"
   | InhPureNormalMagic: 
     "\<lbrakk> wd_pure_exp_total Pr \<Delta> CInhale e \<omega>;  
       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
+      red_inhale Pr \<Delta> havoc_new (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
   | InhPureFail: 
     "\<lbrakk> \<not>wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<rbrakk> \<Longrightarrow>
-      red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (Pure e)) \<omega> RFailure"
-
-lemma AssumeAccNormal:
-  assumes "Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a)))" and
-          "Pr, \<Delta> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p))" and
-          "p \<ge> 0" and
-          "(wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>)" and
-          "(wd_pure_exp_total Pr \<Delta> CInhale e_p \<omega>)" and
-          "((Rep_prat (get_mask_total_full \<omega> (a,f))) \<ge> p)"
-        shows  "red_inhale Pr \<Delta> havoc_new True (Atomic (Acc e_r f e_p)) \<omega> (RNormal \<omega>)"
-  using AssumeAcc[OF assms(1-5)] assms(6)
-  by presburger
-
-lemma AssumeAccWildcardNormal:
-  assumes "Pr, \<Delta> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a)))" and
-          "(wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>)" and
-          "pgt (get_mask_total_full \<omega> (a,f)) pnone"
-  shows  "red_inhale Pr \<Delta> havoc_new True (Atomic (AccWildcard e_r f)) \<omega> (RNormal \<omega>)"
-  using AssumeAccWildcard[OF assms(1-2)] assms(3)
-  by presburger
+      red_inhale Pr \<Delta> havoc_new (Atomic (Pure e)) \<omega> RFailure"
 
 lemma InhPureNormal:
   assumes "wd_pure_exp_total Pr \<Delta> CInhale e \<omega>" and
           "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-        shows "red_inhale Pr \<Delta> havoc_new inh_assume (Atomic (Pure e)) \<omega> (RNormal \<omega>)"
+        shows "red_inhale Pr \<Delta> havoc_new (Atomic (Pure e)) \<omega> (RNormal \<omega>)"
   using InhPureNormalMagic[OF assms]
   by simp
 
@@ -377,7 +361,7 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 
 \<comment>\<open>exhale A && B\<close>
    ExhSepNormal: 
-   "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 A \<omega> (ExhaleNormal m''); 
+   "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 A m (ExhaleNormal m''); 
       red_exhale Pr \<Delta> \<omega>0 B m'' res\<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (A && B) m res"
  | ExhSepFailureMagic: 
@@ -386,13 +370,13 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
  | ExhImpTrue: 
-   "\<lbrakk> \<omega> = update_mask_total_full \<omega>_orig m;
+   "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
       wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>0)) e \<omega>; 
       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
       red_exhale Pr \<Delta> \<omega>0 A m res \<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (Imp e A) m res" 
  | ExhImpFalse:  
-   "\<lbrakk> \<omega> = update_mask_total_full \<omega>_orig m;
+   "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m;
       wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>0)) e \<omega>; 
       Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
       red_exhale Pr \<Delta> \<omega>0 (Imp e A) m (ExhaleNormal m)"
@@ -447,7 +431,7 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
  
 \<comment>\<open>exhale other cases\<close>
   | ExhInhaleExhale: 
-    "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 B \<omega> res \<rbrakk> \<Longrightarrow> 
+    "\<lbrakk> red_exhale Pr \<Delta> \<omega>0 B m res \<rbrakk> \<Longrightarrow> 
        red_exhale Pr \<Delta> \<omega>0 (InhaleExhale A B) m res"  
   | ExhPure:
     "\<lbrakk> \<omega> = update_mask_total_full \<omega>0 m; 
@@ -476,6 +460,11 @@ definition exhale_state :: "'a full_total_state \<Rightarrow> mask \<Rightarrow>
                                       get_mask_total_full \<omega>' = m \<and>
                                       get_heap_total_full \<omega>' \<in> havoc_undef_locs (get_heap_total_full \<omega>) m}"
 
+lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
+  by (simp add: exhale_state_def)
+
+lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
+  by (simp add: exhale_state_def)
 
 fun map_option_2 :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a option \<Rightarrow> 'b"
   where 
@@ -489,7 +478,7 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
   for Pr :: program and \<Delta> :: "'a interp" and conf :: conf where
    RedSkip: " red_stmt_total_single_set Pr \<Delta> conf Skip \<omega> (Inr (), RNormal \<omega>)" 
  | RedInhale: 
-   "\<lbrakk> red_inhale Pr \<Delta> (havoc_inhale conf) False A \<omega> res \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_inhale Pr \<Delta> (havoc_inhale conf) A \<omega> res \<rbrakk> \<Longrightarrow>
       red_stmt_total_single_set Pr \<Delta> conf (Inhale A) \<omega> (Inr (), res)"
  | RedExhale: 
    "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_mask_total_full \<omega>) (ExhaleNormal m');
@@ -739,6 +728,14 @@ lemma havoc_rel_same_mask: "havoc_rel \<omega> \<omega>' \<Longrightarrow> get_m
 lemma havoc_rel_refl: "havoc_rel \<omega> \<omega>"
   by (simp add: equal_on_mask_refl havoc_rel_def)
 
+lemma havoc_rel_traceupd: "havoc_rel \<omega> (update_trace_total \<omega> \<pi>)"
+  unfolding havoc_rel_def
+  apply (intro conjI)
+    apply simp  
+   apply (simp add: equal_on_mask_refl)
+  apply simp
+  done
+
 lemma havoc_rel_sym: "havoc_rel \<omega> \<omega>' \<Longrightarrow> havoc_rel \<omega>' \<omega>"
   by (simp add: havoc_rel_def equal_on_mask_def)
 
@@ -747,17 +744,17 @@ lemma wd_not_fail:
   shows "v \<noteq> VFailure"
   using assms
 proof (induction)
-  case (RedCondExpFalse Pr \<Delta> e1 \<omega> e3 r e2)
+  case (RedCondExpFalse e1 \<omega> e3 r e2)
   then show ?case sorry (* need determinism *)
 next
-  case (RedBinopFailure Pr \<Delta> e1 \<omega> v1 e2 v2 bop)
+  case (RedBinopFailure e1 \<omega> v1 e2 v2 bop)
   hence "wd_binop bop v1 v2" by simp
   then show ?case sorry
 next
-  case (RedOldFailure t l Pr \<Delta> e uz va)
+  case (RedOldFailure t l e uz va)
   then show ?case sorry
 next
-  case (RedPropagateFailure e e' Pr \<Delta> \<omega>)
+  case (RedPropagateFailure e e' \<omega>)
   then show ?case sorry
 qed auto
 
@@ -766,10 +763,10 @@ lemma havoc_rel_expr_eval_same:
   shows "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>]\<^sub>t v"
   using assms
 proof (induction)
-case (RedLit Pr \<Delta> l uu)
+case (RedLit l uu)
   then show ?case by (auto intro!: red_pure_exp_total.intros)
 next
-  case (RedVar \<sigma> n v Pr \<Delta> uv uw)
+  case (RedVar \<sigma> n v uv uw)
   hence "get_store_total \<omega>' = \<sigma>"
     unfolding havoc_rel_def by simp
   from this obtain \<pi> \<phi> where "\<omega>' = (\<sigma>,\<phi>,\<pi>)"
@@ -778,49 +775,49 @@ next
   then show ?case using RedVar
     by (auto intro!: red_pure_exp_total.intros)
 next
-case (RedUnop Pr \<Delta> e \<omega> v unop v')
+case (RedUnop e \<omega> v unop v')
   then show ?case by (auto intro!: red_pure_exp_total.intros)
 next
-  case (RedBinopLazy Pr \<Delta> e1 \<omega> v1 bop v e2)
+  case (RedBinopLazy e1 \<omega> v1 bop v e2)
   then show ?case by (auto intro!: red_pure_exp_total.intros)
 next
-case (RedBinop Pr \<Delta> e1 \<omega> v1 e2 v2 bop v)
+case (RedBinop e1 \<omega> v1 e2 v2 bop v)
   then show ?case 
    by (meson red_pure_exp_total.RedBinop wd_pure_exp_total.simps(4))
 next
-  case (RedCondExpTrue Pr \<Delta> e1 \<omega> e2 r e3)
+  case (RedCondExpTrue e1 \<omega> e2 r e3)
   then show ?case 
     by (meson red_pure_exp_total.RedCondExpTrue wd_pure_exp_total.simps(5))
 next
-  case (RedCondExpFalse Pr \<Delta> e1 \<omega> e3 r e2)
+  case (RedCondExpFalse e1 \<omega> e3 r e2)
   then show ?case 
     sorry (* need to show determinism of expression evaluation *)
 next
-  case (RedPermNull Pr \<Delta> e \<omega> f)
+  case (RedPermNull e \<omega> f)
   then show ?case by auto    
 next
-  case (RedResult \<sigma> v Pr \<Delta> ux uy)
+  case (RedResult \<sigma> v ux uy)
   then show ?case by auto
 next
-  case (RedBinopRightFailure Pr \<Delta> e1 \<omega> v1 e2 bop)
+  case (RedBinopRightFailure e1 \<omega> v1 e2 bop)
   then show ?case 
     using red_pure_exp_total.RedBinopRightFailure wd_pure_exp_total.simps(4) by blast
 next
-  case (RedBinopFailure Pr \<Delta> e1 \<omega> v1 e2 v2 bop)
+  case (RedBinopFailure e1 \<omega> v1 e2 v2 bop)
   then show ?case 
     by (meson red_pure_exp_total.RedBinopFailure wd_pure_exp_total.simps(4))
 next
-case (RedOldFailure t l Pr \<Delta> e uz va)
+case (RedOldFailure t l e uz va)
   then show ?case by auto
 next
-  case (RedPropagateFailure e e' Pr \<Delta> \<omega>)
+  case (RedPropagateFailure e e' \<omega>)
   then show ?case sorry
 next
-  case (RedField Pr \<Delta> e \<omega> a \<phi> f v)
+  case (RedField e \<omega> a f v)
   thus ?case
-    using red_pure_exp_total.RedField wd_pure_exp_total.simps(6) by blast
+    by (smt (verit, ccfv_threshold) equal_on_mask_def havoc_rel_def prat_pgt_pnone red_pure_exp_total.RedField wd_pure_exp_total.simps(6))
 next
-  case (RedPerm Pr \<Delta> e \<omega> a f)
+  case (RedPerm e \<omega> a f)
   then show ?case
     by (metis havoc_rel_def red_pure_exp_total.RedPerm wd_pure_exp_total.simps(8))
 qed
@@ -841,6 +838,90 @@ lemma havoc_rel_wd_same:
            apply (simp add: havoc_rel_expr_eval_same havoc_rel_same_mask)
          apply clarsimp+
   done
+
+lemma havoc_rel_expr_eval_same_exhale: 
+  assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v" and 
+          "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>" and 
+          "\<forall>l \<in> locs. get_heap_total_full \<omega> l = get_heap_total_full \<omega>' l"
+          "get_mask_total_full \<omega> = get_mask_total_full \<omega>'" and
+          "get_store_total \<omega> = get_store_total \<omega>'"
+  shows "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>]\<^sub>t v"
+  using assms
+proof (induction)
+  case (RedVar \<sigma> n v uv uw)
+  show ?case 
+    apply (cases \<omega>')
+    apply simp
+    apply (rule red_pure_exp_total.RedVar)
+    using RedVar by simp
+  next
+    case (RedCondExpFalse e1 \<omega> e3 r e2)
+    then show ?case
+      sorry
+  next
+    case (RedPropagateFailure e e' \<omega>)
+    then show ?case sorry 
+  next
+    case (RedField e \<omega> a f v)
+    hence "(a,f) \<in> locs" by simp
+    hence "get_heap_total_full \<omega> (a,f) = get_heap_total_full \<omega>' (a,f)"      
+      using RedField
+      by blast 
+    thus ?case      
+      by (metis RedField.IH RedField.hyps(2) RedField.prems(1) RedField.prems(2) RedField.prems(3) RedField.prems(4) red_pure_exp_total.RedField wd_pure_exp_total.simps(7))
+  next
+    case (RedPerm e \<omega> a f)
+    then show ?case
+      by (metis red_pure_exp_total.RedPerm wd_pure_exp_total.simps(8))
+qed (auto intro: red_pure_exp_total.intros)
+
+definition havoc_rel_ext :: "heap_loc set \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "havoc_rel_ext locs \<omega> \<omega>' \<equiv>
+          (\<forall>l \<in> locs. get_heap_total_full \<omega> l = get_heap_total_full \<omega>' l) \<and>
+          (get_mask_total_full \<omega> = get_mask_total_full \<omega>') \<and>
+          (get_store_total \<omega> = get_store_total \<omega>')"
+
+lemma havoc_rel_expr_eval_same_exhale_2: 
+  assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v" and 
+          "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>" and 
+          "havoc_rel_ext locs \<omega> \<omega>'"
+        shows "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>]\<^sub>t v"
+  using assms havoc_rel_expr_eval_same_exhale 
+  unfolding havoc_rel_ext_def
+  by blast
+
+lemma havoc_rel_exhale_wd_same:
+  assumes "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>" and 
+          "\<forall>l \<in> locs. get_heap_total_full \<omega> l = get_heap_total_full \<omega>' l"
+          "get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
+  shows "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>'"
+  using assms
+  (*apply (induction Pr \<Delta> "(CExhale locs)" e \<omega> rule: wd_pure_exp_total.induct)
+                apply clarsimp
+               apply clarsimp
+              apply clarsimp*)
+  sorry
+(*
+proof (induction Pr \<Delta> "(CExhale locs)" e \<omega> arbitrary: \<omega> \<omega>' rule: wd_pure_exp_total.induct)
+  case (4 Pr \<Delta> e1 bop e2 \<omega>)
+  have Wd:"wd_pure_exp_total Pr \<Delta> (CExhale locs) e1 \<omega>'"
+    using "4.hyps"(1) "4.prems"(1) "4.prems"(2) "4.prems"(3) wd_pure_exp_total.simps(4) by blast
+  show ?case 
+    apply simp  
+    apply (rule conjI[OF Wd])
+    apply (rule allI, rule impI, rule impI)
+    apply (rule conjI)
+     apply (rule allI, rule impI)
+     apply (frule  havoc_rel_expr_eval_same_exhale)
+         apply (rule Wd)
+    using "4.prems"(2)
+        apply blast
+    using "4.prems"
+       apply simp
+    using "4.prems"
+      apply simp
+    sorry
+*)
 
 lemma havoc_rel_backwards:
   assumes "\<omega>' \<in> inhale_perm_single True \<omega> (a, f) p_opt" and 
@@ -889,18 +970,18 @@ proof -
 qed
 
 lemma havoc_inhale_normal_rel:
-  assumes "red_inhale Pr \<Delta> True inh_assume A \<omega> res" and "res = RNormal \<omega>'" and "havoc_rel \<omega>' \<omega>2'" 
-  shows "red_inhale Pr \<Delta> False inh_assume A (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) (RNormal \<omega>2') \<and> havoc_rel \<omega> (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>))"
+  assumes "red_inhale Pr \<Delta> True A \<omega> res" and "res = RNormal \<omega>'" and "havoc_rel \<omega>' \<omega>2'" 
+  shows "red_inhale Pr \<Delta> False A (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) (RNormal \<omega>2') \<and> havoc_rel \<omega> (update_mask_total_full \<omega>2' (get_mask_total_full \<omega>))"
   using assms
 proof (induction arbitrary: \<omega>' \<omega>2')
   case (InhSepNormal inh_assume A \<omega> \<omega>'' B res)
   thus ?case
     by (metis get_mask_total_full_wf red_inhale.InhSepNormal update_mask_total_full_multiple)
 next
-  case (InhImpTrue e \<omega> inh_assume A res)
+  case (InhImpTrue e \<omega> A res)
   let ?\<omega>2="(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>))"
   from InhImpTrue.IH[OF \<open>res = _\<close> \<open>havoc_rel \<omega>' _\<close>] have
-    A1:"red_inhale Pr \<Delta> False inh_assume A ?\<omega>2 (RNormal \<omega>2')" and
+    A1:"red_inhale Pr \<Delta> False A ?\<omega>2 (RNormal \<omega>2')" and
     "havoc_rel \<omega> ?\<omega>2"
     by auto
   moreover have A2:"Pr, \<Delta> \<turnstile> \<langle>e;?\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)" using InhImpTrue havoc_rel_expr_eval_same
@@ -954,7 +1035,7 @@ next
     using \<open>\<omega>' \<in> _\<close> \<open>havoc_rel \<omega>' \<omega>2'\<close> havoc_rel_backwards
     by blast
 
-  have "red_inhale Pr \<Delta> False False (Atomic (Acc e_r f e_p)) ?\<omega>2 (RNormal \<omega>2')"
+  have "red_inhale Pr \<Delta> False (Atomic (Acc e_r f e_p)) ?\<omega>2 (RNormal \<omega>2')"
     apply rule
          apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))\<close> \<open>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>\<close> HRel])
         apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)\<close> \<open>wd_pure_exp_total Pr \<Delta> CInhale e_p \<omega>\<close> HRel]) 
@@ -975,24 +1056,6 @@ next
     done  
   then show ?case using HRel
     by simp
-next
-  case (AssumeAcc e_r \<omega> a e_p p f)
-  hence StateEq:"(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = \<omega>2'"      
-    by (metis havoc_rel_same_mask standard_result.distinct(3) standard_result.inject update_mask_total_full_same) 
-  from AssumeAcc have HRel:"havoc_rel \<omega> \<omega>2'"
-    by (metis standard_result.distinct(3) standard_result.inject)
-  show ?case 
-    apply (rule conjI)
-    apply (subst StateEq)
-     apply (rule AssumeAccNormal)
-          apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t _\<close> \<open>wd_pure_exp_total _ _ _ e_r \<omega>\<close> HRel])
-         apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t _\<close> \<open>wd_pure_exp_total _ _ _ e_p \<omega>\<close> HRel])
-        apply (rule \<open>0 \<le> p\<close>)
-       apply (rule havoc_rel_wd_same[OF \<open>wd_pure_exp_total _ _ _ e_r \<omega>\<close> HRel])
-      apply (rule havoc_rel_wd_same[OF \<open>wd_pure_exp_total _ _ _ e_p \<omega>\<close> HRel])
-     apply (metis AssumeAcc.prems(1) HRel havoc_rel_same_mask standard_result.distinct(3))
-    apply (subst StateEq, rule HRel)
-    done
 next
   case (InhAccWildcard e_r \<omega> a \<omega>' f \<omega>'')
     from InhAccWildcard have "havoc_rel \<omega>' \<omega>2'" by simp
@@ -1018,7 +1081,7 @@ next
     using \<open>\<omega>' \<in> _\<close> \<open>havoc_rel \<omega>' \<omega>2'\<close> havoc_rel_backwards
     by blast
 
-  have "red_inhale Pr \<Delta> False False (Atomic (AccWildcard e_r f)) ?\<omega>2 (RNormal \<omega>2')"
+  have "red_inhale Pr \<Delta> False (Atomic (AccWildcard e_r f)) ?\<omega>2 (RNormal \<omega>2')"
     apply rule
          apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))\<close> \<open>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>\<close> HRel])
       apply (rule havoc_rel_wd_same[OF \<open>wd_pure_exp_total Pr \<Delta> CInhale e_r \<omega>\<close> HRel])
@@ -1037,21 +1100,6 @@ next
     done  
   then show ?case using HRel
     by simp
-next
-  case (AssumeAccWildcard e_r \<omega> a f)
-    hence StateEq:"(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = \<omega>2'"      
-      by (metis havoc_rel_same_mask standard_result.distinct(3) standard_result.inject update_mask_total_full_same) 
-    from AssumeAccWildcard have HRel:"havoc_rel \<omega> \<omega>2'"
-      by (metis standard_result.distinct(3) standard_result.inject)
-    show ?case
-      apply (rule conjI)
-      apply (subst StateEq)
-       apply (rule AssumeAccWildcardNormal)
-         apply (rule havoc_rel_expr_eval_same[OF \<open>Pr, \<Delta> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t _\<close> \<open>wd_pure_exp_total _ _ _ e_r \<omega>\<close> HRel])
-        apply (rule havoc_rel_wd_same[OF \<open>wd_pure_exp_total _ _ _ e_r \<omega>\<close> HRel])
-       apply (metis AssumeAccWildcard.prems(1) HRel havoc_rel_same_mask standard_result.distinct(3))
-      apply (subst StateEq, rule HRel)
-      done
 next
   case (InhInhaleExhale inh_assume A \<omega> res B)
   then show ?case 
@@ -1081,54 +1129,63 @@ method inh_fail_basic_tac for \<omega> :: "'a full_total_state" uses local_assms
    blast intro!:intro)
 
 lemma havoc_inhale_failure_rel:
-  assumes "red_inhale Pr \<Delta> True inh_assume A \<omega> res" and "res = RFailure"
-  shows "\<exists> \<omega>2. havoc_rel \<omega> \<omega>2 \<and> red_inhale Pr \<Delta> False inh_assume A \<omega>2 RFailure"
+  assumes "red_inhale Pr \<Delta> True A \<omega> res" and "res = RFailure"
+  shows "\<exists> \<omega>2. havoc_rel \<omega> \<omega>2 \<and> red_inhale Pr \<Delta> False A \<omega>2 RFailure"
   using assms
 proof (induction)
-  case (InhSepNormal inh_assume A \<omega> \<omega>A B res)
+  case (InhSepNormal A \<omega> \<omega>A B res)
   from this obtain \<omega>B where
-     "havoc_rel \<omega>A \<omega>B" and "red_inhale Pr \<Delta> False inh_assume B \<omega>B RFailure"
+     "havoc_rel \<omega>A \<omega>B" and "red_inhale Pr \<Delta> False B \<omega>B RFailure"
     by auto
   thus ?case
     using havoc_inhale_normal_rel InhSepNormal.hyps(1) red_inhale.InhSepNormal by blast
 next
-  case (InhSepFailureMagic inh_assume A \<omega> resA B)
+  case (InhSepFailureMagic A \<omega> resA B)
   then show ?case 
     using red_inhale.InhSepFailureMagic by blast
 next
-  case (InhImpTrue e \<omega> inh_assume A res)
+  case (InhImpTrue e \<omega> A res)
   then show ?case 
     by (meson InhImpFailure havoc_rel_expr_eval_same red_inhale.InhImpTrue)
 next
-  case (InhImpFailure e \<omega> inh_assume A)
+  case (InhImpFailure e \<omega> A)
   then show ?case 
   by (meson havoc_rel_sym havoc_rel_wd_same red_inhale.InhImpFailure total_havoc_rel)
 next
-  case (AssumeAcc e_r \<omega> a e_p p f)
-  then show ?case by (simp split: if_split_asm)
-next
-case (InhAssumeAccFail2 e_r \<omega> a e_p p inh_assume f)
+case (InhAssumeAccFail2 e_r \<omega> a e_p p f)
   show ?case 
     by (inh_fail_basic_tac \<omega> local_assms:local.InhAssumeAccFail2 intro: red_inhale.InhAssumeAccFail2)
 next
-case (AssumeAccWildcard e_r \<omega> a f)
-  then show ?case by (simp split: if_split_asm)
-next
-  case (InhAssumeAccWildcardFail2 e_r \<omega> a e_p p inh_assume f)
+  case (InhAssumeAccWildcardFail2 e_r \<omega> a e_p p f)
     show ?case 
      by (inh_fail_basic_tac \<omega> local_assms:local.InhAssumeAccWildcardFail2 intro: red_inhale.InhAssumeAccWildcardFail2)   
 next
-  case (InhInhaleExhale inh_assume A \<omega> res B)
+  case (InhInhaleExhale A \<omega> res B)
   then show ?case
   using red_inhale.InhInhaleExhale by blast
 next
-  case (InhPureNormalMagic e \<omega> b inh_assume)
+  case (InhPureNormalMagic e \<omega> b)
   then show ?case by (simp split: if_split_asm)
 next
-  case (InhPureFail e \<omega> inh_assume)
+  case (InhPureFail e \<omega>)
   show ?case 
     by (inh_fail_basic_tac \<omega> local_assms:local.InhPureFail intro: red_inhale.InhPureFail)
 qed auto
+
+lemma havoc_rel_exhale_state:
+  assumes "havoc_rel \<omega>1 \<omega>2" and "\<omega>1 \<in> exhale_state \<omega> m"
+  shows "\<omega>2 \<in> exhale_state (update_trace_total \<omega> (get_trace_total \<omega>2)) m"
+  sorry
+
+lemma red_exhale_smaller_mask:
+  assumes "red_exhale Pr \<Delta> \<omega>1 A m (ExhaleNormal m')"
+  shows "\<forall>l. pgte (m l) (m' l)"
+  sorry
+
+lemma havoc_rel_red_exhale:
+  assumes "red_exhale Pr \<Delta> \<omega>1 A m res" and "havoc_rel \<omega>1 \<omega>2" and "havoc_rel (update_mask_total_full \<omega>1 m) (update_mask_total_full \<omega>2 m)"
+  shows "red_exhale Pr \<Delta> \<omega>2 A m res"
+  sorry
 
 lemma havoc_rel_store_update:
   assumes "havoc_rel (update_store_total \<omega> x v) \<omega>1"
@@ -1205,6 +1262,12 @@ proof -
     by (metis assms(1) fstI get_store_total.simps havoc_rel_same_store update_heap_total_full.simps)
 qed
 
+method step_havoc_failure_tac uses W2'Eq IntroRule=
+        (rule exI,
+         rule conjI[OF havoc_rel_refl],
+        subst W2'Eq,
+        (rule, rule),
+        (rule IntroRule))
 
 lemma step_havoc_rel:
   assumes "red_stmt_total_single Pr \<Delta> \<lparr>havoc_inhale=True\<rparr> (Inl s,  RNormal \<omega>) w'" and 
@@ -1243,23 +1306,60 @@ lemma step_havoc_rel:
         unfolding lift_sim_rel_def      
         by (metis fst_conv is_failure_config.simps is_normal_config.elims(2) snd_conv standard_result.distinct(5) standard_result.inject surjective_pairing)
       with \<open>res = _\<close> RedInhale assms(2) havoc_inhale_normal_rel
-      obtain \<omega>2 where "havoc_rel \<omega> \<omega>2" and "red_inhale Pr \<Delta> False False A \<omega>2 (RNormal \<omega>2')"
+      obtain \<omega>2 where "havoc_rel \<omega> \<omega>2" and "red_inhale Pr \<Delta> False A \<omega>2 (RNormal \<omega>2')"
         by (metis (full_types) conf.select_convs(1))
       then show ?thesis
         by (metis \<open>w2' = (Inr (), RNormal \<omega>2')\<close> conf.select_convs(1) local.RedInhale(1) red_stmt_total_single.NormalSingleStep red_stmt_total_single_set.RedInhale)
-    qed
+      qed
     next
-      case (RedExhale A m' \<omega>')
-      then show ?case sorry
+      case (RedExhale \<omega> A m' \<omega>')      
+      from this obtain \<omega>2' where "w2' = (Inr (), RNormal \<omega>2')" and "havoc_rel \<omega>' \<omega>2'"
+        unfolding lift_sim_rel_def
+        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+      have Eq:"\<And> \<pi>. get_mask_total_full (update_trace_total \<omega> \<pi>) = get_mask_total_full \<omega>"
+        by simp
+      show ?case
+        apply (rule exI)
+        apply (rule conjI[OF havoc_rel_traceupd])
+        apply (subst \<open>w2' = _\<close>)
+        apply (rule, rule)        
+         apply (rule havoc_rel_red_exhale)
+          apply (subst Eq)
+          apply (rule \<open>red_exhale _ _ _ _ _ _\<close>)
+          apply (rule havoc_rel_traceupd)
+        subgoal
+          sorry
+        apply (rule havoc_rel_exhale_state[OF \<open>havoc_rel \<omega>' \<omega>2'\<close> \<open>\<omega>' \<in> _\<close>])
+        done        
     next
-      case (RedExhaleFailure A)
-      then show ?case sorry
+      case (RedExhaleFailure \<omega> A)
+      from this have "w2' = (Inr (), RFailure)"
+        using lift_sim_rel_fail_3 by blast
+      show ?case
+        by (step_havoc_failure_tac W2'Eq: \<open>w2' = _\<close> IntroRule: \<open>red_exhale _ _ _ _ _ _\<close>)      
     next
-      case (RedAssert A m')
-      then show ?case sorry
+      case (RedAssert \<omega> A m')
+      from this obtain \<omega>2 where "w2' = (Inr (), RNormal \<omega>2)" and HRel:"havoc_rel \<omega> \<omega>2"
+        unfolding lift_sim_rel_def
+        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+      show ?case
+        apply (rule exI)
+        apply (rule conjI[OF HRel])
+        apply (subst \<open>w2' = _\<close>)
+        apply (rule, rule)
+        apply (rule havoc_rel_red_exhale[OF _ HRel])
+        using \<open>red_exhale _ _ _ _ _ _\<close> HRel
+        unfolding havoc_rel_def
+         apply simp
+        subgoal
+          sorry
+        done
     next
-      case (RedAssertFailure A)
-      then show ?case sorry
+      case (RedAssertFailure \<omega> A)
+        from this have "w2' = (Inr (), RFailure)"
+        using lift_sim_rel_fail_3 by blast
+      show ?case
+        by (step_havoc_failure_tac W2'Eq: \<open>w2' = _\<close> IntroRule: \<open>red_exhale _ _ _ _ _ _\<close>)
     next
       case (RedLocalAssign e \<omega> v x)
       from assms(2) obtain \<omega>2' \<omega>2 where "w2' = (Inr (), RNormal \<omega>2')" and 
@@ -1280,11 +1380,7 @@ lemma step_havoc_rel:
       have "w2' = (Inr (), RFailure)" 
         using RedLocalAssignFailure.prems lift_sim_rel_fail_3 by blast
       show ?case
-        apply (rule exI[where ?x = \<omega>])
-        apply (rule conjI[OF havoc_rel_refl])
-        apply (subst \<open>w2' = _\<close>)
-        apply (rule, rule)
-        by (rule \<open>\<not>_\<close>)
+        by (step_havoc_failure_tac W2'Eq: \<open>w2' = _\<close> IntroRule: \<open>\<not>_\<close>)
     next
       case (RedFieldAssign e_r \<omega> e addr f v)
       from assms(2) havoc_rel_heap_update \<open>get_mask_total_full \<omega> (addr, f) \<noteq> pnone\<close> obtain \<omega>2 where
@@ -1307,12 +1403,7 @@ lemma step_havoc_rel:
       hence "w2' = (Inr (), RFailure)"
         using lift_sim_rel_fail_3 by blast       
       show ?case
-        apply (rule exI)
-        apply (rule conjI[OF havoc_rel_refl])
-        apply (subst \<open>w2' = _\<close>)
-        apply (rule, rule) 
-        apply (rule RedFieldAssignFailure(1))
-        done    
+        by (step_havoc_failure_tac W2'Eq: \<open>w2' = _\<close> IntroRule: RedFieldAssignFailure(1))
     next
       case (RedIfTrue e_b \<omega> s1 s2)
       from this obtain \<omega>2 where HRel:"havoc_rel \<omega> \<omega>2" and "w2' = (Inl s1, RNormal \<omega>2)"      
@@ -1342,12 +1433,7 @@ lemma step_havoc_rel:
       hence "w2' = (Inr (), RFailure)"
         using assms(2) lift_sim_rel_fail_3 by blast
       show ?case
-        apply (rule exI)
-        apply (rule conjI[OF havoc_rel_refl])
-        apply (subst \<open>w2' = _\<close>)
-        apply (rule, rule)
-        apply (rule \<open>\<not>_\<close>)
-        done
+        by (step_havoc_failure_tac W2'Eq: \<open>w2' = _\<close> IntroRule: \<open>\<not>_\<close>)
     next
       case (RedSeq1 s1 \<omega> s'' r'' s2)      
       from \<open>lift_sim_rel _ _ w2'\<close> obtain r2' where "w2' = (Inl (Seq s'' s2), r2')"
@@ -1367,9 +1453,20 @@ lemma step_havoc_rel:
         unfolding lift_sim_rel_def
         by auto
       from RedSeq2.IH[OF Rel] show ?case
-        by (metis \<open>w2' = _\<close> prod.inject red_stmt_total_single.NormalSingleStep red_stmt_total_single.cases red_stmt_total_single_set.RedSeq2 sum.inject(1))     
+        by (metis \<open>w2' = _\<close> prod.inject red_stmt_total_single.NormalSingleStep red_stmt_total_single.cases red_stmt_total_single_set.RedSeq2 sum.inject(1))         
     qed
 qed
 
+lemma verification_havoc:
+  assumes "stmt_verifies_total (dummy :: 'a) Pr \<Delta> \<lparr>havoc_inhale = False\<rparr> s"
+  shows "stmt_verifies_total (dummy :: 'a) Pr \<Delta> \<lparr>havoc_inhale = True\<rparr> s"
+  apply (rule backwards_simulation)
+     apply (erule init_havoc_rel)
+     apply assumption
+    apply (rule allI, rule total_havoc_rel)
+   apply (erule step_havoc_rel)
+   apply assumption
+  apply (rule assms)
+  done
 
 end
