@@ -27,6 +27,9 @@ lemma havoc_rel_same_store: "havoc_rel \<omega> \<omega>' \<Longrightarrow> get_
 lemma havoc_rel_same_mask: "havoc_rel \<omega> \<omega>' \<Longrightarrow> get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
   by (simp add: havoc_rel_def)
 
+lemma havoc_rel_eq_on_mask: "havoc_rel \<omega> \<omega>' \<Longrightarrow> equal_on_mask (get_mask_total_full \<omega>) (get_heap_total_full \<omega>) (get_heap_total_full \<omega>')"
+  by (auto simp add: havoc_rel_def)
+
 lemma havoc_rel_refl: "havoc_rel \<omega> \<omega>"
   by (simp add: equal_on_mask_refl havoc_rel_def)
 
@@ -41,20 +44,50 @@ lemma havoc_rel_traceupd: "havoc_rel \<omega> (update_trace_total \<omega> \<pi>
 lemma havoc_rel_sym: "havoc_rel \<omega> \<omega>' \<Longrightarrow> havoc_rel \<omega>' \<omega>"
   by (simp add: havoc_rel_def equal_on_mask_def)
 
+lemma havoc_rel_valid_locs: 
+  assumes "havoc_rel \<omega>1 \<omega>2"
+  shows "get_valid_locs \<omega>1 = get_valid_locs \<omega>2"
+  using havoc_rel_eq_on_mask[OF assms] havoc_rel_same_mask[OF assms]
+  unfolding equal_on_mask_def get_valid_locs_def
+  by simp
+
+lemma havoc_rel_valid_locs_2:
+  assumes "havoc_rel \<omega>1 \<omega>2"
+  shows "\<forall>l\<in>get_valid_locs \<omega>1.
+       get_heap_total_full \<omega>1 l = get_heap_total_full \<omega>2 l"
+  using assms
+  by (metis (mono_tags, lifting) equal_on_mask_def get_valid_locs_def havoc_rel_eq_on_mask mem_Collect_eq prat_pgt_pnone)
+
+lemma havoc_rel_valid_locs_3:
+  assumes "havoc_rel \<omega>1 \<omega>2" and "wf_mask_simple m"
+  shows "\<forall>l\<in>get_valid_locs \<omega>1.
+            get_heap_total_full (update_mask_total_full \<omega>1 m) l = get_heap_total_full (update_mask_total_full \<omega>2 m) l"
+  using assms havoc_rel_valid_locs_2
+  by (metis update_mask_total_full_same_heap)
+
+text \<open>The following lemma would follow directly from determinism of expression evaluation.\<close>
+lemma pure_exp_eval_true_false:
+  assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+  shows "\<not>(Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True))"
+  sorry
+
 lemma wd_not_fail:
   assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v" and "wd_pure_exp_total Pr \<Delta> CInhale e \<omega>"
   shows "v \<noteq> VFailure"
   using assms
 proof (induction)
   case (RedCondExpFalse e1 \<omega> e3 r e2)
-  then show ?case sorry (* need determinism *)
+  then show ?case 
+    using pure_exp_eval_true_false
+    by fastforce
 next
   case (RedBinopFailure e1 \<omega> v1 e2 v2 bop)
-  hence "wd_binop bop v1 v2" by simp
-  then show ?case sorry
+  then show ?case 
+    using wd_binop_safe
+    by force
 next
   case (RedOldFailure t l e uz va)
-  then show ?case sorry
+  then show ?case by simp
 next
   case (RedPropagateFailure e e' \<omega>)
   then show ?case sorry
@@ -92,8 +125,8 @@ next
     by (meson red_pure_exp_total.RedCondExpTrue wd_pure_exp_total.simps(5))
 next
   case (RedCondExpFalse e1 \<omega> e3 r e2)
-  then show ?case 
-    sorry (* need to show determinism of expression evaluation *)
+  then show ?case using pure_exp_eval_true_false red_pure_exp_total.RedCondExpFalse
+    by (metis wd_pure_exp_total.simps(5))
 next
   case (RedPermNull e \<omega> f)
   then show ?case by auto    
@@ -158,8 +191,8 @@ proof (induction)
     using RedVar by simp
   next
     case (RedCondExpFalse e1 \<omega> e3 r e2)
-    then show ?case
-      sorry
+    then show ?case using pure_exp_eval_true_false
+      by (metis red_pure_exp_total.RedCondExpFalse wd_pure_exp_total.simps(5))
   next
     case (RedPropagateFailure e e' \<omega>)
     then show ?case sorry 
@@ -175,7 +208,7 @@ proof (induction)
     case (RedPerm e \<omega> a f)
     then show ?case
       by (metis red_pure_exp_total.RedPerm wd_pure_exp_total.simps(8))
-qed (auto intro: red_pure_exp_total.intros)
+  qed (auto intro: red_pure_exp_total.intros)
 
 definition havoc_rel_ext :: "heap_loc set \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "havoc_rel_ext locs \<omega> \<omega>' \<equiv>
@@ -192,18 +225,31 @@ lemma havoc_rel_expr_eval_same_exhale_2:
   unfolding havoc_rel_ext_def
   by blast
 
-lemma havoc_rel_exhale_wd_same:
+lemma havoc_rel_expr_eval_same_exhale_3: 
+  assumes "Pr, \<Delta> \<turnstile> \<langle>e; update_mask_total_full \<omega>1 m\<rangle> [\<Down>]\<^sub>t v" and 
+          "wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>1)) e (update_mask_total_full \<omega>1 m)" and 
+          "havoc_rel \<omega>1 \<omega>2" and
+          "wf_mask_simple m"
+  shows "Pr, \<Delta> \<turnstile> \<langle>e; update_mask_total_full \<omega>2 m\<rangle> [\<Down>]\<^sub>t v"
+  apply (rule havoc_rel_expr_eval_same_exhale[OF assms(1) assms(2)])
+    apply (rule havoc_rel_valid_locs_3[OF assms(3-4)])
+   apply (metis assms(4) get_update_mask_total_full)
+  by (metis assms(3) fstI get_store_total.simps havoc_rel_same_store update_mask_total_full.simps)
+
+lemma havoc_rel_wd_same_exhale:
   assumes "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>" and 
           "\<forall>l \<in> locs. get_heap_total_full \<omega> l = get_heap_total_full \<omega>' l"
           "get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
   shows "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>'"
   using assms
-  (*apply (induction Pr \<Delta> "(CExhale locs)" e \<omega> rule: wd_pure_exp_total.induct)
+  sorry
+ (*
+  apply (induction Pr \<Delta> "(CExhale locs)" e \<omega> rule: wd_pure_exp_total.induct)
                 apply clarsimp
                apply clarsimp
-              apply clarsimp*)
-  sorry
-(*
+              apply clarsimp
+
+
 proof (induction Pr \<Delta> "(CExhale locs)" e \<omega> arbitrary: \<omega> \<omega>' rule: wd_pure_exp_total.induct)
   case (4 Pr \<Delta> e1 bop e2 \<omega>)
   have Wd:"wd_pure_exp_total Pr \<Delta> (CExhale locs) e1 \<omega>'"
@@ -222,8 +268,19 @@ proof (induction Pr \<Delta> "(CExhale locs)" e \<omega> arbitrary: \<omega> \<o
        apply simp
     using "4.prems"
       apply simp
+    
     sorry
 *)
+
+lemma havoc_rel_wd_same_exhale_2:
+  assumes "wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>1)) e (update_mask_total_full \<omega>1 m)" and
+          "havoc_rel \<omega>1 \<omega>2" and "wf_mask_simple m"
+        shows "wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>2)) e (update_mask_total_full \<omega>2 m)"
+  apply (subst HOL.sym[OF havoc_rel_valid_locs[OF assms(2)]])
+  apply (rule havoc_rel_wd_same_exhale)
+    apply (rule assms(1))
+   apply (rule havoc_rel_valid_locs_3[OF assms(2) assms(3)])
+  by (metis assms(3) get_update_mask_total_full)
 
 lemma havoc_rel_backwards:
   assumes "\<omega>' \<in> inhale_perm_single True \<omega> (a, f) p_opt" and 
@@ -477,17 +534,119 @@ qed auto
 lemma havoc_rel_exhale_state:
   assumes "havoc_rel \<omega>1 \<omega>2" and "\<omega>1 \<in> exhale_state \<omega> m"
   shows "\<omega>2 \<in> exhale_state (update_trace_total \<omega> (get_trace_total \<omega>2)) m"
-  sorry
+proof -
+  from \<open>\<omega>1 \<in> exhale_state \<omega> m\<close>
+  have EqMask:"get_mask_total_full \<omega>1 = m" and
+       HavocLoc:"get_heap_total_full \<omega>1 \<in> havoc_undef_locs (get_heap_total_full \<omega>) m" 
+    by (auto simp add: exhale_state_def)
 
-lemma red_exhale_smaller_mask:
-  assumes "red_exhale Pr \<Delta> \<omega>1 A m (ExhaleNormal m')"
-  shows "\<forall>l. pgte (m l) (m' l)"
-  sorry
+  have "get_heap_total_full \<omega>2 \<in> havoc_undef_locs (get_heap_total_full \<omega>) m"
+    unfolding havoc_undef_locs_def
+    apply rule
+    apply (rule exI)
+    apply (rule conjI[OF HOL.refl])
+    apply (rule allI, rule impI)
+    apply (insert havoc_rel_eq_on_mask[OF assms(1)])
+    apply (subst (asm) EqMask)
+    apply (insert HavocLoc, unfold havoc_undef_locs_def)
+    apply (unfold equal_on_mask_def)
+    using prat_pgt_pnone by fastforce
+
+  show ?thesis
+    unfolding exhale_state_def
+    apply rule
+    apply (rule exI)
+    apply (intro conjI)
+        apply (rule HOL.refl)
+       apply (metis assms(1) assms(2) exhale_state_same_store havoc_rel_same_store update_trace_total_store_same)
+      apply simp
+     apply (metis EqMask assms(1) havoc_rel_same_mask)
+    using \<open>get_heap_total_full \<omega>2 \<in> havoc_undef_locs (get_heap_total_full \<omega>) m\<close> by auto
+qed
+
+lemma exp_rel_aux:
+  assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>1\<rangle> [\<Down>]\<^sub>t Val v"
+  shows "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v"
+  oops
+
+definition exhale_rel_inv :: "'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> mask \<Rightarrow> bool"
+  where "exhale_rel_inv \<omega>1 \<omega>2 m \<equiv>            
+           havoc_rel (update_mask_total_full \<omega>1 m) (update_mask_total_full \<omega>2 m) \<and>
+           wf_mask_simple m"
 
 lemma havoc_rel_red_exhale:
-  assumes "red_exhale Pr \<Delta> \<omega>1 A m res" and "havoc_rel \<omega>1 \<omega>2" and "havoc_rel (update_mask_total_full \<omega>1 m) (update_mask_total_full \<omega>2 m)"
+  assumes "red_exhale Pr \<Delta> \<omega>1 A m res" and 
+          "havoc_rel \<omega>1 \<omega>2" and
+          "exhale_rel_inv \<omega>1 \<omega>2 m"
+  shows "red_exhale Pr \<Delta> \<omega>2 A m res \<and> (\<forall>m'. res = ExhaleNormal m' \<longrightarrow> exhale_rel_inv \<omega>1 \<omega>2 m')"
+  using assms
+proof induction
+  case (ExhSepNormal A m m'' B res)
+  then show ?case 
+    using red_exhale.ExhSepNormal by blast
+next
+  case (ExhSepFailureMagic A m B)
+  then show ?case
+    using red_exhale.ExhSepFailureMagic by blast
+next
+  case (ExhImpTrue \<omega> m e A res)
+  note HRel=\<open>havoc_rel \<omega>1 \<omega>2\<close>
+  let ?\<omega>1' = "update_mask_total_full \<omega>1 m" and ?\<omega>2' = "(update_mask_total_full \<omega>2 m)"
+  from ExhImpTrue have HRelNew:"havoc_rel ?\<omega>1' ?\<omega>2'"
+    sledgehammer
+  have Eval:"Pr, \<Delta> \<turnstile> \<langle>e; ?\<omega>2'\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    using havoc_rel_expr_eval_same_exhale_3 \<open>\<omega> = _\<close> ExhImpTrue.IH ExhImpTrue.hyps(2) ExhImpTrue.hyps(3) HRel by blast
+  have Wd:"wd_pure_exp_total Pr \<Delta> (CExhale (get_valid_locs \<omega>1)) e (update_mask_total_full \<omega>2 m)"
+    using havoc_rel_wd_same_exhale_2 \<open>\<omega> = _\<close>
+    by (metis ExhImpTrue.IH ExhImpTrue.hyps(2) HRel havoc_rel_valid_locs)
+
+  show ?case
+    apply (rule conjI)
+     apply rule
+        apply (rule HOL.refl)
+    using Wd havoc_rel_valid_locs[OF HRel] apply simp
+    apply (rule Eval)
+    using ExhImpTrue.IH HRel by blast+    
+next
+  case (ExhImpFalse \<omega> m e A)
+  thus ?case
+next
+  case (ExhImpFailure e \<omega>_orig m A)
+  then show ?case sorry
+next
+  case (ExhAcc \<omega> m e_r a e_p p f locs m')
+  then show ?case sorry
+next
+  case (ExhAccFail1 e_r \<omega> r e_p p locs f m)
+  then show ?case sorry
+next
+case (ExhAccFail2 \<omega> m e_r a e_p p locs f)
+  then show ?case sorry
+next
+  case (ExhAccWildcard \<omega> m e_r a p f locs m')
+  then show ?case sorry
+next
+  case (ExhAccWildcardFail1 e_r \<omega> r locs f m)
+  then show ?case sorry
+next
+  case (ExhAccWildcardFail2 \<omega> m e_r a locs f)
+  then show ?case sorry
+next
+  case (ExhInhaleExhale B m res A)
+  then show ?case sorry
+next
+  case (ExhPure \<omega> m locs e b)
+  then show ?case sorry
+next
+  case (ExhPureFail \<omega> m locs e)
+  then show ?case sorry
+qed
+
+lemma havoc_rel_red_exhale_2:
+  assumes "red_exhale Pr \<Delta> \<omega>1 A m res" and "havoc_rel \<omega>1 \<omega>2"
   shows "red_exhale Pr \<Delta> \<omega>2 A m res"
-  sorry
+  using assms havoc_rel_red_exhale
+  by blast
 
 lemma havoc_rel_store_update:
   assumes "havoc_rel (update_store_total \<omega> x v) \<omega>1"
@@ -611,10 +770,10 @@ lemma step_havoc_rel:
       obtain \<omega>2 where "havoc_rel \<omega> \<omega>2" and "red_inhale Pr \<Delta> False A \<omega>2 (RNormal \<omega>2')"
         by (metis (full_types) conf.select_convs(1))
       then show ?thesis
-        by (metis \<open>w2' = (Inr (), RNormal \<omega>2')\<close> conf.select_convs(1) local.RedInhale(1) red_stmt_total_single.NormalSingleStep red_stmt_total_single_set.RedInhale)
+        by (metis (full_types) \<open>w2' = (Inr (), RNormal \<omega>2')\<close> conf.select_convs(1) red_stmt_total_single.NormalSingleStep red_stmt_total_single_set.RedInhale)
       qed
     next
-      case (RedExhale \<omega> A m' \<omega>')      
+      case (RedExhale \<omega> A m' \<omega>')   
       from this obtain \<omega>2' where "w2' = (Inr (), RNormal \<omega>2')" and "havoc_rel \<omega>' \<omega>2'"
         unfolding lift_sim_rel_def
         by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
@@ -624,13 +783,11 @@ lemma step_havoc_rel:
         apply (rule exI)
         apply (rule conjI[OF havoc_rel_traceupd])
         apply (subst \<open>w2' = _\<close>)
-        apply (rule, rule)        
-         apply (rule havoc_rel_red_exhale)
+        apply (rule, rule)   
+         apply (rule havoc_rel_red_exhale_2)
           apply (subst Eq)
           apply (rule \<open>red_exhale _ _ _ _ _ _\<close>)
           apply (rule havoc_rel_traceupd)
-        subgoal
-          sorry
         apply (rule havoc_rel_exhale_state[OF \<open>havoc_rel \<omega>' \<omega>2'\<close> \<open>\<omega>' \<in> _\<close>])
         done        
     next
@@ -649,12 +806,10 @@ lemma step_havoc_rel:
         apply (rule conjI[OF HRel])
         apply (subst \<open>w2' = _\<close>)
         apply (rule, rule)
-        apply (rule havoc_rel_red_exhale[OF _ HRel])
+        apply (rule havoc_rel_red_exhale_2[OF _ HRel])
         using \<open>red_exhale _ _ _ _ _ _\<close> HRel
         unfolding havoc_rel_def
          apply simp
-        subgoal
-          sorry
         done
     next
       case (RedAssertFailure \<omega> A)
