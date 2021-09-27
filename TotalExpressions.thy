@@ -11,6 +11,14 @@ fun the_rat :: "'a val \<Rightarrow> rat" where
   "the_rat (VPerm r) = r"
 | "the_rat _ = undefined"
 
+
+fun wd_binop :: "binop \<Rightarrow> 'a val \<Rightarrow> 'a val \<Rightarrow> bool"
+  where 
+    "wd_binop IntDiv v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
+  | "wd_binop PermDiv v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
+  | "wd_binop Mod v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
+  | "wd_binop _ _ _ = True"
+
 inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a extended_val \<Rightarrow> bool"
   ("_, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,0,51,51] 81)
   for Pr :: program and \<Delta> :: "'a interp"
@@ -18,10 +26,10 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> p
 (* Independent of SA *)
   RedLit: "Pr, \<Delta> \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
 | RedVar: "\<lbrakk> \<sigma> n = Some v \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Var n; (\<sigma>, _, _)\<rangle> [\<Down>]\<^sub>t Val v"
-| RedUnop: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v ; eval_unop unop v = Some v' \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
+| RedUnop: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v ; eval_unop unop v = BinopNormal v' \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
 | RedBinopLazy: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; eval_binop_lazy v1 bop = Some v \<rbrakk>
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
-| RedBinop: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 ; eval_binop_lazy v1 bop = None; eval_binop v1 bop v2 = Some v \<rbrakk>
+| RedBinop: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 ; eval_binop_lazy v1 bop = None; eval_binop v1 bop v2 = BinopNormal v \<rbrakk>
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 (*| RedOld: "\<lbrakk> t l = Some \<phi> ; Pr, \<Delta> \<turnstile> \<langle>e; (\<sigma>, t, \<phi>)\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Old l e; (\<sigma>, t, _)\<rangle> [\<Down>]\<^sub>t v"*) (* Implicitly propagates failures *)
 (*| RedLet: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; shift_and_add_state \<omega> v1\<rangle> [\<Down>]\<^sub>t r \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>]\<^sub>t r"
@@ -44,7 +52,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> p
 
 | RedBinopRightFailure: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure ;  eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-| RedBinopFailure: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 ; eval_binop v1 bop v2 = None ; eval_binop_lazy v1 bop = None \<rbrakk>
+| RedBinopFailure: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 ; eval_binop v1 bop v2 = BinopOpFailure ; eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* Division by 0 *)
 | RedOldFailure: "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Old l e ; (_, t, _)\<rangle> [\<Down>]\<^sub>t VFailure"
 (*
@@ -64,12 +72,6 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> p
 *)
 
 datatype inh_exh_conf = CInhale | CExhale "heap_loc set"
-
-fun wd_binop :: "binop \<Rightarrow> 'a val \<Rightarrow> 'a val \<Rightarrow> bool"
-  where 
-    "wd_binop Div v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
-  | "wd_binop Mod v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
-  | "wd_binop _ _ _ = True"
 
 (* can't show this, since need to take typing into account *)
 lemma wd_binop_total: 
