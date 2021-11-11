@@ -9,43 +9,39 @@ type_synonym 'a interp = "'a val list \<rightharpoonup> 'a val"
 type_synonym 'a total_heap = "heap_loc \<Rightarrow> 'a val"
 type_synonym 'a predicate_mask = "'a predicate_loc \<Rightarrow> prat"
 
-text \<open>For each predicate instance, the state tracks the heap snapshot represented as a partial map, 
-because one needs to know which locations are part of the snapshot to reason about function framing.\<close>
+text \<open>For each predicate instance, the state tracks the heap snapshot represented as a subset of
+heap locations and predicate locations. The values of the heap locations are given by the 
+corresponding total heap\<close>
 
-type_synonym 'a predicate_heap = "'a predicate_loc \<Rightarrow> (heap_loc \<rightharpoonup> 'a val)"
+type_synonym 'a predicate_heap = "'a predicate_loc \<Rightarrow> (heap_loc set \<times> 'a predicate_loc set)"
 
 type_synonym 'a pre_total_state = 
-  "(mask \<times> 'a total_heap) \<times> 
-                ('a predicate_mask \<times> 'a predicate_heap)"
+  "('a total_heap \<times> 'a predicate_heap) \<times> (mask \<times> 'a predicate_mask)"
 
-fun get_mh_pre_total :: "'a pre_total_state \<Rightarrow> mask \<times> 'a total_heap"
-  where "get_mh_pre_total \<phi> = fst \<phi>"
+fun get_m_pre_total :: "'a pre_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
+  where "get_m_pre_total \<phi> = snd \<phi>"
 
-fun get_mask_pre_total :: "'a pre_total_state \<Rightarrow> mask"
-  where "get_mask_pre_total \<phi> = fst (get_mh_pre_total \<phi>)"
+fun get_mh_pre_total :: "'a pre_total_state \<Rightarrow> mask"
+  where "get_mh_pre_total \<phi> = fst (get_m_pre_total \<phi>)"
 
-fun get_heap_pre_total :: "'a pre_total_state \<Rightarrow> 'a total_heap"
-  where "get_heap_pre_total \<phi> = snd (get_mh_pre_total \<phi>)"
+fun get_mp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_mask"
+  where "get_mp_pre_total \<phi> = snd (get_m_pre_total \<phi>)"
 
-fun get_pmh_pre_total :: "'a pre_total_state \<Rightarrow> ('a predicate_mask \<times> 'a predicate_heap)"
-  where "get_pmh_pre_total \<phi> = snd \<phi>"
+fun get_h_pre_total :: "'a pre_total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
+  where "get_h_pre_total \<phi> = fst \<phi>"
 
-fun get_pmask_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_mask"
-  where "get_pmask_pre_total \<phi> = fst (get_pmh_pre_total \<phi>)"
+fun get_hh_pre_total :: "'a pre_total_state \<Rightarrow> 'a total_heap"
+  where "get_hh_pre_total \<phi> = fst (get_h_pre_total \<phi>)"
 
-fun get_pheap_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_heap"
-  where "get_pheap_pre_total \<phi> = snd (get_pmh_pre_total \<phi>)"
+fun get_hp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_heap"
+  where "get_hp_pre_total \<phi> = snd (get_h_pre_total \<phi>)"
 
-\<comment> \<open> TODO
-Could also enforce that predicate heap snapshots must be consistent with total heap, but then 
-known-folded permission would not have effect on semantics (maybe better because allow for more 
-implementations). This could also be a parameter.\<close>
 
 fun wf_pre_total_state :: "'a pre_total_state \<Rightarrow> bool" where
-  "wf_pre_total_state \<phi> \<longleftrightarrow> wf_mask_simple (fst (get_mh_pre_total \<phi>))"
+  "wf_pre_total_state \<phi> \<longleftrightarrow> wf_mask_simple (fst (get_m_pre_total \<phi>))"
 
 typedef 'a total_state = "{ \<phi> :: 'a pre_total_state |\<phi>. wf_pre_total_state \<phi> }"
-  apply (rule_tac x="((zero_mask, \<lambda>hl. VInt 0), (zero_mask, \<lambda>p. (\<lambda>hl. None)))" in exI)
+  apply (rule_tac x="((\<lambda>hl. VInt 0, \<lambda>p. ({},{})), (zero_mask, zero_mask))" in exI)
   apply (simp add: wf_zero_mask)
   done
 
@@ -58,26 +54,30 @@ type_synonym 'a full_total_state = "'a store \<times> 'a total_trace \<times> 'a
 subsection \<open>Destructors for (full) total state\<close>
 
 (*lift_definition get_heap_total :: "'a total_state \<Rightarrow> 'a total_heap" is "snd" done*)
-fun get_mh_total :: "'a total_state \<Rightarrow> mask \<times> 'a total_heap"
-  where "get_mh_total \<phi> = get_mh_pre_total (Rep_total_state \<phi>)"
-fun get_mask_total :: "'a total_state \<Rightarrow> mask" where "get_mask_total \<phi> = fst (get_mh_total \<phi>)"
-fun get_heap_total :: "'a total_state \<Rightarrow> 'a total_heap" where "get_heap_total \<phi> = snd (get_mh_total \<phi>)"
+(*fun get_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask"
+  where "get_m_total \<phi> = get_m_pre_total (Rep_total_state \<phi>)"*)
 
-fun get_pmh_total :: "'a total_state \<Rightarrow> 'a predicate_mask \<times> 'a predicate_heap"
-  where "get_pmh_total \<phi> = get_pmh_pre_total (Rep_total_state \<phi>)"
-fun get_pmask_total :: "'a total_state \<Rightarrow> 'a predicate_mask" where "get_pmask_total \<phi> = fst (get_pmh_total \<phi>)"
-fun get_pheap_total :: "'a total_state \<Rightarrow> 'a predicate_heap" where "get_pheap_total \<phi> = snd (get_pmh_total \<phi>)"
+fun get_mh_total :: "'a total_state \<Rightarrow> mask" where "get_mh_total \<phi> = get_mh_pre_total (Rep_total_state \<phi>)"
 
-lemma get_mask_total_wf: "wf_mask_simple (get_mask_total \<phi>)"  
+fun get_hh_total :: "'a total_state \<Rightarrow> 'a total_heap" where "get_hh_total \<phi> = get_hh_pre_total (Rep_total_state \<phi>)"
+
+fun get_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask" where "get_mp_total \<phi> = get_mp_pre_total (Rep_total_state \<phi>)"
+fun get_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap" where "get_hp_total \<phi> = get_hp_pre_total (Rep_total_state \<phi>)"
+
+lemma get_mask_total_wf: "wf_mask_simple (get_mh_total \<phi>)"  
   sorry
 
 
 fun get_store_total :: "'a full_total_state \<Rightarrow> 'a store" where "get_store_total \<omega> = fst \<omega>"
 fun get_trace_total :: "'a full_total_state \<Rightarrow> 'a total_trace" where "get_trace_total \<omega> = fst (snd \<omega>)"
-fun get_mh_total_full :: "'a full_total_state \<Rightarrow> 'a total_state"
-  where "get_mh_total_full \<omega> = snd (snd \<omega>)"
-fun get_heap_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" where "get_heap_total_full \<omega> = get_heap_total (get_mh_total_full \<omega>)"
-fun get_mask_total_full :: "'a full_total_state \<Rightarrow> mask" where "get_mask_total_full \<omega> = get_mask_total (get_mh_total_full \<omega>)"
+fun get_total_full :: "'a full_total_state \<Rightarrow> 'a total_state"
+  where "get_total_full \<omega> = snd (snd \<omega>)"
+
+
+fun get_hh_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" where "get_hh_total_full \<omega> = get_hh_total (get_total_full \<omega>)"
+fun get_mh_total_full :: "'a full_total_state \<Rightarrow> mask" where "get_mh_total_full \<omega> = get_mh_total (get_total_full \<omega>)"
+fun get_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask" where "get_mp_total_full \<omega> = get_mp_total (get_total_full \<omega>)"                   
+fun get_hp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_heap" where "get_hp_total_full \<omega> = get_hp_total (get_total_full \<omega>)"                   
 
 (*
 lemma total_state_eq:
@@ -96,10 +96,10 @@ lemma full_total_state_eq:
           "get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
         shows "\<omega> = \<omega>'"
   using assms
-  by (metis Rep_total_state_inject get_heap_total.elims get_heap_total_full.elims get_mh_total_full.elims get_mask_total.elims get_mask_total_full.elims get_store_total.elims get_trace_total.elims prod.expand) 
+  by (metis Rep_total_state_inject get_heap_total.elims get_heap_total_full.elims get_total_full.elims get_mask_total.elims get_mask_total_full.elims get_store_total.elims get_trace_total.elims prod.expand) 
 
 
-lemma get_mh_total_full_comp: "Rep_total_state (get_mh_total_full \<omega>) = (get_mask_total_full \<omega>, get_heap_total_full \<omega>)"
+lemma get_total_full_comp: "Rep_total_state (get_total_full \<omega>) = (get_mask_total_full \<omega>, get_heap_total_full \<omega>)"
   by simp
 
 lemma get_mask_total_full_wf: "wf_mask_simple (get_mask_total_full \<omega>)"
@@ -109,6 +109,7 @@ lemma get_mask_total_full_wf: "wf_mask_simple (get_mask_total_full \<omega>)"
 
 subsection \<open>Addition of total states\<close>
 
+(*
 fun compatible_pre_states_total :: "'a pre_total_state \<Rightarrow> 'a pre_total_state \<Rightarrow> bool"
   where
     "compatible_pre_states_total s1 s2 =    
@@ -119,6 +120,7 @@ fun compatible_pre_states_total :: "'a pre_total_state \<Rightarrow> 'a pre_tota
 
 definition add_total_heaps :: "'a total_heap \<Rightarrow> 'a total_heap \<Rightarrow> mask \<Rightarrow> 'a total_heap"
   where "add_total_heaps h1 h2 m2 = (\<lambda>l. if ((pgt (m2 l) pnone)) then h2 l else h1 l)"
+*)
 
 text \<open>For compatible states, always the heap value of the first state is taken if the second state 
 does not have positive permission to the corresponding location.\<close>
@@ -166,27 +168,27 @@ lemma plus_total_full_properties:
          get_trace_total \<omega>1 = get_trace_total \<omega>3" (is "compatible_pre_states_total (?m1,?h1) (?m2,?h2) \<and> ?Q")
   using assms
 proof -
-  let ?hm1 = "get_mh_total_full \<omega>1"
-  let ?hm2 = "get_mh_total_full \<omega>2"
+  let ?hm1 = "get_total_full \<omega>1"
+  let ?hm2 = "get_total_full \<omega>2"
   have R1: "Rep_total_state ?hm1 = (?m1, ?h1)" and R2:"Rep_total_state ?hm2 = (?m2, ?h2)"
     by simp_all
-  from assms have A0:"plus_total ?hm1 ?hm2 = Some (get_mh_total_full \<omega>3)"
+  from assms have A0:"plus_total ?hm1 ?hm2 = Some (get_total_full \<omega>3)"
     by (clarsimp split: if_split_asm)
   hence A1:"pre_plus_total (?m1, ?h1) (?m2, ?h2) = Some (add_masks ?m1 ?m2, add_total_heaps ?h1 ?h2 ?m2) \<and> compatible_pre_states_total (?m1, ?h1) (?m2, ?h2)"
-    apply (clarsimp simp del: get_mh_total_full.simps)
+    apply (clarsimp simp del: get_total_full.simps)
     apply (subst R1 R2)+
     apply (subst (asm) R1 R2)+
     by (metis fst_conv option.discI snd_conv)  
-  hence A2:"Some (get_mh_total_full \<omega>3) = Some (Abs_total_state (add_masks ?m1 ?m2, add_total_heaps ?h1 ?h2 ?m2))"
+  hence A2:"Some (get_total_full \<omega>3) = Some (Abs_total_state (add_masks ?m1 ?m2, add_total_heaps ?h1 ?h2 ?m2))"
     using A0
     by simp
   hence "get_mask_total_full \<omega>3 = add_masks ?m1 ?m2"
     using HOL.conjunct2[OF A1]
-    by (metis (mono_tags, lifting) Abs_total_state_inverse compatible_pre_states_total.simps fst_conv get_mh_total_full_comp mem_Collect_eq option.inject wf_pre_total_state.simps) 
+    by (metis (mono_tags, lifting) Abs_total_state_inverse compatible_pre_states_total.simps fst_conv get_total_full_comp mem_Collect_eq option.inject wf_pre_total_state.simps) 
   moreover from A2 have "get_heap_total_full \<omega>3 = add_total_heaps ?h1 ?h2 ?m2"
     using HOL.conjunct2[OF A1]
-    by (metis Abs_total_state_inverse calculation get_mh_total_full_comp get_mask_total_full_wf mem_Collect_eq option.inject sndI wf_pre_total_state.simps) 
-  ultimately show ?thesis
+    by (metis Abs_total_state_inverse calculation get_total_full_comp get_mask_total_full_wf mem_Collect_eq option.inject sndI wf_pre_total_state.simps) 
+  ultimately show ?thesismask
     using HOL.conjunct2[OF A1] assms
     by (clarsimp split: if_split_asm)
 qed
