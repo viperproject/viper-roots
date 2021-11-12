@@ -13,19 +13,30 @@ text \<open>For each predicate instance, the state tracks the heap snapshot repr
 heap locations and predicate locations. The values of the heap locations are given by the 
 corresponding total heap\<close>
 
-type_synonym 'a predicate_heap = "'a predicate_loc \<Rightarrow> (heap_loc set \<times> 'a predicate_loc set)"
+type_synonym 'a predicate_heap = "'a predicate_loc \<Rightarrow> heap_loc set \<times> 'a predicate_loc set"
 
 type_synonym 'a pre_total_state = 
   "('a total_heap \<times> 'a predicate_heap) \<times> (mask \<times> 'a predicate_mask)"
 
-fun get_m_pre_total :: "'a pre_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
-  where "get_m_pre_total \<phi> = snd \<phi>"
+text \<open> We use the following naming scheme:
 
-fun get_mh_pre_total :: "'a pre_total_state \<Rightarrow> mask"
-  where "get_mh_pre_total \<phi> = fst (get_m_pre_total \<phi>)"
+hh: heap for heap locations
+hp: heap for predicate locations
+h: hh and hp together (e.g., (hh,hp))
 
-fun get_mp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_mask"
-  where "get_mp_pre_total \<phi> = snd (get_m_pre_total \<phi>)"
+mh: permission mask for heap locations
+mp: permission mask for predicate locations
+m: mh and mp together (e.g., (mh,mp))
+
+lh: heap location
+lp: predicate location
+\<close>
+
+fun get_lhset_pheap :: "'a predicate_heap \<Rightarrow> 'a predicate_loc \<Rightarrow> heap_loc set"
+  where "get_lhset_pheap hp lp = fst (hp lp)"
+
+fun get_lpset_pheap :: "'a predicate_heap \<Rightarrow> 'a predicate_loc \<Rightarrow> 'a predicate_loc set"
+  where "get_lpset_pheap hp lp = snd (hp lp)"
 
 fun get_h_pre_total :: "'a pre_total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
   where "get_h_pre_total \<phi> = fst \<phi>"
@@ -36,6 +47,14 @@ fun get_hh_pre_total :: "'a pre_total_state \<Rightarrow> 'a total_heap"
 fun get_hp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_heap"
   where "get_hp_pre_total \<phi> = snd (get_h_pre_total \<phi>)"
 
+fun get_m_pre_total :: "'a pre_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
+  where "get_m_pre_total \<phi> = snd \<phi>"
+
+fun get_mh_pre_total :: "'a pre_total_state \<Rightarrow> mask"
+  where "get_mh_pre_total \<phi> = fst (get_m_pre_total \<phi>)"
+
+fun get_mp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_mask"
+  where "get_mp_pre_total \<phi> = snd (get_m_pre_total \<phi>)"
 
 fun wf_pre_total_state :: "'a pre_total_state \<Rightarrow> bool" where
   "wf_pre_total_state \<phi> \<longleftrightarrow> wf_mask_simple (fst (get_m_pre_total \<phi>))"
@@ -57,27 +76,61 @@ subsection \<open>Destructors for (full) total state\<close>
 (*fun get_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask"
   where "get_m_total \<phi> = get_m_pre_total (Rep_total_state \<phi>)"*)
 
-fun get_mh_total :: "'a total_state \<Rightarrow> mask" where "get_mh_total \<phi> = get_mh_pre_total (Rep_total_state \<phi>)"
+text\<open>Heap destructors total state\<close>
 
-fun get_hh_total :: "'a total_state \<Rightarrow> 'a total_heap" where "get_hh_total \<phi> = get_hh_pre_total (Rep_total_state \<phi>)"
+fun get_h_total :: "'a total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap" 
+  where "get_h_total \<phi> = get_h_pre_total (Rep_total_state \<phi>)"
 
-fun get_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask" where "get_mp_total \<phi> = get_mp_pre_total (Rep_total_state \<phi>)"
-fun get_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap" where "get_hp_total \<phi> = get_hp_pre_total (Rep_total_state \<phi>)"
+fun get_hh_total :: "'a total_state \<Rightarrow> 'a total_heap" 
+  where "get_hh_total \<phi> = get_hh_pre_total (Rep_total_state \<phi>)"
 
-lemma get_mask_total_wf: "wf_mask_simple (get_mh_total \<phi>)"  
-  sorry
+fun get_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap" 
+  where "get_hp_total \<phi> = get_hp_pre_total (Rep_total_state \<phi>)"
 
+text\<open>Mask destructors total state\<close>
 
-fun get_store_total :: "'a full_total_state \<Rightarrow> 'a store" where "get_store_total \<omega> = fst \<omega>"
-fun get_trace_total :: "'a full_total_state \<Rightarrow> 'a total_trace" where "get_trace_total \<omega> = fst (snd \<omega>)"
+fun get_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask" 
+  where "get_m_total \<phi> = get_m_pre_total (Rep_total_state \<phi>)"
+
+fun get_mh_total :: "'a total_state \<Rightarrow> mask" 
+  where "get_mh_total \<phi> = get_mh_pre_total (Rep_total_state \<phi>)"
+
+fun get_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask" 
+  where "get_mp_total \<phi> = get_mp_pre_total (Rep_total_state \<phi>)"
+
+lemma get_mask_total_wf: "wf_mask_simple (get_mh_total \<phi>)"
+  using Rep_total_state by auto
+
+text\<open>Top-level constructors full total state\<close>
+
+fun get_store_total :: "'a full_total_state \<Rightarrow> 'a store" 
+  where "get_store_total \<omega> = fst \<omega>"
+
+fun get_trace_total :: "'a full_total_state \<Rightarrow> 'a total_trace" 
+  where "get_trace_total \<omega> = fst (snd \<omega>)"
+
 fun get_total_full :: "'a full_total_state \<Rightarrow> 'a total_state"
   where "get_total_full \<omega> = snd (snd \<omega>)"
 
+text\<open>Heap destructors full total state\<close>
 
-fun get_hh_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" where "get_hh_total_full \<omega> = get_hh_total (get_total_full \<omega>)"
+fun get_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
+  where "get_h_total_full \<omega> = get_h_total (get_total_full \<omega>)"
+
+fun get_hh_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap" 
+  where "get_hh_total_full \<omega> = get_hh_total (get_total_full \<omega>)"
+
+fun get_hp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_heap" 
+  where "get_hp_total_full \<omega> = get_hp_total (get_total_full \<omega>)"                   
+
+text\<open>Mask destructors full total state\<close>
+
+fun get_m_total_full :: "'a full_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
+  where "get_m_total_full \<omega> = get_m_total (get_total_full \<omega>)"
+
 fun get_mh_total_full :: "'a full_total_state \<Rightarrow> mask" where "get_mh_total_full \<omega> = get_mh_total (get_total_full \<omega>)"
+
 fun get_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask" where "get_mp_total_full \<omega> = get_mp_total (get_total_full \<omega>)"                   
-fun get_hp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_heap" where "get_hp_total_full \<omega> = get_hp_total (get_total_full \<omega>)"                   
 
 (*
 lemma total_state_eq:
