@@ -44,6 +44,9 @@ definition update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> '
 definition update_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a total_state"
   where "update_mp_total \<phi> mp = Abs_total_state (get_h_total \<phi>, (get_mh_total \<phi>, mp))"
 
+definition update_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state"
+  where "update_m_total \<phi> m = Abs_total_state (get_h_total \<phi>, m)"
+
 lemma Abs_total_state_inverse_2:
   assumes "wf_pre_total_state (m,h)"
   shows "Rep_total_state (Abs_total_state (m,h)) = (m,h)"

@@ -187,7 +187,6 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
 
 
-
 inductive unfold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where UnfoldRelStep: 
                     "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
@@ -195,7 +194,7 @@ inductive unfold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate
                      m = get_mp_total_full \<omega>;
                      pgte (m (pred_id,vs)) q;
                      m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q);
-                     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_pmask_total (get_mh_total_full \<omega>) m');
+                     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_mp_total (get_total_full \<omega>) m');
                      red_inhale Pr \<Delta> (\<lambda>_. True) (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
                      unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>'"
 
@@ -211,7 +210,7 @@ coinductive unfold_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 
                      \<exists>\<omega>'. unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>' \<and> unfold_consistent Pr \<Delta> \<omega>' \<rbrakk> \<Longrightarrow>
                   unfold_consistent Pr \<Delta> \<omega>"
 
-(*  this definition here is incorrect since it does not account for non-determinism
+(*  this definition below is incorrect since it does not account for non-determinism
 definition unfold_consistent where
  "unfold_consistent Pr \<Delta> \<omega> \<equiv> 
           \<forall> \<omega>' pred_id vs q. 
@@ -296,10 +295,11 @@ definition total_heap_consistent :: "program \<Rightarrow> 'a interp \<Rightarro
   where "total_heap_consistent Pr \<Delta> \<omega> \<equiv> unfold_consistent Pr \<Delta> \<omega> \<and> pheap_consistent Pr \<Delta> \<omega>"
 
 
-abbreviation red_inhale1 :: "program \<Rightarrow> 'a interp \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
-  where "red_inhale1 Pr \<Delta> A \<omega> res \<equiv> red_inhale Pr \<Delta> (total_heap_consistent Pr \<Delta>) A \<omega> res"
+abbreviation red_inhale_th_cons :: "program \<Rightarrow> 'a interp \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
+  where "red_inhale_th_cons Pr \<Delta> A \<omega> res \<equiv> red_inhale Pr \<Delta> (total_heap_consistent Pr \<Delta>) A \<omega> res"
 
-text \<open>\<^const>\<open>red_inhale1\<close> only takes transitions to total heap consistent states whenever some permission is inhaled\<close>
+text \<open>\<^const>\<open>red_inhale_th_cons\<close> only takes transitions to total heap consistent states whenever some 
+permission is inhaled\<close>
 
 (*
 datatype inh_exh_conf = CInhale | CExhale "heap_loc set"
