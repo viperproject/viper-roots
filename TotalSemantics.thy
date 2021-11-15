@@ -182,9 +182,10 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
       get_mh_total_full \<omega> (addr,f) = pwrite;
       Pr, \<Delta>, get_valid_locs \<omega>  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
+\<comment>\<open>Is null case handled in NestedPermSem?\<close>
  | RedFieldAssignFailure: 
-   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
-      get_mh_total_full \<omega> (addr,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
+   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+      r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
