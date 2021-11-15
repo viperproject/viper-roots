@@ -142,7 +142,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
 | RedOld: "\<lbrakk> t l = Some \<phi> ; Pr, \<Delta>, LH \<turnstile> \<langle>e; (\<sigma>, t, \<phi>)\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, LH \<turnstile> \<langle>Old l e; (\<sigma>, t, _)\<rangle> [\<Down>]\<^sub>t v"
 | RedOldFailure: "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> Pr, \<Delta>, LH \<turnstile> \<langle>Old l e ; (_, t, _)\<rangle> [\<Down>]\<^sub>t VFailure" 
 
-\<comment>\<open>Heap lookup\<close>
+\<comment>\<open>Heap lookup (TODO: null case?)\<close>
 | RedField: "\<lbrakk> Pr, \<Delta>, LH \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
        Pr, \<Delta>, LH \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (a,f) \<in> LH then Val v else VFailure)"
 | RedFieldFailure: "\<lbrakk> Pr, \<Delta>, LH \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> Pr, \<Delta>, LH \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
