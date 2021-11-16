@@ -190,7 +190,9 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>'
+     unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>';
+     unfold_consistent Pr \<Delta> \<omega>'
+
  \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), RNormal \<omega>')"
 | RedUnfoldWildcard:
@@ -199,6 +201,10 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
 \<comment>\<open>TODO: unfold acc(P(x),0)\<close>
 
+\<comment>\<open>One should be able to prove that if \<omega> is unfolding consistent, then so is \<omega>' after a fold, without
+  explicitly pruning states. This is because folds just replace permissions with a predicate instance 
+  (and even if there is a wildcard, we know that there must be at least one transition for the
+ newly generated predicate instance, namely the one before the fold)\<close>
 | RedFold:
   "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
@@ -255,9 +261,8 @@ fun is_normal_config :: "'a stmt_config \<Rightarrow> 'a full_total_state \<Righ
   where "is_normal_config config \<omega> \<longleftrightarrow> (snd config) = RNormal \<omega>"
 
 (* todo: incorporate precondition *)
-(* first argument is just there to fix 'a *)
-definition stmt_verifies_total :: "'a \<Rightarrow> program \<Rightarrow> 'a interp \<Rightarrow> stmt \<Rightarrow>  bool"
-  where "stmt_verifies_total dummy Pr \<Delta> s \<equiv> 
+definition stmt_verifies_total :: " program \<Rightarrow> 'a interp \<Rightarrow> stmt \<Rightarrow>  bool"
+  where "stmt_verifies_total Pr \<Delta> s \<equiv> 
          \<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
            red_stmt_total_multi Pr \<Delta> ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r"
 
