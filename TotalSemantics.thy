@@ -191,7 +191,7 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
   "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
      unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>';
-     unfold_consistent Pr \<Delta> \<omega>'
+     total_heap_consistent Pr \<Delta> \<omega>'
 
  \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), RNormal \<omega>')"
