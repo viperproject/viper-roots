@@ -1,18 +1,6 @@
-theory TotalSemantics
+theory TotalSemantics         
 imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
 begin
-
-(*datatype 'a result = Failure | Set (select_set: "'a full_total_state set")*)
-
-
-(*
-lemma InhPureNormal:
-  assumes "wd_pure_exp_total Pr \<Delta> CInhale e \<omega>" and
-          "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-        shows "red_inhale Pr \<Delta> havoc_new (Atomic (Pure e)) \<omega> (RNormal \<omega>)"
-  using InhPureNormalMagic[OF assms]
-  by simp
-*)
 
 datatype 'a exhale_result = ExhaleNormal "mask \<times> 'a predicate_mask" | ExhaleFailure
 
@@ -43,11 +31,11 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
        red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
                            (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
 
- \<comment>\<open>Exhaling wildcard removes some non-zero permission that this is less than the current permission held\<close>
+ \<comment>\<open>Exhaling wildcard removes some non-zero permission that this is less than the current permission held.\<close>
   | ExhAccWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
        Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-       q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
+       q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
                                          (m( (a,f) := q),pm))"
@@ -55,14 +43,14 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale acc(P(es), p)\<close>
   | ExhAccPred:
      "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
+       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
        Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
               (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
                             (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
   | ExhAccPredWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
+       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
        q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone)
@@ -102,7 +90,6 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
      red_exhale Pr \<Delta> \<omega>0 (Imp e A) m_pm ExhaleFailure"
 
-
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 
            { (hh', hp') | hh' hp'. 
@@ -131,14 +118,21 @@ lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longri
 lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
   by (simp add: exhale_state_def)
 
-inductive fold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
-  where FoldRelStep: 
-                    "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
-                     ViperLang.predicate_decl.body pred_decl = Some pred_body;
-                     red_exhale Pr \<Delta> \<omega> (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
-                     m' = (fst m', (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q));
-                     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_m_total (get_total_full \<omega>) m')\<rbrakk> \<Longrightarrow> 
-                     fold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>2"
+inductive fold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
+  where 
+    FoldRelNormal: 
+      "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
+       ViperLang.predicate_decl.body pred_decl = Some pred_body;
+       red_exhale Pr \<Delta> (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
+       m' = (fst m', (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q));
+       \<omega>2 = update_m_total_full \<omega> (fst m') (snd m')\<rbrakk> \<Longrightarrow> 
+       fold_rel Pr \<Delta> pred_id vs q \<omega> (RNormal \<omega>2)"
+  | FoldRelFailure:
+       "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
+       ViperLang.predicate_decl.body pred_decl = Some pred_body;
+       red_exhale Pr \<Delta> (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
+       fold_rel Pr \<Delta> pred_id vs q \<omega> RFailure"
+    
 
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp set" where
   "sub_expressions (If p _ _) = {p}"
@@ -176,7 +170,7 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
 
  | RedLocalAssign:
    "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<rbrakk> \<Longrightarrow> 
-     red_stmt_total_single_set Pr \<Delta> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_store_total \<omega> x v)))"
+     red_stmt_total_single_set Pr \<Delta> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
  | RedFieldAssign: 
    "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
       get_mh_total_full \<omega> (addr,f) = pwrite;
@@ -187,16 +181,15 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
    "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
       r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
-| RedUnfold:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
-     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>';
-     total_heap_consistent Pr \<Delta> \<omega>'
 
- \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), RNormal \<omega>')"
+| RedUnfold:
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
+     \<omega>' = (SOME \<omega>2. unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent Pr \<Delta> \<omega>') \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> 
+      (Inr (), compute_th_result (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True \<omega>')"
 | RedUnfoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);     
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);     
      unfold_rel Pr \<Delta> pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
 \<comment>\<open>TODO: unfold acc(P(x),0)\<close>
@@ -206,16 +199,16 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
   (and even if there is a wildcard, we know that there must be at least one transition for the
  newly generated predicate instance, namely the one before the fold)\<close>
 | RedFold:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     fold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>'
+     fold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> res
  \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args (PureExp e_p)) \<omega> (Inr (), RNormal \<omega>')"
+    red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
 
 | RedFoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);     
-     fold_rel Pr \<Delta> pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);     
+     fold_rel Pr \<Delta> pred_id v_args p \<omega> res \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args Wildcard) \<omega> (Inr (), res)"
 \<comment>\<open>TODO: fold acc(P(x),0)\<close>
 
 \<comment>\<open>Composite statements\<close>

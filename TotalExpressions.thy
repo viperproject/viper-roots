@@ -2,6 +2,8 @@ theory TotalExpressions
 imports Viper.ViperLang Viper.ValueAndBasicState TotalViperState Viper.Binop Viper.DeBruijn Viper.PredicatesUtil TotalUtil
 begin
 
+section \<open>Pure expression evaluation and inhale\<close>
+
 fun wd_binop :: "binop \<Rightarrow> 'a val \<Rightarrow> 'a val \<Rightarrow> bool"
   where 
     "wd_binop IntDiv v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
@@ -15,26 +17,26 @@ definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
   where "get_valid_locs \<omega> = {lh |lh. pgt (get_mh_total_full \<omega> lh) pnone}"
 
 
-definition inhale_perm_single :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
-  where "inhale_perm_single \<omega> lh p_opt =
-      {\<omega>'| \<omega>' q. 
+definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+  where "inhale_perm_single R \<omega> lh p_opt =
+      {\<omega>'| \<omega>' q. R \<omega>' \<and>
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
                pgte pwrite (padd (get_mh_total_full \<omega> lh) q) \<and>
                \<omega>' = update_mh_total_full \<omega> ((get_mh_total_full \<omega>)(lh := (padd (get_mh_total_full \<omega> lh) q)))
        }"
 
-definition inhale_perm_single_pred :: "'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
-  where "inhale_perm_single_pred \<omega> lp p_opt = 
-      {\<omega>'| \<omega>' q.   
+definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+  where "inhale_perm_single_pred R \<omega> lp p_opt = 
+      {\<omega>'| \<omega>' q. R \<omega>' \<and>  
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
                pgte pwrite (padd (get_mp_total_full \<omega> lp) q) \<and>
                \<omega>' = update_mp_total_full \<omega> ((get_mp_total_full \<omega>)(lp := (padd (get_mp_total_full \<omega> lp) q)))
        }"
 
-fun inh_if_if_total :: "bool \<Rightarrow> bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result"  where
-  "inh_if_if_total False _ _ = RFailure"
-| "inh_if_if_total True False _ = RMagic"
-| "inh_if_if_total True True \<omega> = RNormal \<omega>"
+fun compute_th_result :: "bool \<Rightarrow> bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result"  where
+  "compute_th_result False _ _ = RFailure"
+| "compute_th_result True False _ = RMagic"
+| "compute_th_result True True \<omega> = RNormal \<omega>"
 
 (* potential duplicate *)
 fun sub_expressions_exp_or_wildcard :: "pure_exp exp_or_wildcard \<Rightarrow> pure_exp set" where
@@ -52,7 +54,7 @@ text\<open>Pure expression evaluation, where the set of heap locations expresses
 \<close>
 inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> heap_loc set \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a extended_val \<Rightarrow> bool"
   ("_, _, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,51,0,51,51] 81) and
-   red_pure_exps_total :: "program \<Rightarrow> 'a interp \<Rightarrow> heap_loc set \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> ('a extended_val) list \<Rightarrow> bool" and
+   red_pure_exps_total :: "program \<Rightarrow> 'a interp \<Rightarrow> heap_loc set \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> (('a val) list) option \<Rightarrow> bool" and
    red_inhale :: "program \<Rightarrow>  'a interp \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
   for Pr :: program and \<Delta> :: "'a interp"
   where
@@ -60,25 +62,25 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
   InhAcc: 
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
        Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
-       W' = inhale_perm_single \<omega> (the_address r,f) (Some (Abs_prat p)) \<rbrakk> \<Longrightarrow>
+       W' = inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p)) \<rbrakk> \<Longrightarrow>
        red_inhale Pr \<Delta> R (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
-                (inh_if_if_total (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W' \<and> R \<omega>'))"
+                (compute_th_result (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhAccPred:
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
-       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (map Val v_args);
-       W' = inhale_perm_single_pred \<omega> (pred_id, v_args) (Some (Abs_prat p)) \<rbrakk> \<Longrightarrow>       
+       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p)) \<rbrakk> \<Longrightarrow>       
        red_inhale Pr \<Delta> R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> 
-                (inh_if_if_total (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W' \<and> R \<omega>'))"
+                (compute_th_result (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhAccWildcard: 
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-       W' = inhale_perm_single \<omega> (the_address r,f) None \<rbrakk> \<Longrightarrow>
+       W' = inhale_perm_single R \<omega> (the_address r,f) None \<rbrakk> \<Longrightarrow>
        red_inhale Pr \<Delta> R (Atomic (Acc e_r f Wildcard)) \<omega> 
-                   (inh_if_if_total True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W' \<and> R \<omega>'))"
+                   (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhAccPredWildcard: 
-    "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-       W' = inhale_perm_single_pred \<omega> (pred_id, v_args) None \<rbrakk> \<Longrightarrow>
+    "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None \<rbrakk> \<Longrightarrow>
        red_inhale Pr \<Delta> R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> 
-                 (inh_if_if_total True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W' \<and> R \<omega>'))"
+                 (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhPureNormalMagic: 
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
       red_inhale Pr \<Delta> R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
@@ -109,6 +111,13 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
 
 \<comment>\<open>Pure expression evaluation\<close>
 
+\<comment>\<open>List of expressions\<close>
+| RedExpList: 
+  "\<lbrakk> list_all2 (\<lambda>e v. red_pure_exp_total Pr \<Delta> LH e \<omega> (Val v)) es vs \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total Pr \<Delta> LH es \<omega> (Some vs)"
+| RedExpListFailure: 
+  "\<lbrakk> e \<in> set(es); red_pure_exp_total Pr \<Delta> LH e \<omega> VFailure \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total Pr \<Delta> LH es \<omega> None"
 
 \<comment>\<open>Atomic expressions\<close>
 | RedLit: "Pr, \<Delta>, LH \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
@@ -187,36 +196,86 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
 
 
-inductive unfold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
-  where UnfoldRelStep: 
-                    "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
-                     ViperLang.predicate_decl.body pred_decl = Some pred_body;
-                     m = get_mp_total_full \<omega>;
-                     pgte (m (pred_id,vs)) q;
-                     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q);
-                     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_mp_total (get_total_full \<omega>) m');
-                     red_inhale Pr \<Delta> (\<lambda>_. True) (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
-                     unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>'"
+section \<open>Simplified induction principles\<close>
+lemma conj2conj2: "A \<and> B \<and> C \<Longrightarrow> C"
+  apply (rule conjunct2)
+  apply (erule conjunct2)
+  done
 
-definition unfold_rel_general
+lemmas red_inhale_induct_aux = mp[OF conj2conj2[OF red_pure_exp_total_red_pure_exps_total_red_inhale.induct[where ?P1.0 = "\<lambda> a b c d. True" and ?P2.0 = "\<lambda> a b c d. True"]]]
+
+lemma red_inhale_induct [consumes 1, case_names InhAcc InhAccPred InhAccWildcard InhAccPredWildcard 
+InhPureNormalMagic SubFailure InhSepNormal InhSepFailureMagic InhImpTrue InhImpFalse InhImpFailure]:
+  assumes "red_inhale Pr \<Delta> R A \<omega> res" and
+"(\<And>\<omega> e_r r e_p p W' f R.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<Longrightarrow>
+    W' = inhale_perm_single R \<omega> (the_address r, f) (Some (Abs_prat p)) \<Longrightarrow>
+    P R (Atomic (Acc e_r f (PureExp e_p))) \<omega> (compute_th_result (0 \<le> p) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+"(\<And>\<omega> e_p p e_args v_args W' pred_id R r.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<Longrightarrow>
+    red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args) \<Longrightarrow>
+    W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p)) \<Longrightarrow>
+    P R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
+     (compute_th_result (0 \<le> p) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+"(\<And>\<omega> e_r r W' f R.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
+    W' = inhale_perm_single R \<omega> (the_address r, f) None \<Longrightarrow>
+    P R (Atomic (Acc e_r f Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+"(\<And>\<omega> e_r r e_args v_args W' pred_id R.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
+    red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args) \<Longrightarrow>
+    W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None \<Longrightarrow>
+    P R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+"(\<And>\<omega> e b R.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<Longrightarrow>
+    P R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic))" and
+"(\<And>e A \<omega> R.
+    e \<in> sub_expressions_atomic A \<Longrightarrow>
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow>
+    P R (Atomic A) \<omega> RFailure)" and
+"(\<And>R A \<omega> \<omega>'' B res.
+    red_inhale Pr \<Delta> R A \<omega> (RNormal \<omega>'') \<Longrightarrow>
+    P R A \<omega> (RNormal \<omega>'') \<Longrightarrow> red_inhale Pr \<Delta> R B \<omega>'' res \<Longrightarrow> P R B \<omega>'' res \<Longrightarrow> P R (A && B) \<omega> res)" and
+"(\<And>R A \<omega> resA B. red_inhale Pr \<Delta> R A \<omega> resA \<Longrightarrow> P R A \<omega> resA \<Longrightarrow> resA = RFailure \<or> resA = RMagic \<Longrightarrow> P R (A && B) \<omega> resA)" and
+"(\<And>\<omega> e R A res.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<Longrightarrow>
+    red_inhale Pr \<Delta> R A \<omega> res \<Longrightarrow> P R A \<omega> res \<Longrightarrow> P R (Imp e A) \<omega> res)" and
+"(\<And>\<omega> e R A.
+    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<Longrightarrow>
+    P R (Imp e A) \<omega> (RNormal \<omega>))" and
+"(\<And>\<omega> e R A. Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P R (Imp e A) \<omega> RFailure)"
+ shows "P R A \<omega> res"
+  apply (rule red_inhale_induct_aux[where ?P3.0=P])
+  by (tactic \<open>resolve_tac @{context} @{thms assms} 1\<close>, assumption+)+ (auto intro: assms(1)) 
+
+section \<open>Total heap consistency\<close>
+
+inductive unfold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where 
+   UnfoldRelStep: 
+    "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
+     ViperLang.predicate_decl.body pred_decl = Some pred_body;
+     m = get_mp_total_full \<omega>;
+     pgte (m (pred_id,vs)) q;
+     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q);
+     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_mp_total (get_total_full \<omega>) m');
+     red_inhale Pr \<Delta> (\<lambda>_. True) (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>'"
+
+definition unfold_rel_general :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "unfold_rel_general Pr \<Delta> \<omega> \<omega>' \<equiv> \<exists> pred_id vs q. unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>'"
 
-definition unfold_rel_multi
+definition unfold_rel_multi :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "unfold_rel_multi Pr \<Delta>  \<equiv> rtranclp (unfold_rel_general Pr \<Delta>)"
 
 coinductive unfold_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where 
-  unfold_step: "\<lbrakk> \<And> pred_id vs q. pgt (get_mp_total_full \<omega> (pred_id,vs)) q \<Longrightarrow>
+  unfold_step: "\<lbrakk> \<And> pred_id vs q. 
+                     map_option (\<lambda>decl. ViperLang.predicate_decl.body decl) (ViperLang.predicates Pr pred_id) \<noteq> None \<Longrightarrow>
+                     pgt (get_mp_total_full \<omega> (pred_id,vs)) q  \<Longrightarrow>
                      \<exists>\<omega>'. unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>' \<and> unfold_consistent Pr \<Delta> \<omega>' \<rbrakk> \<Longrightarrow>
                   unfold_consistent Pr \<Delta> \<omega>"
-
-(*  this definition below is incorrect since it does not account for non-determinism
-definition unfold_consistent where
- "unfold_consistent Pr \<Delta> \<omega> \<equiv> 
-          \<forall> \<omega>' pred_id vs q. 
-               (unfold_rel_multi Pr \<Delta> \<omega> \<omega>' \<and> pgt (get_mp_total_full \<omega>' (pred_id,vs)) q) \<longrightarrow>
-               (\<exists>\<omega>''. unfold_rel Pr \<Delta> pred_id vs q \<omega>' \<omega>'')"
-*)
 
 text \<open>Expression evaluation as a function. Using this function makes sense, when it is known that 
 e is well-defined and is deterministic (for example, if e is the body of a predicate). \<^term>\<open>UNIV\<close>
@@ -226,7 +285,7 @@ fun red_pure_exp_total_fun :: "program \<Rightarrow> 'a interp \<Rightarrow> pur
   where "red_pure_exp_total_fun Pr \<Delta> e \<omega> = (SOME v. Pr, \<Delta>, UNIV \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v)"
 
 fun red_pure_exps_total_fun :: "program \<Rightarrow> 'a interp \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> ('a val) list"
-  where "red_pure_exps_total_fun Pr \<Delta> es \<omega> = (SOME vs. red_pure_exps_total Pr \<Delta> UNIV es \<omega> (map Val vs))"
+  where "red_pure_exps_total_fun Pr \<Delta> es \<omega> = (SOME vs. red_pure_exps_total Pr \<Delta> UNIV es \<omega> (Some vs))"
 
 (* TODO: duplicate? *)
 fun extract_address_from_val :: "'a val \<Rightarrow> address"
@@ -281,6 +340,8 @@ fun assertion_predicate_snapshot :: "program \<Rightarrow> 'a interp \<Rightarro
  | "assertion_predicate_snapshot Pr \<Delta> _ \<omega> = undefined" (* wands and quantified permissions not supported *)
 
 
+\<comment>\<open>maybe unfold_rel multi assumption is too strong or cumbersome to work with, since it also considers 
+stepping to states that are not unfolding consistent\<close>
 definition pheap_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> bool" where
  "pheap_consistent Pr \<Delta> \<omega> \<equiv> 
           \<forall> \<omega>' pred_id vs pred_decl. 
@@ -300,45 +361,5 @@ abbreviation red_inhale_th_cons :: "program \<Rightarrow> 'a interp \<Rightarrow
 
 text \<open>\<^const>\<open>red_inhale_th_cons\<close> only takes transitions to total heap consistent states whenever some 
 permission is inhaled\<close>
-
-(*
-datatype inh_exh_conf = CInhale | CExhale "heap_loc set"
-
-(* can't show this, since need to take typing into account *)
-lemma wd_binop_total: 
-  assumes "wd_binop bop v1 v2"
-  shows "binop_eval v1 v2 \<noteq> None"
-  oops
-
-fun wd_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> inh_exh_conf \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
-  where
-  "wd_pure_exp_total Pr \<Delta> c (ELit l) \<omega> \<longleftrightarrow> True"
-| "wd_pure_exp_total Pr \<Delta> c (Var n) \<omega> \<longleftrightarrow> True"
-| "wd_pure_exp_total Pr \<Delta> c (Unop unop e) \<omega> \<longleftrightarrow> (wd_pure_exp_total Pr \<Delta> c e \<omega>)"
-| "wd_pure_exp_total Pr \<Delta> c (Binop e1 bop e2) \<omega> \<longleftrightarrow> 
-     (wd_pure_exp_total Pr \<Delta> c e1 \<omega> \<and> ((\<forall>v1. Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 \<longrightarrow> eval_binop_lazy v1 bop = None \<longrightarrow> 
-                  ((\<forall>v2. Pr, \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 \<longrightarrow> wd_binop bop v1 v2) \<and> (wd_pure_exp_total Pr \<Delta> c e2 \<omega>)))))"
-| "wd_pure_exp_total Pr \<Delta> c (CondExp e1 e2 e3) \<omega> \<longleftrightarrow> 
-     wd_pure_exp_total Pr \<Delta> c e1 \<omega> \<and> (if ((Pr,\<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True))) then wd_pure_exp_total Pr \<Delta> c e2 \<omega> else wd_pure_exp_total Pr \<Delta> c e3 \<omega>)" 
-| "wd_pure_exp_total Pr \<Delta> CInhale (FieldAcc e f) \<omega> \<longleftrightarrow> 
-    wd_pure_exp_total Pr \<Delta> CInhale e \<omega> \<and> (\<forall>l. (Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address l))) \<longrightarrow> (pgt (get_mh_total_full \<omega> (l,f)) pnone))"
-| "wd_pure_exp_total Pr \<Delta> (CExhale locs) (FieldAcc e f) \<omega> \<longleftrightarrow> 
-    wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega> \<and>
-    (\<forall>l. ( (Pr,\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address l))) \<longrightarrow> (l,f) \<in> locs))"
-| "wd_pure_exp_total Pr \<Delta> c (Perm e f) \<omega> \<longleftrightarrow> 
-     wd_pure_exp_total Pr \<Delta> c e \<omega> \<and> (\<forall>r. (Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)) \<longrightarrow> r \<noteq> Null)"
-| "wd_pure_exp_total Pr \<Delta> c _ _  \<longleftrightarrow> False"
-
-(* TODO *)
-(*
-| "wd_pure_exp_total conf Pr \<Delta> (PermPred p exps) \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> (FunApp f exps) \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> Result \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> (Unfolding p exps f e) \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> (Let e1 e2) \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> (PExists ty e) \<omega> \<longleftrightarrow> False"
-| "wd_pure_exp_total conf Pr \<Delta> (PForall ty e) \<omega> \<longleftrightarrow> False" 
-*)
-*)
 
 end
