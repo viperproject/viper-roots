@@ -223,7 +223,6 @@ InhPureNormalMagic SubFailure InhSepNormal InhSepFailureMagic InhImpTrue InhImpF
     W' = inhale_perm_single R \<omega> (the_address r, f) None \<Longrightarrow>
     P R (Atomic (Acc e_r f Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
 "(\<And>\<omega> e_r r e_args v_args W' pred_id R.
-    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
     red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args) \<Longrightarrow>
     W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None \<Longrightarrow>
     P R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
