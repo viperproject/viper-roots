@@ -70,7 +70,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
        red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
        W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p)) \<rbrakk> \<Longrightarrow>       
        red_inhale Pr \<Delta> R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> 
-                (compute_th_result (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
+                (compute_th_result (p \<ge> 0) (W' \<noteq> {}) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhAccWildcard: 
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
        W' = inhale_perm_single R \<omega> (the_address r,f) None \<rbrakk> \<Longrightarrow>
@@ -80,7 +80,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> h
     "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
        W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None \<rbrakk> \<Longrightarrow>
        red_inhale Pr \<Delta> R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> 
-                 (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W'))"
+                 (compute_th_result True (W' \<noteq> {}) (SOME \<omega>'. \<omega>' \<in> W'))"
 | InhPureNormalMagic: 
     "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
       red_inhale Pr \<Delta> R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
@@ -212,21 +212,20 @@ InhPureNormalMagic SubFailure InhSepNormal InhSepFailureMagic InhImpTrue InhImpF
     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<Longrightarrow>
     W' = inhale_perm_single R \<omega> (the_address r, f) (Some (Abs_prat p)) \<Longrightarrow>
     P R (Atomic (Acc e_r f (PureExp e_p))) \<omega> (compute_th_result (0 \<le> p) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
-"(\<And>\<omega> e_p p e_args v_args W' pred_id R r.
+"(\<And>\<omega> e_p p e_args v_args W' pred_id R.
     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<Longrightarrow>
     red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args) \<Longrightarrow>
     W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p)) \<Longrightarrow>
     P R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
-     (compute_th_result (0 \<le> p) (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+     (compute_th_result (0 \<le> p) (W' \<noteq> {}) (SOME \<omega>'. \<omega>' \<in> W')))" and
 "(\<And>\<omega> e_r r W' f R.
     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
     W' = inhale_perm_single R \<omega> (the_address r, f) None \<Longrightarrow>
     P R (Atomic (Acc e_r f Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
-"(\<And>\<omega> e_r r e_args v_args W' pred_id R.
-    Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<Longrightarrow>
+"(\<And>\<omega> e_args v_args W' pred_id R.
     red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args) \<Longrightarrow>
     W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None \<Longrightarrow>
-    P R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {} \<and> r \<noteq> Null) (SOME \<omega>'. \<omega>' \<in> W')))" and
+    P R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> (compute_th_result True (W' \<noteq> {}) (SOME \<omega>'. \<omega>' \<in> W')))" and
 "(\<And>\<omega> e b R.
     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<Longrightarrow>
     P R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic))" and
