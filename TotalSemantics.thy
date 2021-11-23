@@ -78,7 +78,7 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
  | ExhImpTrue: 
    "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
       red_exhale Pr \<Delta> \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (Imp e A) m_pm res" 
  | ExhImpFalse:  
@@ -123,6 +123,7 @@ inductive fold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_i
     FoldRelNormal: 
       "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
+       q \<noteq> pnone;
        red_exhale Pr \<Delta> (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
        m' = (fst m', (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q));
        \<omega>2 = update_m_total_full \<omega> (fst m') (snd m')\<rbrakk> \<Longrightarrow> 
@@ -130,6 +131,7 @@ inductive fold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_i
   | FoldRelFailure:
        "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
+       q \<noteq> pnone;
        red_exhale Pr \<Delta> (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
        fold_rel Pr \<Delta> pred_id vs q \<omega> RFailure"
     
@@ -185,13 +187,20 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     \<omega>' = (SOME \<omega>2. unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent Pr \<Delta> \<omega>') \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> 
-      (Inr (), compute_th_result (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True \<omega>')"
+     W' = {\<omega>2. unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent Pr \<Delta> \<omega>2};
+     th_result_rel (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
+
+\<comment>\<open>\<^const>\<open>unfold_rel\<close> constrains permission \<^term>\<open>p\<close> to be strictly positive\<close>
 | RedUnfoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);     
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
      unfold_rel Pr \<Delta> pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
+| RedUnfoldWildcardFailure:
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+     get_mp_total_full \<omega> (pred_id, v_args) = pnone \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> 
+      (Inr (), RFailure)"
 \<comment>\<open>TODO: unfold acc(P(x),0)\<close>
 
 \<comment>\<open>One should be able to prove that if \<omega> is unfolding consistent, then so is \<omega>' after a fold, without
