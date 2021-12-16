@@ -364,6 +364,7 @@ definition pheap_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a
                       (ViperLang.predicate_decl.body pred_decl)"
 
 coinductive total_heap_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  for Pr :: program and \<Delta> :: "'a interp"
   where 
   UnfoldStep: "\<lbrakk> \<And> pred_id vs q.                      
                      option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates Pr pred_id) \<noteq> None \<Longrightarrow>

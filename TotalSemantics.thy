@@ -125,8 +125,8 @@ inductive fold_rel :: "program \<Rightarrow> 'a interp \<Rightarrow> predicate_i
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
        red_exhale Pr \<Delta> (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
-       m' = (fst m', (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q));
-       \<omega>2 = update_m_total_full \<omega> (fst m') (snd m')\<rbrakk> \<Longrightarrow> 
+       mp'' = (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q);
+       \<omega>2 = update_m_total_full \<omega> (fst m') mp''\<rbrakk> \<Longrightarrow> 
        fold_rel Pr \<Delta> pred_id vs q \<omega> (RNormal \<omega>2)"
   | FoldRelFailure:
        "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;

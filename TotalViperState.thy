@@ -107,6 +107,9 @@ fun get_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask"
 lemma get_mask_total_wf: "wf_mask_simple (get_mh_total \<phi>)"
   using Rep_total_state by auto
 
+lemma get_m_mh_mp_total: "get_m_total \<phi> = (get_mh_total \<phi>, get_mp_total \<phi>)"
+  by simp
+
 lemma get_mh_from_m_total: "get_mh_total \<phi> = fst (get_m_total \<phi>)"
   by simp
 
@@ -200,98 +203,5 @@ lemma get_mask_total_full_wf: "wf_mask_simple (get_mh_total_full \<omega>)"
   using get_mask_total_wf
   by simp
 
-(*
-subsection \<open>Addition of total states\<close>
-
-fun compatible_pre_states_total :: "'a pre_total_state \<Rightarrow> 'a pre_total_state \<Rightarrow> bool"
-  where
-    "compatible_pre_states_total s1 s2 =    
-    (let (m1,h1) = get_mh_pre_total s1; (m2,h2) = get_mh_pre_total s2 in
-      ( (\<forall>l. (pgt (m1 l) pnone \<and> pgt (m2 l) pnone) \<longrightarrow> (h1 l = h2 l)) \<and>
-        wf_mask_simple (add_masks m1 m2) )
-    )"
-
-definition add_total_heaps :: "'a total_heap \<Rightarrow> 'a total_heap \<Rightarrow> mask \<Rightarrow> 'a total_heap"
-  where "add_total_heaps h1 h2 m2 = (\<lambda>l. if ((pgt (m2 l) pnone)) then h2 l else h1 l)"
-*)
-(*
-text \<open>For compatible states, always the heap value of the first state is taken if the second state 
-does not have positive permission to the corresponding location.\<close>
-?*)
-
-(*
-fun pre_plus_total :: "'a pre_total_state \<Rightarrow> 'a pre_total_state \<Rightarrow> 'a pre_total_state option" where
-  "pre_plus_total s1 s2 =
-    (if compatible_pre_states_total s1 s2 then
-       Some (add_masks (get_mask_pre_total s1) (get_mask_pre_total s2), 
-             add_total_heaps (get_heap_pre_total s1) (get_heap_pre_total s2) (get_mask_pre_total s2))
-     else None)"
-*)
-
-(*
-lemma add_total_heaps_pos_compat:
-  assumes "m1 hl \<noteq> pnone" and "compatible_pre_states_total (m1,h1) (m2,h2)"
-  shows "(add_total_heaps h1 h2 m2) hl = h1 hl"
-proof (cases "pgt (m2 hl) pnone")
-  case True
-  hence "h1 hl = h2 hl" using assms    
-    apply simp
-    apply (drule prat_pnone_pgt)
-    by (metis prod.exhaust)
-  thus ?thesis
-    by (simp add: add_total_heaps_def)
-qed (simp add: add_total_heaps_def)
-*)
-(*
-fun plus_total :: "'a total_state \<Rightarrow> 'a total_state \<Rightarrow> 'a total_state option"  where
-  "plus_total \<phi>1 \<phi>2 = map_option Abs_total_state (pre_plus_total (Rep_total_state \<phi>1) (Rep_total_state \<phi>2))"
-
-fun plus_total_full :: "'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state option" (infixl "|\<oplus>|\<^sub>t" 60) where
-  (*"(\<sigma>1,\<tau>1,\<phi>1) |\<oplus>|\<^sub>t (\<sigma>2,\<tau>2,\<phi>2) = 
-           (if \<sigma>1 = \<sigma>2 \<and> \<tau>1 = \<tau>2 then map_option (\<lambda>res. (\<sigma>1,\<tau>1,res)) (plus_total \<phi>1 \<phi>2) else None)"*)
- "\<omega>1 |\<oplus>|\<^sub>t \<omega>2 = 
-           (if fst \<omega>1 = fst \<omega>2 \<and> fst (snd \<omega>1) = fst (snd \<omega>2) then map_option (\<lambda>res. (fst \<omega>1, fst (snd \<omega>1),res)) (plus_total (snd (snd \<omega>1)) (snd (snd \<omega>2))) else None)"
-*)
-(*
-lemma plus_total_full_properties:
-  assumes "\<omega>1 |\<oplus>|\<^sub>t \<omega>2 = Some \<omega>3"
-  shows "compatible_pre_states_total (get_mask_total_full \<omega>1, get_heap_total_full \<omega>1) (get_mask_total_full \<omega>2, get_heap_total_full \<omega>2) \<and> 
-         get_mask_total_full \<omega>3 = add_masks (get_mask_total_full \<omega>1) (get_mask_total_full \<omega>2) \<and> 
-         get_heap_total_full \<omega>3 = add_total_heaps (get_heap_total_full \<omega>1) (get_heap_total_full \<omega>2) (get_mask_total_full \<omega>2) \<and>
-         get_store_total \<omega>1 = get_store_total \<omega>3 \<and>
-         get_trace_total \<omega>1 = get_trace_total \<omega>3" (is "compatible_pre_states_total (?m1,?h1) (?m2,?h2) \<and> ?Q")
-  using assms
-proof -
-  let ?hm1 = "get_total_full \<omega>1"
-  let ?hm2 = "get_total_full \<omega>2"
-  have R1: "Rep_total_state ?hm1 = (?m1, ?h1)" and R2:"Rep_total_state ?hm2 = (?m2, ?h2)"
-    by simp_all
-  from assms have A0:"plus_total ?hm1 ?hm2 = Some (get_total_full \<omega>3)"
-    by (clarsimp split: if_split_asm)
-  hence A1:"pre_plus_total (?m1, ?h1) (?m2, ?h2) = Some (add_masks ?m1 ?m2, add_total_heaps ?h1 ?h2 ?m2) \<and> compatible_pre_states_total (?m1, ?h1) (?m2, ?h2)"
-    apply (clarsimp simp del: get_total_full.simps)
-    apply (subst R1 R2)+
-    apply (subst (asm) R1 R2)+
-    by (metis fst_conv option.discI snd_conv)  
-  hence A2:"Some (get_total_full \<omega>3) = Some (Abs_total_state (add_masks ?m1 ?m2, add_total_heaps ?h1 ?h2 ?m2))"
-    using A0
-    by simp
-  hence "get_mask_total_full \<omega>3 = add_masks ?m1 ?m2"
-    using HOL.conjunct2[OF A1]
-    by (metis (mono_tags, lifting) Abs_total_state_inverse compatible_pre_states_total.simps fst_conv get_total_full_comp mem_Collect_eq option.inject wf_pre_total_state.simps) 
-  moreover from A2 have "get_heap_total_full \<omega>3 = add_total_heaps ?h1 ?h2 ?m2"
-    using HOL.conjunct2[OF A1]
-    by (metis Abs_total_state_inverse calculation get_total_full_comp get_mask_total_full_wf mem_Collect_eq option.inject sndI wf_pre_total_state.simps) 
-  ultimately show ?thesismask
-    using HOL.conjunct2[OF A1] assms
-    by (clarsimp split: if_split_asm)
-qed
-*)
-
-(*
-definition plus_total_full_set :: "('a full_total_state) set \<Rightarrow> ('a full_total_state) set \<Rightarrow> ('a full_total_state) set"
-  where
-    "plus_total_full_set A B \<equiv> { \<phi> | \<phi> a b. a \<in> A \<and> b \<in> B \<and> Some \<phi> = a |\<oplus>|\<^sub>t b }"
-*)                
 
 end
