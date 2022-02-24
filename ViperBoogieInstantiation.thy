@@ -1,0 +1,167 @@
+section \<open>Viper Instantiation of Boogie Abstract Values\<close>
+
+theory ViperBoogieInstantiation
+imports Viper.ViperLang Viper.ValueAndBasicState Boogie_Lang.Semantics HOL.Real TotalUtil Boogie_Lang.VCExprHelper
+begin
+
+type_synonym 'a vpr_val = "'a ValueAndBasicState.val"
+type_synonym 'a bpl_val = "'a Semantics.val"
+
+type_synonym vpr_ty = ViperLang.vtyp
+type_synonym bpl_ty = Lang.ty
+
+type_synonym viper_prog = "ViperLang.program"
+
+subsection \<open>Abstract values datatype\<close>
+
+\<comment>\<open>implementation detail\<close>
+datatype 'a vb_field = 
+     NormalField field_ident vpr_ty
+   | PredSnapshotField "'a predicate_loc" 
+   | PredKnownFoldedField "'a predicate_loc"
+   | DummyField bpl_ty bpl_ty \<comment>\<open>used to make sure that every field type \<open>Field A B\<close> is inhabited\<close>
+
+\<comment>\<open>implementation detail\<close>
+codatatype 'a frame_fragment = EmptyFrame | LiftFrame 'a | CombineFrame "'a frame_fragment" "'a frame_fragment"
+
+datatype 'a vbpl_absval = 
+    ARef ref
+  | ADomainVal 'a
+\<comment>\<open>implementation detail\<close>
+  | AField "'a vb_field"
+  | AHeap "ref \<Rightarrow> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
+  | AMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> real"                      
+  | AKnownFoldedMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> bool"         
+  | AFrame  "(('a vbpl_absval) bpl_val) frame_fragment"
+  | ADummy tcon_id "bpl_ty list" 
+
+text \<open>The reason for including \<^const>\<open>ADummy\<close> is that the Boogie interface requires that every type 
+is inhabited. We will need to make sure that \<^term>\<open>ADummy tcon_id ts\<close> is mapped to \<^term>\<open>TCon tcon_id ts\<close> 
+only if \<^term>\<open>TCon tcon_id ts\<close> is not a meaningful type (e.g., not the heap type)\<close>
+
+type_synonym 'a vbpl_val = "('a vbpl_absval) bpl_val"
+
+subsection \<open>Translation interface\<close>
+
+datatype tcon_enum = TCRef | TCField | TCHeap | TCMask | TCKnownFoldedMask | TCFrameFragment | TCNormalField
+
+record 'a vpr_bpl_translation =
+  tcon_id_repr :: "tcon_enum \<Rightarrow> tcon_id"
+  pred_snap_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
+  pred_knownfolded_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
+  domain_translation :: "abs_type \<rightharpoonup> tcon_id \<times> ty list" \<comment>\<open>we assume domains without type parameters\<close>
+  domain_type :: "'a \<Rightarrow> abs_type"
+
+abbreviation "TRefId T \<equiv> (tcon_id_repr T) TCRef"
+abbreviation "TFieldId T \<equiv> (tcon_id_repr T) TCField"
+abbreviation "THeapId T \<equiv> (tcon_id_repr T) TCHeap"
+abbreviation "TMaskId T \<equiv> (tcon_id_repr T) TCMask"
+abbreviation "TKnownFoldedMaskId T \<equiv> (tcon_id_repr T) TCKnownFoldedMask"
+abbreviation "TFrameFragmentId T \<equiv> (tcon_id_repr T) TCFrameFragment"
+abbreviation "TNormalFieldId T \<equiv> (tcon_id_repr T) TCNormalField"
+
+text \<open>For the dummy type, we just pick some identifier that is different from all the ones used by 
+      the translation\<close>
+definition TDummyId :: "'a vpr_bpl_translation \<Rightarrow> tcon_id"
+  where "TDummyId T \<equiv> (SOME v. v \<notin> range (tcon_id_repr T))"
+
+abbreviation TConSingle :: "tcon_id \<Rightarrow> bpl_ty"
+  where "TConSingle tid \<equiv> TCon tid []"
+
+subsection \<open>Type interpretation\<close>
+
+fun vpr_to_bpl_ty :: "'a vpr_bpl_translation \<Rightarrow> vpr_ty \<rightharpoonup> bpl_ty"
+  where 
+    "vpr_to_bpl_ty T ViperLang.TInt = Some (Lang.TPrim Lang.TInt)"
+  | "vpr_to_bpl_ty T ViperLang.TBool = Some( Lang.TPrim Lang.TBool)"  
+  | "vpr_to_bpl_ty T ViperLang.TPerm = undefined" (* TODO: Real type in Boogie *)
+  | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
+  | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
+
+fun field_ty_fun_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
+  where 
+    "field_ty_fun_opt T (NormalField field_id vty) = map_option (\<lambda>t.(TFieldId T, [TConSingle (TNormalFieldId T), t])) (vpr_to_bpl_ty T vty)"
+  | "field_ty_fun_opt T (PredSnapshotField pred_loc) = 
+       map_option (\<lambda>p. (TFieldId T, [p, TConSingle (TFrameFragmentId T)])) (pred_snap_field_type T (fst pred_loc))"
+  | "field_ty_fun_opt T (PredKnownFoldedField pred_loc) = 
+       map_option (\<lambda>p. (TFieldId T, [p, TConSingle (TFrameFragmentId T)])) (pred_knownfolded_field_type T (fst pred_loc))"
+  | "field_ty_fun_opt T (DummyField t1 t2) =
+       Some_if (closed t1 \<and> closed t2) (TFieldId T, [t1, t2])"
+
+fun tcon_to_bplty :: "(tcon_id \<times> bpl_ty list) \<Rightarrow> bpl_ty"
+  where "tcon_to_bplty tc = TCon (fst tc) (snd tc)"
+
+definition heap_rel :: "('a vbpl_absval \<times> 'a vbpl_absval) set"
+  where "heap_rel = {(y, (AHeap h)) | h r f y v. h r f = Some v \<and> y \<in> set_val v}"
+
+lemma wf_heap_rel: "wf heap_rel"
+  unfolding wf_def
+  apply (rule)+
+  apply (unfold heap_rel_def)
+  apply (rule vbpl_absval.induct)
+  by auto (metis UNIV_I image_eqI vbpl_absval.inject(4))
+
+primrec ty_inhabitant :: "tcon_enum \<rightharpoonup> (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval))" 
+  where
+    "ty_inhabitant TCRef      = Some (0, \<lambda>_.  ARef undefined)"
+  | "ty_inhabitant TCField    = Some (2, \<lambda>ts. AField (DummyField (hd ts) (hd (tl ts))))"
+  | "ty_inhabitant TCHeap     = Some (0, \<lambda>_. AHeap (\<lambda> _ _. None))"
+  | "ty_inhabitant TCMask     = Some (0, \<lambda>_. AMask (\<lambda> _ _. 0))"
+  | "ty_inhabitant TCKnownFoldedMask = Some (0, \<lambda>_. AKnownFoldedMask (\<lambda> _ _. False))"
+  | "ty_inhabitant TCFrameFragment = Some (0, \<lambda>_. AFrame EmptyFrame)"
+  | "ty_inhabitant TCNormalField = None"
+
+text\<open>The \<open>NormalField\<close> type is used only to construct field types and thus, we do not need to provide
+an inhabitant that is not a dummy value.\<close>
+
+definition is_inhabited :: "'a vpr_bpl_translation \<Rightarrow> tcon_id \<Rightarrow> nat \<Rightarrow> bool"
+  where 
+    "is_inhabited T tid n = 
+      (\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
+         (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res)"
+
+
+function (sequential) vbpl_absval_ty_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
+  where 
+   "vbpl_absval_ty_opt T (ARef r) = Some (TRefId T, [])"
+ | "vbpl_absval_ty_opt T (AField vb_field) = (field_ty_fun_opt T vb_field)"
+ | "vbpl_absval_ty_opt T (ADomainVal v) = domain_translation T (domain_type T v)"
+ | "vbpl_absval_ty_opt T (AHeap h) = 
+      Some_if 
+          (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
+             h r f = Some v \<and> field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<longrightarrow> 
+             (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
+                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)
+          ) 
+          (THeapId T, [])"
+ | "vbpl_absval_ty_opt T (AMask m) = Some (TMaskId T, [])"
+ | "vbpl_absval_ty_opt T (AKnownFoldedMask pm) = Some (TKnownFoldedMaskId T, [])"
+ | "vbpl_absval_ty_opt T (AFrame f) = Some (TFrameFragmentId T, [])"
+ | "vbpl_absval_ty_opt T (ADummy tid ts) = 
+     Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+  by (pat_completeness) auto
+termination
+  apply (relation "inv_image heap_rel snd")
+   apply (rule wf_inv_image)
+   apply (rule wf_heap_rel)
+  apply (unfold heap_rel_def)
+  by fastforce
+
+fun vbpl_absval_ty :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_absval \<Rightarrow> (tcon_id \<times> bpl_ty list)"
+  where
+    "vbpl_absval_ty T a = option_fold id (TDummyId T, []) (vbpl_absval_ty_opt T a)"
+
+text\<open> \<^const>\<open>vbpl_absval_ty\<close> is the type interpretation for the Boogie abstract value instantiation 
+      used for Viper.\<close>
+
+term type_of_val
+lemma vbpl_absval_ty_closed: "closed (tcon_to_bplty (vbpl_absval_ty A v))"
+
+(* ( ( (\<forall>t. closed t \<longrightarrow> (\<exists>v. type_of_val A (v :: 'a val) = t)) \<and> (\<forall>v. closed ((type_of_val A) v)) ) *)
+
+
+
+
+
+
+end
