@@ -2,7 +2,7 @@ theory TotalUtil
 imports Viper.ViperLang Viper.ValueAndBasicState TotalStateUtil
 begin
 
-fun map_result_2 :: "(mask \<Rightarrow> (mask set) option) \<Rightarrow> (mask set) option \<Rightarrow> (mask set) option"
+fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
   where 
     "map_result_2 f None = None"
   | "map_result_2 f (Some xs) = (if \<exists>x \<in> xs. f x = None then None else Some (\<Union>x \<in> xs. the (f x))) "
@@ -24,5 +24,11 @@ fun option_fold :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a opti
 
 fun nth_option :: "'a list => nat => 'a option"
   where "nth_option xs n = (if n < length xs then Some (nth xs n) else None)"
+
+abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option" where
+  "option_if b opt \<equiv> if b then opt else None"
+
+abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
+  "Some_if b x \<equiv> option_if b (Some x)"
 
 end
