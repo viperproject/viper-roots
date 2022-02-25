@@ -52,6 +52,12 @@ record 'a vpr_bpl_translation =
   domain_translation :: "abs_type \<rightharpoonup> tcon_id \<times> ty list" \<comment>\<open>we assume domains without type parameters\<close>
   domain_type :: "'a \<Rightarrow> abs_type"
 
+definition wf_vpr_bpl_translation :: "'a vpr_bpl_translation \<Rightarrow> bool"
+  where "wf_vpr_bpl_translation T \<equiv>
+               (\<forall> vt bt. domain_translation T vt = Some bt \<longrightarrow> list_all closed (snd bt)) \<and>
+               (\<forall> pid bt. pred_snap_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
+               (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt)"
+
 abbreviation "TRefId T \<equiv> (tcon_id_repr T) TCRef"
 abbreviation "TFieldId T \<equiv> (tcon_id_repr T) TCField"
 abbreviation "THeapId T \<equiv> (tcon_id_repr T) TCHeap"
@@ -68,13 +74,16 @@ definition TDummyId :: "'a vpr_bpl_translation \<Rightarrow> tcon_id"
 abbreviation TConSingle :: "tcon_id \<Rightarrow> bpl_ty"
   where "TConSingle tid \<equiv> TCon tid []"
 
+lemma "closed (TConSingle tid)"
+  by simp
+
 subsection \<open>Type interpretation\<close>
 
 fun vpr_to_bpl_ty :: "'a vpr_bpl_translation \<Rightarrow> vpr_ty \<rightharpoonup> bpl_ty"
   where 
     "vpr_to_bpl_ty T ViperLang.TInt = Some (Lang.TPrim Lang.TInt)"
   | "vpr_to_bpl_ty T ViperLang.TBool = Some( Lang.TPrim Lang.TBool)"  
-  | "vpr_to_bpl_ty T ViperLang.TPerm = undefined" (* TODO: Real type in Boogie *)
+  | "vpr_to_bpl_ty T ViperLang.TPerm = Some (Lang.TPrim Lang.TInt)" (* TODO: Real type in Boogie *)
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
   | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
 
@@ -87,6 +96,14 @@ fun field_ty_fun_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<righ
        map_option (\<lambda>p. (TFieldId T, [p, TConSingle (TFrameFragmentId T)])) (pred_knownfolded_field_type T (fst pred_loc))"
   | "field_ty_fun_opt T (DummyField t1 t2) =
        Some_if (closed t1 \<and> closed t2) (TFieldId T, [t1, t2])"
+
+lemma field_ty_fun_opt_closed: "wf_vpr_bpl_translation T \<Longrightarrow> 
+                                field_ty_fun_opt T f = Some res \<Longrightarrow>  
+                                list_all closed (snd res)"  
+  apply (cases f)
+     apply (rename_tac vty)
+     apply (case_tac vty)
+  by (auto split: if_split_asm simp: wf_vpr_bpl_translation_def)
 
 fun tcon_to_bplty :: "(tcon_id \<times> bpl_ty list) \<Rightarrow> bpl_ty"
   where "tcon_to_bplty tc = TCon (fst tc) (snd tc)"
@@ -154,14 +171,93 @@ fun vbpl_absval_ty :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_absval \<Rig
 text\<open> \<^const>\<open>vbpl_absval_ty\<close> is the type interpretation for the Boogie abstract value instantiation 
       used for Viper.\<close>
 
-term type_of_val
-lemma vbpl_absval_ty_closed: "closed (tcon_to_bplty (vbpl_absval_ty A v))"
+subsection \<open>Properties of type interpretation\<close>
 
-(* ( ( (\<forall>t. closed t \<longrightarrow> (\<exists>v. type_of_val A (v :: 'a val) = t)) \<and> (\<forall>v. closed ((type_of_val A) v)) ) *)
+lemma vbpl_absval_ty_opt_closed:
+  assumes "wf_vpr_bpl_translation T" and
+          "vbpl_absval_ty_opt T v = Some res"
+  shows   "list_all closed (snd res)"
+  apply (cases res)
+  apply (insert assms)
+  by (cases v) (auto split: if_split_asm simp: wf_vpr_bpl_translation_def dest: field_ty_fun_opt_closed[OF assms(1)])
 
+lemma vbpl_absval_ty_closed: 
+  assumes "wf_vpr_bpl_translation T"
+  shows "closed (tcon_to_bplty (vbpl_absval_ty T v))" 
+  by (cases "(vbpl_absval_ty_opt T v)") (auto dest: vbpl_absval_ty_opt_closed[OF assms])
 
+lemma deconstruct_list_length_2:
+  assumes "length xs = 2"
+  shows "\<exists> x1 x2. xs = [x1,x2]"
+proof (cases xs)
+  case (Cons y ys)
+  show ?thesis
+  proof (cases ys)
+    case Nil
+    then show ?thesis using Cons assms by simp
+  next
+    case (Cons z zs)
+    then show ?thesis using \<open>xs = y # ys\<close> Cons assms by simp
+  qed  
+qed (insert assms; simp)
 
+lemma ty_inhabitant_well_typed:
+  assumes TyInh:"ty_inhabitant tc_enum = Some (n,f)" and
+          "n = length ts" and
+          Closed:"list_all closed ts"
+  shows "vbpl_absval_ty_opt T (f ts) = Some (tcon_id_repr T tc_enum, ts)"
+proof (cases tc_enum)
+  case TCField
+  hence "n = 2" and "f = (\<lambda>ts. AField (DummyField (hd ts) (hd (tl ts))))" (is "(f = ?f)")
+    using TyInh \<open>n = length ts\<close>
+    by auto
+  moreover from \<open>n = 2\<close> \<open>n = length ts\<close> have "ts = [(hd ts), (hd (tl ts))]"
+    using deconstruct_list_length_2
+    by fastforce
+  ultimately show ?thesis
+    using Closed TCField
+    by (metis (mono_tags, lifting) field_ty_fun_opt.simps(4) list.pred_inject(2) vbpl_absval_ty_opt.simps(2))
+qed (insert assms, auto)
 
+theorem is_inhabited_correct:
+  assumes Inh:"is_inhabited T tid n" and "n = length ts" and "list_all closed ts"
+  shows "\<exists>v. vbpl_absval_ty_opt T v = Some (tid, ts)"
+  using assms ty_inhabitant_well_typed
+  unfolding is_inhabited_def
+  by (metis prod.exhaust_sel)  
 
+theorem closed_types_inhabited:
+  assumes "closed t"
+  shows "\<exists>v. type_of_val (vbpl_absval_ty T) v = t"
+proof (cases t)
+case (TVar x1)
+  then show ?thesis using assms by simp
+next
+  case (TPrim tprim)
+  show ?thesis 
+    apply (cases tprim) 
+     apply (metis TPrim type_of_lit.simps(1) type_of_val.simps(1))
+    apply (metis TPrim type_of_lit.simps(2) type_of_val.simps(1))
+    done
+next
+  case (TCon tid ts)
+  hence Closed:"list_all closed ts" using \<open>closed t\<close>
+    by simp
+  show ?thesis
+  proof (cases "is_inhabited T tid (length ts)")
+    case True
+    from is_inhabited_correct[OF True _ Closed] obtain absv where
+      TyV:"vbpl_absval_ty_opt T absv = Some (tid, ts)"
+      by auto
+    show ?thesis
+      by (rule exI[where ?x="AbsV absv"]) (auto simp: TyV TCon)         
+  next
+    case False
+    show ?thesis
+      apply  (rule exI[where ?x="AbsV (ADummy tid ts)"])
+      using False \<open>closed t\<close> TCon
+      by auto
+  qed
+qed
 
 end
