@@ -41,6 +41,8 @@ only if \<^term>\<open>TCon tcon_id ts\<close> is not a meaningful type (e.g., n
 
 type_synonym 'a vbpl_val = "('a vbpl_absval) bpl_val"
 
+type_synonym 'a heap_repr = "ref \<Rightarrow> 'a vb_field \<rightharpoonup> 'a vbpl_val"
+
 subsection \<open>Translation interface\<close>
 
 datatype tcon_enum = TCRef | TCField | TCHeap | TCMask | TCKnownFoldedMask | TCFrameFragment | TCNormalField
@@ -224,11 +226,14 @@ theorem is_inhabited_correct:
   shows "\<exists>v. vbpl_absval_ty_opt T v = Some (tid, ts)"
   using assms ty_inhabitant_well_typed
   unfolding is_inhabited_def
-  by (metis prod.exhaust_sel)  
+  by (metis prod.exhaust_sel)
+
+abbreviation type_of_vbpl_val :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
+  where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
 
 theorem closed_types_inhabited:
   assumes "closed t"
-  shows "\<exists>v. type_of_val (vbpl_absval_ty T) v = t"
+  shows "\<exists>v. type_of_vbpl_val T v = t"
 proof (cases t)
 case (TVar x1)
   then show ?thesis using assms by simp
@@ -259,5 +264,80 @@ next
       by auto
   qed
 qed
+
+subsection \<open>Functions for map instantiations\<close>
+
+fun arg_types_of_field :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<rightharpoonup> bpl_ty \<times> bpl_ty"
+  where
+    "arg_types_of_field T f = 
+      ( case field_ty_fun_opt T f of
+          Some (tid, [t1,t2]) \<Rightarrow> Some (t1,t2)
+       | _ \<Rightarrow> None )"
+
+subsubsection \<open>Heap\<close>
+
+text \<open>select function for the heap: readHeap<A, B>(h: HeapType, r: Ref, f: (Field A B)): B\<close>
+
+definition select_heap_aux :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty \<Rightarrow> 'a heap_repr \<Rightarrow> ref \<Rightarrow> 'a vb_field \<Rightarrow> 'a vbpl_val"
+  where 
+    "select_heap_aux T ret_ty h r f = 
+       option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h r f)"
+
+fun select_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+  where 
+    "select_heap T ts vs = 
+        (case (ts, vs) of 
+           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
+             if (if_Some (arg_types_of_field T f) (\<lambda>res. res  = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])))
+             then Some (select_heap_aux T t2 h r f)
+             else None
+         | _ \<Rightarrow> None)"
+
+text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
+
+fun store_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+  where
+    "store_heap T ts vs = 
+       (case (ts, vs) of 
+          ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
+             if (if_Some (arg_types_of_field T f) (\<lambda>res. res = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])))
+             then Some (AbsV (  AHeap (h( r := (h r)(f \<mapsto> v) ))  ))
+             else None
+        | _ \<Rightarrow> None)"
+
+subsubsection \<open>Mask\<close>
+
+text \<open>select function for the heap: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
+(* todo need to add reals 
+fun select_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+  where 
+    "select_mask T ts vs = 
+        (case (ts, vs) of 
+           ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
+             Some (RealV (m r f))
+        | _ \<Rightarrow> None)"
+*)
+
+subsubsection \<open>Knownfolded Mask\<close>
+
+text \<open>select function for the knownfolded mask: readPMask<A, B>(pm: PMaskType, r: Ref, f: (Field A B)): bool\<close>
+
+fun select_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+  where 
+    "select_mask T ts vs = 
+        (case (ts, vs) of 
+           ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
+             Some (BoolV (m r f))
+        | _ \<Rightarrow> None)"
+
+text \<open>store function for the knownfolded mask: updPMask<A, B>(PMaskType: PMaskType, obj: Ref, f_1: (Field A B), y: bool): PMaskType\<close>
+
+fun store_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+  where 
+    "store_mask T ts vs = 
+        (case (ts, vs) of 
+           ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f), BoolV b]) \<Rightarrow> 
+             Some (AbsV (AKnownFoldedMask (m(r := (m r)(f := b)))))
+        | _ \<Rightarrow> None)"
 
 end
