@@ -25,8 +25,8 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale acc(e.f, p)\<close>
     ExhAcc: 
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
-       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
+       Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
+       Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
        a = the_address r \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
                            (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
@@ -34,7 +34,7 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
  \<comment>\<open>Exhaling wildcard removes some non-zero permission that this is less than the current permission held.\<close>
   | ExhAccWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+       Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
        q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
@@ -43,14 +43,14 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale acc(P(es), p)\<close>
   | ExhAccPred:
      "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
-       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
+       red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
+       Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
               (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
                             (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
   | ExhAccPredWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+       red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
        q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone)
@@ -59,11 +59,11 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale other cases\<close>
   | ExhPure:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
-       Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+       Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
        red_exhale Pr \<Delta> \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
   | SubAtomicFailure: 
     "\<lbrakk> e \<in> sub_expressions_atomic A ;
-      Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+      Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
        red_exhale Pr \<Delta> \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
 
 \<comment>\<open>exhale A && B\<close>
@@ -78,16 +78,16 @@ inductive red_exhale :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_t
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
  | ExhImpTrue: 
    "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+      Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
       red_exhale Pr \<Delta> \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
       red_exhale Pr \<Delta> \<omega>0 (Imp e A) m_pm res" 
  | ExhImpFalse:  
    "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+      Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
       red_exhale Pr \<Delta> \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
  | ExhImpFailure:
    "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm); 
-      Pr, \<Delta>, get_valid_locs \<omega>0 \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+      Pr, \<Delta>, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
      red_exhale Pr \<Delta> \<omega>0 (Imp e A) m_pm ExhaleFailure"
 
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
@@ -171,33 +171,33 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
         \<^term>\<open>Assert A\<close> goes to failure iff \<^term>\<open>Assume A\<close> goes to magic. \<close>
 
  | RedLocalAssign:
-   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<rbrakk> \<Longrightarrow> 
+   "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<rbrakk> \<Longrightarrow> 
      red_stmt_total_single_set Pr \<Delta> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
  | RedFieldAssign: 
-   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
+   "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
       get_mh_total_full \<omega> (addr,f) = pwrite;
-      Pr, \<Delta>, get_valid_locs \<omega>  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
+      Pr, \<Delta>, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
 \<comment>\<open>Is null case handled in NestedPermSem?\<close>
  | RedFieldAssignFailure: 
-   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+   "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
       r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
 
 | RedUnfold:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
-     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
+     Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
      W' = {\<omega>2. unfold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent Pr \<Delta> \<omega>2};
      th_result_rel (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
 
 \<comment>\<open>\<^const>\<open>unfold_rel\<close> constrains permission \<^term>\<open>p\<close> to be strictly positive\<close>
 | RedUnfoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
      unfold_rel Pr \<Delta> pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
 | RedUnfoldWildcardFailure:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
      get_mp_total_full \<omega> (pred_id, v_args) = pnone \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Unfold pred_id e_args Wildcard) \<omega> 
       (Inr (), RFailure)"
@@ -208,14 +208,14 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
   (and even if there is a wildcard, we know that there must be at least one transition for the
  newly generated predicate instance, namely the one before the fold)\<close>
 | RedFold:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);
-     Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);
+     Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
      fold_rel Pr \<Delta> pred_id v_args (Abs_prat v_p) \<omega> res
  \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
 
 | RedFoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr \<Delta> (get_valid_locs \<omega>) e_args \<omega> (Some v_args);     
+  "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args);     
      fold_rel Pr \<Delta> pred_id v_args p \<omega> res \<rbrakk> \<Longrightarrow>
     red_stmt_total_single_set Pr \<Delta> (Fold pred_id e_args Wildcard) \<omega> (Inr (), res)"
 \<comment>\<open>TODO: fold acc(P(x),0)\<close>
@@ -223,13 +223,13 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
 \<comment>\<open>Composite statements\<close>
 
  | RedIfTrue: 
-   "\<lbrakk> Pr, \<Delta>, get_valid_locs \<omega> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
+   "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (If e_b s1 s2) \<omega> (Inl s1, RNormal \<omega>)"
  | RedIfFalse: 
-   "\<lbrakk> Pr,\<Delta>,get_valid_locs \<omega> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+   "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
       red_stmt_total_single_set Pr \<Delta> (If e_b s1 s2) \<omega> (Inl s2, RNormal \<omega>)"
  | RedIfFailure:
-    "\<lbrakk> Pr,\<Delta>,get_valid_locs \<omega> \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+    "\<lbrakk> Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
        red_stmt_total_single_set Pr \<Delta> (If e_b s1 s2) \<omega> (Inr (), RFailure)"
  | RedSeq1:
    "\<lbrakk> red_stmt_total_single_set Pr \<Delta> s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
@@ -240,7 +240,7 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
 
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
-  "\<lbrakk> e \<in> sub_expressions s; Pr,\<Delta>,get_valid_locs \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+  "\<lbrakk> e \<in> sub_expressions s; Pr,\<Delta>,(Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
     red_stmt_total_single_set Pr \<Delta> s \<omega> (Inr (), RFailure)"
 
 type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a standard_result"
