@@ -1,15 +1,23 @@
+section \<open>Expression evaluation, inhale, total heap consistency\<close>
+
 theory TotalExpressions
 imports Viper.ViperLang Viper.ValueAndBasicState TotalViperState Viper.Binop Viper.DeBruijn Viper.PredicatesUtil TotalUtil
 begin
 
-section \<open>Pure expression evaluation and inhale\<close>
+subsection \<open>Heap-dependent function interpretation\<close>
+type_synonym 'a heapfun_repr = "'a val list \<Rightarrow> 'a full_total_state \<rightharpoonup> 'a extended_val"
+type_synonym 'a interp = "function_ident \<rightharpoonup> 'a heapfun_repr"
 
-fun wd_binop :: "binop \<Rightarrow> 'a val \<Rightarrow> 'a val \<Rightarrow> bool"
-  where 
-    "wd_binop IntDiv v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
-  | "wd_binop PermDiv v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
-  | "wd_binop Mod v1 v2 \<longleftrightarrow> v2 \<noteq> (VInt 0)"
-  | "wd_binop _ _ _ = True"
+text \<open>\<^typ>\<open>'a heapfun_repr\<close> provides a semantic representation of heap-dependent functions. The possible outcomes
+for \<^term>\<open>(f::'a heapfun_repr) vs \<omega>\<close> are 
+\<^item> \<^term>\<open>None\<close>: There is a typing issue (e.g., \<^term>\<open>vs\<close> does not have the correct length or not the correct types)
+\<^item> \<^term>\<open>Some VFailure\<close>: There is no typing issue, but the function applied to arguments \<^term>\<open>vs\<close> 
+                       in state \<^term>\<open>\<omega>\<close> is ill-defined (i.e., \ \<^term>\<open>f\<close>'s  precondition is violated for arguments \<^term>\<open>vs\<close> 
+                       in state \<^term>\<open>\<omega>\<close>).
+\<^item> \<^term>\<open>Some (Val v)\<close>: There is no typing issue and the function call is well-defined. The resulting value is \<^term>\<open>v\<close>.
+\<close>
+
+subsection \<open>Pure expression evaluation and inhale\<close>
 
 datatype 'a standard_result = RMagic | RFailure | RNormal "'a full_total_state"
 
@@ -43,8 +51,6 @@ inductive_cases THResultNormal_case: "th_result_rel True True W (RNormal \<omega
 
 lemma THResultNormal_alt: "\<lbrakk> \<omega> \<in> W; A; B\<rbrakk> \<Longrightarrow> th_result_rel A B W (RNormal \<omega>)"
   by (cases A; cases B) (auto intro: THResultNormal)
-
-
 
 lemma th_result_rel_normal: 
   assumes "th_result_rel a b W (RNormal \<omega>)"
@@ -195,6 +201,16 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
        Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some \<omega>_def (\<lambda>res. (a,f) \<in> get_valid_locs res)) then Val v else VFailure)"
 | RedFieldFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
 
+\<comment>\<open>Function application\<close>
+| RedFunApp: "\<lbrakk> \<Delta> fname = Some f;
+                red_pure_exps_total Pr \<Delta> \<omega>_def es \<omega> (Some vs);                
+                f vs \<omega> = Some (Val v) \<rbrakk> \<Longrightarrow> 
+                Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v)"
+| RedFunAppFailure: 
+             "\<lbrakk> \<Delta> fname = Some f;
+                red_pure_exps_total Pr \<Delta> \<omega>_def es \<omega> None \<or> f vs \<omega> = Some VFailure \<rbrakk> \<Longrightarrow>  
+                Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+
 \<comment>\<open>Permission introspection\<close>
 | RedPermNull: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
 | RedPerm: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat (get_mh_total_full \<omega> (a, f))))"
@@ -207,16 +223,6 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
      unfold_rel Pr \<Delta> pred_id vs pwrite \<omega>_def \<omega>'_def;
      Pr, \<Delta>, (Some \<omega>'_def) \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      Pr, \<Delta>, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t v"
-(*                                                               
-| RedUnfolding: "\<lbrakk> 
-         Pr, \<Delta>, LH \<turnstile> \<langle>e_arg; \<omega>\<rangle> [\<Down>]\<^sub>t v_arg;
-        ViperLang.predicates Pr p = Some pred;
-        ViperLang.predicate_decl.body pred = Some pred_body;
-        red_inhale Pr \<Delta> False pred_body \<omega> (RNormal \<omega>');
-            
- \<rbrakk> \<Longrightarrow>
-     Pr, \<Delta>, LH \<turnstile> \<langle>Unfolding p [e_arg] p_body; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
-*)
 
 (*| RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>  Pr, \<Delta> \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
 (*| RedUnfoldingPermNegFailure: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v) ; v < 0 \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Unfolding p exps f e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
@@ -242,7 +248,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
 
 
-section \<open>Simplified induction principles\<close>
+subsection \<open>Simplified induction principles\<close>
 lemma conj2conj2: "A \<and> B \<and> C \<Longrightarrow> C"
   apply (drule conjunct2)
   apply (drule conjunct2)
@@ -299,7 +305,7 @@ InhPureNormalMagic InhSubFailure InhSepNormal InhSepFailureMagic InhImpTrue InhI
   apply simp
   by (tactic \<open>resolve_tac @{context} @{thms assms} 1\<close>, assumption+)+ (auto intro: assms(1))
 
-section \<open>Total heap consistency\<close>
+subsection \<open>Total heap consistency\<close>
 
 definition unfold_rel_general :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "unfold_rel_general Pr \<Delta> \<omega> \<omega>' \<equiv> \<exists> pred_id vs q. unfold_rel Pr \<Delta> pred_id vs q \<omega> \<omega>'"
@@ -395,5 +401,10 @@ abbreviation red_inhale_th_cons :: "program \<Rightarrow> 'a interp \<Rightarrow
 
 text \<open>\<^const>\<open>red_inhale_th_cons\<close> only takes transitions to total heap consistent states whenever some 
 permission is inhaled\<close>
+
+definition assertion_self_framing_store :: "program \<Rightarrow> 'a interp \<Rightarrow> assertion \<Rightarrow> 'a store \<Rightarrow> bool"
+  where
+    "assertion_self_framing_store Pr \<Delta> A \<sigma> = (\<forall> \<omega> res. red_inhale_th_cons Pr \<Delta> A (update_store_total \<omega> \<sigma>) res \<longrightarrow> res \<noteq> RFailure)"
+
 
 end

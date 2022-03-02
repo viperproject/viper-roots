@@ -4,8 +4,6 @@ theory TotalViperState
 imports Viper.ValueAndBasicState Viper.SepAlgebra
 begin
 
-type_synonym 'a interp = "'a val list \<rightharpoonup> 'a val"
-
 type_synonym 'a total_heap = "heap_loc \<Rightarrow> 'a val"
 type_synonym 'a predicate_mask = "'a predicate_loc \<Rightarrow> prat"
 

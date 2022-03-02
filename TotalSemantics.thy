@@ -152,7 +152,7 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
  | RedInhale: 
    "\<lbrakk> red_inhale_th_cons Pr \<Delta> A \<omega> res \<rbrakk> \<Longrightarrow>
       red_stmt_total_single_set Pr \<Delta> (Inhale A) \<omega> (Inr (), res)"
- | RedExhale: 
+ | RedExhale:
    "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m');
       \<omega>' \<in> exhale_state \<omega> m' \<rbrakk> \<Longrightarrow>
       red_stmt_total_single_set Pr \<Delta> (Exhale A) \<omega> (Inr (), RNormal \<omega>')"
@@ -165,6 +165,11 @@ inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a interp \<Righta
  | RedAssertFailure:
    "\<lbrakk> red_exhale Pr \<Delta> \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total_single_set Pr \<Delta> (Assert A) \<omega> (Inr (), RFailure)"
+
+\<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
+always has at least one failure transition, which is not in-sync with Carbon's reordering heuristic for
+wildcards. We might want to make exhale locally angelic instead. The premise in Failure rule would have to 
+be changed to\<^term>\<open>\<forall>res. red_exhale Pr \<Delta> \<omega> A (get_m_total_full \<omega>) res \<longrightarrow> res = ExhaleFailure\<close>\<close>
 
 
 \<comment>\<open>TODO: Add semantics for \<^term>\<open>Assume A\<close>. Should be the same as \<^term>\<open>Assert A\<close>, except that 
@@ -262,10 +267,73 @@ fun is_failure_config :: "'a stmt_config \<Rightarrow> bool"
 fun is_normal_config :: "'a stmt_config \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "is_normal_config config \<omega> \<longleftrightarrow> (snd config) = RNormal \<omega>"
 
-(* todo: incorporate precondition *)
-definition stmt_verifies_total :: " program \<Rightarrow> 'a interp \<Rightarrow> stmt \<Rightarrow>  bool"
-  where "stmt_verifies_total Pr \<Delta> s \<equiv> 
-         \<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
-           red_stmt_total_multi Pr \<Delta> ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r"
+subsection \<open>Correctness\<close>
+
+definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
+  where "vals_well_typed A vs ts \<equiv> map (get_type A) vs = ts"
+
+definition assertion_sat :: "program \<Rightarrow> 'a interp \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "assertion_sat Pr \<Delta> A \<omega> = 
+            (\<forall> res. red_stmt_total_single_set Pr \<Delta> (Assert A) \<omega> res \<longrightarrow> (snd res) \<noteq> RFailure)"
+
+text \<open>Note that \<^const>\<open>assertion_sat\<close> is ``demonic'', i.e., every reduction of asserting \<^term>\<open>A\<close> must
+be a non-failing state, which is in-sync with the semantics of assert statements in programs. We might
+want to change both to be ``locally angelic''. \<close>
+
+definition heap_dep_interp_wf :: "program \<Rightarrow> 'a interp \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+  where 
+    "heap_dep_interp_wf Pr \<Delta> A \<equiv> \<forall>fid fdecl. ViperLang.funs Pr fid = Some fdecl \<longrightarrow> 
+       (\<exists>fsem. \<Delta> fid = Some fsem \<and>
+            (\<forall>vs \<omega>.   
+               ( ( \<not>vals_well_typed A vs (args fdecl) ) \<longrightarrow> fsem vs \<omega> = None) \<and>
+
+               ( 
+                 ( vals_well_typed A vs (args fdecl) \<and> assertion_self_framing_store Pr \<Delta> (pre fdecl) (nth_option vs) ) \<longrightarrow>
+
+                     ( (\<not>assertion_sat Pr \<Delta> (pre fdecl) (update_store_total \<omega> (nth_option vs))) \<longrightarrow>
+                           fsem vs \<omega> = Some VFailure ) \<and>
+  
+                     (assertion_sat Pr \<Delta> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+                         (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type A v = ret fdecl \<and>
+                              if_Some (body fdecl) (\<lambda>e. Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) ) )
+              )
+            )
+       )"
+
+definition heap_dep_fun_obligations :: "program \<Rightarrow> 'a interp \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+  where
+    "heap_dep_fun_obligations Pr \<Delta> A \<equiv> 
+       \<forall> fid fdecl vs e p. 
+          ( ViperLang.funs Pr fid = Some fdecl \<and>            
+            body fdecl = Some e \<and>
+            vals_well_typed A vs (args fdecl) \<and>
+            post fdecl = Some p)  \<longrightarrow>
+             (
+              assertion_self_framing_store Pr \<Delta> (pre fdecl) (nth_option vs) \<and>
+                (\<forall> \<omega> extVal.
+                  assertion_sat Pr \<Delta> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+    
+                    Pr, \<Delta>, (Some (update_store_total \<omega> (nth_option vs))) \<turnstile> \<langle>e; (update_store_total \<omega> (nth_option vs))\<rangle> [\<Down>]\<^sub>t extVal \<and>
+                      ((\<exists> v. extVal = Val v \<and>
+                         assertion_sat Pr \<Delta> p (update_store_total \<omega> (nth_option (vs@[v])))))
+                )
+             )"
+
+definition predicate_obligations :: "program \<Rightarrow> 'a interp \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+  where
+    "predicate_obligations Pr \<Delta> A \<equiv>
+       \<forall> pid pdecl vs e.
+        ( ViperLang.predicates Pr pid = Some pdecl \<and>
+          predicate_decl.body pdecl = Some e \<and>
+          vals_well_typed A vs (predicate_decl.args pdecl) ) \<longrightarrow>
+          assertion_self_framing_store Pr \<Delta> e (nth_option vs)"
+
+definition stmt_correct_total :: " program \<Rightarrow> 'a interp \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> stmt \<Rightarrow>  bool"
+  where "stmt_correct_total Pr \<Delta> A s \<equiv>
+         heap_dep_interp_wf Pr \<Delta> A \<longrightarrow>           
+           heap_dep_fun_obligations Pr \<Delta> A \<and>
+           predicate_obligations Pr \<Delta> A \<and>
+           (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
+                red_stmt_total_multi Pr \<Delta> ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r)"
 
 end
