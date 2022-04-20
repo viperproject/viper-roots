@@ -31,6 +31,7 @@ abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option"
 abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
   "Some_if b x \<equiv> option_if b (Some x)"
 
+
 subsection \<open>\<open>if_Some\<close>\<close>
 
 text \<open>interface for \<open>if_Some\<close> was initially defined by Benjamin Bonneau\<close>
@@ -39,6 +40,9 @@ text \<open>interface for \<open>if_Some\<close> was initially defined by Benjam
 primrec if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
     "if_Some f (Some x) = f x"
   | "if_Some f  None = True"*)
+
+abbreviation has_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
+  "has_Some f \<equiv> option_fold f False"
 
 abbreviation if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
   "if_Some  \<equiv> pred_option"
