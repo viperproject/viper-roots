@@ -288,7 +288,7 @@ fun select_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarro
     "select_heap T ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             if (if_Some (arg_types_of_field T f) (\<lambda>res. res  = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])))
+             if (if_Some (\<lambda>res. res  = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])) (arg_types_of_field T f))
              then Some (select_heap_aux T t2 h r f)
              else None
          | _ \<Rightarrow> None)"
@@ -300,7 +300,7 @@ fun store_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow
     "store_heap T ts vs = 
        (case (ts, vs) of 
           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
-             if (if_Some (arg_types_of_field T f) (\<lambda>res. res = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])))
+             if (if_Some (\<lambda>res. res = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])) (arg_types_of_field T f))
              then Some (AbsV (  AHeap (h( r := (h r)(f \<mapsto> v) ))  ))
              else None
         | _ \<Rightarrow> None)"
