@@ -17,7 +17,7 @@ fun get_address_opt :: "'a val \<Rightarrow> address option"
     "get_address_opt (VRef (Address a)) = Some a"
   | "get_address_opt _ = None"
 
-fun option_fold :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a option \<Rightarrow> 'b"
+primrec option_fold :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a option \<Rightarrow> 'b"
   where 
     "option_fold f e (Some x) = f x"
   | "option_fold f e None = e"
@@ -35,41 +35,45 @@ subsection \<open>\<open>if_Some\<close>\<close>
 
 text \<open>interface for \<open>if_Some\<close> was initially defined by Benjamin Bonneau\<close>
 
-primrec if_Some :: "'a option \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> bool" where
-    "if_Some (Some x) f = f x"
-  | "if_Some None     f = True"
+(*
+primrec if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
+    "if_Some f (Some x) = f x"
+  | "if_Some f  None = True"*)
+
+abbreviation if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
+  "if_Some  \<equiv> pred_option"
 
 lemma if_SomeI:
-  "(\<And>x. opt = Some x \<Longrightarrow> f x) \<Longrightarrow> if_Some opt f"
+  "(\<And>x. opt = Some x \<Longrightarrow> f x) \<Longrightarrow> if_Some f opt"
   by (cases opt; simp)
 lemma if_SomeIex:
-  "opt = Some x \<Longrightarrow> f x \<Longrightarrow> if_Some opt f"
+  "opt = Some x \<Longrightarrow> f x \<Longrightarrow> if_Some f opt"
   by (cases opt; simp)
 lemma if_SomeD:
-  "if_Some opt f \<Longrightarrow> opt = Some x \<Longrightarrow> f x"
+  "if_Some f opt \<Longrightarrow> opt = Some x \<Longrightarrow> f x"
   by simp
 lemma if_Some_iff:
-  "(if_Some opt f) = (\<forall>x. opt = Some x \<longrightarrow> f x)"
+  "(if_Some f opt) = (\<forall>x. opt = Some x \<longrightarrow> f x)"
   by (cases opt; simp)
 
 lemma if_Some_split:
-  "P (if_Some opt f) = ((opt = None \<longrightarrow> P True) \<and> (\<forall>x. opt = Some x \<longrightarrow> P (f x)))"
+  "P (if_Some f opt) = ((opt = None \<longrightarrow> P True) \<and> (\<forall>x. opt = Some x \<longrightarrow> P (f x)))"
   by (cases opt; simp)
 lemma if_Some_split_asm:
-  "P (if_Some opt f) = (\<not> ((opt = None \<and> \<not> P True) \<or> (\<exists>x. opt = Some x \<and> \<not> P (f x))))"
+  "P (if_Some f opt) = (\<not> ((opt = None \<and> \<not> P True) \<or> (\<exists>x. opt = Some x \<and> \<not> P (f x))))"
   by (cases opt; simp)
 
 lemma if_Some_imp:
-  "if_Some opt P \<Longrightarrow> (\<And>x. P x \<Longrightarrow> Q x) \<Longrightarrow> if_Some opt Q"
+  "if_Some P opt \<Longrightarrow> (\<And>x. P x \<Longrightarrow> Q x) \<Longrightarrow> if_Some Q opt"
   by (cases opt; simp)
 lemma if_Some_mono_strong:
-  "if_Some opt P \<Longrightarrow> (\<And>x. opt = Some x \<Longrightarrow> P x \<Longrightarrow> Q x) \<Longrightarrow> if_Some opt Q"
+  "if_Some P opt \<Longrightarrow> (\<And>x. opt = Some x \<Longrightarrow> P x \<Longrightarrow> Q x) \<Longrightarrow> if_Some Q opt"
   by (cases opt; simp)
 lemma if_Some_mono[mono]:
-  "P \<le> Q \<Longrightarrow> if_Some opt P \<le> if_Some opt Q"
+  "P \<le> Q \<Longrightarrow> if_Some P opt \<le> if_Some Q opt"
   by (cases opt; auto)
 lemma[fundef_cong]:
-  "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some x P = if_Some y Q"
+  "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some P x = if_Some Q y"
   by (cases y; simp)
 
 end
