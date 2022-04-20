@@ -47,15 +47,15 @@ subsection \<open>Translation interface\<close>
 
 datatype tcon_enum = TCRef | TCField | TCHeap | TCMask | TCKnownFoldedMask | TCFrameFragment | TCNormalField
 
-record 'a vpr_bpl_translation =
+record 'a ty_repr_bpl =
   tcon_id_repr :: "tcon_enum \<Rightarrow> tcon_id"
   pred_snap_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
   pred_knownfolded_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
   domain_translation :: "abs_type \<rightharpoonup> tcon_id \<times> ty list" \<comment>\<open>we assume domains without type parameters\<close>
   domain_type :: "'a \<Rightarrow> abs_type"
 
-definition wf_vpr_bpl_translation :: "'a vpr_bpl_translation \<Rightarrow> bool"
-  where "wf_vpr_bpl_translation T \<equiv>
+definition wf_ty_repr_bpl :: "'a ty_repr_bpl \<Rightarrow> bool"
+  where "wf_ty_repr_bpl T \<equiv>
                (\<forall> vt bt. domain_translation T vt = Some bt \<longrightarrow> list_all closed (snd bt)) \<and>
                (\<forall> pid bt. pred_snap_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
                (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt)"
@@ -70,7 +70,7 @@ abbreviation "TNormalFieldId T \<equiv> (tcon_id_repr T) TCNormalField"
 
 text \<open>For the dummy type, we just pick some identifier that is different from all the ones used by 
       the translation\<close>
-definition TDummyId :: "'a vpr_bpl_translation \<Rightarrow> tcon_id"
+definition TDummyId :: "'a ty_repr_bpl \<Rightarrow> tcon_id"
   where "TDummyId T \<equiv> (SOME v. v \<notin> range (tcon_id_repr T))"
 
 abbreviation TConSingle :: "tcon_id \<Rightarrow> bpl_ty"
@@ -81,7 +81,7 @@ lemma "closed (TConSingle tid)"
 
 subsection \<open>Type interpretation\<close>
 
-fun vpr_to_bpl_ty :: "'a vpr_bpl_translation \<Rightarrow> vpr_ty \<rightharpoonup> bpl_ty"
+fun vpr_to_bpl_ty :: "'a ty_repr_bpl \<Rightarrow> vpr_ty \<rightharpoonup> bpl_ty"
   where 
     "vpr_to_bpl_ty T ViperLang.TInt = Some (Lang.TPrim Lang.TInt)"
   | "vpr_to_bpl_ty T ViperLang.TBool = Some( Lang.TPrim Lang.TBool)"  
@@ -89,7 +89,7 @@ fun vpr_to_bpl_ty :: "'a vpr_bpl_translation \<Rightarrow> vpr_ty \<rightharpoon
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
   | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
 
-fun field_ty_fun_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
+fun field_ty_fun_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
   where 
     "field_ty_fun_opt T (NormalField field_id vty) = map_option (\<lambda>t.(TFieldId T, [TConSingle (TNormalFieldId T), t])) (vpr_to_bpl_ty T vty)"
   | "field_ty_fun_opt T (PredSnapshotField pred_loc) = 
@@ -99,13 +99,13 @@ fun field_ty_fun_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<righ
   | "field_ty_fun_opt T (DummyField t1 t2) =
        Some_if (closed t1 \<and> closed t2) (TFieldId T, [t1, t2])"
 
-lemma field_ty_fun_opt_closed: "wf_vpr_bpl_translation T \<Longrightarrow> 
+lemma field_ty_fun_opt_closed: "wf_ty_repr_bpl T \<Longrightarrow> 
                                 field_ty_fun_opt T f = Some res \<Longrightarrow>  
                                 list_all closed (snd res)"  
   apply (cases f)
      apply (rename_tac vty)
      apply (case_tac vty)
-  by (auto split: if_split_asm simp: wf_vpr_bpl_translation_def)
+  by (auto split: if_split_asm simp: wf_ty_repr_bpl_def)
 
 fun tcon_to_bplty :: "(tcon_id \<times> bpl_ty list) \<Rightarrow> bpl_ty"
   where "tcon_to_bplty tc = TCon (fst tc) (snd tc)"
@@ -133,14 +133,14 @@ primrec ty_inhabitant :: "tcon_enum \<rightharpoonup> (nat \<times> (Lang.ty lis
 text\<open>The \<open>NormalField\<close> type is used only to construct field types and thus, we do not need to provide
 an inhabitant that is not a dummy value.\<close>
 
-definition is_inhabited :: "'a vpr_bpl_translation \<Rightarrow> tcon_id \<Rightarrow> nat \<Rightarrow> bool"
+definition is_inhabited :: "'a ty_repr_bpl \<Rightarrow> tcon_id \<Rightarrow> nat \<Rightarrow> bool"
   where 
     "is_inhabited T tid n = 
       (\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
          (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res)"
 
 
-function (sequential) vbpl_absval_ty_opt :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
+function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
   where 
    "vbpl_absval_ty_opt T (ARef r) = Some (TRefId T, [])"
  | "vbpl_absval_ty_opt T (AField vb_field) = (field_ty_fun_opt T vb_field)"
@@ -166,7 +166,7 @@ termination
   apply (unfold heap_rel_def)
   by fastforce
 
-fun vbpl_absval_ty :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_absval \<Rightarrow> (tcon_id \<times> bpl_ty list)"
+fun vbpl_absval_ty :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<Rightarrow> (tcon_id \<times> bpl_ty list)"
   where
     "vbpl_absval_ty T a = option_fold id (TDummyId T, []) (vbpl_absval_ty_opt T a)"
 
@@ -176,15 +176,15 @@ text\<open> \<^const>\<open>vbpl_absval_ty\<close> is the type interpretation fo
 subsection \<open>Properties of type interpretation\<close>
 
 lemma vbpl_absval_ty_opt_closed:
-  assumes "wf_vpr_bpl_translation T" and
+  assumes "wf_ty_repr_bpl T" and
           "vbpl_absval_ty_opt T v = Some res"
   shows   "list_all closed (snd res)"
   apply (cases res)
   apply (insert assms)
-  by (cases v) (auto split: if_split_asm simp: wf_vpr_bpl_translation_def dest: field_ty_fun_opt_closed[OF assms(1)])
+  by (cases v) (auto split: if_split_asm simp: wf_ty_repr_bpl_def dest: field_ty_fun_opt_closed[OF assms(1)])
 
 lemma vbpl_absval_ty_closed: 
-  assumes "wf_vpr_bpl_translation T"
+  assumes "wf_ty_repr_bpl T"
   shows "closed (tcon_to_bplty (vbpl_absval_ty T v))" 
   by (cases "(vbpl_absval_ty_opt T v)") (auto dest: vbpl_absval_ty_opt_closed[OF assms])
 
@@ -228,7 +228,7 @@ theorem is_inhabited_correct:
   unfolding is_inhabited_def
   by (metis prod.exhaust_sel)
 
-abbreviation type_of_vbpl_val :: "'a vpr_bpl_translation \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
+abbreviation type_of_vbpl_val :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
   where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
 
 theorem closed_types_inhabited:
@@ -242,7 +242,8 @@ next
   show ?thesis 
     apply (cases tprim) 
      apply (metis TPrim type_of_lit.simps(1) type_of_val.simps(1))
-    apply (metis TPrim type_of_lit.simps(2) type_of_val.simps(1))
+     apply (metis TPrim type_of_lit.simps(2) type_of_val.simps(1))
+    apply (metis TPrim type_of_lit.simps(3) type_of_val.simps(1))
     done
 next
   case (TCon tid ts)
@@ -267,7 +268,7 @@ qed
 
 subsection \<open>Functions for map instantiations\<close>
 
-fun arg_types_of_field :: "'a vpr_bpl_translation \<Rightarrow> 'a vb_field \<rightharpoonup> bpl_ty \<times> bpl_ty"
+fun arg_types_of_field :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> bpl_ty \<times> bpl_ty"
   where
     "arg_types_of_field T f = 
       ( case field_ty_fun_opt T f of
@@ -278,12 +279,12 @@ subsubsection \<open>Heap\<close>
 
 text \<open>select function for the heap: readHeap<A, B>(h: HeapType, r: Ref, f: (Field A B)): B\<close>
 
-definition select_heap_aux :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty \<Rightarrow> 'a heap_repr \<Rightarrow> ref \<Rightarrow> 'a vb_field \<Rightarrow> 'a vbpl_val"
+definition select_heap_aux :: "'a ty_repr_bpl \<Rightarrow> bpl_ty \<Rightarrow> 'a heap_repr \<Rightarrow> ref \<Rightarrow> 'a vb_field \<Rightarrow> 'a vbpl_val"
   where 
     "select_heap_aux T ret_ty h r f = 
        option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h r f)"
 
-fun select_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun select_heap :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where 
     "select_heap T ts vs = 
         (case (ts, vs) of 
@@ -295,7 +296,7 @@ fun select_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarro
 
 text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
 
-fun store_heap :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun store_heap :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where
     "store_heap T ts vs = 
        (case (ts, vs) of 
@@ -309,7 +310,7 @@ subsubsection \<open>Mask\<close>
 
 text \<open>select function for the heap: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
 (* todo need to add reals 
-fun select_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun select_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where 
     "select_mask T ts vs = 
         (case (ts, vs) of 
@@ -322,7 +323,7 @@ subsubsection \<open>Knownfolded Mask\<close>
 
 text \<open>select function for the knownfolded mask: readPMask<A, B>(pm: PMaskType, r: Ref, f: (Field A B)): bool\<close>
 
-fun select_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun select_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where 
     "select_mask T ts vs = 
         (case (ts, vs) of 
@@ -332,7 +333,7 @@ fun select_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarro
 
 text \<open>store function for the knownfolded mask: updPMask<A, B>(PMaskType: PMaskType, obj: Ref, f_1: (Field A B), y: bool): PMaskType\<close>
 
-fun store_mask :: "'a vpr_bpl_translation \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun store_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where 
     "store_mask T ts vs = 
         (case (ts, vs) of 
