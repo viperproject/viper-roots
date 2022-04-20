@@ -12,7 +12,7 @@ text \<open>\<^typ>\<open>'a heapfun_repr\<close> provides a semantic representa
 for \<^term>\<open>(f::'a heapfun_repr) vs \<omega>\<close> are 
 \<^item> \<^term>\<open>None\<close>: There is a typing issue (e.g., \<^term>\<open>vs\<close> does not have the correct length or not the correct types)
 \<^item> \<^term>\<open>Some VFailure\<close>: There is no typing issue, but the function applied to arguments \<^term>\<open>vs\<close> 
-                       in state \<^term>\<open>\<omega>\<close> is ill-defined (i.e., \ \<^term>\<open>f\<close>'s  precondition is violated for arguments \<^term>\<open>vs\<close> 
+                       in state \<^term>\<open>\<omega>\<close> is ill-defined (i.e., \<^term>\<open>f\<close>'s  precondition is violated for arguments \<^term>\<open>vs\<close> 
                        in state \<^term>\<open>\<omega>\<close>).
 \<^item> \<^term>\<open>Some (Val v)\<close>: There is no typing issue and the function call is well-defined. The resulting value is \<^term>\<open>v\<close>.
 \<close>
@@ -154,15 +154,33 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
  "\<lbrakk> Pr, \<Delta>, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
    red_inhale Pr \<Delta> R (Imp e A) \<omega> RFailure"
 
+(* QP inhale rules (ignore for now)
+\<comment>\<open>QP inhale\<close>
+
+| InhQP:
+ "\<lbrakk>  \<And>v. v \<in> set_from_type placeholder ty \<Longrightarrow> Pr, \<Delta>, Some (shift_and_add_state \<omega> v) \<turnstile> \<langle>e_r; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address (q1 v))));
+    \<And>v. v \<in> set_from_type placeholder ty \<Longrightarrow> Pr, \<Delta>, Some (shift_and_add_state \<omega> v) \<turnstile> \<langle>e_p; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t (Val (VPerm (q2 v)));
+    \<And>v. v \<in> set_from_type placeholder ty \<Longrightarrow> Pr, \<Delta>, Some (shift_and_add_state \<omega> v) \<turnstile> \<langle>cond; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t (Val (VBool (q3 v)));
+    m = get_mh_total_full \<omega>;
+    inj_on q2 {v. v \<in> (set_from_type placeholder ty) \<and> q3 v \<and> q2 v > 0 } ;
+   \<And>v. v \<in> set_from_type placeholder ty \<Longrightarrow> m' ((q1 v), f) = (if (q3 v) \<and> (q2 v > 0) then padd (m ((q1 v), f)) (Abs_prat (q2 v)) else m ((q1 v), f));
+   \<And>v. v \<notin> set_from_type placeholder ty \<Longrightarrow> m' ((q1 v), f) = m ((q1 v, f))
+ \<rbrakk> \<Longrightarrow>
+   red_inhale Pr \<Delta> R (ForAll ty (Imp cond (Atomic (Acc e_r f (PureExp e_p))))) \<omega> (RNormal \<omega>')"
+
+| InhQPFailure:
+ "\<lbrakk>  v \<in> set_from_type placeholder ty;
+     red_inhale Pr \<Delta> R (Imp cond (Atomic (Acc e_r f (PureExp e_p)))) (shift_and_add_state \<omega> v) RFailure
+ \<rbrakk> \<Longrightarrow>
+   red_inhale Pr \<Delta> R (ForAll ty (Imp cond (Atomic (Acc e_r f (PureExp e_p))))) \<omega> RFailure"
+*)
+
 \<comment>\<open>Pure expression evaluation\<close>
 
 \<comment>\<open>List of expressions\<close>
 | RedExpList: 
   "\<lbrakk> list_all2 (\<lambda>e v. red_pure_exp_total Pr \<Delta> LH e \<omega> (Val v)) es vs \<rbrakk> \<Longrightarrow>
      red_pure_exps_total Pr \<Delta> LH es \<omega> (Some vs)"
-| RedExpListFailure: 
-  "\<lbrakk> e \<in> set(es); red_pure_exp_total Pr \<Delta> LH e \<omega> VFailure \<rbrakk> \<Longrightarrow>
-     red_pure_exps_total Pr \<Delta> LH es \<omega> None"
 
 \<comment>\<open>Atomic expressions\<close>
 | RedLit: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
@@ -178,74 +196,74 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
   \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 | RedBinopOpFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v2 ; eval_binop v1 bop v2 = BinopOpFailure ; eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* Division by 0 *)
-| RedBinopLeftFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
 
 | RedUnop: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; eval_unop unop v = BinopNormal v' \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
-| RedUnopFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
 
 \<comment>\<open>Cond\<close>
 | RedCondExpTrue: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t r \<rbrakk>
   \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>]\<^sub>t r"
 | RedCondExpFalse: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e3; \<omega>\<rangle> [\<Down>]\<^sub>t r \<rbrakk>
   \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>]\<^sub>t r"
-| RedCondExpFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
 
 \<comment>\<open>Old\<close>
 | RedOld: "\<lbrakk> t l = Some \<phi> ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; (\<sigma>, t, \<phi>)\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Old l e; (\<sigma>, t, _)\<rangle> [\<Down>]\<^sub>t v"
 | RedOldFailure: "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Old l e ; (_, t, _)\<rangle> [\<Down>]\<^sub>t VFailure" 
 
-\<comment>\<open>Heap lookup (TODO: null case?)\<close>
+\<comment>\<open>Heap lookup (TODO null case)\<close>
 | RedField: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
-       Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some \<omega>_def (\<lambda>res. (a,f) \<in> get_valid_locs res)) then Val v else VFailure)"
-| RedFieldFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
+       Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) \<omega>_def) then Val v else VFailure)"
 
 \<comment>\<open>Function application\<close>
 | RedFunApp: "\<lbrakk> \<Delta> fname = Some f;
                 red_pure_exps_total Pr \<Delta> \<omega>_def es \<omega> (Some vs);                
-                f vs \<omega> = Some (Val v) \<rbrakk> \<Longrightarrow> 
-                Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v)"
-| RedFunAppFailure: 
-             "\<lbrakk> \<Delta> fname = Some f;
-                red_pure_exps_total Pr \<Delta> \<omega>_def es \<omega> None \<or> f vs \<omega> = Some VFailure \<rbrakk> \<Longrightarrow>  
-                Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+                f vs \<omega> = Some res \<rbrakk> \<Longrightarrow> 
+                Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t res"
 
 \<comment>\<open>Permission introspection\<close>
 | RedPermNull: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
 | RedPerm: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat (get_mh_total_full \<omega> (a, f))))"
-| RedPermFailure: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" (* could be replaced *)
 
 \<comment>\<open>Unfolding\<close>
-| "\<lbrakk> Pr, \<Delta>, None \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
+(* TODO: currently unfolding rules only make sense for inductive predicates, since each recursive unfolding instance is checked *)
+| RedUnfolding: "\<lbrakk> Pr, \<Delta>, None \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      Pr, \<Delta>, None \<turnstile> \<langle>Unfolding p es ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v"
-| "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>_def) es \<omega> (Some vs);
+| RedUnfoldingDef: 
+   "\<lbrakk> red_pure_exps_total Pr \<Delta> (Some \<omega>_def) es \<omega> (Some vs);
      unfold_rel Pr \<Delta> pred_id vs pwrite \<omega>_def \<omega>'_def;
      Pr, \<Delta>, (Some \<omega>'_def) \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      Pr, \<Delta>, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t v"
 
-(*| RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>  Pr, \<Delta> \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
-(*| RedUnfoldingPermNegFailure: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v) ; v < 0 \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Unfolding p exps f e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
+| RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+     Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+(* Pure quantifier rules (ignore for now)
+(* todo fix interpretation in set_from_type *)
+| RedForallTrue: "\<lbrakk> \<And>v. v \<in> set_from_type f ty \<longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
+     Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+| RedForallFalse: "\<lbrakk> v \<in> set_from_type f ty ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk>
+  \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+(* not clear if one wants to avoid that forall can reduce to false and failure in the same state *)
+| RedForallFailure:  "\<lbrakk> v \<in> set_from_type f ty ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk>
+  \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+
+(* todo fix interpretation in set_from_type *)
+| RedExistsTrue: "\<lbrakk> v \<in> set_from_type f ty ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow>
+  Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+(* not clear if one wants to avoid that forall can reduce to true and failure in the same state *)
+| RedExistsFalse: "\<lbrakk> \<And> v. v \<in> set_from_type f ty \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow>
+  Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+| RedExistsFailure: "\<lbrakk>v \<in> set_from_type f ty ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+  Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+*)
+(*
+| RedForallFalse: "\<lbrakk> v \<in> set_from_type \<Delta> ty ; Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk>
+  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"*)
+
 (*
 (* perm(P(...)) = 0 if equirecursive *)
 | RedPermPred: "\<lbrakk> list_all2 (\<lambda>e v. Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) exps vals \<rbrakk>
   \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PermPred p exps; \<omega>\<rangle> [\<Down>] Val (VPerm (Rep_prat (get_pm \<omega> (p, vals))))"
 *)
-(*| RedLet: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; shift_and_add_state \<omega> v1\<rangle> [\<Down>]\<^sub>t r \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>]\<^sub>t r"
-| RedExistsTrue: "\<lbrakk> v \<in> set_from_type \<Delta> ty ; Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool True) ;
-  \<And>v'. \<exists>b. Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v'\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-| RedExistsFalse: "\<lbrakk> \<And>v. v \<in> set_from_type \<Delta> ty \<longrightarrow> Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
-| RedForallTrue: "\<lbrakk> \<And>v. v \<in> set_from_type \<Delta> ty \<longrightarrow> Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-| RedForallFalse: "\<lbrakk> v \<in> set_from_type \<Delta> ty ; Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"*)
-(*
-| RedExistsFailure: "\<lbrakk> v \<in> set_from_type \<Delta> ty \<longrightarrow> Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-| RedForallFailure: "\<lbrakk> v \<in> set_from_type \<Delta> ty \<longrightarrow> Pr, \<Delta> \<turnstile> \<langle>e; shift_and_add_state \<omega> v\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk>
-  \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"*)
+(*| RedLet: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; shift_and_add_state \<omega> v1\<rangle> [\<Down>]\<^sub>t r \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>]\<^sub>t r" *)
 
 
 subsection \<open>Simplified induction principles\<close>
@@ -314,8 +332,7 @@ definition unfold_rel_multi :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a
   where "unfold_rel_multi Pr \<Delta>  \<equiv> rtranclp (unfold_rel_general Pr \<Delta>)"
 
 text \<open>Expression evaluation as a function. Using this function makes sense, when it is known that 
-e is well-defined and is deterministic (for example, if e is the body of a predicate). \<^term>\<open>UNIV\<close>
-is used to indicate that every heap location can be read (effectively omitting heap checks)\<close>
+e is well-defined and is deterministic (for example, if e is the body of a predicate).\<close>
 
 fun red_pure_exp_total_fun :: "program \<Rightarrow> 'a interp \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a val"
   where "red_pure_exp_total_fun Pr \<Delta> e \<omega> = (SOME v. Pr, \<Delta>, None \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v)"
@@ -381,7 +398,7 @@ definition pheap_consistent :: "program \<Rightarrow> 'a interp \<Rightarrow> 'a
     \<forall> \<omega>' pred_id vs pred_decl. 
          (pgt (get_mp_total_full \<omega>' (pred_id,vs)) pnone \<and> ViperLang.predicates Pr pred_id = Some pred_decl) \<longrightarrow>
           option_fold (\<lambda> pred_body. get_hp_total_full \<omega> (pred_id, vs) = 
-                        (assertion_heap_snapshot Pr \<Delta> pred_body \<omega>, assertion_predicate_snapshot Pr \<Delta> pred_body \<omega>) )
+                        (assertion_heap_snapshot Pr \<Delta> pred_body (update_store_total \<omega> (nth_option vs)), assertion_predicate_snapshot Pr \<Delta> pred_body (update_store_total \<omega> (nth_option vs))) )
                       True
                       (ViperLang.predicate_decl.body pred_decl)"
 

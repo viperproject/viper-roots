@@ -295,7 +295,7 @@ definition heap_dep_interp_wf :: "program \<Rightarrow> 'a interp \<Rightarrow> 
   
                      (assertion_sat Pr \<Delta> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
                          (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type A v = ret fdecl \<and>
-                              if_Some (body fdecl) (\<lambda>e. Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) ) )
+                              if_Some (\<lambda>e. Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) (body fdecl) ) )
               )
             )
        )"
