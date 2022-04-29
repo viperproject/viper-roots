@@ -44,6 +44,34 @@ primrec if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow
 abbreviation has_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
   "has_Some f \<equiv> option_fold f False"
 
+lemma has_SomeI:
+  "opt = Some x \<and> f x \<Longrightarrow> has_Some f opt"
+  by simp
+
+lemma has_SomeD:
+  "has_Some f opt \<Longrightarrow> opt = Some x \<Longrightarrow> f x"
+  by simp
+
+lemma has_Some_iff:
+  "(has_Some f opt) = (\<exists>x. opt = Some x \<and> f x)"  
+  by (cases opt; simp)
+
+lemma has_Some_imp:
+  "has_Some P opt \<Longrightarrow> (\<And>x. P x \<Longrightarrow> Q x) \<Longrightarrow> has_Some Q opt"
+  by (cases opt; simp)
+
+lemma has_Some_mono_strong:
+  "has_Some P opt \<Longrightarrow> (\<And>x. opt = Some x \<Longrightarrow> P x \<Longrightarrow> Q x) \<Longrightarrow> has_Some Q opt"
+  by (cases opt; simp)
+
+lemma has_Some_mono[mono]:
+  "P \<le> Q \<Longrightarrow> has_Some P opt \<le> has_Some Q opt"
+  by (cases opt; auto)
+
+lemma[fundef_cong]:
+  "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> has_Some P x = has_Some Q y"
+  by (cases y; simp)
+
 abbreviation if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
   "if_Some  \<equiv> pred_option"
 
