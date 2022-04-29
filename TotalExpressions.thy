@@ -184,7 +184,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
 
 \<comment>\<open>Atomic expressions\<close>
 | RedLit: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
-| RedVar: "\<lbrakk> \<sigma> n = Some v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Var n; (\<sigma>, _, _)\<rangle> [\<Down>]\<^sub>t Val v"
+| RedVar: "\<lbrakk> (get_store_total \<omega>) n = Some v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 | RedResult: "\<lbrakk> \<sigma> 0 = Some v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Result; (\<sigma>, _, _)\<rangle> [\<Down>]\<^sub>t Val v"
 
 \<comment>\<open>Binop and Unop\<close>
@@ -209,9 +209,13 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
 | RedOld: "\<lbrakk> t l = Some \<phi> ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; (\<sigma>, t, \<phi>)\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Old l e; (\<sigma>, t, _)\<rangle> [\<Down>]\<^sub>t v"
 | RedOldFailure: "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Old l e ; (_, t, _)\<rangle> [\<Down>]\<^sub>t VFailure" 
 
-\<comment>\<open>Heap lookup (TODO null case)\<close>
-| RedField: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
+\<comment>\<open>Heap lookup\<close>
+| RedField: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) ; 
+              get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
        Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) \<omega>_def) then Val v else VFailure)"
+| RedFieldNullFailure:
+   "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
+       Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 
 \<comment>\<open>Function application\<close>
 | RedFunApp: "\<lbrakk> \<Delta> fname = Some f;
@@ -221,7 +225,9 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
 
 \<comment>\<open>Permission introspection\<close>
 | RedPermNull: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
-| RedPerm: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<rbrakk> \<Longrightarrow> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat (get_mh_total_full \<omega> (a, f))))"
+| RedPerm: "\<lbrakk> Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
+              get_mh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
+             Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat v))"
 
 \<comment>\<open>Unfolding\<close>
 (* TODO: currently unfolding rules only make sense for inductive predicates, since each recursive unfolding instance is checked *)
@@ -233,7 +239,7 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
      Pr, \<Delta>, (Some \<omega>'_def) \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      Pr, \<Delta>, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t v"
 
-| RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+| RedSubFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
      Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 (* Pure quantifier rules (ignore for now)
 (* todo fix interpretation in set_from_type *)
@@ -265,6 +271,37 @@ inductive red_pure_exp_total :: "program \<Rightarrow> 'a interp \<Rightarrow> '
 *)
 (*| RedLet: "\<lbrakk> Pr, \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1 ; Pr, \<Delta> \<turnstile> \<langle>e2; shift_and_add_state \<omega> v1\<rangle> [\<Down>]\<^sub>t r \<rbrakk> \<Longrightarrow> Pr, \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>]\<^sub>t r" *)
 
+subsubsection \<open>Elimination rules\<close>
+
+inductive_cases RedVar_case: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+lemma RedLit_case:
+  assumes 
+    "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>ELit l; \<omega>\<rangle> [\<Down>]\<^sub>t v" and
+    "v = Val (val_of_lit l) \<Longrightarrow> P" 
+  shows P
+  using assms
+  by (cases) auto
+
+lemma RedFieldNormal_case:
+  assumes "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v" and
+          "\<And>a. Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<Longrightarrow>
+           (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) \<omega>_def) \<Longrightarrow>
+           get_hh_total_full \<omega> (a, f) = v \<Longrightarrow>
+             P"
+        shows P
+  using assms
+  by cases (metis extended_val.distinct(1) extended_val.inject)
+
+inductive_cases RedUnop_case: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
+inductive_cases RedBinop_case: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+inductive_cases RedFunApp_case: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t res"
+
+inductive_cases RedExpList_case: "red_pure_exps_total Pr \<Delta> LH es \<omega> (Some vs)"
+
+inductive_cases RedPerm_case: "Pr, \<Delta>, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+lemmas red_pure_exp_total_elims = RedUnop_case RedBinop_case RedFunApp_case RedExpList_case
 
 subsection \<open>Simplified induction principles\<close>
 lemma conj2conj2: "A \<and> B \<and> C \<Longrightarrow> C"
