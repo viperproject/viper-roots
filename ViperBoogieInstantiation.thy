@@ -10,13 +10,11 @@ type_synonym 'a bpl_val = "'a Semantics.val"
 type_synonym vpr_ty = ViperLang.vtyp
 type_synonym bpl_ty = Lang.ty
 
-type_synonym viper_prog = "ViperLang.program"
-
 subsection \<open>Abstract values datatype\<close>
 
 \<comment>\<open>implementation detail\<close>
 datatype 'a vb_field = 
-     NormalField field_ident vpr_ty
+     NormalField vname vpr_ty
    | PredSnapshotField "'a predicate_loc" 
    | PredKnownFoldedField "'a predicate_loc"
    | DummyField bpl_ty bpl_ty \<comment>\<open>used to make sure that every field type \<open>Field A B\<close> is inhabited\<close>
@@ -85,7 +83,7 @@ fun vpr_to_bpl_ty :: "'a ty_repr_bpl \<Rightarrow> vpr_ty \<rightharpoonup> bpl_
   where 
     "vpr_to_bpl_ty T ViperLang.TInt = Some (Lang.TPrim Lang.TInt)"
   | "vpr_to_bpl_ty T ViperLang.TBool = Some( Lang.TPrim Lang.TBool)"  
-  | "vpr_to_bpl_ty T ViperLang.TPerm = Some (Lang.TPrim Lang.TInt)" (* TODO: Real type in Boogie *)
+  | "vpr_to_bpl_ty T ViperLang.TPerm = Some (Lang.TPrim Lang.TReal)"
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
   | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
 
