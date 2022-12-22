@@ -1,8 +1,15 @@
 section \<open>Viper Instantiation of Boogie Abstract Values\<close>
 
-theory ViperBoogieInstantiation
+theory ViperBoogieAbsValueInst
 imports Viper.ViperLang Viper.ValueAndBasicState Boogie_Lang.Semantics HOL.Real TotalUtil Boogie_Lang.VCExprHelper
 begin
+
+text \<open>
+This theory file provides an instantiation of the Boogie values \<^typ>\<open>'a Semantics.val\<close> that can be used 
+to reason about the Viper-genereated Boogie encodings. That is, this theory provides a concrete 
+instantiation for the abstract Boogie value carrier type \<^typ>\<open>'a\<close>.
+\<close>
+
 
 type_synonym 'a vpr_val = "'a ValueAndBasicState.val"
 type_synonym 'a bpl_val = "'a Semantics.val"
@@ -10,7 +17,7 @@ type_synonym 'a bpl_val = "'a Semantics.val"
 type_synonym vpr_ty = ViperLang.vtyp
 type_synonym bpl_ty = Lang.ty
 
-subsection \<open>Abstract values datatype\<close>
+subsection \<open>Abstract values instantiation\<close>
 
 \<comment>\<open>implementation detail\<close>
 datatype 'a vb_field = 
@@ -39,11 +46,23 @@ only if \<^term>\<open>TCon tcon_id ts\<close> is not a meaningful type (e.g., n
 
 type_synonym 'a vbpl_val = "('a vbpl_absval) bpl_val"
 
+text \<open>\<^typ>\<open>'a vbpl_val\<close> is the instantiated version of the Boogie values.\<close>
+
 type_synonym 'a heap_repr = "ref \<Rightarrow> 'a vb_field \<rightharpoonup> 'a vbpl_val"
 
 subsection \<open>Translation interface\<close>
 
-datatype tcon_enum = TCRef | TCField | TCHeap | TCMask | TCKnownFoldedMask | TCFrameFragment | TCNormalField
+text \<open>Here, we define an interface in the form a record that abstracts over how various Viper 
+constructs are represented using Boogie types.\<close>
+
+datatype tcon_enum = 
+  TCRef 
+  | TCField 
+  | TCHeap 
+  | TCMask 
+  | TCKnownFoldedMask 
+  | TCFrameFragment 
+  | TCNormalField
 
 record 'a ty_repr_bpl =
   tcon_id_repr :: "tcon_enum \<Rightarrow> tcon_id"
@@ -79,10 +98,15 @@ lemma "closed (TConSingle tid)"
 
 subsection \<open>Type interpretation\<close>
 
+text \<open>In order to work with the Boogie semantics for our instantiated Boogie values \<^typ>\<open>'a vbpl_val\<close>,
+we must provide a interpretation of the abstract values in our instantiation. This subsection defines
+such an instantiation and proves properties about it.
+\<close>
+
 fun vpr_to_bpl_ty :: "'a ty_repr_bpl \<Rightarrow> vpr_ty \<rightharpoonup> bpl_ty"
   where 
     "vpr_to_bpl_ty T ViperLang.TInt = Some (Lang.TPrim Lang.TInt)"
-  | "vpr_to_bpl_ty T ViperLang.TBool = Some( Lang.TPrim Lang.TBool)"  
+  | "vpr_to_bpl_ty T ViperLang.TBool = Some (Lang.TPrim Lang.TBool)"  
   | "vpr_to_bpl_ty T ViperLang.TPerm = Some (Lang.TPrim Lang.TReal)"
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
   | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
@@ -169,9 +193,14 @@ fun vbpl_absval_ty :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<Rightarrow>
     "vbpl_absval_ty T a = option_fold id (TDummyId T, []) (vbpl_absval_ty_opt T a)"
 
 text\<open> \<^const>\<open>vbpl_absval_ty\<close> is the type interpretation for the Boogie abstract value instantiation 
-      used for Viper.\<close>
+      used for Viper. It uses \<^const>\<open>vbpl_absval_ty_opt\<close>, which maps each value to a type if there
+      is such a clear type and otherwise maps the value to \<^const>\<open>None\<close>. For those values that 
+      do not have a clear type, the dummy type is associated. \<close>
 
 subsection \<open>Properties of type interpretation\<close>
+
+text \<open>The goal of this subsection is to prove the necessary properties of our concrete type interpretation
+in order to use the Boogie correctness results. This includes proving that every closed type is inhabited.\<close>
 
 lemma vbpl_absval_ty_opt_closed:
   assumes "wf_ty_repr_bpl T" and
@@ -263,80 +292,5 @@ next
       by auto
   qed
 qed
-
-subsection \<open>Functions for map instantiations\<close>
-
-fun arg_types_of_field :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> bpl_ty \<times> bpl_ty"
-  where
-    "arg_types_of_field T f = 
-      ( case field_ty_fun_opt T f of
-          Some (tid, [t1,t2]) \<Rightarrow> Some (t1,t2)
-       | _ \<Rightarrow> None )"
-
-subsubsection \<open>Heap\<close>
-
-text \<open>select function for the heap: readHeap<A, B>(h: HeapType, r: Ref, f: (Field A B)): B\<close>
-
-definition select_heap_aux :: "'a ty_repr_bpl \<Rightarrow> bpl_ty \<Rightarrow> 'a heap_repr \<Rightarrow> ref \<Rightarrow> 'a vb_field \<Rightarrow> 'a vbpl_val"
-  where 
-    "select_heap_aux T ret_ty h r f = 
-       option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h r f)"
-
-fun select_heap :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
-  where 
-    "select_heap T ts vs = 
-        (case (ts, vs) of 
-           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             if (if_Some (\<lambda>res. res  = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])) (arg_types_of_field T f))
-             then Some (select_heap_aux T t2 h r f)
-             else None
-         | _ \<Rightarrow> None)"
-
-text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
-
-fun store_heap :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
-  where
-    "store_heap T ts vs = 
-       (case (ts, vs) of 
-          ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
-             if (if_Some (\<lambda>res. res = (t1, t2) \<and> (vbpl_absval_ty_opt T (AHeap h)) = Some ((THeapId T) ,[])) (arg_types_of_field T f))
-             then Some (AbsV (  AHeap (h( r := (h r)(f \<mapsto> v) ))  ))
-             else None
-        | _ \<Rightarrow> None)"
-
-subsubsection \<open>Mask\<close>
-
-text \<open>select function for the heap: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
-(* todo need to add reals 
-fun select_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
-  where 
-    "select_mask T ts vs = 
-        (case (ts, vs) of 
-           ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             Some (RealV (m r f))
-        | _ \<Rightarrow> None)"
-*)
-
-subsubsection \<open>Knownfolded Mask\<close>
-
-text \<open>select function for the knownfolded mask: readPMask<A, B>(pm: PMaskType, r: Ref, f: (Field A B)): bool\<close>
-
-fun select_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
-  where 
-    "select_mask T ts vs = 
-        (case (ts, vs) of 
-           ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             Some (BoolV (m r f))
-        | _ \<Rightarrow> None)"
-
-text \<open>store function for the knownfolded mask: updPMask<A, B>(PMaskType: PMaskType, obj: Ref, f_1: (Field A B), y: bool): PMaskType\<close>
-
-fun store_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
-  where 
-    "store_mask T ts vs = 
-        (case (ts, vs) of 
-           ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f), BoolV b]) \<Rightarrow> 
-             Some (AbsV (AKnownFoldedMask (m(r := (m r)(f := b)))))
-        | _ \<Rightarrow> None)"
 
 end
