@@ -35,12 +35,13 @@ text\<open> Points to think about:
 
 definition stmt_rel_simple :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
                                ('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 
-                                ViperLang.program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> 'a astcontext_bpl \<Rightarrow>
+                                'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 
+                                type_context \<Rightarrow> 'a astcontext_bpl \<Rightarrow>
                                 ViperLang.stmt \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
   where 
-    "stmt_rel_simple R R' Pr \<Lambda> ctxt_vpr ctxt stmt_vpr \<gamma> \<equiv>
+    "stmt_rel_simple R R' ctxt_vpr StateCons \<Lambda> ctxt stmt_vpr \<gamma> \<equiv>
       \<forall> \<omega> ns stmt'_vpr res. R \<omega> ns \<longrightarrow> 
-             red_stmt_total_multi Pr \<Lambda> ctxt_vpr (Inl stmt_vpr, RNormal \<omega>) (stmt'_vpr, res) \<longrightarrow>
+             red_stmt_total_multi ctxt_vpr StateCons \<Lambda> (Inl stmt_vpr, RNormal \<omega>) (stmt'_vpr, res) \<longrightarrow>
              (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
                  \<comment>\<open>Since the target configuration \<gamma>' is existentially quantified, we cannot connect
                     this result to a subsequent Boogie statement.\<close> 
@@ -118,8 +119,8 @@ lemma assign_rel_simple:
                      "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> state_rel Pr Trep Tr (econtext_bpl.truncate ctxt) (mask_var Tr) \<omega> \<omega> ns)"*)
                    "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
           VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
-          ExpWfRel: "expr_wf_rel R3 Pr ctxt_vpr ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)" 
-                    (is "expr_wf_rel R3 Pr ctxt_vpr ctxt e_vpr \<gamma> (?b, cont)") and
+          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)" 
+                    (is "expr_wf_rel R3 ctxt_vpr StateCons ctxt e_vpr \<gamma> (?b, cont)") and
           BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
           TyRel: "vpr_to_bpl_ty Trep ty = Some ty_bpl" and
                     \<comment>\<open>Key assignment property for R2\<close>
@@ -129,14 +130,14 @@ lemma assign_rel_simple:
                            R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
           TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep"
   and
-          ExpRel: "exp_rel_vpr_bpl R3 Pr ctxt_vpr (econtext_bpl.truncate ctxt) e_vpr e_bpl" 
+          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr (econtext_bpl.truncate ctxt) e_vpr e_bpl" 
           
-  shows "stmt_rel_simple R2 R2 Pr ctxt_vpr \<Lambda>_vpr ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>"  
+  shows "stmt_rel_simple R2 R2 ctxt_vpr StateCons \<Lambda>_vpr ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>"  
 proof (cases rule: stmt_rel_simple_intro)
 \<comment>\<open>normal case\<close>
   fix \<omega> ns stmt'_vpr \<omega>' res
   assume R: "R2 \<omega> ns" and    
-         RedVpr: "red_stmt_total_multi Pr ctxt_vpr \<Lambda>_vpr (Inl (LocalAssign x_vpr e_vpr), RNormal \<omega>) (stmt'_vpr, RNormal \<omega>')"
+         RedVpr: "red_stmt_total_multi ctxt_vpr StateCons \<Lambda>_vpr (Inl (LocalAssign x_vpr e_vpr), RNormal \<omega>) (stmt'_vpr, RNormal \<omega>')"
 
   from RedVpr
   show "\<exists>\<gamma>' ns'. red_ast_bpl ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R2 \<omega>' ns'"
@@ -154,7 +155,7 @@ proof (cases rule: stmt_rel_simple_intro)
       using red_stmt_total_multi_normal_source
       by (metis snd_conv surjective_pairing)
 
-    from step(1) obtain v where RedEVpr: "Pr, ctxt_vpr, (Some \<omega>) \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v)" and 
+    from step(1) obtain v where RedEVpr: "ctxt_vpr, StateCons, (Some \<omega>) \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v)" and 
                                 yEq: "y = (Inr (), RNormal (update_var_total \<omega> x_vpr v))" and
                                 "\<omega>'' = (update_var_total \<omega> x_vpr v)" and
                                 vTyVpr: "get_type (absval_interp_total ctxt_vpr) v = ty"
@@ -210,8 +211,7 @@ next
   \<comment>\<open>Failure case\<close>
   fix \<omega> ns stmt'_vpr res
   assume "R2 \<omega> ns" and 
-         RedVpr:"red_stmt_total_multi Pr ctxt_vpr \<Lambda>_vpr (Inl (LocalAssign x_vpr e_vpr), RNormal \<omega>) (stmt'_vpr, RFailure)"
-
+         RedVpr:"red_stmt_total_multi ctxt_vpr StateCons \<Lambda>_vpr (Inl (LocalAssign x_vpr e_vpr), RNormal \<omega>) (stmt'_vpr, RFailure)"
   
   from RedVpr show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl ctxt (\<gamma>, Normal ns) c'"
   proof (cases rule: converse_rtranclpE)
@@ -230,7 +230,7 @@ next
           by blast
       next 
         case (RedSubExpressionFailure e)
-        hence "Pr, ctxt_vpr, Some \<omega> \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+        hence "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
           by simp
 
         then show ?thesis 
@@ -247,7 +247,7 @@ lemma assign_rel_simple_2:
                      "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> state_rel Pr Trep Tr (econtext_bpl.truncate ctxt) (mask_var Tr) \<omega> \<omega> ns)"*)
                    "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
           VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
-          ExpWfRel: "expr_wf_rel R3 Pr ctxt_vpr ctxt e_vpr \<gamma> \<gamma>'" and
+          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons ctxt e_vpr \<gamma> \<gamma>'" and
           ProgressToAssign: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow> 
                           \<exists>ns3. red_ast_bpl ctxt (\<gamma>', Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
                                 R3 \<omega>_def \<omega> ns3" and
@@ -260,12 +260,12 @@ lemma assign_rel_simple_2:
                            R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
           TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep"
   and
-          ExpRel: "exp_rel_vpr_bpl R3 Pr ctxt_vpr (econtext_bpl.truncate ctxt) e_vpr e_bpl" 
+          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr (econtext_bpl.truncate ctxt) e_vpr e_bpl" 
           
-        shows "stmt_rel_simple R2 R2 Pr ctxt_vpr \<Lambda>_vpr ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>"  
+        shows "stmt_rel_simple R2 R2 ctxt_vpr StateCons \<Lambda>_vpr ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>"  
 proof -  
   from ExpWfRel and ProgressToAssign 
-  have *:"expr_wf_rel R3 Pr ctxt_vpr ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
+  have *:"expr_wf_rel R3 ctxt_vpr StateCons ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
     using wf_rel_extend_1
     by blast
   show ?thesis

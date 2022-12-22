@@ -41,6 +41,7 @@ lemma inhale_perm_single_pred_h_eq:
   using assms inhale_perm_single_pred_mupd update_mp_total_h_full_eq
   by blast
 
+(*
 lemma inhale_heap_unchanged: 
   assumes "red_inhale Pr \<Delta> R A \<omega> (RNormal \<omega>')"
   shows "get_h_total_full \<omega> = get_h_total_full \<omega>'"
@@ -66,9 +67,11 @@ case (InhPureNormalMagic \<omega> e b R)
   then show ?case
     by (insert InhPureNormalMagic.hyps, cases b) auto    
 qed auto
+*)
 
 section \<open>Unfold leads to one normal successor state\<close>
 
+(*
 lemma unfold_at_least_one:
   assumes "ViperLang.predicates Pr pred_id = Some pdecl" and
           "ViperLang.predicate_decl.body pdecl = Some pbody" and
@@ -110,6 +113,7 @@ lemma fold_normal_consistent:
 proof cases
 case (FoldRelNormal pred_decl pred_body m' mp'' m)
 then show ?thesis oops
+*)
 
 subsection \<open>Basic properties\<close>
 

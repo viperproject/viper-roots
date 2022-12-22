@@ -72,18 +72,18 @@ abbreviation red_expr_bpl :: "'a econtext_bpl \<Rightarrow> expr \<Rightarrow> (
   where "red_expr_bpl ctxt e ns v \<equiv> type_interp ctxt, var_context ctxt, fun_interp ctxt, [] \<turnstile> \<langle>e, ns\<rangle> \<Down> v"       
 
 definition exp_rel_vb_single ::
-  "ViperLang.program \<Rightarrow> 'a total_context \<Rightarrow> 'a econtext_bpl \<Rightarrow> viper_expr \<Rightarrow> boogie_expr \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow>  bool"
+  "'a total_context \<Rightarrow> 'a econtext_bpl \<Rightarrow> viper_expr \<Rightarrow> boogie_expr \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where
-    "exp_rel_vb_single Pr ctxt_vpr ctxt e_vpr e_bpl \<omega> ns \<equiv> 
-      (\<forall>v1 \<omega>_def_opt. (Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<longrightarrow>
+    "exp_rel_vb_single ctxt_vpr ctxt e_vpr e_bpl \<omega> ns \<equiv> 
+      (\<forall>v1 StateCons \<omega>_def_opt. (ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<longrightarrow>
                (\<exists>v2. (red_expr_bpl ctxt e_bpl ns v2) \<and> (val_rel_vpr_bpl v1 = v2)))"
 
 text \<open>Expression relation: Here, the well-definedness state is not fixed in the expression evaluation, 
 because we only care about the case where the expression successfully evaluates to a value.\<close>
 definition exp_rel_vpr_bpl :: 
-   "('a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> ViperLang.program \<Rightarrow> 'a total_context \<Rightarrow> 'a econtext_bpl \<Rightarrow> viper_expr \<Rightarrow> boogie_expr \<Rightarrow> bool"
-   where "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e_vpr e_bpl \<equiv> 
-           \<forall> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<longrightarrow> exp_rel_vb_single Pr ctxt_vpr ctxt e_vpr e_bpl \<omega> ns"
+   "('a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> 'a econtext_bpl \<Rightarrow> viper_expr \<Rightarrow> boogie_expr \<Rightarrow> bool"
+   where "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl \<equiv> 
+           \<forall> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<longrightarrow> exp_rel_vb_single ctxt_vpr ctxt e_vpr e_bpl \<omega> ns"
 
 
 subsection \<open>State relationship\<close>

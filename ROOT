@@ -1,16 +1,19 @@
 session TotalViper = Viper +
+  sessions
+    "HOL-Eisbach"
+    "Boogie_Lang"
   theories
-    TotalViperState.thy
-    TotalStateUtil.thy
-    TotalConsistency.thy
-    TotalExpressions.thy
-    TotalSemantics.thy
-    TotalSemProperties.thy
-    TotalUtil.thy
-    ViperBoogieAbsValueInst.thy
-    ViperBoogieBasicRel.thy
-    ExpRel.thy
-	ExpRelML.thy
-    ExprWfRel.thy
-	ExprWfRelML.thy
-    ExpProofGenTest.thy
+    TotalViperState
+    TotalStateUtil
+    TotalConsistency
+    TotalExpressions
+    TotalSemantics
+    TotalSemProperties
+    TotalUtil
+    ViperBoogieAbsValueInst
+    ViperBoogieBasicRel
+    ExpRel
+    ExpRelML
+    ExprWfRel
+    ExprWfRelML
+    ExpProofGenTest

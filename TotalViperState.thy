@@ -57,6 +57,8 @@ fun get_mp_pre_total :: "'a pre_total_state \<Rightarrow> 'a predicate_mask"
 fun wf_pre_total_state :: "'a pre_total_state \<Rightarrow> bool" where
   "wf_pre_total_state \<phi> \<longleftrightarrow> wf_mask_simple (fst (get_m_pre_total \<phi>))"
 
+(* TODO: Does it make sense to use a typedef here given that we can't express the entire state consistency
+here? *)
 typedef 'a total_state = "{ \<phi> :: 'a pre_total_state |\<phi>. wf_pre_total_state \<phi> }"
   apply (rule_tac x="((\<lambda>hl. VInt 0, \<lambda>p. ({},{})), (zero_mask, zero_mask))" in exI)
   apply (simp add: wf_zero_mask)

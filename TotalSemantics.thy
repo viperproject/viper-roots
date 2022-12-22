@@ -1,4 +1,6 @@
-theory TotalSemantics         
+section \<open>Total heap semantics of statements\<close>
+
+theory TotalSemantics
 imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
 begin
 
@@ -17,77 +19,76 @@ definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat
                m' = m(lh := psub (m lh) q)
        }"
 
-inductive red_exhale :: "program \<Rightarrow> 'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a  exhale_result \<Rightarrow> bool"
-  for Pr :: program and ctxt :: "'a total_context" and \<omega>0 :: "'a full_total_state"
+inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a  exhale_result \<Rightarrow> bool"
+  for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool" and \<omega>0 :: "'a full_total_state"
   where
 
 \<comment>\<open>exhale acc(e.f, p)\<close>
     ExhAcc: 
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
-       Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
+       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
+       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
        a = the_address r \<rbrakk> \<Longrightarrow>
-       red_exhale Pr ctxt \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
+       red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
                            (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
 
- \<comment>\<open>Exhaling wildcard removes some non-zero permission that this is less than the current permission held.\<close>
+ \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
   | ExhAccWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
        q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
-       red_exhale Pr ctxt \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
+       red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
                                          (m( (a,f) := q),pm))"
 
 \<comment>\<open>exhale acc(P(es), p)\<close>
   | ExhAccPred:
      "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
-       Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
-      red_exhale Pr ctxt \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
+       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
+      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
               (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
                             (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
   | ExhAccPredWildcard:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
+       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
        q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
-       red_exhale Pr ctxt \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
+       red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
                            (exh_if_total (m(a,f) \<noteq> pnone)
                                          (m, pm ( (pred_id, v_args) := q )))"
 
-\<comment>\<open>exhale other cases\<close>
   | ExhPure:
     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
-       Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-       red_exhale Pr ctxt \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
+       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+       red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
   | SubAtomicFailure: 
     "\<lbrakk> e \<in> sub_expressions_atomic A ;
-      Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
-       red_exhale Pr ctxt \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
+      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+       red_exhale ctxt R \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
 
 \<comment>\<open>exhale A && B\<close>
   |  ExhSepNormal: 
-   "\<lbrakk> red_exhale Pr ctxt \<omega>0 A m_pm (ExhaleNormal m_pm'); 
-      red_exhale Pr ctxt \<omega>0 B m_pm' res\<rbrakk> \<Longrightarrow>
-      red_exhale Pr ctxt \<omega>0 (A && B) m_pm res"
+   "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm (ExhaleNormal m_pm'); 
+      red_exhale ctxt R \<omega>0 B m_pm' res\<rbrakk> \<Longrightarrow>
+      red_exhale ctxt R \<omega>0 (A && B) m_pm res"
  | ExhSepFailureMagic: 
-   "\<lbrakk> red_exhale Pr ctxt \<omega>0 A m_pm ExhaleFailure \<rbrakk> \<Longrightarrow>
-      red_exhale Pr ctxt \<omega>0 (A && B) m_pm ExhaleFailure"
+   "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_exhale ctxt R \<omega>0 (A && B) m_pm ExhaleFailure"
 
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
  | ExhImpTrue: 
    "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
-      red_exhale Pr ctxt \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
-      red_exhale Pr ctxt \<omega>0 (Imp e A) m_pm res" 
+      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+      red_exhale ctxt R \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
+      red_exhale ctxt R \<omega>0 (Imp e A) m_pm res" 
  | ExhImpFalse:  
    "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-      red_exhale Pr ctxt \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
+      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+      red_exhale ctxt R \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
  | ExhImpFailure:
    "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm); 
-      Pr, ctxt, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
-     red_exhale Pr ctxt \<omega>0 (Imp e A) m_pm ExhaleFailure"
+      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+     red_exhale ctxt R \<omega>0 (Imp e A) m_pm ExhaleFailure"
 
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 
@@ -117,23 +118,22 @@ lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longri
 lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
   by (simp add: exhale_state_def)
 
-inductive fold_rel :: "program \<Rightarrow> 'a total_context \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
+inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
   where 
     FoldRelNormal: 
-      "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
+      "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale Pr ctxt (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
        mp'' = (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q);
        \<omega>2 = update_m_total_full \<omega> (fst m') mp''\<rbrakk> \<Longrightarrow> 
-       fold_rel Pr ctxt pred_id vs q \<omega> (RNormal \<omega>2)"
+       fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>2)"
   | FoldRelFailure:
-       "\<lbrakk> ViperLang.predicates Pr pred_id = Some pred_decl;
+       "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale Pr ctxt (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
-       fold_rel Pr ctxt pred_id vs q \<omega> RFailure"
-    
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
+       fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp set" where
   "sub_expressions (If p _ _) = {p}"
@@ -144,26 +144,26 @@ fun sub_expressions :: "stmt \<Rightarrow> pure_exp set" where
 | "sub_expressions _ = {}"
 \<comment>\<open>TODO: \<^const>\<open>sub_expressions\<close> is duplicated from ViperLang\<close>
 
-inductive red_stmt_total_single_set :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow>  stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> (stmt+unit) \<times> ('a standard_result) \<Rightarrow> bool"
-  for Pr :: program and ctxt :: "'a total_context" and \<Lambda> :: "type_context"  where
+inductive red_stmt_total_single_set :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow>  stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> (stmt+unit) \<times> ('a standard_result) \<Rightarrow> bool"
+  for ctxt :: "'a total_context" and R :: "('a full_total_state \<Rightarrow> bool)" and \<Lambda> :: "type_context"  where
 \<comment>\<open>Atomic statements\<close>
-   RedSkip: " red_stmt_total_single_set Pr ctxt \<Lambda> Skip \<omega> (Inr (), RNormal \<omega>)" 
+   RedSkip: "red_stmt_total_single_set ctxt R \<Lambda> Skip \<omega> (Inr (), RNormal \<omega>)" 
  | RedInhale: 
-   "\<lbrakk> red_inhale_th_cons Pr ctxt A \<omega> res \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Inhale A) \<omega> (Inr (), res)"
+   "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Inhale A) \<omega> (Inr (), res)"
  | RedExhale:
-   "\<lbrakk> red_exhale Pr ctxt \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m');
+   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m');
       \<omega>' \<in> exhale_state \<omega> m' \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Exhale A) \<omega> (Inr (), RNormal \<omega>')"
+      red_stmt_total_single_set ctxt R \<Lambda> (Exhale A) \<omega> (Inr (), RNormal \<omega>')"
  | RedExhaleFailure:
-   "\<lbrakk> red_exhale Pr ctxt \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Exhale A) \<omega> (Inr (), RFailure)"
+   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Exhale A) \<omega> (Inr (), RFailure)"
  | RedAssert:
-   "\<lbrakk> red_exhale Pr ctxt \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m') \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Assert A) \<omega> (Inr (), RNormal \<omega>)"
+   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Assert A) \<omega> (Inr (), RNormal \<omega>)"
  | RedAssertFailure:
-   "\<lbrakk> red_exhale Pr ctxt \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Assert A) \<omega> (Inr (), RFailure)"
+   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Assert A) \<omega> (Inr (), RFailure)"
 
 \<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
 always has at least one failure transition, which is not in-sync with Carbon's reordering heuristic for
@@ -175,37 +175,37 @@ be changed to\<^term>\<open>\<forall>res. red_exhale Pr ctxt \<omega> A (get_m_t
 
 \<comment>\<open>only reduce assignment if RHS has the type expected by LHS \<close>
  | RedLocalAssign:
-   "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v);
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v);
       \<Lambda> x = Some ty; 
       get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
-     red_stmt_total_single_set Pr ctxt \<Lambda> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
+     red_stmt_total_single_set ctxt R \<Lambda> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
  | RedFieldAssign: 
-   "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
       get_mh_total_full \<omega> (addr,f) = pwrite;
-      Pr, ctxt, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
-      red_stmt_total_single_set Pr ctxt \<Lambda> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
+      ctxt, R, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
 \<comment>\<open>Is null case handled in NestedPermSem?\<close>
  | RedFieldAssignFailure: 
-   "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
       r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
-      red_stmt_total_single_set Pr ctxt \<Lambda> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
+      red_stmt_total_single_set ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (Inr (), (RNormal (update_hh_loc_total_full \<omega> (addr,f) v)))"
 
 | RedUnfold:
-  "\<lbrakk> red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
-     Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     W' = {\<omega>2. unfold_rel Pr ctxt pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent Pr ctxt \<omega>2};
+  "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
+     W' = {\<omega>2. unfold_rel ctxt R pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> total_heap_consistent ctxt \<omega>2};
      th_result_rel (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr ctxt \<Lambda> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
+    red_stmt_total_single_set ctxt R \<Lambda> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
 
 \<comment>\<open>\<^const>\<open>unfold_rel\<close> constrains permission \<^term>\<open>p\<close> to be strictly positive\<close>
 | RedUnfoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
-     unfold_rel Pr ctxt pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr ctxt \<Lambda> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
+  "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     unfold_rel ctxt R pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set ctxt R \<Lambda> (Unfold pred_id e_args Wildcard) \<omega> (Inr (), RNormal \<omega>')"
 | RedUnfoldWildcardFailure:
-  "\<lbrakk> red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
+  "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      get_mp_total_full \<omega> (pred_id, v_args) = pnone \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr ctxt \<Lambda> (Unfold pred_id e_args Wildcard) \<omega> 
+    red_stmt_total_single_set ctxt R \<Lambda> (Unfold pred_id e_args Wildcard) \<omega> 
       (Inr (), RFailure)"
 \<comment>\<open>TODO: unfold acc(P(x),0)\<close>
 
@@ -214,55 +214,55 @@ be changed to\<^term>\<open>\<forall>res. red_exhale Pr ctxt \<omega> A (get_m_t
   (and even if there is a wildcard, we know that there must be at least one transition for the
  newly generated predicate instance, namely the one before the fold)\<close>
 | RedFold:
-  "\<lbrakk> red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);
-     Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     fold_rel Pr ctxt pred_id v_args (Abs_prat v_p) \<omega> res
+  "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
+     fold_rel ctxt R pred_id v_args (Abs_prat v_p) \<omega> res
  \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr ctxt \<Lambda> (Fold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
+    red_stmt_total_single_set ctxt R \<Lambda> (Fold pred_id e_args (PureExp e_p)) \<omega> (Inr (), res)"
 
 | RedFoldWildcard:
-  "\<lbrakk> red_pure_exps_total Pr ctxt (Some \<omega>) e_args \<omega> (Some v_args);     
-     fold_rel Pr ctxt pred_id v_args p \<omega> res \<rbrakk> \<Longrightarrow>
-    red_stmt_total_single_set Pr ctxt \<Lambda> (Fold pred_id e_args Wildcard) \<omega> (Inr (), res)"
+  "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);     
+     fold_rel ctxt R pred_id v_args p \<omega> res \<rbrakk> \<Longrightarrow>
+    red_stmt_total_single_set ctxt R \<Lambda> (Fold pred_id e_args Wildcard) \<omega> (Inr (), res)"
 \<comment>\<open>TODO: fold acc(P(x),0)\<close>
 
 \<comment>\<open>Composite statements\<close>
 
  | RedIfTrue: 
-   "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
-      red_stmt_total_single_set Pr ctxt \<Lambda> (If e_b s1 s2) \<omega> (Inl s1, RNormal \<omega>)"
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set ctxt R \<Lambda> (If e_b s1 s2) \<omega> (Inl s1, RNormal \<omega>)"
  | RedIfFalse: 
-   "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-      red_stmt_total_single_set Pr ctxt \<Lambda> (If e_b s1 s2) \<omega> (Inl s2, RNormal \<omega>)"
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+      red_stmt_total_single_set ctxt R \<Lambda> (If e_b s1 s2) \<omega> (Inl s2, RNormal \<omega>)"
  | RedIfFailure:
-    "\<lbrakk> Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
-       red_stmt_total_single_set Pr ctxt \<Lambda> (If e_b s1 s2) \<omega> (Inr (), RFailure)"
+    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+       red_stmt_total_single_set ctxt R \<Lambda> (If e_b s1 s2) \<omega> (Inr (), RFailure)"
  | RedSeq1:
-   "\<lbrakk> red_stmt_total_single_set Pr ctxt \<Lambda> s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Seq s1 s2) \<omega> (Inl (Seq s'' s2), r'')"
+   "\<lbrakk> red_stmt_total_single_set ctxt R \<Lambda> s1 \<omega> (Inl s'', r'') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Seq s1 s2) \<omega> (Inl (Seq s'' s2), r'')"
  | RedSeq2: 
-   "\<lbrakk> red_stmt_total_single_set Pr ctxt \<Lambda> s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
-      red_stmt_total_single_set Pr ctxt \<Lambda> (Seq s1 s2) \<omega> (Inl s2, r'')"
+   "\<lbrakk> red_stmt_total_single_set ctxt R \<Lambda> s1 \<omega> (Inr (), r'') \<rbrakk> \<Longrightarrow>
+      red_stmt_total_single_set ctxt R \<Lambda> (Seq s1 s2) \<omega> (Inl s2, r'')"
 
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
-  "\<lbrakk> e \<in> sub_expressions s; Pr,ctxt,(Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
-    red_stmt_total_single_set Pr ctxt \<Lambda> s \<omega> (Inr (), RFailure)"
+  "\<lbrakk> e \<in> sub_expressions s; ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+    red_stmt_total_single_set ctxt R \<Lambda> s \<omega> (Inr (), RFailure)"
 
 inductive_cases RedLocalAssign_case: 
-     "red_stmt_total_single_set Pr ctxt \<Lambda> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
+     "red_stmt_total_single_set ctxt R \<Lambda> (LocalAssign x e) \<omega> (Inr (), (RNormal (update_var_total \<omega> x v)))"
 
 type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a standard_result"
 
-inductive red_stmt_total_single :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+inductive red_stmt_total_single :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
   where 
-    NormalSingleStep: "\<lbrakk> red_stmt_total_single_set Pr ctxt \<Lambda> s \<omega> res \<rbrakk> \<Longrightarrow> 
-       red_stmt_total_single Pr ctxt \<Lambda> ((Inl s, RNormal \<omega>)) res"
+    NormalSingleStep: "\<lbrakk> red_stmt_total_single_set ctxt R \<Lambda> s \<omega> res \<rbrakk> \<Longrightarrow> 
+       red_stmt_total_single ctxt R \<Lambda> ((Inl s, RNormal \<omega>)) res"
 
-inductive_cases NormalSingleStep_case [elim]: "red_stmt_total_single Pr ctxt \<Lambda> ((Inl s, RNormal \<omega>)) res"
+inductive_cases NormalSingleStep_case [elim]: "red_stmt_total_single ctxt R \<Lambda> ((Inl s, RNormal \<omega>)) res"
 
-abbreviation red_stmt_total_multi :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
-  where "red_stmt_total_multi Pr ctxt \<Lambda> \<equiv> rtranclp (red_stmt_total_single Pr ctxt \<Lambda>)"
+abbreviation red_stmt_total_multi :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+  where "red_stmt_total_multi ctxt R \<Lambda> \<equiv> rtranclp (red_stmt_total_single ctxt R \<Lambda>)"
 
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_m_total_full \<omega> = (zero_mask, zero_mask)"
@@ -278,68 +278,68 @@ subsection \<open>Correctness\<close>
 definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
   where "vals_well_typed A vs ts \<equiv> map (get_type A) vs = ts"
 
-definition assertion_sat :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
-  where "assertion_sat Pr \<Lambda> ctxt A \<omega> = 
-            (\<forall> res. red_stmt_total_single_set Pr \<Lambda> ctxt (Assert A) \<omega> res \<longrightarrow> (snd res) \<noteq> RFailure)"
+definition assertion_sat :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "assertion_sat \<Lambda> R ctxt A \<omega> = 
+            (\<forall> res. red_stmt_total_single_set \<Lambda> R ctxt (Assert A) \<omega> res \<longrightarrow> (snd res) \<noteq> RFailure)"
 
 text \<open>Note that \<^const>\<open>assertion_sat\<close> is ``demonic'', i.e., every reduction of asserting \<^term>\<open>A\<close> must
 be a non-failing state, which is in-sync with the semantics of assert statements in programs. We might
 want to change both to be ``locally angelic''. \<close>
 
-definition heap_dep_interp_wf :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+definition heap_dep_interp_wf :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
   where 
-    "heap_dep_interp_wf Pr ctxt \<Lambda> A \<equiv> \<forall>fid fdecl. ViperLang.funs Pr fid = Some fdecl \<longrightarrow> 
+    "heap_dep_interp_wf ctxt R \<Lambda> \<equiv> \<forall>fid fdecl. ViperLang.funs (program_total ctxt) fid = Some fdecl \<longrightarrow> 
        (\<exists>fsem. fun_interp_total ctxt fid = Some fsem \<and>
             (\<forall>vs \<omega>.   
-               ( ( \<not>vals_well_typed A vs (args fdecl) ) \<longrightarrow> fsem vs \<omega> = None) \<and>
+               ( ( \<not>vals_well_typed (absval_interp_total ctxt) vs (args fdecl) ) \<longrightarrow> fsem vs \<omega> = None) \<and>
 
                ( 
-                 ( vals_well_typed A vs (args fdecl) \<and> assertion_self_framing_store Pr ctxt (pre fdecl) (nth_option vs) ) \<longrightarrow>
+                 ( vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and> assertion_self_framing_store ctxt (pre fdecl) (nth_option vs) ) \<longrightarrow>
 
-                     ( (\<not>assertion_sat Pr ctxt \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs))) \<longrightarrow>
+                     ( (\<not>assertion_sat ctxt R \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs))) \<longrightarrow>
                            fsem vs \<omega> = Some VFailure ) \<and>
   
-                     (assertion_sat Pr ctxt \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
-                         (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type A v = ret fdecl \<and>
-                              if_Some (\<lambda>e. Pr, ctxt, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) (body fdecl) ) )
+                     (assertion_sat ctxt R \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+                         (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type (absval_interp_total ctxt) v = ret fdecl \<and>
+                              if_Some (\<lambda>e. ctxt, R, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) (body fdecl) ) )
               )
             )
        )"
 
-definition heap_dep_fun_obligations :: "program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+definition heap_dep_fun_obligations :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
   where
-    "heap_dep_fun_obligations Pr ctxt \<Lambda> A \<equiv> 
+    "heap_dep_fun_obligations ctxt R \<Lambda> \<equiv> 
        \<forall> fid fdecl vs e p. 
-          ( ViperLang.funs Pr fid = Some fdecl \<and>            
+          ( ViperLang.funs (program_total ctxt) fid = Some fdecl \<and>            
             body fdecl = Some e \<and>
-            vals_well_typed A vs (args fdecl) \<and>
+            vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and>
             post fdecl = Some p)  \<longrightarrow>
              (
-              assertion_self_framing_store Pr ctxt (pre fdecl) (nth_option vs) \<and>
+              assertion_self_framing_store ctxt (pre fdecl) (nth_option vs) \<and>
                 (\<forall> \<omega> extVal.
-                  assertion_sat Pr ctxt \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+                  assertion_sat ctxt R \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
     
-                    Pr, ctxt, (Some (update_store_total \<omega> (nth_option vs))) \<turnstile> \<langle>e; (update_store_total \<omega> (nth_option vs))\<rangle> [\<Down>]\<^sub>t extVal \<and>
+                    ctxt, R, (Some (update_store_total \<omega> (nth_option vs))) \<turnstile> \<langle>e; (update_store_total \<omega> (nth_option vs))\<rangle> [\<Down>]\<^sub>t extVal \<and>
                       ((\<exists> v. extVal = Val v \<and>
-                         assertion_sat Pr ctxt \<Lambda> p (update_store_total \<omega> (nth_option (vs@[v])))))
+                         assertion_sat ctxt R \<Lambda> p (update_store_total \<omega> (nth_option (vs@[v])))))
                 )
              )"
 
-definition predicate_obligations :: "program \<Rightarrow> 'a total_context \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> bool"
+definition predicate_obligations :: "'a total_context \<Rightarrow> bool"
   where
-    "predicate_obligations Pr ctxt A \<equiv>
+    "predicate_obligations ctxt \<equiv>
        \<forall> pid pdecl vs e.
-        ( ViperLang.predicates Pr pid = Some pdecl \<and>
+        ( ViperLang.predicates (program_total ctxt) pid = Some pdecl \<and>
           predicate_decl.body pdecl = Some e \<and>
-          vals_well_typed A vs (predicate_decl.args pdecl) ) \<longrightarrow>
-          assertion_self_framing_store Pr ctxt e (nth_option vs)"
+          vals_well_typed (absval_interp_total ctxt) vs (predicate_decl.args pdecl) ) \<longrightarrow>
+          assertion_self_framing_store ctxt e (nth_option vs)"
 
-definition stmt_correct_total :: " program \<Rightarrow> 'a total_context \<Rightarrow> type_context \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> stmt \<Rightarrow>  bool"
-  where "stmt_correct_total Pr ctxt \<Lambda> A s \<equiv>
-         heap_dep_interp_wf Pr ctxt \<Lambda> A \<longrightarrow>           
-           heap_dep_fun_obligations Pr ctxt \<Lambda> A \<and>
-           predicate_obligations Pr ctxt A \<and>
+definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow>  bool"
+  where "stmt_correct_total ctxt R \<Lambda> s \<equiv>
+         heap_dep_interp_wf ctxt R \<Lambda> \<longrightarrow>           
+           heap_dep_fun_obligations ctxt R \<Lambda> \<and>
+           predicate_obligations ctxt \<and>
            (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
-                red_stmt_total_multi Pr ctxt \<Lambda> ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r)"
+                red_stmt_total_multi ctxt R \<Lambda> ((Inl s, RNormal \<omega>)) r \<longrightarrow> \<not>is_failure_config r)"
 
 end

@@ -124,14 +124,14 @@ inductive syn_exp_rel :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Right
 
 lemma syn_exp_rel_correct:
   assumes 
-          "syn_exp_rel Pr Trep Tr e_vpr e_bpl" and 
-          "Pr, ctxt_vpr, None \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and
+          "syn_exp_rel (program_total ctxt_vpr) Trep Tr e_vpr e_bpl" and 
+          "ctxt_vpr, StateCons, None \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and
 
          \<comment>\<open>Need Boogie expression to reduce because Viper has lazy binary operators but Boogie does not.
            Thus, the Viper reduction on its own cannot be used to construct a Boogie reduction.\<close>
           "\<exists>v. red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) e_bpl ns v" and
-          StateRel:"state_rel0 Pr A \<Lambda> Trep Tr \<omega> ns" and
-          FInterpRel: "fun_interp_rel Pr (field_translation Tr) (fun_translation Tr) ctxt_vpr \<Gamma>" and
+          StateRel:"state_rel0 (program_total ctxt_vpr) A \<Lambda> Trep Tr \<omega> ns" and
+          FInterpRel: "fun_interp_rel (program_total ctxt_vpr) (field_translation Tr) (fun_translation Tr) ctxt_vpr \<Gamma>" and
           HeapReadWf: "heap_read_wf Trep (create_ctxt_bpl A \<Lambda> \<Gamma>) (heap_read Tr)" and
           MaskReadWf: "mask_read_wf Trep (create_ctxt_bpl A \<Lambda> \<Gamma>) (mask_read Tr)"
         shows "red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) e_bpl ns (val_rel_vpr_bpl v1)"
@@ -157,14 +157,14 @@ next
     by blast
 next
   case (FieldAccRel e_bpl e_rcv_bpl e_f_bpl \<tau>_bpl e f f_tr \<tau>)
-  from FieldAccRel.prems obtain a where "Pr, ctxt_vpr, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))" and HeapVal:"get_hh_total_full \<omega> (a,f) = v1" 
+  from FieldAccRel.prems obtain a where "ctxt_vpr, StateCons, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))" and HeapVal:"get_hh_total_full \<omega> (a,f) = v1" 
     using RedFieldNormal_case
     by blast
   hence LookupRcv:"A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e_rcv_bpl,ns\<rangle> \<Down> AbsV (ARef (Address a))"
     using FieldAccRel.IH FieldAccRel.prems \<open>e_bpl = _\<close> HeapReadWf
     unfolding heap_read_wf_def
     by (metis econtext_bpl.select_convs(1) econtext_bpl.select_convs(2) econtext_bpl.select_convs(3) val_rel_vpr_bpl.simps(3))
-  note FieldTy=\<open>declared_fields Pr f = Some \<tau>\<close>
+  note FieldTy=\<open>declared_fields (program_total ctxt_vpr) f = Some \<tau>\<close>
   with StateRel have
       LookupField:"lookup_var \<Lambda> ns f_tr = Some (AbsV (AField (NormalField f_tr \<tau>)))"
     unfolding state_rel0_def field_rel_def
@@ -173,7 +173,7 @@ next
   from StateRel obtain h_bpl where
      LookupHeap:"lookup_var \<Lambda> ns (heap_var Tr) = Some (AbsV (AHeap h_bpl))" and 
      HeapWellTy: "vbpl_absval_ty_opt Trep (AHeap h_bpl) = Some ((THeapId Trep) ,[])" and
-     HeapRel:"heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) h_bpl"
+     HeapRel:"heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>) h_bpl"
     unfolding state_rel0_def heap_var_rel_def
     by blast  
   from HeapRel have
@@ -202,10 +202,10 @@ next
         Red2:"red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) e2_bpl ns w2"
     by auto
   show ?case    
-  proof (rule RedBinop_case[OF \<open>Pr, ctxt_vpr, None \<turnstile> \<langle>Binop e1 bop e2; _\<rangle> [\<Down>]\<^sub>t _\<close>])    
+  proof (rule RedBinop_case[OF \<open>ctxt_vpr, StateCons, None \<turnstile> \<langle>Binop e1 bop e2; _\<rangle> [\<Down>]\<^sub>t _\<close>])    
     \<comment>\<open>lazy binop case\<close>
     fix v1'
-    assume a:"Pr, ctxt_vpr, None \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1'" and eval_lazy:"eval_binop_lazy v1' bop = Some v1"
+    assume a:"ctxt_vpr, StateCons, None \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1'" and eval_lazy:"eval_binop_lazy v1' bop = Some v1"
     hence Red3:"red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) e1_bpl ns (val_rel_vpr_bpl v1')"
       using BinopRel.IH(1) Red1
       by auto
@@ -215,8 +215,8 @@ next
   next    
     \<comment>\<open>nonlazy binop case\<close>
     fix v1' v2'
-    assume "Pr, ctxt_vpr, None \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1'" and 
-           "Pr, ctxt_vpr, None \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v2'" and 
+    assume "ctxt_vpr, StateCons, None \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1'" and 
+           "ctxt_vpr, StateCons, None \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v2'" and 
            "eval_binop v1' bop v2' = BinopNormal v1"
     thus ?thesis
       using BinopRel.IH Red1 Red2 \<open>binop_rel _ = _\<close> binop_nonlazy_rel_correct      
@@ -224,7 +224,7 @@ next
   qed
 next
   case (PermRel e_bpl e_rcv_bpl f_bpl \<tau> e f f_tr \<tau>_bpl)
-  from PermRel.prems obtain r where "Pr, ctxt_vpr, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" 
+  from PermRel.prems obtain r where "ctxt_vpr, StateCons, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" 
     using RedPerm_case
     by blast  
 
@@ -236,7 +236,7 @@ next
     
   from StateRel obtain m_bpl where
      LookupMask:"lookup_var \<Lambda> ns (mask_var Tr) = Some (AbsV (AMask m_bpl))" and 
-     MaskRel:"mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) m_bpl"
+     MaskRel:"mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) m_bpl"
     unfolding state_rel0_def mask_var_rel_def
     by blast
 
@@ -247,11 +247,11 @@ next
 
   show ?case
   proof (rule RedPerm_case)
-    show "Pr, ctxt_vpr, None \<turnstile> \<langle>Perm e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+    show "ctxt_vpr, StateCons, None \<turnstile> \<langle>Perm e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
       by (auto intro: PermRel)
   next
     assume "v1 = VPerm 0"
-    assume "Pr, ctxt_vpr, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null)"
+    assume "ctxt_vpr, StateCons, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null)"
     hence "A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e_rcv_bpl,ns\<rangle> \<Down> AbsV (ARef Null)"
       using PermRel.IH PermRel.prems \<open>e_bpl = _\<close> MaskReadWf
       unfolding mask_read_wf_def
@@ -266,7 +266,7 @@ next
     assume "v1 = VPerm (Rep_prat (fst (snd (Rep_total_state (snd (snd \<omega>)))) (a, f)))"
     hence HeapVal:"v1 = VPerm (Rep_prat (get_mh_total_full \<omega> (a,f)))"
       by simp
-    assume "Pr, ctxt_vpr, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
+    assume "ctxt_vpr, StateCons, None \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
     hence RedRcv: "A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e_rcv_bpl,ns\<rangle> \<Down> AbsV (ARef (Address a))"
       using PermRel.IH PermRel.prems \<open>e_bpl = _\<close> MaskReadWf
       unfolding mask_read_wf_def
@@ -288,9 +288,9 @@ next
   qed
 next
   case (FunAppRel es_bpl e_heap e_args_bpl f f_bpl es)
-  from \<open>Pr, ctxt_vpr, None \<turnstile> \<langle>FunApp f es;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1\<close>
+  from \<open>ctxt_vpr, StateCons, None \<turnstile> \<langle>FunApp f es;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1\<close>
   obtain vs f_interp_vpr where     
-      args_vpr: "list_all2 (\<lambda>e v. red_pure_exp_total Pr ctxt_vpr None e \<omega> (Val v)) es vs" and
+      args_vpr: "list_all2 (\<lambda>e v. red_pure_exp_total ctxt_vpr StateCons None e \<omega> (Val v)) es vs" and
                 "fun_interp_total ctxt_vpr f = Some f_interp_vpr" and
                 "f_interp_vpr vs \<omega> = Some (Val v1)"
     by (blast elim: red_pure_exp_total_elims)
@@ -314,7 +314,7 @@ next
     hence "n < length es" using \<open>length es = length e_args_bpl\<close>
       by simp
 
-    hence IHReq1:"Pr, ctxt_vpr, None \<turnstile> \<langle>es ! n;\<omega>\<rangle> [\<Down>]\<^sub>t Val (vs ! n)"
+    hence IHReq1:"ctxt_vpr, StateCons, None \<turnstile> \<langle>es ! n;\<omega>\<rangle> [\<Down>]\<^sub>t Val (vs ! n)"
       using args_vpr
       by (metis list_all2_conv_all_nth)
 
@@ -334,7 +334,7 @@ next
 
   from StateRel obtain h_bpl where
      LookupHeap:"lookup_var \<Lambda> ns (heap_var Tr) = Some (AbsV (AHeap h_bpl))" and 
-     HeapRel:"heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) h_bpl"
+     HeapRel:"heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>) h_bpl"
     unfolding state_rel0_def heap_var_rel_def
     by blast
 
@@ -345,7 +345,7 @@ next
 
   obtain f_interp_bpl where
        "\<Gamma> f_bpl = Some f_interp_bpl" and
-       "fun_rel Pr (field_translation Tr) f_interp_vpr f_interp_bpl"
+       "fun_rel (program_total ctxt_vpr) (field_translation Tr) f_interp_vpr f_interp_bpl"
     using FInterpRel \<open>fun_translation Tr f = Some f_bpl\<close> \<open>fun_interp_total ctxt_vpr f = Some f_interp_vpr\<close>
     unfolding fun_interp_rel_def
     by (metis has_Some_iff)
@@ -369,11 +369,11 @@ qed
 
 lemma syn_exp_rel_correct_2:
   assumes 
-      "syn_exp_rel Pr Trep Tr e_vpr e_bpl" and 
-      "Pr, ctxt_vpr, None \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and
+      "syn_exp_rel (program_total ctxt_vpr) Trep Tr e_vpr e_bpl" and 
+      "ctxt_vpr, StateCons, None \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and
       "\<exists>v. red_expr_bpl ctxt e_bpl ns v" and
-      StateRel:"state_rel Pr Trep Tr ctxt wdmask \<omega>def \<omega> ns" and
-      TrWf: "tr_wf Pr ctxt_vpr ctxt Trep Tr"
+      StateRel:"state_rel (program_total ctxt_vpr) Trep Tr ctxt wdmask \<omega>def \<omega> ns" and
+      TrWf: "tr_wf (program_total ctxt_vpr) ctxt_vpr ctxt Trep Tr"
 shows "red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)"
   using assms tr_wf_def state_rel_def syn_exp_rel_correct
   by (metis (mono_tags, lifting) econtext_bpl.surjective old.unit.exhaust)
@@ -381,18 +381,18 @@ shows "red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)"
 subsection \<open>Semantic approach\<close>
 
 lemma exp_rel_vpr_bpl_intro:
-assumes "\<And> \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
-                    (Pr, ctxt_vpr, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
+assumes "\<And> StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
+                    (ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
                     (\<exists>v2. (red_expr_bpl ctxt e_bpl ns v2) \<and> (val_rel_vpr_bpl v1 = v2))"                   
-shows "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e_vpr e_bpl"
+shows "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
   using assms
   unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
   by auto
 
 lemma exp_rel_vpr_bpl_elim:
-  assumes "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e_vpr e_bpl" and
-          "(\<And> \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
-                    (Pr, ctxt_vpr, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
+  assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl" and
+          "(\<And> StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
+                    (ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
                     (\<exists>v2. (red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)) \<and> (val_rel_vpr_bpl v1 = v2))) \<Longrightarrow> P"
   shows P
   using assms
@@ -400,9 +400,9 @@ lemma exp_rel_vpr_bpl_elim:
   by blast
 
 lemma exp_rel_vpr_bpl_elim_2:
-  assumes "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e_vpr e_bpl" and
+  assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl" and
           "(\<And> \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
-                    (Pr, ctxt_vpr, \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
+                    (ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
                     red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)) \<Longrightarrow> P"
   shows P
   using assms
@@ -412,11 +412,11 @@ lemma exp_rel_vpr_bpl_elim_2:
 lemma exp_rel_var: 
   assumes VarRel:"\<And> \<omega> \<omega>_def ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>val_vpr. ((get_store_total \<omega>) var_vpr) = Some val_vpr \<and>
                                   lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr))"
-  shows "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.Var var_vpr) (Lang.Var var_bpl)"  
+  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Var var_vpr) (Lang.Var var_bpl)"  
 proof(rule exp_rel_vpr_bpl_intro)
-  fix \<omega> \<omega>_def \<omega>_def_opt ns v1
+  fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
   assume R:"R \<omega>_def \<omega> ns"
-  assume "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>ViperLang.Var var_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  assume "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>ViperLang.Var var_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
   hence VprLookup:"get_store_total \<omega> var_vpr = Some v1"
     by (auto elim: TotalExpressions.RedVar_case)
   show "\<exists>v2. red_expr_bpl ctxt (expr.Var var_bpl) ns v2 \<and> val_rel_vpr_bpl v1 = v2"
@@ -431,11 +431,11 @@ qed
 lemma exp_rel_lit:
   assumes LitRel: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> lit_translation_rel ctxt ns litT" and
                   "litT lit_vpr = e_bpl"
-  shows "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.ELit lit_vpr) e_bpl"
+  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.ELit lit_vpr) e_bpl"
 proof(rule exp_rel_vpr_bpl_intro)
-  fix \<omega> \<omega>_def \<omega>_def_opt ns v1
+  fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
   assume R:"R \<omega>_def_opt \<omega> ns"
-  assume "Pr, ctxt_vpr, \<omega>_def \<turnstile> \<langle>ViperLang.ELit lit_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  assume "ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>ViperLang.ELit lit_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
   hence "v1 = (val_of_lit lit_vpr)"
     using TotalExpressions.RedLit_case by blast
   show "\<exists>v2. red_expr_bpl ctxt e_bpl ns v2 \<and> val_rel_vpr_bpl v1 = v2"
@@ -451,17 +451,17 @@ lemma exp_rel_field_access:
        StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_context ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
        HeapReadWf: "heap_read_wf TyRep ctxt hread" and
        "e_bpl = hread (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
-       RcvRel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e e_rcv_bpl" and
+       RcvRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_rcv_bpl" and
        FieldRel: "field_translation Tr f = Some f_tr" and
        "e_f_bpl = Lang.Var f_tr" and
        FieldTy: "declared_fields Pr f = Some \<tau>" and
        FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
-     shows "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (FieldAcc e f) e_bpl"
+     shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (FieldAcc e f) e_bpl"
 proof(rule exp_rel_vpr_bpl_intro)
-  fix \<omega> \<omega>_def \<omega>_def_opt ns v1
+  fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
   assume R:"R \<omega>_def \<omega> ns"
-  assume RedVpr: "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
-  from this obtain a where "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))" and HeapVal:"get_hh_total_full \<omega> (a,f) = v1" 
+  assume RedVpr: "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  from this obtain a where "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))" and HeapVal:"get_hh_total_full \<omega> (a,f) = v1" 
     using RedFieldNormal_case
     by blast
 
@@ -504,9 +504,9 @@ qed
 lemma exp_rel_unop:
   assumes 
     UopRel:"unop_rel uop = uopb" and 
-    ExpRel:"exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e e_bpl"
+    ExpRel:"exp_rel_vpr_bpl R ctxt_vpr ctxt e e_bpl"
   shows 
-    "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.Unop uop e) (Lang.UnOp uopb e_bpl)"
+    "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Unop uop e) (Lang.UnOp uopb e_bpl)"
   apply (rule exp_rel_vpr_bpl_intro)
   apply (rule exp_rel_vpr_bpl_elim[OF ExpRel])
   by (auto elim!: TotalExpressions.RedUnop_case intro!: Semantics.RedUnOp unop_rel_correct[OF _ UopRel] )
@@ -517,19 +517,19 @@ lemma exp_rel_binop:
    \<comment>\<open>If the binary operation is lazy, we need a well-typedness result on e2, since the Viper reduction
       of \<^term>\<open>Binop e1 bop e2\<close> might not need to reduce e2 if e1 establishes the result.\<close>
    RedE2Bpl: "binop_lazy bop \<noteq> None \<Longrightarrow> (\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<exists>b. red_expr_bpl ctxt e2_bpl ns (BoolV b))" and
-   E1Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e1 e1_bpl" and
-   E2Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e2 e2_bpl"
+   E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
+   E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
  shows
-   "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
+   "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
 proof (rule exp_rel_vpr_bpl_intro)
-  fix \<omega> \<omega>_def \<omega>_def_opt ns v
+  fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v
   assume R: "R \<omega>_def \<omega> ns"
-  assume RedVpr: "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>ViperLang.Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+  assume RedVpr: "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>ViperLang.Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
   have "red_expr_bpl ctxt (e1_bpl \<guillemotleft>bopb\<guillemotright> e2_bpl) ns (val_rel_vpr_bpl v)"
-  proof (rule RedBinop_case[OF \<open>Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>Binop e1 bop e2; _\<rangle> [\<Down>]\<^sub>t _\<close>])
+  proof (rule RedBinop_case[OF \<open>ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>Binop e1 bop e2; _\<rangle> [\<Down>]\<^sub>t _\<close>])
     \<comment>\<open>lazy binop case\<close>
     fix v1
-    assume RedE1Vpr:"Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and eval_lazy:"eval_binop_lazy v1 bop = Some v"
+    assume RedE1Vpr:"ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and eval_lazy:"eval_binop_lazy v1 bop = Some v"
     obtain b1 where "v1 = VBool b1"
       by (rule eval_binop_lazy.elims[OF eval_lazy]) auto
             
@@ -558,8 +558,8 @@ proof (rule exp_rel_vpr_bpl_intro)
   next
     \<comment>\<open>nonlazy binop case\<close>
     fix v1 v2
-    assume RedE1Vpr: "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and 
-           RedE2Vpr: "Pr, ctxt_vpr, \<omega>_def_opt \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v2" and 
+    assume RedE1Vpr: "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and 
+           RedE2Vpr: "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v2" and
            BopEvalNormalVpr: "eval_binop v1 bop v2 = BinopNormal v"
 
     have RedE1Bpl:"red_expr_bpl ctxt e1_bpl ns (val_rel_vpr_bpl v1)"
@@ -584,10 +584,10 @@ qed
 lemma exp_rel_binop_eager:
   assumes
    BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None"and
-   E1Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e1 e1_bpl" and
-   E2Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e2 e2_bpl"
+   E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
+   E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
  shows
-   "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
+   "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
   using assms
   by (auto intro: exp_rel_binop)
 
@@ -595,10 +595,10 @@ lemma exp_rel_binop_lazy:
   assumes
    BopRel: "binop_rel bop = bopb \<and> binop_lazy bop \<noteq> None" and
    RedE2Bpl: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<exists>b. red_expr_bpl ctxt e2_bpl ns (BoolV b)" and
-   E1Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e1 e1_bpl" and
-   E2Rel: "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt e2 e2_bpl"
+   E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
+   E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
  shows
-   "exp_rel_vpr_bpl R Pr ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
+   "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
   using assms
   by (auto intro: exp_rel_binop)
 

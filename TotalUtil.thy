@@ -73,7 +73,7 @@ lemma[fundef_cong]:
   by (cases y; simp)
 
 abbreviation if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
-  "if_Some  \<equiv> pred_option"
+  "if_Some \<equiv> pred_option"
 
 lemma if_SomeI:
   "(\<And>x. opt = Some x \<Longrightarrow> f x) \<Longrightarrow> if_Some f opt"
