@@ -907,7 +907,7 @@ lemma red_ast_bpl_empty_block: "red_ast_bpl ctxt ((BigBlock name [] None None, K
 type_synonym viper_stmt = ViperLang.stmt
 
 (*
-type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a standard_result"
+type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a stmt_result_total"
 
 inductive red_stmt_total_single :: "program \<Rightarrow> 'a total_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
   where 

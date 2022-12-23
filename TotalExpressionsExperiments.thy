@@ -1,4 +1,4 @@
-theory TotalExpressionsExperiment
+theory TotalExpressionsExperiments
 imports TotalExpressions
 begin
 

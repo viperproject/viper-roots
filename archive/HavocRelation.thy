@@ -358,7 +358,7 @@ next
 next
   case (InhImpFalse e \<omega> inh_assume A)
   hence StateEq:"(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = \<omega>2'"
-    by (metis Rep_total_state_inverse get_heap_total_full.simps get_hm_total_full.simps get_hm_total_full_comp get_store_total.simps get_trace_total.simps havoc_rel_same_mask prod.exhaust_sel standard_result.inject update_mask_total_def update_mask_total_full.simps)
+    by (metis Rep_total_state_inverse get_heap_total_full.simps get_hm_total_full.simps get_hm_total_full_comp get_store_total.simps get_trace_total.simps havoc_rel_same_mask prod.exhaust_sel stmt_result_total.inject update_mask_total_def update_mask_total_full.simps)
   from InhImpFalse have HRel:"havoc_rel \<omega> \<omega>2'" by simp
   show ?case 
     apply (rule conjI)
@@ -466,16 +466,16 @@ next
 next
   case (InhPureNormalMagic e \<omega> b inh_assume)
   hence StateEq:"(update_mask_total_full \<omega>2' (get_mask_total_full \<omega>)) = \<omega>2'"      
-    by (metis havoc_rel_same_mask standard_result.distinct(3) standard_result.inject update_mask_total_full_same) 
+    by (metis havoc_rel_same_mask stmt_result_total.distinct(3) stmt_result_total.inject update_mask_total_full_same) 
   from InhPureNormalMagic have HRel:"havoc_rel \<omega> \<omega>2'"
-    by (metis standard_result.distinct(3) standard_result.inject)
+    by (metis stmt_result_total.distinct(3) stmt_result_total.inject)
   show ?case
     apply (rule conjI)
     apply (subst StateEq)
      apply (rule InhPureNormal)
       apply (rule havoc_rel_wd_same[OF \<open>wd_pure_exp_total _ _ _ e \<omega>\<close> HRel])
      apply (rule havoc_rel_expr_eval_same[OF _ \<open>wd_pure_exp_total _ _ _ e \<omega>\<close> HRel])
-    using \<open>Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t _\<close> InhPureNormalMagic.prems(1) standard_result.distinct(3)
+    using \<open>Pr, \<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t _\<close> InhPureNormalMagic.prems(1) stmt_result_total.distinct(3)
     apply (simp split: if_split_asm)
     apply (subst StateEq, rule HRel)
     done
@@ -744,7 +744,7 @@ lemma step_havoc_rel:
     proof (induction arbitrary: w2')
       case RedSkip
       then show ?case
-       by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.elims(2) lift_sim_rel_def prod.exhaust_sel red_stmt_total_single.NormalSingleStep red_stmt_total_single_set.RedSkip snd_conv standard_result.distinct(5) standard_result.inject)
+       by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.elims(2) lift_sim_rel_def prod.exhaust_sel red_stmt_total_single.NormalSingleStep red_stmt_total_single_set.RedSkip snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
     next
     case (RedInhale A \<omega> res)
     show ?case
@@ -765,7 +765,7 @@ lemma step_havoc_rel:
       case (RNormal \<omega>')
       with RedInhale obtain \<omega>2' where "w2' = (Inr (), RNormal \<omega>2')" and "havoc_rel \<omega>' \<omega>2'"
         unfolding lift_sim_rel_def      
-        by (metis fst_conv is_failure_config.simps is_normal_config.elims(2) snd_conv standard_result.distinct(5) standard_result.inject surjective_pairing)
+        by (metis fst_conv is_failure_config.simps is_normal_config.elims(2) snd_conv stmt_result_total.distinct(5) stmt_result_total.inject surjective_pairing)
       with \<open>res = _\<close> RedInhale assms(2) havoc_inhale_normal_rel
       obtain \<omega>2 where "havoc_rel \<omega> \<omega>2" and "red_inhale Pr \<Delta> False A \<omega>2 (RNormal \<omega>2')"
         by (metis (full_types) conf.select_convs(1))
@@ -776,7 +776,7 @@ lemma step_havoc_rel:
       case (RedExhale \<omega> A m' \<omega>')   
       from this obtain \<omega>2' where "w2' = (Inr (), RNormal \<omega>2')" and "havoc_rel \<omega>' \<omega>2'"
         unfolding lift_sim_rel_def
-        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
       have Eq:"\<And> \<pi>. get_mask_total_full (update_trace_total \<omega> \<pi>) = get_mask_total_full \<omega>"
         by simp
       show ?case
@@ -800,7 +800,7 @@ lemma step_havoc_rel:
       case (RedAssert \<omega> A m')
       from this obtain \<omega>2 where "w2' = (Inr (), RNormal \<omega>2)" and HRel:"havoc_rel \<omega> \<omega>2"
         unfolding lift_sim_rel_def
-        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+        by (metis fst_conv is_failure_config.elims(2) is_normal_config.elims(2) prod.exhaust_sel snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
       show ?case
         apply (rule exI)
         apply (rule conjI[OF HRel])
@@ -864,7 +864,7 @@ lemma step_havoc_rel:
     next
       case (RedIfTrue e_b \<omega> s1 s2)
       from this obtain \<omega>2 where HRel:"havoc_rel \<omega> \<omega>2" and "w2' = (Inl s1, RNormal \<omega>2)"      
-        by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.simps lift_sim_rel_def prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+        by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.simps lift_sim_rel_def prod.exhaust_sel snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
       show ?case 
         apply (rule exI)
         apply (rule conjI[OF HRel])
@@ -876,7 +876,7 @@ lemma step_havoc_rel:
     next
       case (RedIfFalse e_b \<omega> s1 s2)
         from this obtain \<omega>2 where HRel:"havoc_rel \<omega> \<omega>2" and "w2' = (Inl s2, RNormal \<omega>2)"      
-        by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.simps lift_sim_rel_def prod.exhaust_sel snd_conv standard_result.distinct(5) standard_result.inject)
+        by (metis (no_types, lifting) assms(2) fst_conv is_failure_config.simps is_normal_config.simps lift_sim_rel_def prod.exhaust_sel snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
       show ?case
         apply (rule exI)
         apply (rule conjI[OF HRel])

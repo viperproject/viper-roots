@@ -114,36 +114,4 @@ proof cases
 case (FoldRelNormal pred_decl pred_body m' mp'' m)
 then show ?thesis oops
 *)
-
-subsection \<open>Basic properties\<close>
-
-lemma red_stmt_total_single_final:
-  assumes "red_stmt_total_single Pr ctxt \<Lambda> (Inr (), q) z"
-  shows "False"
-  using assms
-  by cases
-
-lemma red_stmt_total_multi_final:
-  assumes "red_stmt_total_multi Pr ctxt \<Lambda> r1 r2" and "r1 = (Inr(), q)"
-  shows "r2 = (Inr (), q)"
-  using assms
-  by (induction arbitrary: q)
-     (auto dest: red_stmt_total_single_final)
-
-
-lemma red_stmt_total_single_normal_source:
-  assumes "red_stmt_total_single Pr ctxt_vpr \<Lambda>_vpr y y'"
- shows "\<exists>\<omega>. snd y = RNormal \<omega>"
-  using assms
-  by (cases) auto
-
-lemma red_stmt_total_multi_normal_source:
-  assumes "red_stmt_total_multi Pr ctxt_vpr \<Lambda>_vpr y y'" and
-          "snd y' = RNormal \<omega>'"
-  shows "\<exists>\<omega>. snd y = RNormal \<omega>"
-  using assms
-  by (induction arbitrary: \<omega>')
-     (auto dest: red_stmt_total_single_normal_source)
-
-
 end

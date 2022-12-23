@@ -46,7 +46,7 @@ proof (induction rule: rtranclp_induct)
   case base   
     from this obtain \<omega>2' where "w2' = (Inl s, RNormal \<omega>2')" and "R \<omega> \<omega>2'"
     unfolding lift_sim_rel_def
-    by (metis fstI is_failure_config.elims(2) is_normal_config.elims(2) prod.collapse snd_conv standard_result.distinct(5) standard_result.inject)
+    by (metis fstI is_failure_config.elims(2) is_normal_config.elims(2) prod.collapse snd_conv stmt_result_total.distinct(5) stmt_result_total.inject)
   show ?case
     apply (rule exI)
     apply (rule conjI[OF \<open>R \<omega> \<omega>2'\<close>])

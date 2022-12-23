@@ -20,7 +20,13 @@ for \<^term>\<open>(f::'a heapfun_repr) vs \<omega>\<close> are
 
 subsection\<open>Evaluation of pure expressions, well-definedness of pure expressions, inhale of assertions\<close>
 
-datatype 'a standard_result = RMagic | RFailure | RNormal "'a full_total_state"
+datatype 'a stmt_result_total = RMagic | RFailure | RNormal "'a full_total_state"
+
+fun map_stmt_result_total :: "('a full_total_state \<Rightarrow> 'b full_total_state) \<Rightarrow> 'a stmt_result_total \<Rightarrow> 'b stmt_result_total"
+  where
+    "map_stmt_result_total f (RNormal \<omega>) = (RNormal (f \<omega>))"
+  | "map_stmt_result_total f RMagic = RMagic"
+  | "map_stmt_result_total f RFailure = RFailure"
 
 definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
   where "get_valid_locs \<omega> = {lh |lh. pgt (get_mh_total_full \<omega> lh) pnone}"
@@ -49,7 +55,7 @@ definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) 
                \<omega>' = update_mp_total_full \<omega> ((get_mp_total_full \<omega>)(lp := (padd (get_mp_total_full \<omega> lp) q)))
        }"
 
-inductive th_result_rel :: "bool \<Rightarrow> bool \<Rightarrow> ('a full_total_state) set \<Rightarrow> 'a standard_result \<Rightarrow> bool"  where
+inductive th_result_rel :: "bool \<Rightarrow> bool \<Rightarrow> ('a full_total_state) set \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"  where
   THResultNormal: "\<lbrakk> \<omega> \<in> W \<rbrakk> \<Longrightarrow> th_result_rel True True W (RNormal \<omega>)"
 | THResultMagic: "th_result_rel True False W RMagic"
 | THResultFailure: "th_result_rel False b W RFailure"
@@ -140,7 +146,7 @@ if the resulting state is consistent.
 inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state option \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a extended_val \<Rightarrow> bool"
   ("_, _, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,51,0,51,51] 81) and
    red_pure_exps_total :: "'a total_context \<Rightarrow>  ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state option \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> (('a val) list) option \<Rightarrow> bool" and
-   red_inhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool" and
+   red_inhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool" and
    unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool"
   where
@@ -438,7 +444,7 @@ inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total
                  total_heap_consistent ctxt \<omega>"
 
 
-abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a standard_result \<Rightarrow> bool"
+abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where "red_inhale_th_cons ctxt A \<omega> res \<equiv> red_inhale ctxt (total_heap_consistent ctxt) A \<omega> res"
 
 text \<open>\<^const>\<open>red_inhale_th_cons\<close> only takes transitions to total heap consistent states whenever some 
