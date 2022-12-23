@@ -1,7 +1,7 @@
 section \<open>Viper State with a Total Heap\<close>
 
 theory TotalViperState
-imports Viper.ValueAndBasicState Viper.SepAlgebra
+imports Viper.ValueAndBasicState
 begin
 
 type_synonym 'a total_heap = "heap_loc \<Rightarrow> 'a val"
