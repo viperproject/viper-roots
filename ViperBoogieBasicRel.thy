@@ -124,7 +124,7 @@ definition heap_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Right
          ( (\<exists>v. red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v) \<longrightarrow>
              (\<exists>v. red_expr_bpl ctxt e_rcv ns v) \<and> (\<exists>v. red_expr_bpl ctxt e_f ns v) )"
 
-definition mask_read_wf :: "'a ty_repr_bpl \<Rightarrow>'a econtext_bpl \<Rightarrow> (boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> boogie_expr) \<Rightarrow> bool"
+definition mask_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rightarrow> (boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> boogie_expr) \<Rightarrow> bool"
   where 
     "mask_read_wf T ctxt mread \<equiv> \<forall> e_mask e_rcv e_f m r f ns v field_tcon ty_args.
          ( (red_expr_bpl ctxt e_mask ns (AbsV (AMask m)) \<and> 
@@ -184,14 +184,32 @@ lemma zero_mask_rel_2:
   using assms
   unfolding is_empty_total_def 
   by (simp add: zero_mask_rel)
-  
+
+fun boogie_const_val :: "boogie_const => ('a vbpl_val)"
+  where
+    "boogie_const_val CNoPerm = RealV 0"
+  | "boogie_const_val CWritePerm = RealV 1"
+  | "boogie_const_val CNull = AbsV (ARef Null)"
+  | "boogie_const_val CZeroMask = AbsV (AMask zero_mask_bpl)"
 
 definition boogie_const_rel :: "(boogie_const \<Rightarrow> vname) \<Rightarrow> var_context \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "boogie_const_rel C \<Lambda> ns \<equiv> 
-           lookup_var \<Lambda> ns (C CNoPerm) = Some (RealV 0) \<and>
-           lookup_var \<Lambda> ns (C CWritePerm) = Some (RealV 1) \<and>
-           lookup_var \<Lambda> ns (C CNull) = Some (AbsV (ARef Null)) \<and>
-           lookup_var \<Lambda> ns (C CZeroMask) = Some (AbsV (AMask zero_mask_bpl))"
+           \<forall>const. lookup_var \<Lambda> ns (C const) = Some (boogie_const_val const)"
+
+lemma boogie_const_rel_lookup:
+  assumes "boogie_const_rel C \<Lambda> ns"           
+  shows "lookup_var \<Lambda> ns (C const) = Some (boogie_const_val const)"
+  using assms
+  unfolding boogie_const_rel_def
+  by auto
+
+lemma boogie_const_rel_lookup_2:
+  assumes "boogie_const_rel C \<Lambda> ns" and
+          "c = C const" and
+          "v = boogie_const_val const"
+  shows "lookup_var \<Lambda> ns c = Some (boogie_const_val const)"
+  using assms boogie_const_rel_lookup
+  by simp
 
 lemma boogie_const_rel_stable:
   assumes "boogie_const_rel C \<Lambda> ns" and
@@ -855,22 +873,6 @@ fun state_from_config :: "'a ast_config \<Rightarrow> 'a state"
 
 subsection \<open>Boogie AST\<close>
 
-record 'a astcontext_bpl = "'a econtext_bpl" +
-  proc_context :: "ast proc_context"
-  ast_context :: Ast.ast
-
-text \<open>The following equalities are often necessary for goals to relate accessing fields in
-   \<^term>\<open>ctxt\<close> and \<^term>\<open>econtext_bpl.truncate ctxt\<close>.\<close>
-
-lemma type_interp_ast_expr [simp]: "type_interp (econtext_bpl.truncate ctxt) = type_interp (ctxt :: 'a astcontext_bpl)"
-  by (simp add: ViperBoogieBasicRel.econtext_bpl.defs(4)) 
-
-lemma fun_interp_ast_expr [simp]: "fun_interp (econtext_bpl.truncate ctxt) = fun_interp (ctxt :: 'a astcontext_bpl)"
-  by (simp add: ViperBoogieBasicRel.econtext_bpl.defs(4)) 
-
-lemma var_context_ast_expr [simp]: " var_context (econtext_bpl.truncate ctxt) = var_context (ctxt :: 'a astcontext_bpl)"
-  by (simp add: ViperBoogieBasicRel.econtext_bpl.defs(4)) 
-
 type_synonym ast_bpl = Ast.ast
 
 text \<open>AST transitive closure relation. We make sure simple commands step take one step at a time\<close>
@@ -880,53 +882,31 @@ abbreviation empty_bigblock :: "string option \<Rightarrow> bigblock"
 
 type_synonym 'a vast_config = "(bigblock * cont) * ('a vbpl_absval) state"
 
-inductive red_bigblock_small :: "'a astcontext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
+inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
   where 
     RedNonEmptyBigBlock [intro]: 
-      "\<lbrakk> (type_interp ctxt), (proc_context ctxt), (var_context ctxt), (fun_interp ctxt), \<Omega> \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
-       red_bigblock_small ctxt (((BigBlock name (c#cs) str tr), k), s) (((BigBlock name cs str tr), k), s')"
-  | RedEmptyBigBlock [intro]: 
-    "\<lbrakk> red_bigblock A M \<Lambda> \<Gamma> \<Omega> T (BigBlock name [] str tr, k, s) (b', k', s') \<rbrakk> \<Longrightarrow>
-       red_bigblock_small ctxt ((BigBlock name [] str tr, k), s) ((b', k'), s')"
+      "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
+       red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), k), s) (((BigBlock name cs str tr), k), s')"
+   | RedEmptyBigBlock [intro]: 
+    "\<lbrakk> red_bigblock A [] \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (b', k', s') \<rbrakk> \<Longrightarrow>
+       red_bigblock_small P ctxt ((BigBlock name [] str tr, k), s) ((b', k'), s')"
 
-abbreviation red_bigblock_multi :: "'a astcontext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
-  where "red_bigblock_multi ctxt \<equiv> rtranclp (red_bigblock_small ctxt)"
+abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
+  where "red_bigblock_multi P ctxt \<equiv> rtranclp (red_bigblock_small P ctxt)"
 
 text \<open>We order the arguments of an AST config such that the syntactic part (bigblock + continuation) is the 
 first element s.t. one can easily construct an AST configuration from the syntactic part and the state\<close>                                                                                                                                 
 
-abbreviation red_ast_bpl :: "'a astcontext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
+abbreviation red_ast_bpl :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
   where "red_ast_bpl ctxt \<equiv> red_bigblock_multi ctxt"
 
-lemma red_ast_bpl_refl: "red_ast_bpl ctxt \<gamma> \<gamma>"
+lemma red_ast_bpl_refl: "red_ast_bpl P ctxt \<gamma> \<gamma>"
   by simp
 
-lemma red_ast_bpl_empty_block: "red_ast_bpl ctxt ((BigBlock name [] None None, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
+lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
   by (auto intro: RedSkip)
 
 type_synonym viper_stmt = ViperLang.stmt
-
-(*
-type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a stmt_result_total"
-
-inductive red_stmt_total_single :: "program \<Rightarrow> 'a total_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
-  where 
-    NormalSingleStep: "\<lbrakk> red_stmt_total_single_set Pr ctxt_vpr s \<omega> res \<rbrakk> \<Longrightarrow> 
-       red_stmt_total_single Pr ctxt_vpr ((Inl s, RNormal \<omega>)) res"
-
-abbreviation red_stmt_total_multi :: "program \<Rightarrow> 'a total_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
-  where "red_stmt_total_multi Pr ctxt_vpr \<equiv> rtranclp (red_stmt_total_single Pr ctxt_vpr)"
-*)
-
-(* TODO
-definition stmt_rel ::
-  "ViperLang.program \<Rightarrow> 'a total_context \<Rightarrow> 'a astcontext_bpl \<Rightarrow> viper_stmt \<Rightarrow> 'a vast_config \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow>  bool"
-  where
-    "stmt_rel Pr ctxt_vpr ctxt v_s \<gamma> \<omega> ns \<equiv>
-        \<forall> y. red_stmt_total_multi Pr ctxt_vpr (Inl v_s, RNormal \<omega>) y \<longrightarrow> 
-          (\<forall>\<omega>'. (snd y) = RNormal \<omega>' \<longrightarrow> (\<exists>c'. red_bigblock_multi ctxt \<gamma> 
-          ((snd y) = RFailure \<longrightarrow> (\<exists>c'. snd c' = Failure \<and> red_bigblock_multi ctxt \<gamma> c'))"
-*)
 
 subsection \<open>syntactic relations\<close>
 

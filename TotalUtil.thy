@@ -1,5 +1,5 @@
 theory TotalUtil
-imports Viper.ViperLang Viper.ValueAndBasicState TotalStateUtil
+imports TotalStateUtil
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"

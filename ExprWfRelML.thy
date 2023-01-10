@@ -69,7 +69,7 @@ ML \<open>
      resolve_tac ctxt [@{thm exI}] THEN'
      resolve_tac ctxt [@{thm conjI}] THEN'     
      (resolve_tac ctxt [@{thm red_ast_bpl_refl}] ORELSE' 
-      resolve_tac ctxt [@{thm red_ast_bpl_empty_block}])  THEN'
+      resolve_tac ctxt [@{thm red_ast_bpl_empty_block}]) THEN'
      assm_full_simp_solved_tac ctxt
 
 

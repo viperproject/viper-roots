@@ -39,7 +39,7 @@ fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup
       (case (ts, vs) of 
            ([], [AbsV (AHeap h), AbsV (AMask m)]) \<Rightarrow> 
              Some (BoolV (\<exists> \<omega> :: 'a full_total_state. 
-                                 \<comment>\<open>TODO: predicates\<close>
+                                 \<comment>\<open>TODO: predicates \<longrightarrow> need state consistency\<close>
                                  heap_rel Pr F (get_hh_total_full \<omega>) h \<and> 
                                  mask_rel Pr F (get_mh_total_full \<omega>) m))
         | _ \<Rightarrow> None)"
