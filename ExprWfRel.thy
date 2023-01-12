@@ -812,7 +812,7 @@ lemma syn_lazy_bop_short_circuit_wf_rel:
    Guard: "bop \<in> {ViperLang.And, ViperLang.BImp} \<Longrightarrow> guard = e1_bpl" 
          "bop = ViperLang.Or \<Longrightarrow> guard = UnOp Not e1_bpl" and
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
-   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont (rev thnTl) cont)) \<gamma>'"
+   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont thnTl cont)) \<gamma>'"
                (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma>'' _")
   shows
    Rel2a: "expr_wf_rel (\<lambda>\<omega>_def \<omega> s. R \<omega>_def \<omega> s \<and> 
@@ -849,7 +849,7 @@ proof (rule expr_wf_rel_intro)
     using NotB1 \<open>v1 = _\<close>
     by simp
 
-  let ?\<gamma>'' = "(thnHd, convert_list_to_cont (rev thnTl) cont)"
+  let ?\<gamma>'' = "(thnHd, convert_list_to_cont thnTl cont)"
   from WfRel E2Fail obtain c' where "snd c' = Failure" and RedThn: "red_ast_bpl P ctxt (?\<gamma>'', Normal ns) c'"
     using wf_rel_failure_elim Rext
     by blast
@@ -893,7 +893,7 @@ next
     using NotB1 RedE1Bpl \<open>v1 = _\<close>
     by simp
 
-   let ?\<gamma>'' = "(thnHd, convert_list_to_cont (rev thnTl) cont)"
+   let ?\<gamma>'' = "(thnHd, convert_list_to_cont thnTl cont)"
    from E2Normal obtain ns' where 
      Rns': "R \<omega>_def \<omega> ns'" and RedThn:"red_ast_bpl P ctxt (?\<gamma>'', Normal ns) (?\<gamma>', Normal ns')"
      using wf_rel_normal_elim[OF WfRel] Rext
@@ -1002,7 +1002,7 @@ lemma syn_lazy_bop_wf_rel:
    Guard: "bop \<in> {ViperLang.And, ViperLang.BImp} \<Longrightarrow> guard = e1_bpl" 
          "bop = ViperLang.Or \<Longrightarrow> guard = UnOp Not e1_bpl" and
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
-   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont (rev thnTl) (KSeq bNext cont))) (bNext, cont)"
+   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont thnTl (KSeq bNext cont))) (bNext, cont)"
                (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma>'' _")
    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Binop e1 bop e2) \<gamma>0 (bNext, cont)"
 proof (rule binop_lazy_expr_wf_rel[OF Lazy])
@@ -1035,7 +1035,7 @@ lemma syn_lazy_bop_wf_rel_2:
    Guard: "bop \<in> {ViperLang.And, ViperLang.BImp} \<Longrightarrow> guard = e1_bpl" 
          "bop = ViperLang.Or \<Longrightarrow> guard = UnOp Not e1_bpl" and
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
-   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont (rev thnTl) (KSeq bNext cont))) \<gamma>3"
+   WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont thnTl(KSeq bNext cont))) \<gamma>3"
                (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma>'' _") and
    Red3: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>3, Normal ns2) ((bNext, cont), Normal ns3) \<and> R \<omega>_def \<omega> ns3"
    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Binop e1 bop e2) \<gamma>0 (bNext, cont)"

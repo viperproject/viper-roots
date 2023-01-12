@@ -158,14 +158,27 @@ fun tcon_enum_to_id :: "tcon_enum \<Rightarrow> tcon_id"
   | "tcon_enum_to_id TCFrameFragment = ''FrameFragment''"
   | "tcon_enum_to_id TCNormalField = ''NormalField''"
 
-text \<open>Showcase a concrete type representation example\<close>
-definition ty_repr_example :: "'a ty_repr_bpl"
-  where "ty_repr_example = 
+text \<open>Type representation instantiation without predicates and domains\<close>
+
+definition ty_repr_basic :: "'a ty_repr_bpl"
+  where "ty_repr_basic = 
      \<lparr>  tcon_id_repr = tcon_enum_to_id,
         pred_snap_field_type = (\<lambda>_. None),
         pred_knownfolded_field_type = (\<lambda>_. None),
         domain_translation = (\<lambda>_. None),
         domain_type = (\<lambda>_. ''placeholder'')  \<rparr>"
+
+subsection \<open>Helper definitions\<close>
+
+text \<open>Since currently Carbon always generates the same constants and global variables in the same order,
+one can use the following variable name mapping for the constants.\<close>
+
+fun const_repr_basic :: "boogie_const \<Rightarrow> vname"
+  where 
+    "const_repr_basic CNoPerm = 4"
+  | "const_repr_basic CWritePerm = 5"
+  | "const_repr_basic CNull = 0"
+  | "const_repr_basic CZeroMask = 2"
 
 
 end

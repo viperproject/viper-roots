@@ -31,6 +31,14 @@ abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option"
 abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
   "Some_if b x \<equiv> option_if b (Some x)"
 
+text \<open>Some helper definitions for trivial Viper programs\<close>
+
+fun f_None :: "'a \<Rightarrow> 'b option"
+  where "f_None _ = None"
+
+definition Pr_trivial :: ViperLang.program
+  where 
+    "Pr_trivial \<equiv> \<lparr> methods = f_None, predicates = f_None, funs = f_None, declared_fields = f_None, domains = 0 \<rparr>"
 
 subsection \<open>\<open>if_Some\<close>\<close>
 

@@ -24,6 +24,9 @@ datatype boogie_const =
      | CNull 
      | CZeroMask
 
+definition total_context_trivial :: "'a total_context"
+  where "total_context_trivial \<equiv> \<lparr> program_total = Pr_trivial, fun_interp_total=f_None, absval_interp_total=(\<lambda>_.''dummy'')  \<rparr>"
+
 text \<open>The following record abstracts over elements in the Boogie encoding that are used to represent
 Viper counterparts.\<close>
 
@@ -888,7 +891,7 @@ inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
       "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), k), s) (((BigBlock name cs str tr), k), s')"
    | RedEmptyBigBlock [intro]: 
-    "\<lbrakk> red_bigblock A [] \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (b', k', s') \<rbrakk> \<Longrightarrow>
+    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (b', k', s') \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt ((BigBlock name [] str tr, k), s) ((b', k'), s')"
 
 abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"

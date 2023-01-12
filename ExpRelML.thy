@@ -53,21 +53,6 @@ fun expr_red_tac type_safety_thm lookup_var_thms ctxt =
   assm_full_simp_solved_tac ctxt THEN'
   typing_tac ctxt NoPolyHint lookup_var_thms []
 
-(* TODO:
-   write method recursively to get more information when expression relation should finish solving the goal
-   and to avoid solving more goals than just the provided one
- *)
-
-(*
-fun exp_rel_rec_tac type_safety_thm_map lookup_var_rel_tac vpr_lit_bpl_exp_rel_tac lookup_var_thms ctxt =
-  FIRST' [
-    var_rel_tac lookup_var_rel_tac ctxt |> SOLVED',
-    lit_tac vpr_lit_bpl_exp_rel_tac ctxt |> SOLVED',
-    (fn i => fn st => binop_eager_rel_tac ctxt i st) |> SOLVED',
-    (fn i => fn st => binop_lazy_rel_tac (type_safety_thm_map TBool) lookup_var_thms ctxt i st)
-  ] 
-*)
-
 fun binop_eager_rel_tac info ctxt = 
   resolve_tac ctxt [@{thm exp_rel_binop_eager}] THEN'
   assm_full_simp_solved_tac ctxt THEN' (* bop *)
