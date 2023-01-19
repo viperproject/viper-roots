@@ -1,5 +1,5 @@
 theory ExpProofGenTest
-imports ExpRel ExprWfRel TotalSemProperties
+imports ExpRel ExprWfRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface
 begin
 
 text \<open>
@@ -25,6 +25,59 @@ definition assert_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) ns
               (\<exists>c'.  snd c' = Failure \<and>
                     red_ast_bpl ctxt (\<gamma>, Normal ns) c'))"
 *)
+
+subsection \<open>Well formedness of type relation\<close>
+
+definition type_interp_rel_wf :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a vbpl_absval) absval_ty_fun  \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> bool"
+  where "type_interp_rel_wf A_vpr A_bpl Trep \<equiv> 
+    \<forall>v ty_vpr ty_bpl. get_type A_vpr v = ty_vpr \<longrightarrow>
+                      vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl \<longrightarrow>
+                      type_of_val A_bpl (val_rel_vpr_bpl v) = ty_bpl"
+
+lemma type_interp_rel_wf_vbpl: 
+  assumes "A_vpr = domain_type Trep"
+    shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
+  unfolding type_interp_rel_wf_def
+proof (rule allI | rule impI)+
+  fix v ty_vpr ty_bpl
+  assume *:"get_type A_vpr v = ty_vpr" and
+         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
+  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
+  proof (cases v)
+    case (VAbs a)
+    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
+    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d" and "ty_bpl = TCon (fst d) (snd d)"
+      by fastforce
+    hence "vbpl_absval_ty Trep (ADomainVal a) = d" using \<open>A_vpr = domain_type Trep\<close>
+      by simp
+    hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
+      by simp
+    thus ?thesis using VAbs
+      by simp     
+  qed (insert * **, auto)
+qed
+
+lemma type_interp_rel_wf_vbpl_no_domains:
+  assumes "\<And> d. domain_translation Trep d = None"
+  shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
+  unfolding type_interp_rel_wf_def
+proof (rule allI | rule impI)+
+  fix v ty_vpr ty_bpl
+  assume *:"get_type A_vpr v = ty_vpr" and
+         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
+  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
+  proof (cases v)
+    case (VAbs a)
+    fix contra
+    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
+    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d"
+      by fastforce
+    with assms show contra 
+      by simp
+  qed (insert * **, auto)
+qed
+
+subsection \<open>Statement relation - general statement\<close>
 
 text\<open> Points to think about:
   \<^item> backward vs. forward simulation (also tracking single Boogie state vs sets of Boogie states)
@@ -78,54 +131,69 @@ lemma stmt_rel_failure_elim:
   unfolding stmt_rel_def
   by blast
 
-definition type_interp_rel_wf :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a vbpl_absval) absval_ty_fun  \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> bool"
-  where "type_interp_rel_wf A_vpr A_bpl Trep \<equiv> 
-    \<forall>v ty_vpr ty_bpl. get_type A_vpr v = ty_vpr \<longrightarrow>
-                      vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl \<longrightarrow>
-                      type_of_val A_bpl (val_rel_vpr_bpl v) = ty_bpl"
+lemma stmt_rel_propagate:
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
+          "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
+        shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"  
+proof (rule stmt_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R0 \<omega> ns" and
+         RedVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> (RNormal \<omega>')"
 
-lemma type_interp_rel_wf_vbpl: 
-  assumes "A_vpr = domain_type Trep"
-    shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d" and "ty_bpl = TCon (fst d) (snd d)"
-      by fastforce
-    hence "vbpl_absval_ty Trep (ADomainVal a) = d" using \<open>A_vpr = domain_type Trep\<close>
-      by simp
-    hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
-      by simp
-    thus ?thesis using VAbs
-      by simp     
-  qed (insert * **, auto)
+  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
+    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    by blast
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
+    using stmt_rel_normal_elim[OF assms(2)] RedVpr
+    by (meson rtranclp_trans)
+next
+  fix \<omega> ns \<omega>'
+  assume "R0 \<omega> ns" and
+         RedVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> RFailure"
+
+  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
+    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    by blast
+
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
+    using stmt_rel_failure_elim[OF assms(2)] RedVpr
+    by (meson rtranclp_trans)
 qed
 
-lemma type_interp_rel_wf_vbpl_no_domains:
-  assumes "\<And> d. domain_translation Trep d = None"
-  shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    fix contra
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d"
-      by fastforce
-    with assms show contra 
-      by simp
-  qed (insert * **, auto)
+lemma stmt_rel_propagate_2:
+  assumes "stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
+          "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
+  shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+proof (rule stmt_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R0 \<omega> ns" and
+         "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> (RNormal \<omega>')"  
+  from this obtain ns1 where 
+    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega>' ns1"
+    using assms(1) stmt_rel_normal_elim 
+    by blast
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
+    using assms(2)
+    by (meson rtranclp_trans)
+next
+  fix \<omega> ns
+  assume "R0 \<omega> ns" and
+         "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> RFailure"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
+    using assms(1) stmt_rel_failure_elim 
+    by blast
 qed
+
+lemma stmt_rel_seq:
+  assumes "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s1_vpr \<gamma>1 \<gamma>2" and
+          "stmt_rel R2 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s2_vpr \<gamma>2 \<gamma>3"
+  shows 
+    "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) \<gamma>1 \<gamma>3"
+  oops
+
+subsection \<open>Local variable assignment relation\<close>
 
 lemma assign_rel_simple:
   assumes R_def:  "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
@@ -139,9 +207,8 @@ lemma assign_rel_simple:
                            get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
                            type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
                            R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
-          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep"
-  and
-          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl" 
+          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
+          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl"
           
         shows "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) 
                \<gamma>
@@ -216,13 +283,16 @@ next
   qed
 qed
 
-text \<open>Relational rule for Viper assignment \<open>x := e_vpr\<close>\<close>
+
+text \<open>Relational rule for Viper assignment \<open>x := e_vpr\<close>. The difference to the above lemma is that 
+this lemma provides explicit premises that allow the Boogie program to progress after the well-definedness
+check and before the assignment\<close>
 lemma assign_rel_simple_2:
   assumes R_def: "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
           VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
-          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma> \<gamma>'" and
+          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 \<gamma>1" and
           ProgressToAssign: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow> 
-                          \<exists>ns3. red_ast_bpl P ctxt (\<gamma>', Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
+                          \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
                                 R3 \<omega>_def \<omega> ns3" and
           BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
           TyRel: "vpr_to_bpl_ty Trep ty = Some ty_bpl" and
@@ -231,53 +301,62 @@ lemma assign_rel_simple_2:
                            get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
                            type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
                            R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
-          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep"
-  and
-          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl" 
+          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
+          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl"  and
+          ProgressToFinal: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow>
+                            \<exists>ns3. red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ns2) (\<gamma>3, Normal ns3) \<and> 
+                                  R3 \<omega>_def \<omega> ns3"
           
         shows "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) 
-               \<gamma>
+               \<gamma>0
                (BigBlock name cs str tr, cont)"
-proof -  
+proof -
   from ExpWfRel and ProgressToAssign 
-  have *:"expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
+  have *:"expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
     using wf_rel_extend_1
     by blast
   show ?thesis
     apply (rule assign_rel_simple[OF R_def _ *])
-    using assms
-    by auto
+    using assms by auto
 qed
 
-lemma stmt_rel_simple_propagate:
-  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
-          "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
-        shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"  
-proof (rule stmt_rel_intro)
-  fix \<omega> ns \<omega>'
-  assume "R0 \<omega> ns" and
-         RedVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> (RNormal \<omega>')"
-
-  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
-    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+lemma assign_rel_simple_3:
+  assumes R_def: "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
+          VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
+          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 \<gamma>1" and
+          ProgressToAssign: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow> 
+                          \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
+                                R3 \<omega>_def \<omega> ns3" and
+          BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
+          TyRel: "vpr_to_bpl_ty Trep ty = Some ty_bpl" and
+                    \<comment>\<open>Key assignment property for R2\<close>
+          RAssign:  "\<And> \<omega> ns v . R2 \<omega> ns \<Longrightarrow>
+                           get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
+                           type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
+                           R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
+          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
+          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl"  and
+          ProgressToFinal: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow>
+                            \<exists>ns3. red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ns2) (\<gamma>3, Normal ns3) \<and> 
+                                  R3 \<omega>_def \<omega> ns3"
+          
+        shows "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>0 \<gamma>3"
+proof -  
+  from ExpWfRel and ProgressToAssign 
+  have *:"expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
+    using wf_rel_extend_1
     by blast
-
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
-    using stmt_rel_normal_elim[OF assms(2)] RedVpr
-    by (meson rtranclp_trans)
-next
-  fix \<omega> ns \<omega>'
-  assume "R0 \<omega> ns" and
-         RedVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr stmt_vpr \<omega> RFailure"
-
-  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
-    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
-    by blast
-
-  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
-    using stmt_rel_failure_elim[OF assms(2)] RedVpr
-    by (meson rtranclp_trans)
+  have StmtRel:"stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) 
+               \<gamma>0
+               (BigBlock name cs str tr, cont)"
+    apply (rule assign_rel_simple[OF R_def _ *])
+    using assms by auto
+  show ?thesis
+    using  R_def stmt_rel_propagate_2[OF StmtRel ProgressToFinal]
+    by fastforce
 qed
+
+subsection \<open>Misc\<close>
 
 lemma init_state:
   assumes "R0 \<omega> ns" and
@@ -299,11 +378,34 @@ lemma red_ast_bpl_one_simple_cmd:
   using assms
   by blast
 
-lemma lookup_zero_mask_bpl_2:
+lemma lookup_zero_mask_bpl:
   assumes "state_rel Pr TyRep Tr ctxt mvar \<omega>_def \<omega> ns" and
-          "const_repr Tr const = x"
-          "boogie_const_val const = v"
-  shows "lookup_var (var_context ctxt) ns x = Some v"
-  using state_rel_boogie_const[OF assms(1)]  
-  using assms(2) assms(3) boogie_const_rel_lookup by blast
+          "const_repr Tr = const_repr_basic"
+  shows "lookup_var (var_context ctxt) ns 2 = Some (AbsV (AMask zero_mask_bpl))"
+  using boogie_const_rel_lookup[where ?const = CZeroMask] state_rel_boogie_const[OF assms(1)] assms
+  by fastforce
+
+lemma tr_def_field_translation:
+  assumes "tr \<equiv> tr_def" and
+          "field_translation tr_def = F"
+        shows "field_translation tr = F"
+  using assms by simp
+
+method zero_mask_lookup_tac uses tr_def =
+       (rule boogie_const_rel_lookup_2[where ?const = CZeroMask],
+        rule state_rel_boogie_const,
+         blast,
+         simp add: tr_def,
+         simp)
+(* (rule tr_def_field_translation[OF tr_def], fastforce)*)
+method red_assume_good_state uses CtxtWf tr_def =
+     (rule RedAssumeOk,
+      rule assume_state_normal[OF CtxtWf],
+      (rule tr_def_field_translation[OF tr_def], fastforce),
+      simp add: tr_def,
+      simp add: tr_def,
+      simp add: tr_def,
+      simp add: tr_def)
+
+
 end

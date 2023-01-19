@@ -425,6 +425,9 @@ definition state_rel
           mask_var_rel Pr (var_context ctxt) TyRep Tr wd_mask_var \<omega> ns \<and>
           state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns"
 
+definition state_rel_empty
+  where "state_rel_empty R \<omega> ns \<equiv> is_empty_total \<omega> \<and> R \<omega> ns"
+
 lemma state_rel_state_rel0:
   assumes "state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns"
   shows "state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns"
