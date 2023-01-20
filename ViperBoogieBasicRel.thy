@@ -441,6 +441,8 @@ lemma state_rel_boogie_const:
   unfolding state_rel_def state_rel0_def
   by simp
 
+lemmas state_rel_well_state_well_typed = state_rel0_state_well_typed[OF state_rel_state_rel0]
+
 lemma lookup_disj_aux:
   assumes "\<And>x. x \<notin> M \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
           "disjnt M S"

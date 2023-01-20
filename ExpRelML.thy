@@ -17,6 +17,22 @@ datatype boogie_prim_type = TBool | TInt | TReal
 (* provide type safety theorem for each primitive type *)
 type type_safety_thm_map = boogie_prim_type -> thm
 
+fun gen_type_safety_thm_map fun_interp_wf fun_decls_wf var_context_wf state_wf =
+   let val type_safety_bpl_aux_bool = 
+            @{thm type_safety_top_level_inv} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf]
+       val type_safety_bpl_aux_int = 
+            @{thm type_safety_top_level_inv_int} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf] 
+       val type_safety_bpl_aux_real =
+            @{thm type_safety_top_level_inv_real} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf] 
+    in
+    (fn primTy => 
+       case primTy of
+          TBool => type_safety_bpl_aux_bool
+        | TInt => type_safety_bpl_aux_int
+        | TReal => type_safety_bpl_aux_real
+    )
+   end
+
 (* type_safety_thm lookup_var_rel_tac vpr_lit_bpl_exp_rel_tac lookup_var_thms *)
 datatype exp_rel_info = ExpRelInfo0 of type_safety_thm_map * 
                                      (Proof.context -> int -> tactic) * 
