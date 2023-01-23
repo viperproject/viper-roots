@@ -96,7 +96,7 @@ lemma exprs_wf_rel_elim:
   using assms
 proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns vs rule: exprs_wf_rel.induct)
   case (1 R ctxt_vpr StateCons P ctxt \<gamma> \<gamma>')
-  then show ?case by auto
+  then show ?case by (auto simp: red_ast_bpl_def)
 next
   case (2 R ctxt_vpr StateCons P ctxt e es \<gamma> \<gamma>')
 
@@ -121,7 +121,7 @@ next
     by blast
 
   with RedBpl show ?case
-    by auto
+    by (auto simp: red_ast_bpl_def)
 qed
 
 lemma wf_rel_failure_elim:
@@ -168,11 +168,11 @@ next
     apply (rule exI)
     apply (rule conjI)
      apply (rule \<open>R _ _ _\<close>)
-    by simp
+    by (simp add: red_ast_bpl_def)
 qed (insert assms, fastforce)
 
 lemma wf_rel_no_failure_refl: "wf_rel R IsNormal (\<lambda>_ _. False) P ctxt \<gamma> \<gamma>" 
-  unfolding wf_rel_def
+  unfolding wf_rel_def red_ast_bpl_def
   by blast
 
 subsection \<open>Rules to derive semantic well-definedness relation\<close>
@@ -229,7 +229,7 @@ proof (rule wf_rel_intro)
     using Red
     by blast    
   hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
-    by simp
+    by (simp add: red_ast_bpl_def)
   with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns')"
     by blast
 qed (insert assms, unfold wf_rel_def, blast)
@@ -250,7 +250,7 @@ proof (rule wf_rel_intro)
     unfolding wf_rel_def
     by blast
   hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
-    by simp
+    by (simp add: red_ast_bpl_def)
   with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns')"
     by blast
 next
@@ -259,7 +259,8 @@ next
   from this obtain ns2 where "R \<omega>_def \<omega> ns2" and Red1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)" using Red
     by blast
   with Failure show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) c'"
-    by (meson Wf rtranclp_trans wf_rel_failure_elim)
+    unfolding red_ast_bpl_def
+    by (metis (no_types, lifting) Wf red_ast_bpl_def rtranclp_trans wf_rel_failure_elim)
 qed
 
 abbreviation wf_rel_bop_op 
@@ -300,17 +301,17 @@ proof (rule expr_wf_rel_intro)
       using wf_rel_failure_elim[OF Rel2 \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopRightFailure
       by blast
     ultimately show ?thesis
-      by fastforce
+      by (fastforce simp: red_ast_bpl_def)
   next
     case (RedBinopOpFailure v1 v2)
       from this obtain ns' where
          "R \<omega>_def \<omega> ns'" and
          "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns')"
-        using wf_rel_normal_elim[OF Rel1 R] wf_rel_normal_elim[OF Rel2]
-        by (meson rtranclp_trans)
-    then show ?thesis
-      using wf_rel_failure_elim[OF RelOp \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopOpFailure
-      by (meson rtranclp_trans)      
+        using wf_rel_normal_elim[OF Rel1 R] wf_rel_normal_elim[OF Rel2] red_ast_bpl_def
+        by (metis (no_types, lifting) rtranclp_trans)
+      then show ?thesis
+      using wf_rel_failure_elim[OF RelOp \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopOpFailure red_ast_bpl_def
+      by (metis (no_types, lifting) rtranclp_trans)      
   next
     case (RedSubFailure e)
     then show ?thesis
@@ -335,10 +336,10 @@ next
              "R \<omega>_def \<omega> ns''" and
              "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns'')"
         using wf_rel_normal_elim[OF Rel2] RedBinop
-        by (meson rtranclp_trans)
+        by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans) 
       thus ?thesis      
         using wf_rel_normal_elim[OF RelOp] RedBinop
-        by (meson rtranclp_trans)
+        by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans) 
   next
     case (RedBinopLazy v1)
     then show ?thesis using \<open>binop_lazy _ = _\<close> eval_binop_lazy_iff_2
@@ -378,7 +379,7 @@ proof (rule expr_wf_rel_intro)
     from this show ?thesis
       using Red_s_s' wf_rel_failure_elim[OF Rel2a HOL.conjI[OF Red_s_s'(1)] RedBinopRightFailure(2)] RedBinopRightFailure(1)
             \<open>\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure\<close>
-      by fastforce
+      by (fastforce simp: red_ast_bpl_def)
   next
     case (RedBinopOpFailure v1 v2)  
     moreover from this have "binop_lazy bop = None"
@@ -412,7 +413,7 @@ next
       by blast
     from this \<open>v1 \<noteq> b1\<close> show ?thesis
       using wf_rel_normal_elim[OF Rel2a] RedBinop v1BinopWellTy
-      by (meson rtranclp_trans)
+      by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans)
   next
     case (RedBinopLazy v1)
     hence  *:"binop_lazy bop = Some(v1, val)"
@@ -426,7 +427,7 @@ next
 
     thus ?thesis
       using wf_rel_normal_elim[OF Rel2b \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopLazy Lazy *
-      by auto              
+      by (auto simp: red_ast_bpl_def)
   qed
 qed
 
@@ -466,11 +467,11 @@ proof (rule expr_wf_rel_intro)
       by force    
     moreover have "VRef (Address a) \<noteq> VRef Null"      
       by blast
-    ultimately show ?thesis using assms RedField wf_rel_failure_elim
+    ultimately show ?thesis using assms RedField wf_rel_failure_elim red_ast_bpl_def
      by (smt (verit, ccfv_SIG) \<open>R \<omega>_def \<omega> ns\<close> rtranclp_trans wf_rel_normal_elim) (*TODO, the smt tactic does not always work here*)
   next
     case RedFieldNullFailure
-    then show ?thesis using assms wf_rel_failure_elim wf_rel_normal_elim \<open>R \<omega>_def \<omega> ns\<close>
+    then show ?thesis using assms wf_rel_failure_elim wf_rel_normal_elim \<open>R \<omega>_def \<omega> ns\<close> red_ast_bpl_def
       by (smt (verit, ccfv_threshold) rtranclp_trans)
   next
     case (RedSubFailure e')
@@ -493,7 +494,7 @@ next
       by (metis extended_val.distinct(1) if_SomeD)
     moreover have "VRef (Address a) \<noteq> VRef Null"    
       by simp
-    ultimately show ?thesis using assms wf_rel_normal_elim RedField \<open>R \<omega>_def \<omega> ns\<close> rtranclp_trans
+    ultimately show ?thesis using assms wf_rel_normal_elim RedField \<open>R \<omega>_def \<omega> ns\<close> rtranclp_trans red_ast_bpl_def
       by (smt (verit, ccfv_SIG))
   qed
 qed
@@ -582,7 +583,7 @@ lemma wf_rel_bop_op_trivial:
   assumes "bop \<notin> {IntDiv, PermDiv, ViperLang.Mod}"
   shows "wf_rel_bop_op R ctxt_vpr StateCons P ctxt e1 bop e2 \<gamma> \<gamma>"  
   apply (rule wf_rel_intro)
-   apply fastforce
+   apply (fastforce simp: red_ast_bpl_def)
   using assms eval_binop_not_failure
   by blast
 
@@ -654,7 +655,7 @@ proof (rule wf_rel_intro)
       apply (simp add: \<open>i \<noteq> 0\<close>)
       done
     then show ?thesis 
-    using R by auto
+    using R by (auto simp: red_ast_bpl_def)
   next
     case False
     from this obtain p where "v2 = VPerm p" using IntOrPerm by auto
@@ -684,7 +685,7 @@ proof (rule wf_rel_intro)
       apply (simp add: \<open>p \<noteq> 0\<close>)
       done
     then show ?thesis 
-      using R by auto
+      using R by (auto simp: red_ast_bpl_def)
   qed
 next
   fix v \<omega>_def \<omega> ns
@@ -731,7 +732,7 @@ next
       apply simp
       done
     then show ?thesis 
-      by auto
+      by (auto simp: red_ast_bpl_def)
   next
     case False
     hence "v2 = VPerm 0" using IntOrPerm 
@@ -760,7 +761,7 @@ next
       apply simp
       done
     then show ?thesis 
-      by auto
+      by (auto simp: red_ast_bpl_def)
   qed
 qed
 
@@ -855,13 +856,15 @@ proof (rule expr_wf_rel_intro)
     by blast
 
   have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) c'" (is "?P c'")
+    unfolding red_ast_bpl_def
     apply (rule converse_rtranclp_into_rtranclp)
      apply rule
      apply (rule RedParsedIfTrue)
     using TrueEval 
      apply blast
-    apply (rule RedThn)
-    done
+    using RedThn
+    unfolding red_ast_bpl_def
+    by simp    
 
   thus "\<exists>c'. snd c' = Failure \<and> ?P c'"
     using \<open>snd c' = Failure\<close>
@@ -900,13 +903,15 @@ next
      by blast
 
    have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns')"
+     unfolding red_ast_bpl_def
     apply (rule converse_rtranclp_into_rtranclp)
      apply rule
      apply (rule RedParsedIfTrue)
     using TrueEval 
      apply blast
-    apply (rule RedThn)
-    done
+    using RedThn
+    unfolding red_ast_bpl_def
+    by simp
 
   thus "\<exists>ns'. (R \<omega>_def \<omega> ns' \<and> ?Re1) \<and> red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns')"
     using Rns' Rext
@@ -947,6 +952,7 @@ proof (rule wf_rel_intro)
     using \<open>b1 = _\<close> by simp
 
   have RedAst:"red_ast_bpl P ctxt (?\<gamma>,Normal ns) (?\<gamma>', Normal ns)"
+    unfolding red_ast_bpl_def
     apply (rule converse_rtranclp_into_rtranclp)
      apply rule
      apply (fastforce intro: RedParsedIfFalse GuardEvalFalse)
@@ -984,6 +990,7 @@ proof -
     apply (rule wf_rel_extend_1)
      apply (rule *)
     apply (rule exI, rule conjI)
+    unfolding red_ast_bpl_def
      apply (rule converse_rtranclp_into_rtranclp)
       apply rule+
     by simp
@@ -1027,24 +1034,26 @@ lemma syn_lazy_bop_wf_rel_2:
    Lazy: "binop_lazy bop = Some (b1 :: 'a ValueAndBasicState.val, bResult)" and
    Rel1: "expr_wf_rel R (ctxt_vpr :: 'a total_context) StateCons P ctxt e1 \<gamma>0 \<gamma>2" and
    Red2: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) 
-            ((BigBlock name [] (Some (ParsedIf (Some guard) (thnHd#thnTl) [empty_bigblock elseName])) None, KSeq bNext cont), Normal ns3) \<and>
+            ((BigBlock name [] (Some (ParsedIf (Some guard) (thnHd#thnTl) [empty_else_block])) None, KSeq bNext cont), Normal ns3) \<and>
              R \<omega>_def \<omega> ns3"
            (is "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) ((?b_if, ?cont_if), Normal ns3) \<and>
-             R \<omega>_def \<omega> ns3")
-   and
+             R \<omega>_def \<omega> ns3") and
+   ElseBlockEmpty: "is_empty_bigblock empty_else_block" and
    Guard: "bop \<in> {ViperLang.And, ViperLang.BImp} \<Longrightarrow> guard = e1_bpl" 
          "bop = ViperLang.Or \<Longrightarrow> guard = UnOp Not e1_bpl" and
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
    WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont thnTl (KSeq bNext cont))) \<gamma>3"
                (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma>'' _") and
-   Red3: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>3, Normal ns2) ((bNext, cont), Normal ns3) \<and> R \<omega>_def \<omega> ns3"
+   Red3: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>3, Normal ns2) (\<gamma>4, Normal ns3) \<and> R \<omega>_def \<omega> ns3"
    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Binop e1 bop e2) \<gamma>0 (bNext, cont)"
 proof (rule binop_lazy_expr_wf_rel[OF Lazy])
   show "expr_wf_rel R ctxt_vpr StateCons P ctxt e1 \<gamma>0 (?b_if, ?cont_if)"
     by (auto intro: wf_rel_extend_1 Rel1 Red2)
-next
-  show "expr_wf_rel (\<lambda>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<and> (\<exists>b. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b \<and> b \<noteq> b1 \<and> (\<exists>v2. eval_binop b bop v2 \<noteq> BinopTypeFailure)))
-     ctxt_vpr StateCons P ctxt e2 (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_bigblock elseName])) None, KSeq bNext cont) (bNext, cont)"
+next                                                                             
+  from ElseBlockEmpty obtain else_name where "empty_else_block = empty_bigblock else_name" 
+    using is_empty_bigblock.elims(2) by auto
+  have "expr_wf_rel (\<lambda>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<and> (\<exists>b. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b \<and> b \<noteq> b1 \<and> (\<exists>v2. eval_binop b bop v2 \<noteq> BinopTypeFailure)))
+     ctxt_vpr StateCons P ctxt e2 (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_bigblock else_name])) None, KSeq bNext cont) (bNext, cont)"
     apply (rule syn_lazy_bop_short_circuit_wf_rel[OF Lazy])
        apply (insert Guard)
        apply simp
@@ -1052,13 +1061,24 @@ next
      apply (rule ExpRel)
     apply (rule wf_rel_extend_1)
      apply (rule WfRel)
-    by (fastforce intro: Red3)    
+    by (fastforce intro: Red3) 
+  thus "expr_wf_rel
+     (\<lambda>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<and> (\<exists>b. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b \<and> b \<noteq> b1 \<and> (\<exists>v2. eval_binop b bop v2 \<noteq> BinopTypeFailure)))
+     ctxt_vpr StateCons P ctxt e2 (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_else_block])) None, KSeq bNext cont) (bNext, cont)"
+    using \<open>empty_else_block = _\<close>
+    by simp
 next
-  show "wf_rel R (\<lambda>\<omega>_def \<omega>. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b1) (\<lambda>_ _. False) P ctxt
-     (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_bigblock elseName])) None, KSeq bNext cont) (bNext, cont)"
+  from ElseBlockEmpty obtain else_name where "empty_else_block = empty_bigblock else_name" 
+    using is_empty_bigblock.elims(2) by auto
+  have "wf_rel R (\<lambda>\<omega>_def \<omega>. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b1) (\<lambda>_ _. False) P ctxt
+     (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_bigblock else_name])) None, KSeq bNext cont) (bNext, cont)"
     apply (rule syn_lazy_bop_no_short_circuit_seq_wf_rel[OF Lazy])
       apply (insert Guard)
     by (auto intro: ExpRel)
+  thus "wf_rel R (\<lambda>\<omega>_def \<omega>. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b1) (\<lambda>_ _. False) P ctxt
+     (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd # thnTl) [empty_else_block])) None, KSeq bNext cont) (bNext, cont)"
+    using \<open>empty_else_block = _\<close>
+    by simp
 qed
 
 method wf_rel_bop_op_trivial_tac =

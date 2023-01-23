@@ -888,6 +888,11 @@ text \<open>AST transitive closure relation. We make sure simple commands step t
 abbreviation empty_bigblock :: "string option \<Rightarrow> bigblock"
   where "empty_bigblock name \<equiv> BigBlock name [] None None"
 
+fun is_empty_bigblock :: "bigblock \<Rightarrow> bool"
+  where 
+    "is_empty_bigblock (BigBlock _ [] None None) = True"
+  | "is_empty_bigblock _ = False"
+
 type_synonym 'a vast_config = "(bigblock * cont) * ('a vbpl_absval) state"
 
 inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
@@ -905,14 +910,14 @@ abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarr
 text \<open>We order the arguments of an AST config such that the syntactic part (bigblock + continuation) is the 
 first element s.t. one can easily construct an AST configuration from the syntactic part and the state\<close>                                                                                                                                 
 
-abbreviation red_ast_bpl :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
+definition red_ast_bpl :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
   where "red_ast_bpl ctxt \<equiv> red_bigblock_multi ctxt"
 
 lemma red_ast_bpl_refl: "red_ast_bpl P ctxt \<gamma> \<gamma>"
-  by simp
+  by (simp add: red_ast_bpl_def)
 
 lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
-  by (auto intro: RedSkip)
+  by (auto intro: RedSkip simp: red_ast_bpl_def)
 
 type_synonym viper_stmt = ViperLang.stmt
 

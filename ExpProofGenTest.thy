@@ -145,8 +145,8 @@ proof (rule stmt_rel_intro)
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
-    using stmt_rel_normal_elim[OF assms(2)] RedVpr
-    by (meson rtranclp_trans)
+    using stmt_rel_normal_elim[OF assms(2)] RedVpr red_ast_bpl_def
+    by (metis (no_types, opaque_lifting) rtranclp_trans)
 next
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and
@@ -157,8 +157,8 @@ next
     by blast
 
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
-    using stmt_rel_failure_elim[OF assms(2)] RedVpr
-    by (meson rtranclp_trans)
+    using stmt_rel_failure_elim[OF assms(2)] RedVpr red_ast_bpl_def
+    by (metis (no_types, opaque_lifting) rtranclp_trans)
 qed
 
 lemma stmt_rel_propagate_2:
@@ -175,8 +175,8 @@ proof (rule stmt_rel_intro)
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
-    using assms(2)
-    by (meson rtranclp_trans)
+    using assms(2) red_ast_bpl_def
+    by (metis (no_types, opaque_lifting) rtranclp_trans)
 next
   fix \<omega> ns
   assume "R0 \<omega> ns" and
@@ -248,6 +248,7 @@ proof (cases rule: stmt_rel_intro)
     let ?ns'' = "update_var (var_context ctxt) ns' x_bpl ?v_bpl"
 
     have RedBpl: "red_ast_bpl P ctxt ((?b, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ?ns'')"
+      unfolding red_ast_bpl_def
       apply (rule converse_rtranclp_into_rtranclp)
        apply rule
        apply rule
@@ -262,8 +263,8 @@ proof (cases rule: stmt_rel_intro)
       by auto
 
     ultimately show ?thesis 
-      using RedBplWf R_def \<open>\<omega>' = _\<close>
-      by (meson rtranclp_trans)
+      using RedBplWf R_def \<open>\<omega>' = _\<close> red_ast_bpl_def
+      by (metis (mono_tags, lifting) rtranclp_trans)
   qed
 next
   \<comment>\<open>Failure case\<close>
@@ -370,12 +371,14 @@ lemma red_ast_bpl_propagate_rel:
           "R1 \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
         shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
   using assms
+  unfolding red_ast_bpl_def
   by auto
 
 lemma red_ast_bpl_one_simple_cmd:
   assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s'"
   shows "red_ast_bpl P ctxt ((BigBlock name (c#cs) str tr, cont), s) ((BigBlock name cs str tr, cont), s')"
   using assms
+  unfolding red_ast_bpl_def
   by blast
 
 lemma lookup_zero_mask_bpl:
