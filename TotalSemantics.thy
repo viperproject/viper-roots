@@ -231,18 +231,20 @@ always has at least one failure transition. This is in-sync with the recent Carb
 
       red_stmt_total ctxt R \<Lambda> (Scope \<tau> scopeBody) \<omega> res_unshift"
  | RedIfTrue: 
-   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<rbrakk> \<Longrightarrow> 
-      red_stmt_total ctxt R \<Lambda> (If e_b s1 s2) \<omega> (RNormal \<omega>)"
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True);
+      red_stmt_total ctxt R \<Lambda> s_thn \<omega> res \<rbrakk> \<Longrightarrow> 
+      red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
  | RedIfFalse: 
-   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-      red_stmt_total ctxt R \<Lambda> (If e_b s1 s2) \<omega> (RNormal \<omega>)"
- | RedIfFailure:
-    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
-       red_stmt_total ctxt R \<Lambda> (If e_b s1 s2) \<omega> RFailure"
+   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False);
+      red_stmt_total ctxt R \<Lambda> s_els \<omega> res \<rbrakk> \<Longrightarrow> 
+      red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
  | RedSeq:
    "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> (RNormal \<omega>');
-      red_stmt_total ctxt R \<Lambda> s1 \<omega>' res \<rbrakk> \<Longrightarrow>
+      red_stmt_total ctxt R \<Lambda> s2 \<omega>' res \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> res"
+ | RedSeqFailure:
+   "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> RFailure \<rbrakk> \<Longrightarrow>
+      red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
 
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
@@ -252,8 +254,28 @@ always has at least one failure transition. This is in-sync with the recent Carb
 inductive_cases RedLocalAssign_case: 
      "red_stmt_total ctxt R \<Lambda> (LocalAssign x e) \<omega> (RNormal (update_var_total \<omega> x v))"
 
+inductive_cases RedSeqNormal_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> (RNormal \<omega>')"
+inductive_cases RedSeqFailure_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
+inductive_cases RedIfNormal_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> (RNormal \<omega>')"
+inductive_cases RedIfFailure_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> RFailure"
+inductive_cases RedIf_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
+
+
+lemmas red_stmt_total_inversion_thms =
+   RedLocalAssign_case
+   RedIf_case
+   RedSeqNormal_case
+   RedSeqFailure_case
+
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_m_total_full \<omega> = (zero_mask, zero_mask)"
+
+(*
+lemma red_stmt_total_seq_failure_inversion:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> RFailure" and
+          "                              
+  shows "P"
+*)
 
 subsection \<open>Correctness\<close>
 

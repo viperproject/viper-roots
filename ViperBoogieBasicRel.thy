@@ -893,6 +893,11 @@ fun is_empty_bigblock :: "bigblock \<Rightarrow> bool"
     "is_empty_bigblock (BigBlock _ [] None None) = True"
   | "is_empty_bigblock _ = False"
 
+abbreviation if_bigblock :: "string option \<Rightarrow> expr option \<Rightarrow> bigblock list \<Rightarrow> bigblock list \<Rightarrow> bigblock"
+  where 
+    "if_bigblock name_opt cond_opt thn_list els_list \<equiv> 
+       BigBlock name_opt [] (Some (ParsedIf cond_opt thn_list els_list)) None"
+
 type_synonym 'a vast_config = "(bigblock * cont) * ('a vbpl_absval) state"
 
 inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
@@ -901,8 +906,8 @@ inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
       "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), k), s) (((BigBlock name cs str tr), k), s')"
    | RedEmptyBigBlock [intro]: 
-    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (b', k', s') \<rbrakk> \<Longrightarrow>
-       red_bigblock_small P ctxt ((BigBlock name [] str tr, k), s) ((b', k'), s')"
+    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (fst \<gamma>', snd \<gamma>', s') \<rbrakk> \<Longrightarrow>
+       red_bigblock_small P ctxt ((BigBlock name [] str tr, k), s) (\<gamma>', s')"
 
 abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
   where "red_bigblock_multi P ctxt \<equiv> rtranclp (red_bigblock_small P ctxt)"
@@ -916,8 +921,32 @@ definition red_ast_bpl :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>'a vas
 lemma red_ast_bpl_refl: "red_ast_bpl P ctxt \<gamma> \<gamma>"
   by (simp add: red_ast_bpl_def)
 
+lemma red_ast_bpl_transitive:
+  assumes "red_ast_bpl P ctxt \<gamma>1 \<gamma>2" and
+          "red_ast_bpl P ctxt \<gamma>2 \<gamma>3"
+  shows "red_ast_bpl P ctxt \<gamma>1 \<gamma>3"
+  using assms 
+  unfolding red_ast_bpl_def
+  by fastforce
+
+lemma red_ast_bpl_one_simple_cmd:
+  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s'"
+  shows "red_ast_bpl P ctxt ((BigBlock name (c#cs) str tr, cont), s) ((BigBlock name cs str tr, cont), s')"
+  using assms
+  unfolding red_ast_bpl_def
+  by blast
+
+lemma red_ast_bpl_one_step_empty_simple_cmd:
+  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [], P \<turnstile> 
+             \<langle>(BigBlock name [] str tr, cont, s)\<rangle> \<longrightarrow> (b', cont', s')"
+  shows "red_ast_bpl P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
+  using assms
+  unfolding red_ast_bpl_def
+  sorry
+ 
 lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
-  by (auto intro: RedSkip simp: red_ast_bpl_def)
+  unfolding red_ast_bpl_def
+  by (fastforce intro: RedSkip)
 
 type_synonym viper_stmt = ViperLang.stmt
 

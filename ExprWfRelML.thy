@@ -2,13 +2,19 @@ theory ExprWfRelML
 imports ExprWfRel ExpRelML TotalViperHelperML Boogie_Lang.HelperML TotalViper.CPGHelperML
 begin
 
+text \<open>We define a tactic for proving that a Boogie statement captures the well-definedness check
+of a Viper expression. The tactics in general may not assume that the current Boogie configuration
+already matches the corresponding wf_rel lemma rule that must be applied next. Thus, tactics
+may have to first progress the current Boogie configuration. Moreover, tactics need not ensure 
+at the end that the Boogie configuration is in a position where the next simple command is already
+in the active big block. So, if a tactic A invokes tactic B, then tactic A may need to progress
+the current Boogie configuration.
+\<close>
 ML \<open>
   val R' = run_and_print_if_fail_tac' "failure"
   val Rmsg' = run_and_print_if_fail_tac' 
 
   fun progress_tac ctxt = 
-     (*(asm_full_simp_tac ctxt ORELSE' (K all_tac)) THEN'*)  (* simplify continuation *)
-      
      resolve_tac ctxt [@{thm exI}] THEN'
      resolve_tac ctxt [@{thm conjI}] THEN'
     (* (K (print_tac ctxt "before unfold"))  THEN'*)

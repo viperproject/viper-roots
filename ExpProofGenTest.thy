@@ -83,6 +83,27 @@ text\<open> Points to think about:
   \<^item> backward vs. forward simulation (also tracking single Boogie state vs sets of Boogie states)
 \<close>
 
+type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a stmt_result_total"
+
+definition red_stmt_total_smallstep :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
+  where "red_stmt_total_smallstep ctxt R \<Lambda> config1 config2 \<equiv> True"
+
+definition stmt_rel_small_step :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
+                                   'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow>
+                                   type_context \<Rightarrow> ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
+                                   ViperLang.stmt \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
+  where "stmt_rel_small_step R ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>'  \<equiv>
+           \<comment>\<open>for all  Viper and Boogie states in the input relation\<close>
+           \<forall> \<omega> ns. R \<omega> ns \<longrightarrow>               
+               \<comment>\<open>If the Boogie program starting at program point \<^term>\<open>\<gamma>\<close> cannot fail\<close>
+               (\<forall> \<gamma>' state_bpl. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', state_bpl)) \<longrightarrow> state_bpl \<noteq> Failure) \<longrightarrow>
+               \<comment>\<open>Then the Viper statement \<^term>\<open>stmt_vpr\<close> cannot fail\<close>
+               (\<forall> a b. red_stmt_total_smallstep ctxt_vpr StateCons \<Lambda> (Inl stmt_vpr, RNormal \<omega>) (a,b) \<longrightarrow>
+                     b \<noteq> RFailure )"
+(*\<and>
+                     (a = Inr () \<longrightarrow> \<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')) )
+                  "*)
+ 
 definition stmt_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
                                ('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 
                                 'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 
@@ -90,14 +111,18 @@ definition stmt_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nsta
                                 ViperLang.stmt \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
   where 
     "stmt_rel R R' ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' \<equiv>
+      \<comment>\<open>for all  Viper and Boogie states in the input relation\<close>
       \<forall> \<omega> ns res. R \<omega> ns \<longrightarrow> 
+             \<comment>\<open>If the Viper stmt reduces\<close>
              red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> res \<longrightarrow>
              (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
+                 \<comment>\<open>Normal Viper executions can be simulated by normal Boogie executions\<close>
                  (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns'))) \<and>
              (res = RFailure \<longrightarrow> 
+                 \<comment>\<open>If the Viper execution fails, then there is a failing Boogie execution\<close>
                 (\<exists>c'. snd c' = Failure \<and>
                       red_ast_bpl P ctxt (\<gamma>, Normal ns) c'))"
-
+ 
 lemma stmt_rel_intro[case_names base step]:
   assumes 
   "\<And>\<omega> ns \<omega>'. 
@@ -111,6 +136,34 @@ lemma stmt_rel_intro[case_names base step]:
   shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>'"
   using assms
   unfolding stmt_rel_def  
+  by blast
+
+definition stmt_rel_aux 
+  where "stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res \<equiv>             
+          (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
+                 (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns'))) \<and>
+             (res = RFailure \<longrightarrow> 
+                (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure))"
+
+lemma stmt_rel_aux_intro:
+  assumes "\<And>\<omega>'. res = RNormal \<omega>' \<Longrightarrow>
+            \<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns')" and
+          "res = RFailure \<Longrightarrow> 
+            (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
+  shows "stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res"
+  using assms
+  unfolding stmt_rel_aux_def
+  by blast
+
+lemma stmt_rel_intro_2:
+  assumes 
+  "\<And>\<omega> ns res. 
+          R \<omega> ns \<Longrightarrow> 
+          red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> res \<Longrightarrow>
+          stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res"
+shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>'"
+  using assms
+  unfolding stmt_rel_def stmt_rel_aux_def
   by blast
 
 lemma stmt_rel_normal_elim:
@@ -145,8 +198,8 @@ proof (rule stmt_rel_intro)
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
-    using stmt_rel_normal_elim[OF assms(2)] RedVpr red_ast_bpl_def
-    by (metis (no_types, opaque_lifting) rtranclp_trans)
+    using stmt_rel_normal_elim[OF assms(2)] RedVpr
+    by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 next
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and
@@ -157,8 +210,8 @@ next
     by blast
 
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
-    using stmt_rel_failure_elim[OF assms(2)] RedVpr red_ast_bpl_def
-    by (metis (no_types, opaque_lifting) rtranclp_trans)
+    using stmt_rel_failure_elim[OF assms(2)] RedVpr
+    by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 qed
 
 lemma stmt_rel_propagate_2:
@@ -175,8 +228,8 @@ proof (rule stmt_rel_intro)
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
-    using assms(2) red_ast_bpl_def
-    by (metis (no_types, opaque_lifting) rtranclp_trans)
+    using assms(2)
+    by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 next
   fix \<omega> ns
   assume "R0 \<omega> ns" and
@@ -191,7 +244,167 @@ lemma stmt_rel_seq:
           "stmt_rel R2 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s2_vpr \<gamma>2 \<gamma>3"
   shows 
     "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) \<gamma>1 \<gamma>3"
-  oops
+proof (rule stmt_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume R1:"R1 \<omega> ns" and RedStmt:"red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> (RNormal \<omega>')"
+  from RedStmt obtain \<omega>'' where
+    RedS1: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s1_vpr \<omega> (RNormal \<omega>'')" and
+    RedS2: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s2_vpr \<omega>'' (RNormal \<omega>')"
+    by (auto elim: RedSeqNormal_case)
+
+  with stmt_rel_normal_elim[OF assms(1) R1 RedS1] stmt_rel_normal_elim[OF assms(2) _ RedS2]
+  show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>3, Normal ns') \<and> R3 \<omega>' ns'"
+    by (meson red_ast_bpl_transitive)
+next
+  fix \<omega> ns
+  assume R1: "R1 \<omega> ns"
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> RFailure"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) c'"
+  proof (rule RedSeqFailure_case)
+   \<comment>\<open>s1 normal, s2 fails\<close>
+    fix \<omega>'
+    assume RedS1: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s1_vpr \<omega> (RNormal \<omega>')" and
+           RedS2: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s2_vpr \<omega>' RFailure"
+    show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) c'"
+      using stmt_rel_normal_elim[OF assms(1) R1 RedS1] stmt_rel_failure_elim[OF assms(2) _ RedS2]      
+      by (meson red_ast_bpl_transitive)
+  next
+    assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s1_vpr \<omega> RFailure"
+    thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) c'"
+      using stmt_rel_failure_elim[OF assms(1) R1]
+      by blast
+  qed (simp)
+qed
+
+method stmt_rel_if_proof_tac uses InitElim RedBranch ResultEq RedAstToIf RedCondBpl RedParsedIfRule =
+        (
+         rule InitElim,
+         (insert RedBranch ResultEq),
+          simp,
+         (rule exI, rule conjI),
+         (rule red_ast_bpl_transitive),
+         (rule RedAstToIf),
+         (rule red_ast_bpl_transitive),
+         (rule red_ast_bpl_one_step_empty_simple_cmd),
+         (rule RedParsedIfRule),
+         (fastforce intro: RedCondBpl),
+         auto
+        )
+         
+lemma stmt_rel_if_2:
+  assumes \<comment>\<open>When invoking the wf_rel tactic, apply one of the wf_rel extension lemmas such that the 
+            wf_rel tactic itself need not guarantee progress to the if block\<close>
+     ExpWfRel:          
+          "expr_wf_rel (\<lambda> _ \<omega>. R \<omega>) ctxt_vpr StateCons P ctxt cond 
+           \<gamma>1
+           (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)" and
+     ExpRel: "exp_rel_vpr_bpl (\<lambda> _ \<omega>. R \<omega>) ctxt_vpr ctxt cond cond_bpl" and
+     ThnRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_thn (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+     ElsRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_els (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
+   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (If cond s_thn s_els) \<gamma>1 (next, cont)"
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume R: "R \<omega> ns"
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.If cond s_thn s_els) \<omega> res"
+
+  thus "stmt_rel_aux R \<Lambda>_vpr P ctxt (stmt.If cond s_thn s_els) \<gamma>1 (next, cont) ns res"
+  proof (rule RedIf_case)
+    \<comment>\<open>thn case\<close>
+    assume RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)" and 
+           RedThn: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> res"
+
+    from RedCond wf_rel_normal_elim[OF ExpWfRel R] obtain ns' where
+     Rns': "R \<omega> ns'" and
+     RedAstToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns)
+           ((if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont), Normal ns')"
+      by blast
+
+    have RedCondBpl: "red_expr_bpl ctxt cond_bpl ns' (BoolV True)"
+     using ExpRel RedCond Rns'
+     by (fastforce elim: exp_rel_vpr_bpl_elim)
+    
+    show "stmt_rel_aux R \<Lambda>_vpr P ctxt (stmt.If cond s_thn s_els) \<gamma>1 (next, cont) ns res"
+      
+
+    proof (rule stmt_rel_aux_intro)
+      fix \<omega>'
+      assume "res = RNormal \<omega>'"
+
+      show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) ((next, cont), Normal ns') \<and> R \<omega>' ns'"
+        by (stmt_rel_if_proof_tac 
+                   InitElim: exE[OF stmt_rel_normal_elim[OF ThnRel Rns']] 
+                   RedBranch: RedThn 
+                   ResultEq: \<open>res = _\<close> 
+                   RedAstToIf: RedAstToIf
+                   RedCondBpl: RedCondBpl
+                   RedParsedIfRule: RedParsedIfTrue)
+     next
+       assume "res = RFailure"
+       show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure" 
+        by (stmt_rel_if_proof_tac 
+                   InitElim: exE[OF stmt_rel_failure_elim[OF ThnRel Rns']] 
+                   RedBranch: RedThn 
+                   ResultEq: \<open>res = _\<close> 
+                   RedAstToIf: RedAstToIf
+                   RedCondBpl: RedCondBpl
+                   RedParsedIfRule: RedParsedIfTrue)
+     qed
+   next
+    assume RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)" and 
+           RedEls: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> res"
+
+    from RedCond wf_rel_normal_elim[OF ExpWfRel R] obtain ns' where
+     Rns': "R \<omega> ns'" and
+     RedAstToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns)
+           ((if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont), Normal ns')"
+      by blast
+
+    have RedCondBpl: "red_expr_bpl ctxt cond_bpl ns' (BoolV False)"
+     using ExpRel RedCond Rns'
+     by (fastforce elim: exp_rel_vpr_bpl_elim)
+    
+    show "stmt_rel_aux R \<Lambda>_vpr P ctxt (stmt.If cond s_thn s_els) \<gamma>1 (next, cont) ns res"
+      
+
+    proof (rule stmt_rel_aux_intro)
+      fix \<omega>'
+      assume "res = RNormal \<omega>'"
+
+      show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) ((next, cont), Normal ns') \<and> R \<omega>' ns'"        
+        by (stmt_rel_if_proof_tac 
+                   InitElim: exE[OF stmt_rel_normal_elim[OF ElsRel Rns']] 
+                   RedBranch: RedEls 
+                   ResultEq: \<open>res = _\<close> 
+                   RedAstToIf: RedAstToIf
+                   RedCondBpl: RedCondBpl
+                   RedParsedIfRule: RedParsedIfFalse)
+     next
+       assume "res = RFailure"
+       show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure"         
+        by (stmt_rel_if_proof_tac 
+                   InitElim: exE[OF stmt_rel_failure_elim[OF ElsRel Rns']] 
+                   RedBranch: RedEls 
+                   ResultEq: \<open>res = _\<close> 
+                   RedAstToIf: RedAstToIf
+                   RedCondBpl: RedCondBpl
+                   RedParsedIfRule: RedParsedIfFalse)
+     qed
+   next
+     fix e
+     assume "res = RFailure" and "e \<in> sub_expressions (stmt.If cond s_thn s_els)" and 
+            "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+     hence RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+       by simp
+     
+     show "stmt_rel_aux R \<Lambda>_vpr P ctxt (stmt.If cond s_thn s_els) \<gamma>1 (next, cont) ns res"
+     proof (rule stmt_rel_aux_intro)
+       assume "res = RFailure"
+       show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure "
+         using wf_rel_failure_elim[OF ExpWfRel R RedCond]
+         by simp
+     qed (simp add: \<open>res = _\<close>)
+   qed
+ qed
 
 subsection \<open>Local variable assignment relation\<close>
 
@@ -373,13 +586,6 @@ lemma red_ast_bpl_propagate_rel:
   using assms
   unfolding red_ast_bpl_def
   by auto
-
-lemma red_ast_bpl_one_simple_cmd:
-  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s'"
-  shows "red_ast_bpl P ctxt ((BigBlock name (c#cs) str tr, cont), s) ((BigBlock name cs str tr, cont), s')"
-  using assms
-  unfolding red_ast_bpl_def
-  by blast
 
 lemma lookup_zero_mask_bpl:
   assumes "state_rel Pr TyRep Tr ctxt mvar \<omega>_def \<omega> ns" and
