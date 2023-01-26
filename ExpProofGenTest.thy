@@ -214,6 +214,13 @@ next
     by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 qed
 
+lemma stmt_rel_propagate_same_rel:
+  assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
+          "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
+        shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+  using stmt_rel_propagate assms
+  by blast
+
 lemma stmt_rel_propagate_2:
   assumes "stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
           "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
@@ -238,6 +245,13 @@ next
     using assms(1) stmt_rel_failure_elim 
     by blast
 qed
+
+lemma stmt_rel_propagate_2_same_rel:
+  assumes "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
+          "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
+  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+  using assms stmt_rel_propagate_2
+  by blast
 
 lemma stmt_rel_seq:
   assumes "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s1_vpr \<gamma>1 \<gamma>2" and
@@ -500,40 +514,7 @@ qed
 
 text \<open>Relational rule for Viper assignment \<open>x := e_vpr\<close>. The difference to the above lemma is that 
 this lemma provides explicit premises that allow the Boogie program to progress after the well-definedness
-check and before the assignment\<close>
-lemma assign_rel_simple_2:
-  assumes R_def: "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
-          VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
-          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 \<gamma>1" and
-          ProgressToAssign: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow> 
-                          \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
-                                R3 \<omega>_def \<omega> ns3" and
-          BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
-          TyRel: "vpr_to_bpl_ty Trep ty = Some ty_bpl" and
-                    \<comment>\<open>Key assignment property for R2\<close>
-          RAssign:  "\<And> \<omega> ns v . R2 \<omega> ns \<Longrightarrow>
-                           get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
-                           type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
-                           R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
-          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
-          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl"  and
-          ProgressToFinal: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow>
-                            \<exists>ns3. red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ns2) (\<gamma>3, Normal ns3) \<and> 
-                                  R3 \<omega>_def \<omega> ns3"
-          
-        shows "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) 
-               \<gamma>0
-               (BigBlock name cs str tr, cont)"
-proof -
-  from ExpWfRel and ProgressToAssign 
-  have *:"expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
-    using wf_rel_extend_1
-    by blast
-  show ?thesis
-    apply (rule assign_rel_simple[OF R_def _ *])
-    using assms by auto
-qed
-
+check and before the assignment. However, the theorem is not required if one uses propagation lemmas\<close>
 lemma assign_rel_simple_3:
   assumes R_def: "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
           VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
