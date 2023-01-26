@@ -291,7 +291,7 @@ method stmt_rel_if_proof_tac uses InitElim RedBranch ResultEq RedAstToIf RedCond
          auto
         )
          
-lemma stmt_rel_if_2:
+lemma stmt_rel_if:
   assumes \<comment>\<open>When invoking the wf_rel tactic, apply one of the wf_rel extension lemmas such that the 
             wf_rel tactic itself need not guarantee progress to the if block\<close>
      ExpWfRel:          

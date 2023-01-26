@@ -552,7 +552,7 @@ proof (rule expr_wf_rel_intro)
     hence "e \<in> set xs" by simp
     \<comment>\<open>TODO: mismatch Viper and Boogie, Boogie evaluates from left-to-right. Resolve by proving
             that Boogie expression\<close>
-    then show ?thesis sorry
+    then show ?thesis oops
   qed
 next
   fix v \<omega>_def \<omega> ns

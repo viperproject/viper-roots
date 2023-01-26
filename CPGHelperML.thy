@@ -11,7 +11,6 @@ fun unfold_bigblock_atomic ctxt bigblock =
          Local_Defs.unfold_tac ctxt thm
       end )
   | _ => all_tac
- val test = @{term "BigBlock name [] None None"}
 
 fun is_empty_bigblock bigblock =
   case bigblock of 
@@ -39,6 +38,7 @@ fun unfold_bigblock_in_program_point ctxt (program_point, _) =
 fun unfold_bigblock_in_goal_aux ctxt (t,i) =
   case t of 
     @{term "Trueprop"} $ t' => unfold_bigblock_in_goal_aux ctxt (t',i)
+     (* just recurse in the first conjunct *)
   | @{term "(\<and>)"} $ conj1 $ _ => (unfold_bigblock_in_goal_aux ctxt (conj1, i))
   | Const (@{const_name "red_ast_bpl"}, _) 
          $ _ (* AST *)

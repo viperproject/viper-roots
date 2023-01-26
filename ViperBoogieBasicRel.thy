@@ -900,14 +900,20 @@ abbreviation if_bigblock :: "string option \<Rightarrow> expr option \<Rightarro
 
 type_synonym 'a vast_config = "(bigblock * cont) * ('a vbpl_absval) state"
 
+text \<open>
+ We define a single step relation on big blocks based on \<^const>\<open>red_bigblock\<close>, where only a single 
+simple command reduces in a single step (contrary to \<^const>\<open>red_bigblock\<close>, where all simple commands 
+of the same big block reduce in a single step).
+\<close>
+
 inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
   where 
-    RedNonEmptyBigBlock [intro]: 
+    RedBigBlockSmallSimpleCmd [intro]: 
       "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
-       red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), k), s) (((BigBlock name cs str tr), k), s')"
-   | RedEmptyBigBlock [intro]: 
-    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, k, s) (fst \<gamma>', snd \<gamma>', s') \<rbrakk> \<Longrightarrow>
-       red_bigblock_small P ctxt ((BigBlock name [] str tr, k), s) (\<gamma>', s')"
+       red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), cont), s) (((BigBlock name cs str tr), cont), s')"
+   | RedBigBlockSmallNoSimpleCmdOneStep [intro]: 
+    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
+       red_bigblock_small P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
 
 abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
   where "red_bigblock_multi P ctxt \<equiv> rtranclp (red_bigblock_small P ctxt)"
@@ -942,7 +948,7 @@ lemma red_ast_bpl_one_step_empty_simple_cmd:
   shows "red_ast_bpl P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
   using assms
   unfolding red_ast_bpl_def
-  sorry
+  by blast
  
 lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
   unfolding red_ast_bpl_def
