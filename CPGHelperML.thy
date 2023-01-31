@@ -1,5 +1,5 @@
 theory CPGHelperML
-  imports ViperBoogieBasicRel
+  imports ViperBoogieBasicRel Boogie_Lang.HelperML
 begin
 
 ML \<open>
@@ -58,6 +58,24 @@ a form where bigblock is unfolded and not empty. The nonemptiness guarantee reli
  that an empty bigblocks is not succeeded by another empty bigblock. *)
 fun unfold_bigblock_in_goal ctxt =
   SUBGOAL (fn (t,i) => unfold_bigblock_in_goal_aux ctxt (Logic.strip_assums_concl t, i))
+
+  (* progress_tac tries to solve a goal of the form 
+         \<open>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'\<close>
+     Usually \<gamma>1 is a schematic variable in the goal and the tactic tries to solve the goal by 
+     instantiating \<gamma>1 to be the unfolded bigblock version of \<gamma>0. In case where \<gamma>0 is an already
+     unfolded empty bigblock (TODO: what if \<gamma>0 is a folded empty bigblock?), \<gamma>1 is instantiated 
+     to be the successor unfolded bigblock.           
+     *)
+fun progress_tac ctxt = 
+   resolve_tac ctxt [@{thm exI}] THEN'
+   resolve_tac ctxt [@{thm conjI}] THEN'
+  (* (K (print_tac ctxt "before unfold"))  THEN'*)
+   (unfold_bigblock_in_goal ctxt) THEN'
+  (* (K (print_tac ctxt "after unfold"))  THEN' *)
+   (resolve_tac ctxt [@{thm red_ast_bpl_refl}] ORELSE' 
+    
+    resolve_tac ctxt [@{thm red_ast_bpl_empty_block}]) THEN'
+   assm_full_simp_solved_tac ctxt
 \<close>
 
 

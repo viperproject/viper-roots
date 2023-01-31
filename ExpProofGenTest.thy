@@ -258,6 +258,7 @@ lemma stmt_rel_seq:
           "stmt_rel R2 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s2_vpr \<gamma>2 \<gamma>3"
   shows 
     "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) \<gamma>1 \<gamma>3"
+(* "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) (Seq s1_bpl s2_bpl)" *)
 proof (rule stmt_rel_intro)
   fix \<omega> ns \<omega>'
   assume R1:"R1 \<omega> ns" and RedStmt:"red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> (RNormal \<omega>')"
@@ -289,6 +290,14 @@ next
       by blast
   qed (simp)
 qed
+
+lemma stmt_rel_seq_same_rel:
+  assumes "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s1_vpr \<gamma>1 \<gamma>2" and
+          "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s2_vpr \<gamma>2 \<gamma>3"
+  shows 
+    "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) \<gamma>1 \<gamma>3"
+  using assms stmt_rel_seq
+  by blast
 
 method stmt_rel_if_proof_tac uses InitElim RedBranch ResultEq RedAstToIf RedCondBpl RedParsedIfRule =
         (
@@ -420,6 +429,21 @@ proof (rule stmt_rel_intro_2)
    qed
  qed
 
+ text \<open>Skip relation\<close>
+
+lemma skip_rel_simple: "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Skip) \<gamma> \<gamma>"
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume "R2 \<omega> ns" and "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr Skip \<omega> res"
+  hence "res = RNormal \<omega>"
+    by (auto elim: RedSkip_case)
+
+  thus "stmt_rel_aux R2 \<Lambda>_vpr P ctxt Skip \<gamma> \<gamma> ns res"
+    unfolding stmt_rel_aux_def
+    using \<open>R2 \<omega> ns\<close> red_ast_bpl_refl by blast
+qed
+
+
 subsection \<open>Local variable assignment relation\<close>
 
 lemma assign_rel_simple:
@@ -511,46 +535,6 @@ next
   qed
 qed
 
-
-text \<open>Relational rule for Viper assignment \<open>x := e_vpr\<close>. The difference to the above lemma is that 
-this lemma provides explicit premises that allow the Boogie program to progress after the well-definedness
-check and before the assignment. However, the theorem is not required if one uses propagation lemmas\<close>
-lemma assign_rel_simple_3:
-  assumes R_def: "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
-          VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
-          ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 \<gamma>1" and
-          ProgressToAssign: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow> 
-                          \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr, cont), Normal ns3) \<and> 
-                                R3 \<omega>_def \<omega> ns3" and
-          BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
-          TyRel: "vpr_to_bpl_ty Trep ty = Some ty_bpl" and
-                    \<comment>\<open>Key assignment property for R2\<close>
-          RAssign:  "\<And> \<omega> ns v . R2 \<omega> ns \<Longrightarrow>
-                           get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
-                           type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
-                           R2 (update_var_total \<omega> x_vpr v) (update_var (var_context ctxt) ns x_bpl (val_rel_vpr_bpl v))" and
-          TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
-          ExpRel: "exp_rel_vpr_bpl R3 ctxt_vpr ctxt e_vpr e_bpl"  and
-          ProgressToFinal: "\<And>\<omega>_def \<omega> ns2. R3 \<omega>_def \<omega> ns2 \<Longrightarrow>
-                            \<exists>ns3. red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ns2) (\<gamma>3, Normal ns3) \<and> 
-                                  R3 \<omega>_def \<omega> ns3"
-          
-        shows "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma>0 \<gamma>3"
-proof -  
-  from ExpWfRel and ProgressToAssign 
-  have *:"expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma>0 ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)"
-    using wf_rel_extend_1
-    by blast
-  have StmtRel:"stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) 
-               \<gamma>0
-               (BigBlock name cs str tr, cont)"
-    apply (rule assign_rel_simple[OF R_def _ *])
-    using assms by auto
-  show ?thesis
-    using  R_def stmt_rel_propagate_2[OF StmtRel ProgressToFinal]
-    by fastforce
-qed
-
 subsection \<open>Misc\<close>
 
 lemma init_state:
@@ -568,6 +552,15 @@ lemma red_ast_bpl_propagate_rel:
   unfolding red_ast_bpl_def
   by auto
 
+lemma red_ast_bpl_propagate_same_rel:
+    assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
+          "R \<omega> ns1" and
+          "R \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
+        shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
+  using assms
+  unfolding red_ast_bpl_def
+  by auto
+
 lemma lookup_zero_mask_bpl:
   assumes "state_rel Pr TyRep Tr ctxt mvar \<omega>_def \<omega> ns" and
           "const_repr Tr = const_repr_basic"
@@ -576,18 +569,21 @@ lemma lookup_zero_mask_bpl:
   by fastforce
 
 lemma tr_def_field_translation:
-  assumes "tr \<equiv> tr_def" and
+  assumes "tr = tr_def" and
           "field_translation tr_def = F"
         shows "field_translation tr = F"
   using assms by simp
 
+(*
 method zero_mask_lookup_tac uses tr_def =
        (rule boogie_const_rel_lookup_2[where ?const = CZeroMask],
         rule state_rel_boogie_const,
          blast,
          simp add: tr_def,
          simp)
+*)
 (* (rule tr_def_field_translation[OF tr_def], fastforce)*)
+(*
 method red_assume_good_state uses CtxtWf tr_def =
      (rule RedAssumeOk,
       rule assume_state_normal[OF CtxtWf],
@@ -596,6 +592,7 @@ method red_assume_good_state uses CtxtWf tr_def =
       simp add: tr_def,
       simp add: tr_def,
       simp add: tr_def)
+*)
 
 
 end

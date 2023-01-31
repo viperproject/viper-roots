@@ -254,14 +254,15 @@ always has at least one failure transition. This is in-sync with the recent Carb
 inductive_cases RedLocalAssign_case: 
      "red_stmt_total ctxt R \<Lambda> (LocalAssign x e) \<omega> (RNormal (update_var_total \<omega> x v))"
 
+inductive_cases RedSkip_case: "red_stmt_total ctxt R \<Lambda> Skip \<omega> res"
 inductive_cases RedSeqNormal_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> (RNormal \<omega>')"
 inductive_cases RedSeqFailure_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
 inductive_cases RedIfNormal_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> (RNormal \<omega>')"
 inductive_cases RedIfFailure_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> RFailure"
 inductive_cases RedIf_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
 
-
 lemmas red_stmt_total_inversion_thms =
+   RedSkip_case
    RedLocalAssign_case
    RedIf_case
    RedSeqNormal_case

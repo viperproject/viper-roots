@@ -3,27 +3,16 @@ imports ExprWfRel ExpRelML TotalViperHelperML Boogie_Lang.HelperML TotalViper.CP
 begin
 
 text \<open>We define a tactic for proving that a Boogie statement captures the well-definedness check
-of a Viper expression. The tactics in general may not assume that the current Boogie configuration
-already matches the corresponding wf_rel lemma rule that must be applied next. Thus, tactics
-may have to first progress the current Boogie configuration. Moreover, tactics need not ensure 
-at the end that the Boogie configuration is in a position where the next simple command is already
-in the active big block. So, if a tactic A invokes tactic B, then tactic A may need to progress
-the current Boogie configuration.
+of a Viper expression. The tactics in general may not assume right before the tactic is invoked
+that the current Boogie configuration already matches the corresponding wf_rel lemma rule that 
+must be applied next. Thus, tactics may have to first progress the current Boogie configuration. 
+Moreover, tactics need not ensure at the end that the Boogie configuration is in a position where 
+the next simple command is already in the active big block. So, if a tactic A invokes tactic B, then 
+tactic A may need to progress the current Boogie configuration.
 \<close>
 ML \<open>
   val R' = run_and_print_if_fail_tac' "failure"
   val Rmsg' = run_and_print_if_fail_tac' 
-
-  fun progress_tac ctxt = 
-     resolve_tac ctxt [@{thm exI}] THEN'
-     resolve_tac ctxt [@{thm conjI}] THEN'
-    (* (K (print_tac ctxt "before unfold"))  THEN'*)
-     (unfold_bigblock_in_goal ctxt) THEN'
-    (* (K (print_tac ctxt "after unfold"))  THEN' *)
-     (resolve_tac ctxt [@{thm red_ast_bpl_refl}] ORELSE' 
-      
-      resolve_tac ctxt [@{thm red_ast_bpl_empty_block}]) THEN'
-     assm_full_simp_solved_tac ctxt
 
   fun exp_wf_rel_trivial_tac ctxt =
       FIRST' [
@@ -86,7 +75,7 @@ ML \<open>
       bop_wf_rel_div_mod exp_rel_info ctxt |> SOLVED'
    ]      
   
-  fun simplify_continuation ctxt = asm_full_simp_tac ctxt
+  fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
 
   fun exp_wf_rel_non_trivial_tac exp_rel_info ctxt = 
      FIRST_AND_THEN' [
@@ -127,13 +116,6 @@ ML \<open>
          (Rmsg' "Wf E2" (exp_wf_rel_non_trivial_tac exp_rel_info) ctxt |> SOLVED') THEN' (* e2 *)
          (Rmsg' "Progress2" progress_tac ctxt |> SOLVED')  (* progress to expected configuration *)
         )
-    
-(*
- fun vc_expr_rel_select_tac ctxt red_expr_tac assms (t,i) =
-  case (Logic.strip_assums_concl t) of
-    Const (@{const_name "HOL.eq"},_) $ _ $ _ => 0
-   | @{term "Trueprop"} $ t' => 0
-*)
 \<close>
 
 end
