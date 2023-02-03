@@ -431,7 +431,7 @@ proof (rule stmt_rel_intro_2)
 
  text \<open>Skip relation\<close>
 
-lemma skip_rel_simple: "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Skip) \<gamma> \<gamma>"
+lemma stmt_rel_skip: "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Skip) \<gamma> \<gamma>"
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
   assume "R2 \<omega> ns" and "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr Skip \<omega> res"

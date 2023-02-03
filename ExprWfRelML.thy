@@ -11,7 +11,6 @@ the next simple command is already in the active big block. So, if a tactic A in
 tactic A may need to progress the current Boogie configuration.
 \<close>
 ML \<open>
-  val R' = run_and_print_if_fail_tac' "failure"
   val Rmsg' = run_and_print_if_fail_tac' 
 
   fun exp_wf_rel_trivial_tac ctxt =
@@ -87,11 +86,11 @@ ML \<open>
        resolve_tac ctxt [@{thm syn_lazy_bop_wf_rel_2}] THEN'
        assm_full_simp_solved_tac ctxt
       ] [  
-       fn _ => fn st => (writeln "var"; all_tac) st, (* var *)
-       fn _ => fn st => (writeln "lit"; all_tac) st, (* lit *)
-       fn i => fn st => (writeln "uop"; exp_wf_rel_non_trivial_tac exp_rel_info ctxt i st), (* uop *)
-       fn i => fn st => (writeln "bop_eager"; binop_eager_wf_rel_tac exp_rel_info ctxt i st), (* bop eager *)
-       fn i => fn st => (writeln "bop_lazy"; binop_lazy_wf_rel_tac exp_rel_info ctxt) i st (* bop lazy *)
+       fn _ => fn st => all_tac st, (* var *)
+       fn _ => fn st => all_tac st, (* lit *)
+       fn i => fn st => exp_wf_rel_non_trivial_tac exp_rel_info ctxt i st, (* uop *)
+       fn i => fn st => binop_eager_wf_rel_tac exp_rel_info ctxt i st, (* bop eager *)
+       fn i => fn st => binop_lazy_wf_rel_tac exp_rel_info ctxt i st (* bop lazy *)
       ]
    and 
     binop_eager_wf_rel_tac exp_rel_info ctxt =        

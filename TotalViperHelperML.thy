@@ -9,6 +9,9 @@ fun run_and_print_if_fail_tac tac ctxt =
 fun run_and_print_if_fail_tac' msg tac ctxt =
     (tac ctxt) ORELSE' (K ((print_tac ctxt msg) THEN no_tac))
 
+fun run_and_print_if_fail_2_tac' msg tac ctxt =
+    tac ORELSE' (K ((print_tac ctxt msg) THEN no_tac))
+
 fun REPEAT_DETERM' tac x =
    REPEAT_DETERM (tac x)
 
