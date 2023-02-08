@@ -409,6 +409,22 @@ lemma exp_rel_vpr_bpl_elim_2:
   unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
   by blast
 
+lemma exp_rel_equiv_vpr:
+  assumes "\<And>v1 StateCons \<omega> \<omega>_def_opt. (ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e1_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow>
+                          (ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e2_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1)" and
+          "exp_rel_vpr_bpl R ctxt_vpr ctxt e2_vpr e_bpl"
+        shows "exp_rel_vpr_bpl R ctxt_vpr ctxt e1_vpr e_bpl"
+  using assms
+  by (blast intro: exp_rel_vpr_bpl_intro elim: exp_rel_vpr_bpl_elim)
+
+lemma exp_rel_equiv_bpl:
+  assumes "\<And>ns v. red_expr_bpl ctxt e1_bpl ns v \<Longrightarrow>
+                    red_expr_bpl ctxt e2_bpl ns v" and
+          "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e1_bpl"
+        shows "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e2_bpl"
+  using assms
+  by (blast intro: exp_rel_vpr_bpl_intro elim: exp_rel_vpr_bpl_elim)
+
 lemma exp_rel_var: 
   assumes VarRel:"\<And> \<omega> \<omega>_def ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>val_vpr. ((get_store_total \<omega>) var_vpr) = Some val_vpr \<and>
                                   lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr))"
