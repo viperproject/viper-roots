@@ -70,6 +70,9 @@ type_synonym 'a total_trace = "label \<rightharpoonup> 'a total_state"
 type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 type_synonym 'a full_total_state = "'a store \<times> 'a total_trace \<times> 'a total_state"
 
+definition empty_full_total_state :: "'a store \<Rightarrow> 'a total_trace \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) \<Rightarrow> 'a full_total_state"
+  where "empty_full_total_state \<sigma> t h = (\<sigma>, t, Abs_total_state (h, (zero_mask, zero_mask)))"
+
 section \<open>Destructors for (full) total state\<close>
 
 (*lift_definition get_heap_total :: "'a total_state \<Rightarrow> 'a total_heap" is "snd" done*)
