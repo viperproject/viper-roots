@@ -74,8 +74,6 @@ ML \<open>
       bop_wf_rel_div_mod exp_rel_info ctxt |> SOLVED'
    ]      
   
-  fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
-
   fun exp_wf_rel_non_trivial_tac exp_rel_info ctxt = 
      FIRST_AND_THEN' [
        resolve_tac ctxt [@{thm var_expr_wf_rel}],

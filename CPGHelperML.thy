@@ -3,6 +3,9 @@ theory CPGHelperML
 begin
 
 ML \<open>
+
+fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
+
 fun unfold_bigblock_atomic ctxt bigblock =
   case bigblock of
     Const (bigblock_name, _) =>
