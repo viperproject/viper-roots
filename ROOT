@@ -12,8 +12,12 @@ session TotalViper = Viper +
     TotalUtil
     ViperBoogieAbsValueInst
     ViperBoogieBasicRel
+	CPGHelperML
     ExpRel
     ExpRelML
     ExprWfRel
     ExprWfRelML
     ExpProofGenTest
+	StmtRelML
+	
+	
