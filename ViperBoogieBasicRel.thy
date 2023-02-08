@@ -905,14 +905,14 @@ text \<open>
 simple command reduces in a single step (contrary to \<^const>\<open>red_bigblock\<close>, where all simple commands 
 of the same big block reduce in a single step).
 \<close>
-
-inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool" 
+inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
+  for P ctxt
   where 
     RedBigBlockSmallSimpleCmd [intro]: 
       "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), cont), s) (((BigBlock name cs str tr), cont), s')"
    | RedBigBlockSmallNoSimpleCmdOneStep [intro]: 
-    "\<lbrakk> red_bigblock A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
+    "\<lbrakk> red_bigblock (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) [] P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
 
 abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
