@@ -915,14 +915,14 @@ inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
     "\<lbrakk> red_bigblock (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) [] P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
 
-abbreviation red_bigblock_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
-  where "red_bigblock_multi P ctxt \<equiv> rtranclp (red_bigblock_small P ctxt)"
+abbreviation red_bigblock_small_multi :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow> 'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
+  where "red_bigblock_small_multi P ctxt \<equiv> rtranclp (red_bigblock_small P ctxt)"
 
 text \<open>We order the arguments of an AST config such that the syntactic part (bigblock + continuation) is the 
 first element s.t. one can easily construct an AST configuration from the syntactic part and the state\<close>                                                                                                                                 
 
 definition red_ast_bpl :: "ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>'a vast_config \<Rightarrow> 'a vast_config \<Rightarrow> bool"
-  where "red_ast_bpl ctxt \<equiv> red_bigblock_multi ctxt"
+  where "red_ast_bpl ctxt \<equiv> red_bigblock_small_multi ctxt"
 
 lemma red_ast_bpl_refl: "red_ast_bpl P ctxt \<gamma> \<gamma>"
   by (simp add: red_ast_bpl_def)

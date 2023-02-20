@@ -140,7 +140,7 @@ subsection \<open>Global function map\<close>
 text \<open>Transforms a Boogie function f into a function that only reduces to f if the input types are 
 correct w.r.t. the function declaration. This function enables defining f to just guarantee
 a correct return type if the argument types are correct and then lifts f to a function that satisfies
-all the typing required typing constraints.\<close>
+all the required typing constraints.\<close>
 
 definition lift_fun_bpl :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> fdecl_ty_bpl \<Rightarrow> 'a sem_fun_bpl \<Rightarrow> 'a sem_fun_bpl"
   where
