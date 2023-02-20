@@ -464,14 +464,15 @@ qed
 
 lemma exp_rel_field_access:
   assumes 
-       StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_context ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
-       HeapReadWf: "heap_read_wf TyRep ctxt hread" and
-       "e_bpl = hread (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
-       RcvRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_rcv_bpl" and
+       StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
+       HeapReadWf: "heap_read_wf TyRep ctxt (heap_read Tr)" and
+       "e_bpl = (heap_read Tr) (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
        FieldRel: "field_translation Tr f = Some f_tr" and
-       "e_f_bpl = Lang.Var f_tr" and
+       "e_f_bpl = Lang.Var f_tr" and    
        FieldTy: "declared_fields Pr f = Some \<tau>" and
-       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
+       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and
+\<comment>\<open>receiver relation last, since that is the "implementation-independent" premise\<close>
+       RcvRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_rcv_bpl" 
      shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (FieldAcc e f) e_bpl"
 proof(rule exp_rel_vpr_bpl_intro)
   fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
@@ -514,7 +515,7 @@ proof(rule exp_rel_vpr_bpl_intro)
     apply (rule heap_read_wf_apply[OF HeapReadWf])
          apply (rule HeapValBpl)
     by (fastforce intro: LookupHeap LookupRcv LookupField RedVar HeapWellTy 
-                  simp:  \<open>e_f_bpl = expr.Var f_tr\<close> \<open>vpr_to_bpl_ty _ \<tau>  = Some \<tau>_bpl\<close>)+
+                  simp:  \<open>e_f_bpl = expr.Var f_tr\<close> FieldTyBpl)+
 qed
 
 lemma exp_rel_unop:
