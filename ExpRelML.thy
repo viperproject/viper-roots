@@ -33,23 +33,15 @@ fun gen_type_safety_thm_map fun_interp_wf fun_decls_wf var_context_wf state_wf =
     )
    end
 
-(* type_safety_thm lookup_var_rel_tac vpr_lit_bpl_exp_rel_tac lookup_var_thms *)
-datatype exp_rel_info = ExpRelInfo0 of type_safety_thm_map * 
-                                     (Proof.context -> int -> tactic) * 
-                                     (Proof.context -> int -> tactic) *
-                                     thm list ; 
-
-fun sel_type_safety_thm_map (info : exp_rel_info) : type_safety_thm_map =
-  case info of ExpRelInfo0 (res, _, _ ,_) => res
-
-fun sel_lookup_var_rel_tac (info : exp_rel_info) : (Proof.context -> int -> tactic) =
-  case info of ExpRelInfo0 (_, res, _ ,_) => res
-
-fun sel_vpr_lit_bpl_exp_rel_tac (info : exp_rel_info) : (Proof.context -> int -> tactic) =
-  case info of ExpRelInfo0 (_, _, res ,_) => res
-
-fun sel_lookup_var_thms (info : exp_rel_info) : thm list =
-  case info of ExpRelInfo0 (_, _, _ ,res) => res
+type exp_rel_info = {
+    type_safety_thm_map : type_safety_thm_map,
+    lookup_var_rel_tac : Proof.context -> int -> tactic,
+    vpr_lit_bpl_exp_rel_tac : Proof.context -> int -> tactic,
+    lookup_var_thms : thm list,
+    (* should be tactic that given goal to relate Viper field access reduces the goal to a single
+       goal where the receiver expression must be related *)       
+    field_access_rel_pre_tac : Proof.context -> int -> tactic 
+}
 
 fun var_rel_tac lookup_var_rel_tac ctxt =
   resolve_tac ctxt [@{thm exp_rel_var}] THEN'
@@ -75,24 +67,42 @@ fun binop_eager_rel_tac info ctxt =
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)
 and
-  binop_lazy_rel_tac info ctxt = 
+  binop_lazy_rel_tac (info : exp_rel_info) ctxt = 
   resolve_tac ctxt [@{thm exp_rel_binop_lazy}] THEN'
   assm_full_simp_solved_tac ctxt THEN' (* bop *) 
   (fn i => fn st => 
      (* e2 reduces to a Boolean *)
-     expr_red_tac (sel_type_safety_thm_map info TBool) (sel_lookup_var_thms info) ctxt i st) THEN' 
+     expr_red_tac (#type_safety_thm_map info TBool) (#lookup_var_thms info) ctxt i st) THEN' 
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *) 
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)
+and
+  field_access_rel_tac (info : exp_rel_info) ctxt = 
+    (#field_access_rel_pre_tac info ctxt) THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
+
 and 
   (* the reason for abstraction over the state st in multiple places is to avoid infinite recursion due
      to eager evaluation of arguments in a function call *)
-   exp_rel_tac info ctxt =
+   exp_rel_tac (info : exp_rel_info) ctxt =
       FIRST' [
-        var_rel_tac (sel_lookup_var_rel_tac info) ctxt |> SOLVED',
-        lit_tac (sel_vpr_lit_bpl_exp_rel_tac info) ctxt |> SOLVED',
+        var_rel_tac (#lookup_var_rel_tac info) ctxt |> SOLVED',
+        lit_tac (#vpr_lit_bpl_exp_rel_tac info) ctxt |> SOLVED',
         (fn i => fn st => binop_eager_rel_tac info ctxt i st) |> SOLVED',
-        (fn i => fn st => binop_lazy_rel_tac info ctxt i st) |> SOLVED'
+        (fn i => fn st => binop_lazy_rel_tac info ctxt i st) |> SOLVED',
+        (fn i => fn st => field_access_rel_tac info ctxt i st) |> SOLVED'
       ]
+\<close>
+
+ML
+ \<open> fun field_access_rel_pre_tac_aux heap_read_wf_tac head_read_match_tac field_rel_tac field_lookup_tac ctxt =
+    resolve_tac ctxt [@{thm exp_rel_field_access} OF [@{thm state_rel_state_rel0}]] THEN'
+    blast_tac ctxt THEN'
+    heap_read_wf_tac ctxt THEN'
+    head_read_match_tac ctxt THEN'
+    field_rel_tac ctxt THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    field_lookup_tac ctxt THEN'
+    assm_full_simp_solved_tac ctxt
 \<close>
 
 end

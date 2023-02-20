@@ -44,45 +44,105 @@ lemma field_ty_fun_two_params:
   apply simp
   by (metis Pair_inject option.distinct(1) option.inject)
 
-lemma heap_read_wf_concrete: 
-  assumes ReadHeapInterp: "fun_interp ctxt (fun_repr FReadHeap) = Some (select_heap T)"
-  shows "heap_read_wf T ctxt (read_heap_concrete fun_repr)"
+lemma field_ty_fun_opt_num_args:
+     "field_ty_fun_opt T f = Some res \<Longrightarrow> length (snd res) = 2"
+  apply (erule field_ty_fun_opt.elims)
+     apply (simp_all add: map_option_case split: option.split_asm split: if_split_asm)
+  done
+
+lemma vpr_to_bpl_ty_closed:
+  assumes   "wf_ty_repr_bpl TyRep" and
+            "vpr_to_bpl_ty TyRep vty = Some t" 
+          shows "closed t"
+  apply (rule vpr_to_bpl_ty.elims[OF assms(2)])
+  using assms(1)
+  unfolding wf_ty_repr_bpl_def
+  by (auto simp: map_option_case split:option.split_asm)  
+
+lemma field_ty_fun_opt_closed_args: 
+  assumes "wf_ty_repr_bpl TyRep" and
+          "field_ty_fun_opt TyRep f = Some res"
+  shows  "list_all closed (snd res)"
+  apply (rule field_ty_fun_opt.elims[OF assms(2)])
+  using assms(1) wf_ty_repr_bpl_def
+       apply (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)
+   apply blast+
+  done
+
+lemma field_ty_fun_opt_tcon:
+  assumes "field_ty_fun_opt TyRep f = Some res"
+  shows "fst res = TFieldId TyRep"
+  using assms
+  by (rule field_ty_fun_opt.elims)
+     (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)     
+
+lemma instantiate_nil_id: "instantiate [] = id"
+  by auto
+
+lemma map_instantiate_nil: "map (instantiate []) ts = ts"
+  by (simp add: List.List.list.map_id instantiate_nil_id)
+
+lemma heap_wf_concrete:
+  assumes 
+    TyRepWf: "wf_ty_repr_bpl TyRep" and
+    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" 
+  shows "heap_read_wf TyRep ctxt (read_heap_concrete FunMap)"
   unfolding heap_read_wf_def
-  apply clarify
-  apply rule
+  apply (rule allI)+
+  apply (rule conjI)
    apply (rule impI)
    apply (unfold read_heap_concrete_def)
-   apply rule
-     apply (rule ReadHeapInterp)
-    apply rule
-     apply blast
-    apply rule
-     apply blast
-    apply rule
-     apply blast
-    apply rule
-   apply (rule field_ty_fun_two_params)    
+  apply (rule RedFunOp)
+       using CtxtWf
+    unfolding ctxt_wf_def fun_interp_vpr_bpl_wf_def
+       apply blast
+      apply ((rule RedExpListCons, blast)+, rule RedExpListNil)
+     apply (simp del: vbpl_absval_ty_opt.simps)
+     apply (rule lift_fun_decl_well_typed)
+         apply simp       
+    using field_ty_fun_two_params
+        apply fastforce    
+    using field_ty_fun_opt_closed_args[OF TyRepWf] 
+       apply (fastforce simp: map_instantiate_nil)
+      apply (simp only: map_instantiate_nil)    
+      apply simp
+    using field_ty_fun_two_params field_ty_fun_opt_tcon
+    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+     apply (rule field_ty_fun_two_params)
+    apply blast
+     apply (simp only: map_instantiate_nil)
   by (auto elim: cons_exp_elim simp: select_heap_aux_def)
 
-lemma mask_read_wf_concrete: 
-  assumes ReadMaskInterp: "fun_interp ctxt (fun_repr FReadMask) = Some (select_mask ty_repr)"
-  shows "mask_read_wf ty_repr ctxt (read_mask_concrete fun_repr)"
+lemma mask_read_wf_concrete:
+  assumes 
+    TyRepWf: "wf_ty_repr_bpl TyRep" and
+    CtxtWf: "ctxt_wf Pr TyRep F fun_repr ctxt" 
+  shows "mask_read_wf TyRep ctxt (read_mask_concrete fun_repr)"   
   unfolding mask_read_wf_def
-  apply clarify
-  apply rule
+  apply (rule allI)+
+  apply (rule conjI)
    apply (rule impI)
    apply (unfold read_mask_concrete_def)
-   apply rule
-     apply (rule ReadMaskInterp)
-    apply rule
-     apply blast
-    apply rule
-     apply blast
-    apply rule
-     apply blast
-    apply rule
-   apply (rule field_ty_fun_two_params)    
-  by (auto elim: cons_exp_elim simp: select_heap_aux_def)
+  apply (rule RedFunOp)
+       using CtxtWf
+    unfolding ctxt_wf_def fun_interp_vpr_bpl_wf_def
+       apply blast
+      apply ((rule RedExpListCons, blast)+, rule RedExpListNil)
+     apply (simp del: vbpl_absval_ty_opt.simps)
+     apply (rule lift_fun_decl_well_typed)
+         apply simp       
+    using field_ty_fun_two_params
+        apply fastforce    
+    using field_ty_fun_opt_closed_args[OF TyRepWf] 
+       apply (fastforce simp: map_instantiate_nil)
+      apply (simp only: map_instantiate_nil)    
+      apply simp
+    using field_ty_fun_two_params field_ty_fun_opt_tcon
+    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+     apply (rule field_ty_fun_two_params)
+    apply blast
+     apply (simp only: map_instantiate_nil)
+  by (auto elim: cons_exp_elim)
 
 subsection \<open>Translation interface\<close>
 
@@ -168,6 +228,19 @@ definition ty_repr_basic :: "'a ty_repr_bpl"
         domain_translation = (\<lambda>_. None),
         domain_type = (\<lambda>_. ''placeholder'')  \<rparr>"
 
+lemma wf_ty_repr_basic: "wf_ty_repr_bpl ty_repr_basic"
+  unfolding wf_ty_repr_bpl_def
+  apply (intro conjI)
+    apply clarify
+  using ty_repr_basic_def
+    apply (metis option.discI ty_repr_bpl.select_convs(4))
+  using ty_repr_basic_def
+   apply (metis option.discI ty_repr_bpl.select_convs(2))
+  using ty_repr_basic_def
+  apply (metis option.discI ty_repr_bpl.select_convs(3))
+  done
+
+
 subsection \<open>Helper definitions\<close>
 
 text \<open>Since currently Carbon always generates the same constants and global variables in the same order,
@@ -175,10 +248,10 @@ one can use the following variable name mapping for the constants.\<close>
 
 fun const_repr_basic :: "boogie_const \<Rightarrow> vname"
   where 
-    "const_repr_basic CNoPerm = 4"
-  | "const_repr_basic CWritePerm = 5"
+    "const_repr_basic CNoPerm = 3"
+  | "const_repr_basic CWritePerm = 4"
   | "const_repr_basic CNull = 0"
-  | "const_repr_basic CZeroMask = 2"
+  | "const_repr_basic CZeroMask = 1"
 
 
 end

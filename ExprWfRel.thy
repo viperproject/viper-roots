@@ -441,7 +441,7 @@ abbreviation wf_rel_fieldacc
            ctxt"
 
 abbreviation wf_rel_nonnull
-  where "wf_rel_nonnull R ctxt_vpr StateCons P ctxt e f \<equiv> wf_rel R           
+  where "wf_rel_nonnull R ctxt_vpr StateCons P ctxt e \<equiv> wf_rel R           
            (\<lambda>\<omega>_def \<omega>. (\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> v \<noteq> (VRef Null)))
            (\<lambda>\<omega>_def \<omega>. (\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> v = (VRef Null)))
            P
@@ -449,7 +449,7 @@ abbreviation wf_rel_nonnull
 
 lemma field_access_wf_rel:
   assumes ExpWfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma>1 \<gamma>2" and
-          WfRelNonNull: "wf_rel_nonnull R ctxt_vpr StateCons P ctxt e f \<gamma>2 \<gamma>3" and
+          WfRelNonNull: "wf_rel_nonnull R ctxt_vpr StateCons P ctxt e \<gamma>2 \<gamma>3" and
           FieldAccWfRel: "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f \<gamma>3 \<gamma>4"
         shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (FieldAcc e f) \<gamma>1 \<gamma>3"
 proof (rule expr_wf_rel_intro)
