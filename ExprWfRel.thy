@@ -34,13 +34,13 @@ definition wf_rel ::
     R \<omega>_def \<omega> ns \<longrightarrow>
      (IsNormal \<omega>_def \<omega> \<longrightarrow>
        (\<exists> ns'.
-         R \<omega>_def \<omega> ns' \<and>
-         red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns'))
+         red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
+         R \<omega>_def \<omega> ns')
      ) \<and>
      (IsFailure \<omega>_def \<omega> \<longrightarrow>
-       (\<exists>c'. 
-        snd c' = Failure \<and>
-        red_ast_bpl P ctxt (\<gamma>, Normal ns) c')
+       (\<exists>c'.         
+        red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
+        snd c' = Failure)
      )"
 
 text \<open>TODO: change v to VFailure in the normal case\<close>
@@ -62,49 +62,18 @@ lemma wf_rel_intro [case_names normal failure]:
   assumes
   cases:"\<And>v \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
          IsNormal \<omega>_def \<omega> \<Longrightarrow>
-         \<exists> ns'.
-           R \<omega>_def \<omega> ns' \<and>
-           red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')" 
+         \<exists> ns'.           
+           red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
+           R \<omega>_def \<omega> ns'" 
     "\<And>v \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
          IsFailure \<omega>_def \<omega> \<Longrightarrow> 
-         (\<exists>c'. 
-          snd c' = Failure \<and>
-          red_ast_bpl P ctxt (\<gamma>, Normal ns) c')"
+         (\<exists>c'.           
+          red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
+          snd c' = Failure)"
  shows "wf_rel R IsNormal IsFailure P ctxt \<gamma> \<gamma>'"
   unfolding wf_rel_def
   using assms
   by fastforce
-
-definition wf_rel_aux 
-  where
-  "wf_rel_aux R IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<omega>_def \<omega> ns  \<equiv>
-    (IsNormal \<omega>_def \<omega> \<longrightarrow>
-       (\<exists> ns'.
-         R \<omega>_def \<omega> ns' \<and>
-         red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns'))
-     ) \<and>
-     (IsFailure \<omega>_def \<omega> \<longrightarrow>
-       (\<exists>c'. 
-        snd c' = Failure \<and>
-        red_ast_bpl P ctxt (\<gamma>, Normal ns) c')
-     )"
-
-
-lemma wf_rel_intro_2:
-  assumes "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> wf_rel_aux R IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<omega>_def \<omega> ns"
-  shows "wf_rel R IsNormal IsFailure P ctxt \<gamma> \<gamma>'"
-  using assms
-  unfolding wf_rel_aux_def wf_rel_def
-  by auto
-
-lemma wf_rel_aux_intro:
-  assumes "IsNormal \<omega>_def \<omega> \<Longrightarrow> (\<exists> ns'. R \<omega>_def \<omega> ns' \<and>
-                                        red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns'))" and
-          "IsFailure \<omega>_def \<omega> \<Longrightarrow> (\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c')"
-  shows "wf_rel_aux R IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<omega>_def \<omega> ns"
-  using assms
-  unfolding wf_rel_aux_def
-  by auto
 
 lemma wf_rel_normal_elim:
   assumes 
@@ -123,7 +92,7 @@ lemma exprs_wf_rel_elim:
        "R \<omega>_def \<omega> ns"
        "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>_def) es \<omega> (Some vs)"
   shows
-        "\<exists> ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
+        "\<exists> ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>_def \<omega> ns'"
   using assms
 proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns vs rule: exprs_wf_rel.induct)
   case (1 R ctxt_vpr StateCons P ctxt \<gamma> \<gamma>')
@@ -147,12 +116,12 @@ next
     by blast
 
   obtain ns'' where
-    "R \<omega>_def \<omega> ns'' \<and> red_ast_bpl P ctxt (\<gamma>'', Normal ns') (\<gamma>', Normal ns'')"
+    "red_ast_bpl P ctxt (\<gamma>'', Normal ns') (\<gamma>', Normal ns'') \<and> R \<omega>_def \<omega> ns''"
     using "2.IH"[OF WfRelEs R2 RedExpsEs]
     by blast
 
   with RedBpl show ?case
-    by (auto simp: red_ast_bpl_def)
+    using red_ast_bpl_transitive by blast
 qed
 
 lemma wf_rel_failure_elim:
@@ -161,8 +130,7 @@ lemma wf_rel_failure_elim:
    "R \<omega>_def \<omega> ns" and 
    "IsFailure \<omega>_def \<omega>"
  shows 
-   "(\<exists>c'. snd c' = Failure \<and>
-          red_ast_bpl P ctxt (\<gamma>, Normal ns) c')"
+   "(\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
   using assms
   unfolding wf_rel_def
   by blast
@@ -172,14 +140,14 @@ lemma expr_wf_rel_intro:
     "\<And>v \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
          ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t v \<Longrightarrow> 
          v = VFailure \<Longrightarrow> 
-         (\<exists>c'. 
-          snd c' = Failure \<and>
-          red_ast_bpl P ctxt (\<gamma>, Normal ns) c')" and
+         (\<exists>c'.           
+          red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
+          snd c' = Failure)" and
    "\<And>v \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
         ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t v \<Longrightarrow> v \<noteq> VFailure \<Longrightarrow>
-         \<exists> ns'.
-           R \<omega>_def \<omega> ns' \<and>
-           red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
+         \<exists> ns'.           
+           red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
+           R \<omega>_def \<omega> ns'"
  shows "expr_wf_rel R ctxt_vpr StateCons P ctxt e_vpr \<gamma> \<gamma>'"
  using assms
   by (auto intro: wf_rel_intro)
@@ -194,12 +162,11 @@ next
   assume "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t v"
   assume "v \<noteq> VFailure"
   show 
-   " \<exists>ns'. R \<omega>_def \<omega> ns' \<and>
-           red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns')"
+   " \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R \<omega>_def \<omega> ns'"
     apply (rule exI)
     apply (rule conjI)
-     apply (rule \<open>R _ _ _\<close>)
-    by (simp add: red_ast_bpl_def)
+    apply (rule red_ast_bpl_refl)
+    by (simp add: \<open>R _ _ _\<close>)
 qed (insert assms, fastforce)
 
 lemma wf_rel_no_failure_refl: "wf_rel R IsNormal (\<lambda>_ _. False) P ctxt \<gamma> \<gamma>" 
@@ -261,7 +228,7 @@ proof (rule wf_rel_intro)
     by blast    
   hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
     by (simp add: red_ast_bpl_def)
-  with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns')"
+  with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns') \<and>  R \<omega>_def \<omega> ns'"
     by blast
 qed (insert assms, unfold wf_rel_def, blast)
 
@@ -282,14 +249,14 @@ proof (rule wf_rel_intro)
     by blast
   hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
     by (simp add: red_ast_bpl_def)
-  with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns')"
+  with \<open>R \<omega>_def \<omega> ns3\<close> show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
     by blast
 next
   fix v \<omega>_def \<omega> ns1  
   assume R:"R \<omega>_def \<omega> ns1" and Failure:"IsFailure \<omega>_def \<omega>"
   from this obtain ns2 where "R \<omega>_def \<omega> ns2" and Red1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)" using Red
     by blast
-  with Failure show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) c'"
+  with Failure show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) c' \<and> snd c' = Failure"
     unfolding red_ast_bpl_def
     by (metis (no_types, lifting) Wf red_ast_bpl_def rtranclp_trans wf_rel_failure_elim)
 qed
@@ -316,7 +283,7 @@ proof (rule expr_wf_rel_intro)
   hence Red:"ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
     by simp
   from Red
-  show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
+  show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) c' \<and> snd c' = Failure"
   proof cases 
   next
     case (RedBinopRightFailure v1)    
@@ -332,7 +299,8 @@ proof (rule expr_wf_rel_intro)
       using wf_rel_failure_elim[OF Rel2 \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopRightFailure
       by blast
     ultimately show ?thesis
-      by (fastforce simp: red_ast_bpl_def)
+      using red_ast_bpl_transitive
+      by blast
   next
     case (RedBinopOpFailure v1 v2)
       from this obtain ns' where
@@ -355,7 +323,7 @@ next
   assume R:"R \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v \<noteq> VFailure"
   from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t (Val val)"
     by (metis extended_val.exhaust)
-  thus "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>3, Normal ns')"
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedBinop v1 v2)
       from this obtain ns' where
@@ -367,10 +335,10 @@ next
              "R \<omega>_def \<omega> ns''" and
              "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns'')"
         using wf_rel_normal_elim[OF Rel2] RedBinop
-        by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans) 
+        using red_ast_bpl_transitive by blast
       thus ?thesis      
         using wf_rel_normal_elim[OF RelOp] RedBinop
-        by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans) 
+        using red_ast_bpl_transitive by blast
   next
     case (RedBinopLazy v1)
     then show ?thesis using \<open>binop_lazy _ = _\<close> eval_binop_lazy_iff_2
@@ -395,7 +363,7 @@ proof (rule expr_wf_rel_intro)
     hence Red:"ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
     by simp
   from Red
-  show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
+  show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) c' \<and> snd c' = Failure"
   proof cases
   next
     case (RedBinopRightFailure v1)    
@@ -410,7 +378,7 @@ proof (rule expr_wf_rel_intro)
     from this show ?thesis
       using Red_s_s' wf_rel_failure_elim[OF Rel2a HOL.conjI[OF Red_s_s'(1)] RedBinopRightFailure(2)] RedBinopRightFailure(1)
             \<open>\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure\<close>
-      by (fastforce simp: red_ast_bpl_def)
+      using red_ast_bpl_transitive by blast
   next
     case (RedBinopOpFailure v1 v2)  
     moreover from this have "binop_lazy bop = None"
@@ -431,7 +399,7 @@ next
   assume R:"R \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v \<noteq> VFailure"
   from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t (Val val)"
     by (metis extended_val.exhaust)
-  thus "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns')"
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedBinop v1 v2)
     hence "v1 \<noteq> b1" using Lazy eval_binop_lazy_iff by force
@@ -444,21 +412,21 @@ next
       by blast
     from this \<open>v1 \<noteq> b1\<close> show ?thesis
       using wf_rel_normal_elim[OF Rel2a] RedBinop v1BinopWellTy
-      by (metis (no_types, lifting) red_ast_bpl_def rtranclp_trans)
+      using red_ast_bpl_transitive by blast
   next
     case (RedBinopLazy v1)
     hence  *:"binop_lazy bop = Some(v1, val)"
       by (simp add: eval_binop_lazy_iff)
 
-    from RedBinopLazy obtain ns' where
+    from RedBinopLazy obtain ns' where  
              "R \<omega>_def \<omega> ns'" and
-             "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns')"
+             "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns')"            
       using wf_rel_normal_elim[OF Rel1 R] 
       by blast
 
     thus ?thesis
       using wf_rel_normal_elim[OF Rel2b \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopLazy Lazy *
-      by (auto simp: red_ast_bpl_def)
+      by (metis (no_types, lifting) Pair_inject option.inject red_ast_bpl_transitive)
   qed
 qed
 
@@ -483,7 +451,7 @@ proof (rule expr_wf_rel_intro)
   hence "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
     by simp
 
-  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) c'"
+  thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure"
   proof cases
     case (RedField a v)
     hence InvalidLoc:"(a, f) \<notin> get_valid_locs \<omega>_def" 
@@ -534,7 +502,7 @@ next
          "v \<noteq> VFailure"
   from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val val"
     by (metis extended_val.exhaust)
-  thus "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>3, Normal ns')"
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedField a v')
     hence "(a, f) \<in> get_valid_locs \<omega>_def" 
@@ -626,7 +594,7 @@ proof (rule wf_rel_intro)
   from Red2 obtain v2_bpl where RedBpl:"red_expr_bpl ctxt e2_bpl ns v2_bpl" and ValRel:"val_rel_vpr_bpl v2 = v2_bpl"
     using ExpRel exp_rel_vpr_bpl_def exp_rel_vb_single_def R
     by metis
-  show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns')"
+  show "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof (cases \<open>(\<exists>i. v2 = VInt i)\<close>)
     case True
     from this obtain i where "v2 = VInt i" by auto
@@ -705,7 +673,7 @@ next
     using ExpRel exp_rel_vpr_bpl_def exp_rel_vb_single_def R
     by metis
 
-  show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (?\<gamma>, Normal ns) c'"
+  show "\<exists>c'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) c' \<and> snd c' = Failure"
   proof (cases \<open>v2 = VInt 0\<close>)
     case True
     hence "v2_bpl = IntV 0" using ValRel by simp
@@ -872,7 +840,7 @@ proof (rule expr_wf_rel_intro)
     unfolding red_ast_bpl_def
     by simp    
 
-  thus "\<exists>c'. snd c' = Failure \<and> ?P c'"
+  thus "\<exists>c'. ?P c' \<and> snd c' = Failure"
     using \<open>snd c' = Failure\<close>
     by blast
 next
@@ -919,7 +887,7 @@ next
     unfolding red_ast_bpl_def
     by simp
 
-  thus "\<exists>ns'. (R \<omega>_def \<omega> ns' \<and> ?Re1) \<and> red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns')"
+  thus "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns') \<and> (R \<omega>_def \<omega> ns' \<and> ?Re1)"
     using Rns' Rext
     by blast
 qed
@@ -964,7 +932,7 @@ proof (rule wf_rel_intro)
      apply (fastforce intro: RedParsedIfFalse GuardEvalFalse)
     by simp
 
-  show "\<exists>ns'. R \<omega>_def \<omega> ns' \<and> red_ast_bpl P ctxt (?\<gamma>,Normal ns) (?\<gamma>', Normal ns')"
+  show "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>,Normal ns) (?\<gamma>', Normal ns') \<and> R \<omega>_def \<omega> ns'"
     using R RedAst
     by auto
 
@@ -1087,23 +1055,6 @@ next
     by simp
 qed
 
-lemma syn_field_access_wf_rel_aux:
-  assumes 
-         CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
-         StateRel0: "state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
-         FunMap:   "FunMap FHasPerm = has_perm_name" and
-         MaskExp:  "e_m_bpl = Lang.Var (mask_var Tr)" and
-         FieldRel: "field_translation Tr f = Some f_tr" and
-         RcvExp:   "e_f_bpl = Lang.Var f_tr" and
-          FieldTy: "declared_fields Pr f = Some \<tau>" and
-       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and 
-       TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
-       ExpRel:     "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl"
-     shows "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> 
-              \<langle>Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]), Normal ns\<rangle> \<rightarrow> Normal ns"
-  oops
-
-
 (* TODO: extract the common parts from this lemma *)
 lemma syn_field_access_wf_rel:
   assumes 
@@ -1160,10 +1111,10 @@ proof (rule wf_rel_intro)
       using if_SomeD by fastforce
 
   show "\<exists>a. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<and> (a, f) \<in> get_valid_locs \<omega>_def \<Longrightarrow>
-          \<exists>ns'. R \<omega>_def \<omega> ns' \<and>
-             red_ast_bpl P ctxt
-              ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns)
-              ((BigBlock name cs str tr, cont), Normal ns')" (is "?A \<Longrightarrow> ?B")
+          \<exists>ns'. red_ast_bpl P ctxt
+                 ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns)
+                 ((BigBlock name cs str tr, cont), Normal ns') \<and>
+                R \<omega>_def \<omega> ns'" (is "?A \<Longrightarrow> ?B")
   proof -
     assume "?A"
 
@@ -1194,9 +1145,9 @@ proof (rule wf_rel_intro)
 
   show "\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and>
            (v = VRef Null \<or> (\<exists>a. v = VRef (Address a) \<and> (a, f) \<notin> get_valid_locs \<omega>_def)) \<Longrightarrow>
-       \<exists>c'. snd c' = Failure \<and>
-            red_ast_bpl P ctxt
-             ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns) c'"
+       \<exists>c'. red_ast_bpl P ctxt
+             ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns) c' \<and>
+            snd c' = Failure"
        (is "?A \<Longrightarrow> ?B")
   proof -
     assume "?A"
