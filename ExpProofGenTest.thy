@@ -446,7 +446,7 @@ lemma assign_rel_simple:
                \<gamma>
                (BigBlock name cs str tr, cont)" (is "stmt_rel R2 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.LocalAssign x_vpr e_vpr) \<gamma> ?\<gamma>'") 
 proof (cases rule: stmt_rel_intro)
-\<comment>\<open>normal case\<close>
+\<comment>\<open>Normal case\<close>
   fix \<omega> ns \<omega>'
   assume R: "R2 \<omega> ns" and
          RedVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (LocalAssign x_vpr e_vpr) \<omega> (RNormal \<omega>')"

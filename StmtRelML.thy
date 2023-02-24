@@ -32,7 +32,7 @@ ML \<open>
     resolve_tac ctxt [@{thm red_ast_bpl_refl}] THEN'
     assume_tac ctxt
 
-  fun red_assign_tac ctxt (exp_rel_info : exp_rel_info) var_context_vpr_tac var_rel_tac lookup_bpl_target_thm =
+  fun red_assign_tac ctxt exp_wf_rel_info (exp_rel_info : exp_rel_info) var_context_vpr_tac var_rel_tac lookup_bpl_target_thm =
     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN'
     (Rmsg' "Assign2" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
     (Rmsg' "Assign3" (var_context_vpr_tac ctxt |> SOLVED') ctxt) THEN'
@@ -40,7 +40,7 @@ ML \<open>
     (* well-def RHS *)
     (* begin *)
     (Rmsg' "Assign4" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
-    (Rmsg' "Assign Wf RHS" (exp_wf_rel_non_trivial_tac exp_rel_info ctxt |> SOLVED') ctxt) THEN'
+    (Rmsg' "Assign Wf RHS" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
     (Rmsg' "Assign5" (progress_tac ctxt) ctxt) THEN'
     (* end *)
     
@@ -64,10 +64,12 @@ ML \<open>
 
   datatype stmt_rel_hint = 
     AssignHint of 
+       exp_wf_rel_info *
        exp_rel_info * (* for relating RHS of assignment *)
        thm (* lookup target theorem *) 
   | SeqnHint of stmt_rel_hint list
   | IfHint of 
+       exp_wf_rel_info *       
        exp_rel_info *
        stmt_rel_hint * (* thn branch *)
        stmt_rel_hint
@@ -105,16 +107,16 @@ and
     resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}] THEN'
     (
       case hint_hd of
-        AssignHint (exp_rel_info, lookup_bpl_target_thm) => 
-               red_assign_tac ctxt exp_rel_info 
+        AssignHint (exp_wf_rel_info, exp_rel_info, lookup_bpl_target_thm) => 
+               red_assign_tac ctxt exp_wf_rel_info exp_rel_info 
                         (#var_context_vpr_tac info) 
                         (#var_rel_tac info) 
                         lookup_bpl_target_thm
-      | IfHint (exp_rel_info, thn_hint, els_hint) =>
+      | IfHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
            (Rmsg' "If0" (resolve_tac ctxt [@{thm stmt_rel_if}]) ctxt) THEN'
            (
              (Rmsg' "If1" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
-             (Rmsg' "If wf cond" (exp_wf_rel_non_trivial_tac exp_rel_info ctxt |> SOLVED') ctxt) THEN'
+             (Rmsg' "If wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
              (Rmsg' "If2" (progress_tac ctxt) ctxt)
            ) THEN'
            (

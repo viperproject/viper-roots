@@ -1061,14 +1061,14 @@ lemma syn_field_access_wf_rel:
   \<comment>\<open>TODO: The following assumption needs to be changed once constructs are supported where the well-definedness
      state and the evaluation state differ\<close>
          StateRel: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<omega>_def = \<omega> \<and> state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns" and
+         ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
          FunMap:   "FunMap FHasPerm = has_perm_name" and
          MaskExp:  "e_m_bpl = Lang.Var (mask_var Tr)" and
          FieldRel: "field_translation Tr f = Some f_bpl" and
          RcvExp:   "e_f_bpl = Lang.Var f_bpl" and
           FieldTy: "declared_fields Pr f = Some \<tau>" and
        FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and 
-       TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
-       ExpRel:     "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl"
+       TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
    shows "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f 
            ((BigBlock name ((Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]))#cs) str tr), cont)
            ((BigBlock name cs str tr), cont)"
