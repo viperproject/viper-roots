@@ -14,7 +14,8 @@ subsection \<open>General\<close>
 datatype fun_enum_bpl = 
      FGoodState
      | FReadHeap 
-     | FReadMask 
+     | FReadMask
+     | FHasPerm
 
 text \<open>\<^typ>\<open>fun_enum_bpl\<close> enumerates the functions required for the encoding\<close>
 
@@ -44,7 +45,7 @@ fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup
                                  mask_rel Pr F (get_mh_total_full \<omega>) m))
         | _ \<Rightarrow> None)"
 
-lemma good_state_Some:
+lemma good_state_Some_true:
   assumes "heap_rel Pr F (get_hh_total_full \<omega>) hb" and
           "mask_rel Pr F (get_mh_total_full \<omega>) mb"
   shows "good_state Pr F [] [AbsV (AHeap hb), AbsV (AMask mb)] = Some (BoolV True)"
@@ -94,9 +95,9 @@ fun select_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
 
 text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
 
-fun store_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
+fun store_heap :: "'a sem_fun_bpl"
   where
-    "store_heap T ts vs = 
+    "store_heap ts vs = 
        (case (ts, vs) of 
           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
             Some (AbsV (  AHeap (h( r := (h r)(f \<mapsto> v) ))  ))
@@ -105,13 +106,66 @@ fun store_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
 subsubsection \<open>Mask\<close>
 
 text \<open>select function for the heap: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
-fun select_mask :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
+fun select_mask :: "'a sem_fun_bpl"
   where 
-    "select_mask T ts vs = 
+    "select_mask ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
              Some (RealV (m r f))
         | _ \<Rightarrow> None)"
+
+lemma select_mask_some: 
+  assumes "select_mask ts vs = Some t"
+  shows "\<exists>t1 t2 m r f. ts = [t1, t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
+  using assms
+  by (simp split: list.split_asm val.split_asm vbpl_absval.split_asm)
+
+lemma select_mask_none:
+  assumes "\<nexists>t1 t2 m r f. ts = [t1, t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
+  shows "select_mask ts vs = None"
+  using assms select_mask_some option.exhaust_sel 
+  by blast
+
+text \<open>function for checking whether there is nonzero permission in mask\<close>
+
+fun has_perm_in_mask :: "'a sem_fun_bpl"
+  where 
+    "has_perm_in_mask ts vs = 
+        (case (ts, vs) of 
+           ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
+             Some (BoolV ((m r f) > 0))
+        | _ \<Rightarrow> None)"
+
+lemma has_perm_in_mask_some: 
+  assumes "has_perm_in_mask ts vs = Some t"
+  shows "\<exists>t1 t2 m r f. ts = [t1, t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
+  using assms
+  by (simp split: list.split_asm val.split_asm vbpl_absval.split_asm)
+
+lemma has_perm_in_mask_none:
+  assumes "\<nexists>t1 t2 m r f. ts = [t1, t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
+  shows "has_perm_in_mask ts vs = None"
+  using assms has_perm_in_mask_some option.exhaust_sel
+  by blast
+
+fun real_from_val :: "'a val \<Rightarrow> real"
+  where
+    "real_from_val (RealV r) = r"
+  | "real_from_val _ = undefined"
+
+lemma has_perm_in_mask_select_mask: 
+  "has_perm_in_mask ts vs = map_option (\<lambda>v. BoolV ((real_from_val v) > 0)) (select_mask ts vs)"
+proof (cases "\<exists> t1 t2 m r f. ts = [t1,t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]")
+  case True
+  then show ?thesis 
+    by force
+next
+  case False
+  then show ?thesis
+    using has_perm_in_mask_none select_mask_none
+    by (metis option.map_disc_iff)
+qed
+
 
 subsubsection \<open>Knownfolded Mask\<close>
 
@@ -174,7 +228,9 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
   | "fun_interp_vpr_bpl_aux Pr T F FReadHeap = 
        (select_heap T, (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TVar 1)))"
   | "fun_interp_vpr_bpl_aux Pr T F FReadMask =
-       (select_mask T, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
+       (select_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =
+       (has_perm_in_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
 
 fun fun_interp_vpr_bpl :: " ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 
                                 fun_enum_bpl \<Rightarrow> 'a sem_fun_bpl"
@@ -190,6 +246,13 @@ definition fun_interp_vpr_bpl_wf :: "ViperLang.program \<Rightarrow> 'a ty_repr_
 
 definition ctxt_wf :: "ViperLang.program \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (fun_enum_bpl \<Rightarrow> fname) \<Rightarrow> 'a econtext_bpl \<Rightarrow>  bool"
   where "ctxt_wf Pr T FieldMap FunMap ctxt \<equiv> fun_interp_vpr_bpl_wf Pr T FieldMap FunMap (fun_interp ctxt)"
+
+lemma ctxt_wf_fun_interp:
+  assumes "ctxt_wf Pr T FieldMap FunMap ctxt"
+  shows "(fun_interp ctxt) (FunMap fid) = Some (fun_interp_vpr_bpl Pr T FieldMap fid)"
+  using assms
+  unfolding ctxt_wf_def fun_interp_vpr_bpl_wf_def
+  by fast
 
 lemma assume_state_normal:
   assumes CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
@@ -245,7 +308,7 @@ proof  -
       apply simp
     using Hty Mty
      apply (simp del: vbpl_absval_ty_opt.simps)    
-    using Hrel Mrel good_state_Some FieldTr
+    using Hrel Mrel good_state_Some_true FieldTr
     by blast
 qed
 

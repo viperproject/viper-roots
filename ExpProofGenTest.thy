@@ -84,25 +84,6 @@ text\<open> Points to think about:
 \<close>
 
 type_synonym 'a stmt_config = "(stmt + unit) \<times> 'a stmt_result_total"
-
-definition red_stmt_total_smallstep :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> 'a stmt_config \<Rightarrow> 'a stmt_config \<Rightarrow> bool"
-  where "red_stmt_total_smallstep ctxt R \<Lambda> config1 config2 \<equiv> True"
-
-definition stmt_rel_small_step :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
-                                   'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow>
-                                   type_context \<Rightarrow> ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
-                                   ViperLang.stmt \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
-  where "stmt_rel_small_step R ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>'  \<equiv>
-           \<comment>\<open>for all  Viper and Boogie states in the input relation\<close>
-           \<forall> \<omega> ns. R \<omega> ns \<longrightarrow>               
-               \<comment>\<open>If the Boogie program starting at program point \<^term>\<open>\<gamma>\<close> cannot fail\<close>
-               (\<forall> \<gamma>' state_bpl. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', state_bpl)) \<longrightarrow> state_bpl \<noteq> Failure) \<longrightarrow>
-               \<comment>\<open>Then the Viper statement \<^term>\<open>stmt_vpr\<close> cannot fail\<close>
-               (\<forall> a b. red_stmt_total_smallstep ctxt_vpr StateCons \<Lambda> (Inl stmt_vpr, RNormal \<omega>) (a,b) \<longrightarrow>
-                     b \<noteq> RFailure )"
-(*\<and>
-                     (a = Inr () \<longrightarrow> \<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')) )
-                  "*)
  
 definition stmt_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
                                ('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 
@@ -561,38 +542,42 @@ lemma red_ast_bpl_propagate_same_rel:
   unfolding red_ast_bpl_def
   by auto
 
-lemma lookup_zero_mask_bpl:
-  assumes "state_rel Pr TyRep Tr ctxt mvar \<omega>_def \<omega> ns" and
-          "const_repr Tr = const_repr_basic"
-  shows "lookup_var (var_context ctxt) ns 2 = Some (AbsV (AMask zero_mask_bpl))"
-  using boogie_const_rel_lookup[where ?const = CZeroMask] state_rel_boogie_const[OF assms(1)] assms
-  by fastforce
-
 lemma tr_def_field_translation:
   assumes "tr = tr_def" and
           "field_translation tr_def = F"
         shows "field_translation tr = F"
   using assms by simp
 
-(*
-method zero_mask_lookup_tac uses tr_def =
-       (rule boogie_const_rel_lookup_2[where ?const = CZeroMask],
-        rule state_rel_boogie_const,
-         blast,
-         simp add: tr_def,
-         simp)
-*)
-(* (rule tr_def_field_translation[OF tr_def], fastforce)*)
-(*
-method red_assume_good_state uses CtxtWf tr_def =
-     (rule RedAssumeOk,
-      rule assume_state_normal[OF CtxtWf],
-      (rule tr_def_field_translation[OF tr_def], fastforce),
-      simp add: tr_def,
-      simp add: tr_def,
-      simp add: tr_def,
-      simp add: tr_def)
-*)
+lemma exp_rel_true_imp_1:
+  assumes  "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
+  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (Binop (ELit (ViperLang.LBool True)) BImp e_vpr) e_bpl"
+proof (rule exp_rel_equiv_vpr[OF _ assms])
+  fix v1 StateCons \<omega> \<omega>_def_opt
+  assume "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>Binop (ELit (ViperLang.LBool True)) BImp e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  thus "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  proof (rule RedBinop_case)
+    fix v1a contra
+    assume "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>ELit (ViperLang.lit.LBool True);\<omega>\<rangle> [\<Down>]\<^sub>t Val v1a"
+    hence "v1a = VBool True"
+      by (metis TotalExpressions.RedLit_case extended_val.inject val_of_lit.simps(1))
+    assume "eval_binop_lazy v1a BImp = Some v1"
+    thus contra using \<open>v1a = _\<close>
+      by simp
+  next
+    fix v1a v2
+    assume "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>ELit (ViperLang.lit.LBool True);\<omega>\<rangle> [\<Down>]\<^sub>t Val v1a"
+    hence "v1a = VBool True"
+      by (metis TotalExpressions.RedLit_case extended_val.inject val_of_lit.simps(1))
+    assume "eval_binop v1a BImp v2 = BinopNormal v1"
+    hence "v2 = v1"
+      unfolding \<open>v1a = _\<close>
+      by (rule eval_binop.elims) auto
+    assume "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v2"
+    thus "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+      by (simp add: \<open>v2 = v1\<close>)
+  qed
+qed
 
 
+    
 end

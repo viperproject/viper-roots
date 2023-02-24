@@ -111,6 +111,13 @@ fun vpr_to_bpl_ty :: "'a ty_repr_bpl \<Rightarrow> vpr_ty \<rightharpoonup> bpl_
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
   | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
 
+lemma vpr_to_bpl_ty_closed:
+          "wf_ty_repr_bpl T \<Longrightarrow>
+           vpr_to_bpl_ty T ty = Some ty_bpl \<Longrightarrow>
+           closed ty_bpl"
+  unfolding wf_ty_repr_bpl_def
+  by (cases ty) auto
+
 fun field_ty_fun_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
   where 
     "field_ty_fun_opt T (NormalField field_id vty) = map_option (\<lambda>t.(TFieldId T, [TConSingle (TNormalFieldId T), t])) (vpr_to_bpl_ty T vty)"

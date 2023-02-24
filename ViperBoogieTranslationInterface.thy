@@ -167,6 +167,7 @@ fun fun_repr_concrete :: fun_repr_bpl
     "fun_repr_concrete FReadHeap = ''readHeap''"
   | "fun_repr_concrete FReadMask = ''readMask''"
   | "fun_repr_concrete FGoodState = ''state''"
+  | "fun_repr_concrete FHasPerm = ''hasDirectPerm''"
 
 (*
 definition tr_vpr_bpl_example :: "fun_repr_bpl \<Rightarrow> tr_vpr_bpl"

@@ -423,7 +423,7 @@ qed
 definition state_rel
   where "state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns \<equiv> 
           mask_var_rel Pr (var_context ctxt) TyRep Tr wd_mask_var \<omega> ns \<and>
-          state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns"
+          state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns" 
 
 definition state_rel_empty
   where "state_rel_empty R \<omega> ns \<equiv> is_empty_total \<omega> \<and> R \<omega> ns"
@@ -654,6 +654,8 @@ lemma state_rel_mask_update:
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty" and
           TypeInterp: "type_interp ctxt = (vbpl_absval_ty TyRep)"
+  \<comment>\<open>TODO: Currently, the well-definedness mask variable is set to the evaluation mask variable, but this will
+     need to be changed once constructs are supported where the two differ.\<close>
         shows "state_rel Pr TyRep Tr ctxt (mask_var Tr) \<omega>_def \<omega> ns'"    
   using assms
   unfolding state_rel_def

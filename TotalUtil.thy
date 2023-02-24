@@ -1,5 +1,5 @@
 theory TotalUtil
-imports TotalStateUtil
+imports TotalStateUtil HOL.Real
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
@@ -115,5 +115,15 @@ lemma if_Some_mono[mono]:
 lemma[fundef_cong]:
   "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some P x = if_Some Q y"
   by (cases y; simp)
+
+subsection \<open>Positive rationals\<close>
+
+lemma prat_positive_transfer:
+  assumes "real_of_rat (Rep_prat qpos) = r" and
+          "pgt qpos pnone"
+        shows "r > 0"
+  using assms
+  apply transfer
+  by simp
 
 end
