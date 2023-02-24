@@ -138,7 +138,7 @@ lemma wf_rel_failure_elim:
 lemma expr_wf_rel_intro:
   assumes
    "\<And>v \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
-        ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t v \<Longrightarrow> v \<noteq> VFailure \<Longrightarrow>
+        ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
          \<exists> ns'.           
            red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
            R \<omega>_def \<omega> ns'" and
@@ -159,8 +159,7 @@ proof (rule expr_wf_rel_intro)
 next
   fix v \<omega>_def \<omega> ns
   assume "R \<omega>_def \<omega> ns"
-  assume "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t v"
-  assume "v \<noteq> VFailure"
+  assume "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
   show 
    " \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R \<omega>_def \<omega> ns'"
     apply (rule exI)
@@ -278,10 +277,9 @@ lemma binop_eager_expr_wf_rel:
 proof (rule expr_wf_rel_intro)
   text\<open>Normal case\<close>
   fix v \<omega>_def \<omega> ns
-  assume R:"R \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v \<noteq> VFailure"
-  from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t (Val val)"
-    by (metis extended_val.exhaust)
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
+  assume R:"R \<omega>_def \<omega> ns" and RedExp:"ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+  from RedExp
+  show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedBinop v1 v2)
       from this obtain ns' where
@@ -359,10 +357,9 @@ lemma binop_lazy_expr_wf_rel:
 proof (rule expr_wf_rel_intro)
   text \<open>Normal case\<close>
     fix v \<omega>_def \<omega> ns
-  assume R:"R \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v \<noteq> VFailure"
-  from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t (Val val)"
-    by (metis extended_val.exhaust)
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>_def \<omega> ns'"
+  assume R:"R \<omega>_def \<omega> ns" and RedExp:"ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+  from RedExp 
+  show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedBinop v1 v2)
     hence "v1 \<noteq> b1" using Lazy eval_binop_lazy_iff by force
@@ -378,7 +375,7 @@ proof (rule expr_wf_rel_intro)
       using red_ast_bpl_transitive by blast
   next
     case (RedBinopLazy v1)
-    hence  *:"binop_lazy bop = Some(v1, val)"
+    hence  *:"binop_lazy bop = Some(v1, v)"
       by (simp add: eval_binop_lazy_iff)
 
     from RedBinopLazy obtain ns' where  
@@ -444,13 +441,12 @@ lemma field_access_wf_rel:
           FieldAccWfRel: "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f \<gamma>2 \<gamma>3"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (FieldAcc e f) \<gamma>1 \<gamma>3"
 proof (rule expr_wf_rel_intro)
+  text\<open>Normal case\<close>
+
   fix v \<omega>_def \<omega> ns
   assume R:"R \<omega>_def \<omega> ns" and
-         "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t v" and
-         "v \<noteq> VFailure"
-  from this obtain val where "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val val"
-    by (metis extended_val.exhaust)
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
+         RedExp:"ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+  from RedExp show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega>_def \<omega> ns'"
   proof cases
     case (RedField a v')
     hence "(a, f) \<in> get_valid_locs \<omega>_def" 
@@ -467,6 +463,8 @@ proof (rule expr_wf_rel_intro)
       by blast
   qed
 next
+  text\<open>Failure case\<close>
+
   fix v \<omega>_def \<omega> ns
   assume R:"R \<omega>_def \<omega> ns" and
          "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t v" and
@@ -799,11 +797,9 @@ lemma syn_lazy_bop_short_circuit_wf_rel:
                         (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd#thnTl) els)) None, cont)
                         \<gamma>'" (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma> ?\<gamma>'")
 proof (rule expr_wf_rel_intro)
-\<comment>\<open>Normal case\<close>
+  text \<open>Normal case\<close>
   fix v \<omega>_def \<omega> ns
-  assume Rext:"?R_ext \<omega>_def \<omega> ns" (is "?R \<and> ?Re1") and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v \<noteq> VFailure"
-  from this obtain val where E2Normal: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val val"
-    by (metis extended_val.exhaust)
+  assume Rext:"?R_ext \<omega>_def \<omega> ns" (is "?R \<and> ?Re1") and RedExp: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
   from Rext obtain v1 v2 where RedE1: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1" and NotB1:"v1 \<noteq> b1" and
                             v1BopWellTy: "eval_binop v1 bop v2 \<noteq> BinopTypeFailure"
@@ -826,7 +822,7 @@ proof (rule expr_wf_rel_intro)
     by simp
 
    let ?\<gamma>'' = "(thnHd, convert_list_to_cont thnTl cont)"
-   from E2Normal obtain ns' where 
+   from RedExp obtain ns' where 
      Rns': "R \<omega>_def \<omega> ns'" and RedThn:"red_ast_bpl P ctxt (?\<gamma>'', Normal ns) (?\<gamma>', Normal ns')"
      using wf_rel_normal_elim[OF WfRel] Rext
      by blast
@@ -846,7 +842,7 @@ proof (rule expr_wf_rel_intro)
     using Rns' Rext
     by blast
 next
-\<comment>\<open>Failure case\<close>
+  text \<open>Failure case\<close>
   fix v \<omega>_def \<omega> ns
   assume Rext:"?R_ext \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v = VFailure"
   hence E2Fail: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
@@ -907,7 +903,7 @@ lemma syn_lazy_bop_no_short_circuit_wf_rel:
                        (BigBlock name [] (Some (ParsedIf (Some guard) (thnHd#thnTl)  [empty_bigblock elseName])) None, cont)
                        (empty_bigblock elseName, cont)" (is "wf_rel R _ _ _ _ ?\<gamma> ?\<gamma>'")
 proof (rule wf_rel_intro)
-\<comment>\<open>Normal case\<close>
+  text \<open>Normal case\<close>
   fix \<omega>_def \<omega> ns
   assume R:"R \<omega>_def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t Val b1"
 
@@ -939,7 +935,7 @@ proof (rule wf_rel_intro)
     by auto
 
 next
-\<comment>\<open>Failure case (can never happen)\<close>
+  text \<open>Failure case (can never happen)\<close>
   fix contra
   assume False
   thus contra
@@ -1112,6 +1108,7 @@ proof (rule wf_rel_intro)
       unfolding mask_rel_def
       using if_SomeD by fastforce
 
+  text \<open>Show normal case\<close>
   show "\<exists>a. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<and> (a, f) \<in> get_valid_locs \<omega>_def \<Longrightarrow>
           \<exists>ns'. red_ast_bpl P ctxt
                  ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns)
@@ -1145,6 +1142,7 @@ proof (rule wf_rel_intro)
     thus "?B" using R by blast
   qed
 
+  text \<open>Show failure case\<close>
   show "\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and>
            (v = VRef Null \<or> (\<exists>a. v = VRef (Address a) \<and> (a, f) \<notin> get_valid_locs \<omega>_def)) \<Longrightarrow>
        \<exists>c'. red_ast_bpl P ctxt
