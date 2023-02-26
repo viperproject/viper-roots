@@ -63,12 +63,18 @@ ML \<open>
       
       ( (* prove divisor reduces to an integer if zero is an integer constant *)
         (assm_full_simp_solved_tac ctxt) ORELSE'        
-          (expr_red_tac (#type_safety_thm_map exp_rel_info TInt)  (#lookup_var_thms exp_rel_info) ctxt)          
+          (expr_red_tac (#type_safety_thm_map exp_rel_info TInt) 
+                        (#lookup_var_thms exp_rel_info) 
+                        (#lookup_fun_bpl_thms exp_rel_info) 
+                        ctxt)          
       ) THEN'
         
       ( (* prove divisor reduces to a real if zero is a real constant *) 
         (Rmsg' "div_rel_5" assm_full_simp_solved_tac ctxt) ORELSE'
-        expr_red_tac (#type_safety_thm_map exp_rel_info TReal) (#lookup_var_thms exp_rel_info) ctxt
+        expr_red_tac (#type_safety_thm_map exp_rel_info TReal) 
+                     (#lookup_var_thms exp_rel_info) 
+                     (#lookup_fun_bpl_thms exp_rel_info) 
+                     ctxt
       )
     
   fun bop_wf_rel_tac exp_rel_info ctxt =
@@ -123,6 +129,9 @@ ML \<open>
    and
      field_access_wf_rel_tac (exp_wf_rel_info : exp_wf_rel_info) exp_rel_info ctxt =
        (
+         (* progress to field access *)
+         resolve_tac ctxt [@{thm wf_rel_extend_2}] THEN' 
+         progress_tac ctxt THEN'
          (Rmsg' "Wf Rcv Field Access" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN'  (* receiver *)
          (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
        )
@@ -132,14 +141,14 @@ ML \<open>
   fun field_access_wf_rel_tac_aux init_tac lookup_mask_var_tac field_rel_tac field_lookup_tac ty_args_eq_tac (exp_rel_info : exp_rel_info) ctxt =
     (Rmsg' "Wf Field Access 1" init_tac ctxt) THEN'
     (Rmsg' "Wf Field Access 2" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 3" (exp_rel_tac exp_rel_info) ctxt) THEN'
+    (Rmsg' "Wf Field Access 3" (exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
     (Rmsg' "Wf Field Access 4" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 5" lookup_mask_var_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 6" field_rel_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 5" lookup_mask_var_tac ctxt |> SOLVED') THEN'
+    (Rmsg' "Wf Field Access 6" field_rel_tac ctxt |> SOLVED') THEN'
     (Rmsg' "Wf Field Access 7" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 8" field_lookup_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 8" field_lookup_tac ctxt |> SOLVED') THEN'
     (Rmsg' "Wf Field Access 9" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 10" ty_args_eq_tac ctxt)
+    (Rmsg' "Wf Field Access 10" ty_args_eq_tac ctxt |> SOLVED')
 
 \<close>
 

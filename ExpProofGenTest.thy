@@ -299,10 +299,10 @@ lemma stmt_rel_if:
   assumes \<comment>\<open>When invoking the wf_rel tactic, apply one of the wf_rel extension lemmas such that the 
             wf_rel tactic itself need not guarantee progress to the if block\<close>
      ExpWfRel:          
-          "expr_wf_rel (\<lambda> _ \<omega>. R \<omega>) ctxt_vpr StateCons P ctxt cond 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr StateCons P ctxt cond 
            \<gamma>1
            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)" and
-     ExpRel: "exp_rel_vpr_bpl (\<lambda> _ \<omega>. R \<omega>) ctxt_vpr ctxt cond cond_bpl" and
+     ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl" and
      ThnRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_thn (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
      ElsRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_els (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (If cond s_thn s_els) \<gamma>1 (next, cont)"
@@ -317,7 +317,8 @@ proof (rule stmt_rel_intro_2)
     assume RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)" and 
            RedThn: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> res"
 
-    from RedCond wf_rel_normal_elim[OF ExpWfRel R] obtain ns' where
+
+    from RedCond wf_rel_normal_elim[OF ExpWfRel HOL.conjI[OF _ R]] obtain ns' where
      Rns': "R \<omega> ns'" and
      RedAstToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns)
            ((if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont), Normal ns')"
@@ -357,7 +358,7 @@ proof (rule stmt_rel_intro_2)
     assume RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)" and 
            RedEls: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> res"
 
-    from RedCond wf_rel_normal_elim[OF ExpWfRel R] obtain ns' where
+    from RedCond wf_rel_normal_elim[OF ExpWfRel HOL.conjI[OF _ R]] obtain ns' where
      Rns': "R \<omega> ns'" and
      RedAstToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns)
            ((if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont), Normal ns')"
@@ -404,7 +405,7 @@ proof (rule stmt_rel_intro_2)
      proof (rule stmt_rel_aux_intro)
        assume "res = RFailure"
        show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure "
-         using wf_rel_failure_elim[OF ExpWfRel R RedCond]
+         using wf_rel_failure_elim[OF ExpWfRel HOL.conjI[OF _ R] RedCond]
          by simp
      qed (simp add: \<open>res = _\<close>)
    qed
