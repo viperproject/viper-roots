@@ -117,25 +117,25 @@ and
            (
              (Rmsg' "If1" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
              (Rmsg' "If wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
-             (Rmsg' "If2" (progress_tac ctxt) ctxt)
+             (Rmsg' "If2" ((progress_tac ctxt) |> SOLVED') ctxt)
            ) THEN'
            (
              (Rmsg' "If cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
            ) THEN'
            (
-            (* apply propagation rule here, so that goal program point is not fixed for
-               recursive call to stmt_rel_tac *)
+            (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+               variable for the recursive call to stmt_rel_tac *)
              simplify_continuation ctxt THEN'
              (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
-             stmt_rel_tac ctxt info thn_hint THEN'
+             (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
              (Rmsg' "If4" (progress_tac ctxt) ctxt)
            ) THEN'
            (
-            (* apply propagation rule here, so that goal program point is not fixed for
-               recursive call to stmt_rel_tac *)
+            (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+               variable for the recursive call to stmt_rel_tac *)
             simplify_continuation ctxt THEN'
             (Rmsg' "If5" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
-            stmt_rel_tac ctxt info els_hint THEN'
+            (stmt_rel_tac ctxt info els_hint |> SOLVED') THEN'
             (Rmsg' "If6" (progress_tac ctxt) ctxt)
            )
       | _ => error "unsupported hint in stmt_rel_single_stmt_tac"

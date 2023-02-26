@@ -64,20 +64,16 @@ fun unfold_bigblock_in_goal ctxt =
 
   (* progress_tac tries to solve a goal of the form 
          \<open>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'\<close>
-     Usually \<gamma>1 is a schematic variable in the goal and the tactic tries to solve the goal by 
-     instantiating \<gamma>1 to be the unfolded bigblock version of \<gamma>0. In case where \<gamma>0 is an already
-     unfolded empty bigblock (TODO: what if \<gamma>0 is a folded empty bigblock?), \<gamma>1 is instantiated 
-     to be the successor unfolded bigblock.           
-     *)
+     The tactic tries to solve the goal by instantiating \<gamma>1 to be the unfolded bigblock version of \<gamma>0. 
+     
+     In cases where \<gamma>0 is an already unfolded (resp. folded) empty bigblock, \<gamma>1 is instantiated to be the 
+     unfolded (resp. folded) block version of \<gamma>0's successor. *)
 fun progress_tac ctxt = 
    resolve_tac ctxt [@{thm exI}] THEN'
    resolve_tac ctxt [@{thm conjI}] THEN'
-  (* (K (print_tac ctxt "before unfold"))  THEN'*)
    (unfold_bigblock_in_goal ctxt) THEN'
-  (* (K (print_tac ctxt "after unfold"))  THEN' *)
-   (resolve_tac ctxt [@{thm red_ast_bpl_refl}] ORELSE' 
-    
-    resolve_tac ctxt [@{thm red_ast_bpl_empty_block}]) THEN'
+   (resolve_tac ctxt [@{thm red_ast_bpl_empty_block}] ORELSE'
+    resolve_tac ctxt [@{thm red_ast_bpl_refl}]) THEN'
    assm_full_simp_solved_tac ctxt
 \<close>
 
