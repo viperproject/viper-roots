@@ -405,7 +405,7 @@ proof (rule stmt_rel_intro_2)
      proof (rule stmt_rel_aux_intro)
        assume "res = RFailure"
        show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure "
-         using wf_rel_failure_elim[OF ExpWfRel HOL.conjI[OF _ R] RedCond]
+         using wf_rel_failure_elim[OF ExpWfRel HOL.conjI[OF _ R]] RedCond
          by simp
      qed (simp add: \<open>res = _\<close>)
    qed
