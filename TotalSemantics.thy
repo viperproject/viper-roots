@@ -62,8 +62,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
        ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
        red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
   | SubAtomicFailure: 
-    "\<lbrakk> e \<in> sub_expressions_atomic A ;
-      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
+       red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
        red_exhale ctxt R \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
 
 \<comment>\<open>exhale A && B\<close>
@@ -135,14 +135,26 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
        red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
-fun sub_expressions :: "stmt \<Rightarrow> pure_exp set" where
-  "sub_expressions (If p _ _) = {p}"
-| "sub_expressions (LocalAssign _ e) = {e}"
-| "sub_expressions (FieldAssign e1 _ e2) = {e1, e2}"
-| "sub_expressions (Unfold _ l pw) = set l \<union> sub_expressions_exp_or_wildcard pw"
-| "sub_expressions (Fold _ l pw) = set l \<union> sub_expressions_exp_or_wildcard pw"
-| "sub_expressions _ = {}"
-\<comment>\<open>TODO: \<^const>\<open>sub_expressions\<close> is duplicated from ViperLang\<close>
+\<comment>\<open>TODO: duplicated from ViperLang\<close>
+fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
+  "sub_expressions (If p _ _) = [p]"
+| "sub_expressions (LocalAssign _ e) = [e]"
+| "sub_expressions (FieldAssign e1 _ e2) = [e1, e2]"
+| "sub_expressions (Unfold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
+| "sub_expressions (Fold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
+| "sub_expressions _ = []"
+
+
+\<comment>\<open>TODO: duplicated from Viper session\<close>
+fun modif :: "stmt \<Rightarrow> var set" where
+  "modif (If b s1 s2) = modif s1 \<union> modif s2"
+| "modif (Seq a b) = modif a \<union> modif b"
+| "modif (LocalAssign x e) = {x}"
+| "modif (Havoc x) = {x}"
+| "modif (Scope l s) = shift_down_set (modif s)" (* We ignore variables from this scope, and we shift the other ones *)
+| "modif (MethodCall x name y) = set y"
+| "modif (While b I s) = modif s"
+| "modif _ = {}"
 
 inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "('a full_total_state \<Rightarrow> bool)" and \<Lambda> :: "type_context"  where
@@ -186,7 +198,7 @@ always has at least one failure transition. This is in-sync with the recent Carb
  | RedFieldAssignFailure: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
       r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
-      red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (RNormal (update_hh_loc_total_full \<omega> (addr,f) v))"
+      red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
 
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
@@ -245,10 +257,11 @@ always has at least one failure transition. This is in-sync with the recent Carb
  | RedSeqFailure:
    "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> RFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
-
+(* TODO while loops *)
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
-  "\<lbrakk> e \<in> sub_expressions s; ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure  \<rbrakk> \<Longrightarrow> 
+  "\<lbrakk> sub_expressions s \<noteq> [];
+    red_pure_exps_total ctxt R (Some \<omega>) (sub_expressions s) \<omega> None  \<rbrakk> \<Longrightarrow> 
     red_stmt_total ctxt R \<Lambda> s \<omega> RFailure"
 
 inductive_cases RedLocalAssign_case: 
@@ -270,13 +283,6 @@ lemmas red_stmt_total_inversion_thms =
 
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_m_total_full \<omega> = (zero_mask, zero_mask)"
-
-(*
-lemma red_stmt_total_seq_failure_inversion:
-  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> RFailure" and
-          "                              
-  shows "P"
-*)
 
 subsection \<open>Correctness\<close>
 

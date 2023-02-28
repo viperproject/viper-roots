@@ -290,18 +290,21 @@ next
   case (FunAppRel es_bpl e_heap e_args_bpl f f_bpl es)
   from \<open>ctxt_vpr, StateCons, None \<turnstile> \<langle>FunApp f es;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1\<close>
   obtain vs f_interp_vpr where     
-      args_vpr: "list_all2 (\<lambda>e v. red_pure_exp_total ctxt_vpr StateCons None e \<omega> (Val v)) es vs" and
+             args_vpr:  "red_pure_exps_total ctxt_vpr StateCons None es \<omega> (Some vs)" and
                 "fun_interp_total ctxt_vpr f = Some f_interp_vpr" and
                 "f_interp_vpr vs \<omega> = Some (Val v1)"
-    by (blast elim: red_pure_exp_total_elims)
+    by (auto elim: red_pure_exp_total_elims)
  
   from this obtain vs_bpl where BplArgsRed:"list_all2 (\<lambda>e v. red_expr A \<Lambda> \<Gamma> [] e ns v) es_bpl vs_bpl"
     using \<open>\<exists>a. red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) (FunExp f_bpl [] es_bpl) ns a\<close>    
     by (auto simp: bg_expr_list_red_all2)
   have "length es = length e_args_bpl" using FunAppRel.IH
     by (simp add: List.list_all2_conv_all_nth)
- have "length es = length vs" using args_vpr
-      by (simp add: List.list_all2_conv_all_nth)
+
+  note args_vpr_list_all2 = red_pure_exps_total_list_all2[OF args_vpr]
+
+  have "length es = length vs" using args_vpr_list_all2
+    by (simp add: List.list_all2_conv_all_nth)
 
   have "list_all2 (\<lambda>e v. red_expr A \<Lambda> \<Gamma> [] e ns (val_rel_vpr_bpl v)) e_args_bpl vs"  
   proof (rule List.list_all2_all_nthI)
@@ -315,7 +318,7 @@ next
       by simp
 
     hence IHReq1:"ctxt_vpr, StateCons, None \<turnstile> \<langle>es ! n;\<omega>\<rangle> [\<Down>]\<^sub>t Val (vs ! n)"
-      using args_vpr
+      using args_vpr_list_all2
       by (metis list_all2_conv_all_nth)
 
     have "red_expr_bpl (create_ctxt_bpl A \<Lambda> \<Gamma>) (es_bpl ! (Suc n)) ns (vs_bpl ! (Suc n))"
@@ -464,6 +467,7 @@ qed
 
 lemma exp_rel_field_access:
   assumes 
+       (* TODO: weaken assumption on R *)
        StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
        HeapReadWf: "heap_read_wf TyRep ctxt (heap_read Tr)" and
        "e_bpl = (heap_read Tr) (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and

@@ -395,11 +395,10 @@ proof (rule stmt_rel_intro_2)
                    RedParsedIfRule: RedParsedIfFalse)
      qed
    next
-     fix e
-     assume "res = RFailure" and "e \<in> sub_expressions (stmt.If cond s_thn s_els)" and 
-            "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+     assume "res = RFailure" and "sub_expressions (stmt.If cond s_thn s_els) \<noteq> []" and 
+            "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>) (sub_expressions (stmt.If cond s_thn s_els)) \<omega> None"
      hence RedCond: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-       by simp
+       by (fastforce elim: red_pure_exps_total_singleton)
      
      show "stmt_rel_aux R \<Lambda>_vpr P ctxt (stmt.If cond s_thn s_els) \<gamma>1 (next, cont) ns res"
      proof (rule stmt_rel_aux_intro)
@@ -507,9 +506,9 @@ next
   
   from RedVpr show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
   proof cases
-  case (RedSubExpressionFailure e)
+  case (RedSubExpressionFailure)
   hence "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-    by simp
+    by (fastforce elim: red_pure_exps_total_singleton)
 
   then show ?thesis 
     using  R_def \<open>R2 \<omega> ns\<close> wf_rel_failure_elim[OF ExpWfRel]

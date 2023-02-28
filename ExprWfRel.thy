@@ -108,8 +108,7 @@ next
   from this obtain v' vs' where "vs = v'#vs'" and
          "red_pure_exp_total ctxt_vpr StateCons (Some \<omega>_def) e  \<omega> (Val v')" and
          RedExpsEs:"red_pure_exps_total ctxt_vpr StateCons (Some \<omega>_def) es \<omega> (Some vs')"
-    using RedExpList_case
-    by (metis (no_types, lifting) RedExpList list_all2_Cons1)
+    by (auto elim: red_exp_list_normal_elim)
 
   with wf_rel_normal_elim[OF WfRelE \<open>R _ _ _\<close>] obtain ns' where
          R2:"R \<omega>_def \<omega> ns'" and RedBpl: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>'', Normal ns')"
@@ -193,8 +192,8 @@ lemma unop_elim:
         ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure 
       else 
         \<exists>v'. ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
-  using assms
-  by (cases) auto
+  using assms 
+  by (cases) (auto elim: red_pure_exps_total_singleton)
 
 lemma var_expr_wf_rel: "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Var x) \<gamma> \<gamma>"
   by (rule expr_wf_rel_intro_trivial) (auto simp: var_never_fails)
@@ -337,10 +336,10 @@ next
       using wf_rel_failure_elim[OF RelOp \<open>R \<omega>_def \<omega> ns'\<close>] RedBinopOpFailure red_ast_bpl_def
       by (metis (no_types, lifting) rtranclp_trans)      
   next
-    case (RedSubFailure e)
+    case RedSubFailure
     then show ?thesis
       using wf_rel_failure_elim[OF Rel1 R]
-      by fastforce
+      by (fastforce elim: red_pure_exps_total_singleton)
   qed
 qed
 
@@ -420,10 +419,10 @@ next
       using \<open>binop_lazy bop = Some(_)\<close> option.distinct(1)
       by metis        
   next
-    case (RedSubFailure e)
+    case RedSubFailure
     then show ?thesis
       using wf_rel_failure_elim[OF Rel1 R]
-      by fastforce
+      by (fastforce elim: red_pure_exps_total_singleton)
   qed
 qed
 
@@ -510,9 +509,9 @@ next
     ultimately show ?thesis 
       using red_ast_bpl_transitive by blast
   next
-    case (RedSubFailure e')
+    case RedSubFailure
     hence "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-      by simp
+      by (fastforce elim: red_pure_exps_total_singleton)
     then show ?thesis using assms wf_rel_failure_elim
       using \<open>R \<omega>_def \<omega> ns\<close> by blast
   qed

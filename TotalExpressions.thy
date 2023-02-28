@@ -96,28 +96,28 @@ One potential difference is that here the body of an \<^const>\<open>Unfolding\<
 subexpression, since the well-definedness of a corresponding body must be evaluated in a separate 
 state.\<close>
 
-fun sub_pure_exp_total :: "pure_exp \<Rightarrow> pure_exp set" where
-  "sub_pure_exp_total (Unop _ e) = {e}"
-| "sub_pure_exp_total (Binop e _ _) = {e}"
-| "sub_pure_exp_total (FieldAcc e _) = {e}"
-| "sub_pure_exp_total (Let e _) = {e}"
-| "sub_pure_exp_total (Perm e _) = {e}"
-| "sub_pure_exp_total (CondExp e _ _) = {e}"
-| "sub_pure_exp_total (PermPred _ exps) = List.set exps"
-| "sub_pure_exp_total (FunApp _ exps) = List.set exps"
-| "sub_pure_exp_total (Unfolding _ exps e) = List.set exps"
-| "sub_pure_exp_total _ = {}"
+fun sub_pure_exp_total :: "pure_exp \<Rightarrow> pure_exp list" where
+  "sub_pure_exp_total (Unop _ e) = [e]"
+| "sub_pure_exp_total (Binop e _ _) = [e]"
+| "sub_pure_exp_total (FieldAcc e _) = [e]"
+| "sub_pure_exp_total (Let e _) = [e]"
+| "sub_pure_exp_total (Perm e _) = [e]"
+| "sub_pure_exp_total (CondExp e _ _) = [e]"
+| "sub_pure_exp_total (PermPred _ exps) = exps"
+| "sub_pure_exp_total (FunApp _ exps) = exps"
+| "sub_pure_exp_total (Unfolding _ exps e) = exps"
+| "sub_pure_exp_total _ = []"
 
 (* potential duplicate *)
-fun sub_expressions_exp_or_wildcard :: "pure_exp exp_or_wildcard \<Rightarrow> pure_exp set" where
-  "sub_expressions_exp_or_wildcard (PureExp e) = {e}"
-| "sub_expressions_exp_or_wildcard Wildcard = {}"
+fun sub_expressions_exp_or_wildcard :: "pure_exp exp_or_wildcard \<Rightarrow> pure_exp list" where
+  "sub_expressions_exp_or_wildcard (PureExp e) = [e]"
+| "sub_expressions_exp_or_wildcard Wildcard = []"
 
 (* TODO: duplicate with ViperLang.SemanticsPerm, put in some common theory *)
-fun sub_expressions_atomic :: "pure_exp atomic_assert \<Rightarrow> pure_exp set" where
-  "sub_expressions_atomic (Pure e) = {e}"
-| "sub_expressions_atomic (Acc x f p) = {x} \<union> sub_expressions_exp_or_wildcard p"
-| "sub_expressions_atomic (AccPredicate P exps p) = set exps \<union> sub_expressions_exp_or_wildcard p"
+fun sub_expressions_atomic :: "pure_exp atomic_assert \<Rightarrow> pure_exp list" where
+  "sub_expressions_atomic (Pure e) = [e]"
+| "sub_expressions_atomic (Acc x f p) = x # sub_expressions_exp_or_wildcard p"
+| "sub_expressions_atomic (AccPredicate P exps p) = exps @ sub_expressions_exp_or_wildcard p"
 
 record 'a total_context =
   program_total :: program
@@ -190,7 +190,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
       red_inhale ctxt R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
 | InhSubFailure: 
-    "\<lbrakk> e \<in> sub_expressions_atomic A; ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
+       red_pure_exps_total ctxt R (Some \<omega>_def) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
       red_inhale ctxt R (Atomic A) \<omega> RFailure"
 
 \<comment>\<open>Connectives inhale\<close>
@@ -216,9 +217,16 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 \<comment>\<open>Pure expression evaluation and well-definedness of pure expressions\<close>
 
 \<comment>\<open>List of expressions\<close>
-| RedExpList: 
-  "\<lbrakk> list_all2 (\<lambda>e v. red_pure_exp_total ctxt R \<omega>_def e \<omega> (Val v)) es vs \<rbrakk> \<Longrightarrow>
-     red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)"
+| RedExpListCons:
+  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
+     red_pure_exps_total ctxt R \<omega>_def es \<omega> res;
+     res' = map_option (\<lambda>vs. (v#vs)) res \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> res'"
+| RedExpListFailure:
+  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> None"
+| RedExpListNil:
+  "red_pure_exps_total ctxt R \<omega>_def Nil \<omega> (Some Nil)"
 
 \<comment>\<open>Atomic expressions\<close>
 | RedLit: "ctxt, R, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
@@ -284,7 +292,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
        ctxt, R, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 
 \<comment>\<open>Function application\<close>
-| RedFunApp: (* Should function application be expression via an operational view? *)
+| RedFunApp: (* Should function application be expressed operationally? *)
    "\<lbrakk> (fun_interp_total ctxt) fname = Some f;
       red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs);                
       f vs \<omega> = Some res \<rbrakk> \<Longrightarrow> 
@@ -309,10 +317,14 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      ctxt, R, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t v"
 
 \<comment>\<open>Important: \<^const>\<open>sub_pure_exp_total\<close> should not include the body of an unfolding\<close>
-| RedSubFailure: "\<lbrakk> e \<in> sub_pure_exp_total e' ; ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+| RedSubFailure: 
+   "\<lbrakk> (sub_pure_exp_total e') \<noteq> [];
+     red_pure_exps_total ctxt R \<omega>_def (sub_pure_exp_total e') \<omega> None \<rbrakk> \<Longrightarrow> 
      ctxt, R, \<omega>_def \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 
 thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct
+
+              
 
 subsubsection \<open>Elimination rules\<close>
 
@@ -336,15 +348,88 @@ lemma RedFieldNormal_case:
   using assms
   by cases (metis extended_val.distinct(1) extended_val.inject)
 
-inductive_cases RedUnop_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
-inductive_cases RedBinop_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
-inductive_cases RedFunApp_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t res"
+inductive_cases RedUnop_case: "ctxt, R, \<omega>_def \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v'"
+inductive_cases RedBinop_case: "ctxt, R, \<omega>_def \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+inductive_cases RedFunApp_case: "ctxt, R, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t res"
 
 inductive_cases RedExpList_case: "red_pure_exps_total Pr ctxt LH es \<omega> (Some vs)"
+inductive_cases RedExpListFailure_case: "red_pure_exps_total Pr ctxt LH es \<omega> None"
+inductive_cases RedExpListGeneral_case: "red_pure_exps_total Pr ctxt LH es \<omega> res"
 
-inductive_cases RedPerm_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+lemma red_exp_list_normal_elim: 
+  assumes
+     "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)" and
+     "(\<And>vs_hd vs_tl e_hd es_tl.
+        vs = vs_hd # vs_tl \<Longrightarrow>
+        es = e_hd # es_tl \<Longrightarrow>
+        ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t Val vs_hd \<Longrightarrow> red_pure_exps_total ctxt R \<omega>_def es_tl \<omega> (Some vs_tl) \<Longrightarrow> P)" and 
+     "vs = [] \<Longrightarrow> P"
+   shows "P"
+  using assms
+proof cases
+  case (RedExpListCons e v es' res)
+  from this obtain vs' where "res = Some vs'" and "vs = v#vs'"
+    by (metis map_option_eq_Some)
+  with RedExpListCons assms(2)[OF \<open>vs = _\<close> \<open>es = e#es'\<close>]  show ?thesis
+    by blast
+next
+  case RedExpListNil
+  then show ?thesis using assms by auto
+qed
 
-lemmas red_pure_exp_total_elims = RedUnop_case RedBinop_case RedFunApp_case RedExpList_case
+lemma red_exp_list_failure_elim:
+  assumes
+     "red_pure_exps_total ctxt R \<omega>_def es \<omega> None" and
+     "(\<And>v e_hd es_tl.
+        es = e_hd # es_tl \<Longrightarrow>
+        ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<Longrightarrow> 
+        red_pure_exps_total ctxt R \<omega>_def es_tl \<omega> None \<Longrightarrow> P)" and
+     "(\<And>e_hd es_tl.
+        es = e_hd # es_tl \<Longrightarrow>
+        ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P)"
+   shows "P"
+  using assms
+  by (cases) auto
+
+inductive_cases RedPerm_case: "ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+lemma red_pure_exps_total_singleton:
+  assumes "red_pure_exps_total ctxt R \<omega>_def [e] \<omega> res" and
+          "\<And>v. res = Some [v] \<and> (ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<Longrightarrow> P" and
+          "res = None \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P"
+  shows P
+  apply (rule RedExpListGeneral_case[OF assms(1)])
+  using RedExpListGeneral_case assms(2) apply blast
+   apply (simp add: assms(3))
+  apply simp
+  done
+
+lemmas red_pure_exp_total_elims = 
+  RedUnop_case RedBinop_case RedFunApp_case  
+  red_exp_list_normal_elim red_exp_list_failure_elim
+
+subsection \<open>Helper lemmas\<close>
+
+lemma red_pure_exps_total_list_all2:
+  assumes "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)"
+  shows "list_all2 (\<lambda>e v. red_pure_exp_total ctxt R  \<omega>_def e \<omega> (Val v)) es vs"
+  using assms
+proof (induction es arbitrary: vs)
+  case Nil
+  then show ?case 
+    by (auto elim: red_pure_exp_total_elims)
+next
+  case (Cons e es)
+  hence RedCons: "red_pure_exps_total ctxt R \<omega>_def (e # es) \<omega> (Some vs)" by simp
+  from this obtain vs_hd vs_tail where 
+     "vs = vs_hd # vs_tail" and
+     "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val vs_hd" and
+     "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs_tail)"
+    using RedExpList_case[OF RedCons] list.distinct(1) list.inject
+    by (smt (verit, best) map_option_eq_Some)    
+  with Cons.IH show ?case
+    by blast
+qed
 
 subsection \<open>Total heap consistency\<close>
 
