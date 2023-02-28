@@ -359,18 +359,18 @@ inductive_cases RedExpListGeneral_case: "red_pure_exps_total Pr ctxt LH es \<ome
 lemma red_exp_list_normal_elim: 
   assumes
      "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)" and
-     "(\<And>vs_hd vs_tl e_hd es_tl.
-        vs = vs_hd # vs_tl \<Longrightarrow>
+     "(\<And>vs_hd vs_tl e_hd es_tl.       
         es = e_hd # es_tl \<Longrightarrow>
+        vs = vs_hd # vs_tl \<Longrightarrow>
         ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t Val vs_hd \<Longrightarrow> red_pure_exps_total ctxt R \<omega>_def es_tl \<omega> (Some vs_tl) \<Longrightarrow> P)" and 
-     "vs = [] \<Longrightarrow> P"
+     "es = [] \<Longrightarrow> vs = [] \<Longrightarrow> P"
    shows "P"
   using assms
 proof cases
   case (RedExpListCons e v es' res)
   from this obtain vs' where "res = Some vs'" and "vs = v#vs'"
     by (metis map_option_eq_Some)
-  with RedExpListCons assms(2)[OF \<open>vs = _\<close> \<open>es = e#es'\<close>]  show ?thesis
+  with RedExpListCons assms(2)[OF \<open>es = e#es'\<close> \<open>vs = _\<close> ]  show ?thesis
     by blast
 next
   case RedExpListNil
