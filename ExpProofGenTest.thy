@@ -516,6 +516,79 @@ next
   qed
 qed
 
+subsection \<open>Field assignment relation\<close>
+
+definition field_rel_single :: "program \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> tr_vpr_bpl \<Rightarrow> char list \<Rightarrow> expr \<Rightarrow> ty \<Rightarrow> bool"
+  where "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl  \<equiv> 
+           has_Some (\<lambda>f_tr. e_f_bpl = Lang.Var f_tr) (field_translation Tr f_vpr) \<and>
+           has_Some (\<lambda>\<tau>_vpr. vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl) (declared_fields Pr f_vpr)"
+
+
+lemma field_assign_rel:
+  assumes Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)" and
+    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) \<omega> ns" and
+    RcvWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
+    RhsWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
+    WriteableLocRel: "wf_rel_fieldacc get_writeable_locs Rext ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
+                 \<gamma>2 
+                 ((BigBlock name ((Lang.Assign h_bpl rhs_bpl)#cs) str tr), cont)" and 
+    HeapUpdateBpl: "rhs_bpl = heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
+    HeapVar: "heap_var Tr = h_bpl" and
+    RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
+    FieldRel: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+    RhsRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rhs_vpr rhs_bpl" and
+
+                    \<comment>\<open>Key field assignment property for R2\<close>
+          RAssign:  "\<And> \<omega> ns v . R \<omega> ns \<Longrightarrow>
+                           get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
+                           type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
+                           R (update_hh_loc_total_full \<omega> (addr,f) v) (update_var (var_context ctxt) ns (heap_var Tr) (val_rel_vpr_bpl v))"
+  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
+         \<gamma>
+         (BigBlock name cs str tr, cont)" 
+proof (rule stmt_rel_intro)
+  let ?\<gamma>3="((BigBlock name ((Lang.Assign h_bpl rhs_bpl)#cs) str tr), cont)"
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" 
+  hence "Rext \<omega> \<omega> ns" using Rext by simp
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> (RNormal \<omega>')"
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>' ns'"
+  proof cases
+    case (RedFieldAssign addr v)
+    from this  obtain ns1 where
+      "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
+      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+      by auto
+    from this RedFieldAssign obtain ns2 where "Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+      using wf_rel_normal_elim[OF RhsWfRel] red_ast_bpl_transitive
+      by blast
+    from this RedFieldAssign obtain ns3 where "Rext \<omega> \<omega> ns3" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>3, Normal ns3)" 
+      using wf_rel_normal_elim[OF WriteableLocRel] red_ast_bpl_transitive
+      by blast
+
+    then show ?thesis 
+      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+            wf_rel_normal_elim[OF RhsWfRel]
+            wf_rel_normal_elim[OF WriteableLocRel] RedFieldAssign
+      sorry
+  qed
+next
+  fix \<omega> ns 
+  assume "R \<omega> ns"
+  hence "Rext \<omega> \<omega> ns" using Rext by simp
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> RFailure"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
+  proof cases
+    case (RedFieldAssignFailure r)
+    then show ?thesis sorry
+  next
+    case RedSubExpressionFailure
+    then show ?thesis sorry
+  qed
+qed
+
+
 subsection \<open>Misc\<close>
 
 lemma init_state:

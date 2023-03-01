@@ -51,7 +51,7 @@ lemma good_state_Some_true:
   shows "good_state Pr F [] [AbsV (AHeap hb), AbsV (AMask mb)] = Some (BoolV True)"
   using assms
   apply simp
-  apply (rule exI[where ?x="(snd (snd \<omega>))"])
+  apply (rule exI[where ?x="\<omega>"])
   by simp
 
 subsection \<open>Functions for polymorphic map instantiations\<close>

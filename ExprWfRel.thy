@@ -427,17 +427,17 @@ next
 qed
 
 abbreviation wf_rel_fieldacc
-  where "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f \<equiv> wf_rel R
+  where "wf_rel_fieldacc admissible_locs R ctxt_vpr StateCons P ctxt e f \<equiv> wf_rel R
            (\<lambda>\<omega>_def \<omega>. (\<exists>a. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a))) \<and> 
-                       (a,f) \<in> get_valid_locs \<omega>_def))
+                       (a,f) \<in> admissible_locs \<omega>_def))
            (\<lambda>\<omega>_def \<omega>. (\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> 
-                           ((v = VRef Null) \<or> (\<exists>a. v = VRef (Address a) \<and> (a,f) \<notin> get_valid_locs \<omega>_def))))
+                           ((v = VRef Null) \<or> (\<exists>a. v = VRef (Address a) \<and> (a,f) \<notin> admissible_locs \<omega>_def))))
            P
            ctxt"
 
 lemma field_access_wf_rel:
   assumes ExpWfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma>1 \<gamma>2" and
-          FieldAccWfRel: "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f \<gamma>2 \<gamma>3"
+          FieldAccWfRel: "wf_rel_fieldacc get_valid_locs R ctxt_vpr StateCons P ctxt e f \<gamma>2 \<gamma>3"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (FieldAcc e f) \<gamma>1 \<gamma>3"
 proof (rule expr_wf_rel_intro)
   text\<open>Normal case\<close>
@@ -1000,10 +1000,12 @@ next
     by (auto intro: ExpRel)
 qed
 
+(* remove syn_lazy_bop_wf_rel_2 and just use syn_laxy_bop_wf_rel *)
 lemma syn_lazy_bop_wf_rel_2:
   assumes
    Lazy: "binop_lazy bop = Some (b1 :: 'a ValueAndBasicState.val, bResult)" and
    Rel1: "expr_wf_rel R (ctxt_vpr :: 'a total_context) StateCons P ctxt e1 \<gamma>0 \<gamma>2" and
+   (* TODO: Red2 is superfluous: can instead use wf_extend rules *)
    Red2: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) 
             ((BigBlock name [] (Some (ParsedIf (Some guard) (thnHd#thnTl) [empty_else_block])) None, KSeq bNext cont), Normal ns3) \<and>
              R \<omega>_def \<omega> ns3"
@@ -1015,6 +1017,7 @@ lemma syn_lazy_bop_wf_rel_2:
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
    WfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e2 (thnHd, (convert_list_to_cont thnTl (KSeq bNext cont))) \<gamma>3"
                (is "expr_wf_rel ?R_ext _ _ _ _ _ ?\<gamma>'' _") and
+   (* TODO: Red3 is superfluous: can instead use wf_extend rules *)
    Red3: "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>3, Normal ns2) ((bNext, cont), Normal ns3) \<and> R \<omega>_def \<omega> ns3"
    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Binop e1 bop e2) \<gamma>0 (bNext, cont)"
 proof (rule binop_lazy_expr_wf_rel[OF Lazy])
@@ -1068,7 +1071,7 @@ lemma syn_field_access_wf_rel:
           FieldTy: "declared_fields Pr f = Some \<tau>" and
        FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and 
        TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
-   shows "wf_rel_fieldacc R ctxt_vpr StateCons P ctxt e f 
+   shows "wf_rel_fieldacc get_valid_locs R ctxt_vpr StateCons P ctxt e f 
            ((BigBlock name ((Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]))#cs) str tr), cont)
            ((BigBlock name cs str tr), cont)"
 proof (rule wf_rel_intro)

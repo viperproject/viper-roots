@@ -34,7 +34,7 @@ datatype 'a vbpl_absval =
   | ADomainVal 'a
 \<comment>\<open>implementation detail\<close>
   | AField "'a vb_field"
-  | AHeap "ref \<Rightarrow> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
+  | AHeap "ref \<times> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
   | AMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> real"                      
   | AKnownFoldedMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> bool"         
   | AFrame  "(('a vbpl_absval) bpl_val) frame_fragment"
@@ -64,6 +64,24 @@ datatype tcon_enum =
   | TCFrameFragment 
   | TCNormalField
 
+lemma tcon_enum_univ: "UNIV = {TCRef, TCField, TCHeap, TCMask, TCKnownFoldedMask, TCFrameFragment, TCNormalField}" (is "UNIV = ?xs")
+proof 
+  show "UNIV \<subseteq> ?xs"
+  proof 
+    fix x
+    assume "x \<in> (UNIV :: tcon_enum set)"
+    thus "x \<in> ?xs"
+      by (cases x) auto
+  qed
+next
+  show "?xs \<subseteq> UNIV"
+    by auto
+qed
+
+lemma tcon_enum_univ_finite: "finite (UNIV :: tcon_enum set)"
+  apply (subst tcon_enum_univ)
+  by blast
+
 record 'a ty_repr_bpl =
   tcon_id_repr :: "tcon_enum \<Rightarrow> tcon_id"
   pred_snap_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
@@ -75,7 +93,14 @@ definition wf_ty_repr_bpl :: "'a ty_repr_bpl \<Rightarrow> bool"
   where "wf_ty_repr_bpl T \<equiv>
                (\<forall> vt bt. domain_translation T vt = Some bt \<longrightarrow> list_all closed (snd bt)) \<and>
                (\<forall> pid bt. pred_snap_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
-               (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt)"
+               (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
+               finite (dom (domain_translation T))" 
+
+text\<open>\<^const>\<open>wf_ty_repr_bpl\<close> requires there to be only finitely many domains. One reason for this 
+restriction is that not all type constructors are selected (we need to be able to pick a fresh
+type constructor for the dummy type). So, one could weaken this requirement, but since Viper only 
+allows finitely many domains this is fine (and if we also supported Viper's domain parameters 
+the mapping would be about the domain names and not the actual instantiated domain types.\<close>
 
 abbreviation "TRefId T \<equiv> (tcon_id_repr T) TCRef"
 abbreviation "TFieldId T \<equiv> (tcon_id_repr T) TCField"
@@ -88,7 +113,28 @@ abbreviation "TNormalFieldId T \<equiv> (tcon_id_repr T) TCNormalField"
 text \<open>For the dummy type, we just pick some identifier that is different from all the ones used by 
       the translation\<close>
 definition TDummyId :: "'a ty_repr_bpl \<Rightarrow> tcon_id"
-  where "TDummyId T \<equiv> (SOME v. v \<notin> range (tcon_id_repr T))"
+  where "TDummyId T \<equiv> SOME v. v \<notin> (range (tcon_id_repr T) \<union> (range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))))"
+
+lemma tdummyid_fresh:
+  assumes "wf_ty_repr_bpl T"
+  shows "TDummyId T \<notin> range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))"
+proof -
+
+  have "finite (range (tcon_id_repr T))"
+    using tcon_enum_univ_finite
+    by blast
+
+  moreover have "finite (fst ` (ran (domain_translation T)))"
+    using assms Map.finite_ran Finite_Set.finite_imageI
+    unfolding wf_ty_repr_bpl_def
+    by blast
+    
+  ultimately have "\<exists>v. v \<notin> range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))"
+    by (meson ex_new_if_finite finite_UnI infinite_UNIV_listI)    
+  thus ?thesis
+    unfolding TDummyId_def
+    by (metis sup_left_idem tfl_some)    
+qed                             
 
 abbreviation TConSingle :: "tcon_id \<Rightarrow> bpl_ty"
   where "TConSingle tid \<equiv> TCon tid []"
@@ -117,6 +163,36 @@ lemma vpr_to_bpl_ty_closed:
            closed ty_bpl"
   unfolding wf_ty_repr_bpl_def
   by (cases ty) auto
+
+lemma vpr_to_bpl_ty_not_dummy:
+  assumes "wf_ty_repr_bpl T" and
+          "vpr_to_bpl_ty T ty = Some ty_bpl"
+  shows "\<And>t_args. ty_bpl \<noteq> TCon (TDummyId T) t_args"
+  using assms
+proof (cases ty)
+  fix t_args
+  assume "ty = TRef"
+  hence "ty_bpl = (TConSingle (TRefId T))" using assms
+    by simp
+  moreover have "TRefId T \<in> range (tcon_id_repr T)"
+    by blast
+  moreover have "(TDummyId T) \<notin> range (tcon_id_repr T)"
+    using tdummyid_fresh[OF assms(1)]
+    by blast        
+  ultimately show "ty_bpl \<noteq> TCon (TDummyId T) t_args"
+    by blast    
+next
+  fix t_args t
+  assume "ty = TAbs t"
+  from this obtain tid_dom t_args_dom where 
+    "domain_translation T t = Some (tid_dom, t_args_dom)" and
+    "ty_bpl = TCon tid_dom t_args_dom"
+    using assms
+    by auto
+  thus "ty_bpl \<noteq> TCon (TDummyId T) t_args"
+    using tdummyid_fresh[OF assms(1)]
+    by (metis UnI2 fst_eqD imageI ranI ty.inject(3))
+qed (auto)
 
 fun field_ty_fun_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
   where 
@@ -167,7 +243,6 @@ definition is_inhabited :: "'a ty_repr_bpl \<Rightarrow> tcon_id \<Rightarrow> n
     "is_inhabited T tid n = 
       (\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
          (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res)"
-
 
 function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
   where 
@@ -298,6 +373,51 @@ next
       using False \<open>closed t\<close> TCon
       by auto
   qed
+qed
+
+subsection \<open>Helper lemmas\<close>
+
+lemma heap_bpl_well_typed:
+  assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h r f = Some v \<Longrightarrow> 
+                   field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>                   
+                   (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
+                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)"
+  shows "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])"
+  using assms
+  by simp
+
+  
+lemma vbpl_absval_ty_not_dummy:
+  assumes "vbpl_absval_ty TyRep absv = (tcon_id, t_args)" and
+          "(tcon_id, t_args) \<noteq> (TDummyId TyRep, [])"
+        shows "vbpl_absval_ty_opt TyRep absv = Some (tcon_id, t_args)"
+  using assms  
+  by (cases "vbpl_absval_ty_opt TyRep absv") auto
+
+text \<open>If we know that the type of a Boogie value is \<^emph>\<open>not\<close> the dummy type, then we know that the 
+      type must be provided by \<^const>\<open>vbpl_absval_ty_opt\<close> (or is a primitve type)\<close>
+
+lemma type_of_val_not_dummy:
+  assumes "type_of_val (vbpl_absval_ty TyRep) v = t" and
+          "t \<noteq> TConSingle (TDummyId TyRep)"
+  shows "case v of LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t 
+       | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
+proof (cases v)
+  case (LitV lit)
+  then show ?thesis 
+    using assms
+    by simp
+next
+  case (AbsV absv)
+  with assms obtain tcon_id t_args 
+    where "t = TCon tcon_id t_args" and "vbpl_absval_ty TyRep absv = (tcon_id, t_args)"
+    by fastforce
+  with \<open>t \<noteq> _\<close> have "vbpl_absval_ty_opt TyRep absv = Some (tcon_id, t_args)"
+    using vbpl_absval_ty_not_dummy
+    by blast
+  thus ?thesis
+    using \<open>t = _\<close> \<open>v = _\<close>
+    by auto
 qed
 
 end

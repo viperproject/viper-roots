@@ -238,7 +238,9 @@ lemma wf_ty_repr_basic: "wf_ty_repr_bpl ty_repr_basic"
   using ty_repr_basic_def
    apply (metis option.discI ty_repr_bpl.select_convs(2))
   using ty_repr_basic_def
-  apply (metis option.discI ty_repr_bpl.select_convs(3))
+   apply (metis option.discI ty_repr_bpl.select_convs(3))
+  apply (unfold ty_repr_basic_def)
+  apply simp
   done
 
 
