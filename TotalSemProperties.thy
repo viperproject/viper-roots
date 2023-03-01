@@ -4,6 +4,7 @@ begin
 
 section \<open>Inhale leaves heap unchanged\<close>
 
+(*
 lemma inhale_perm_single_mupd:
   assumes  "\<omega>' \<in> inhale_perm_single R \<omega> lh popt"
   shows "\<exists>mh. wf_mask_simple mh \<and> \<omega>' = update_mh_total_full \<omega> mh"
@@ -15,7 +16,7 @@ proof -
     unfolding inhale_perm_single_def
     by blast
   have "wf_mask_simple (get_mh_total_full \<omega>)"
-    using get_mask_total_full_wf by blast
+    
   hence "wf_mask_simple m"
     unfolding wf_mask_simple_def
     using A1 A2
@@ -23,7 +24,8 @@ proof -
   thus ?thesis using A2 \<open>\<omega>' = _\<close>
     by blast
 qed
-
+*)
+(*
 lemma inhale_perm_single_h_eq: 
   assumes  "\<omega>' \<in> inhale_perm_single R \<omega> hloc popt"
   shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
@@ -40,6 +42,7 @@ lemma inhale_perm_single_pred_h_eq:
   shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
   using assms inhale_perm_single_pred_mupd update_mp_total_h_full_eq
   by blast
+*)
 
 (*
 lemma inhale_heap_unchanged: 

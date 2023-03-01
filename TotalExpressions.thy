@@ -31,6 +31,8 @@ fun map_stmt_result_total :: "('a full_total_state \<Rightarrow> 'b full_total_s
 definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
   where "get_valid_locs \<omega> = {lh |lh. pgt (get_mh_total_full \<omega> lh) pnone}"
 
+definition get_writeable_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
+  where "get_writeable_locs \<omega> = {lh |lh. (get_mh_total_full \<omega> lh) = pwrite}"
 
 text \<open>Construct the set of states that can be reached after an inhaling field permission.
       \<^term>\<open>R\<close> expresses when a state is consistent. If \<^term>\<open>p_opt = Some q\<close> then precisely \<^term>\<open>q\<close> 
@@ -159,7 +161,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      pgte (m (pred_id,vs)) q;
      q \<noteq> pnone;
      m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q );
-     \<omega>2 = (nth_option vs, get_trace_total \<omega>, update_mp_total (get_total_full \<omega>) m');
+     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
      red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
      unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
 
@@ -231,7 +233,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 \<comment>\<open>Atomic expressions\<close>
 | RedLit: "ctxt, R, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
 | RedVar: "\<lbrakk> (get_store_total \<omega>) n = Some v \<rbrakk> \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
-| RedResult: "\<lbrakk> \<sigma> 0 = Some v \<rbrakk> \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>Result; (\<sigma>, _, _)\<rangle> [\<Down>]\<^sub>t Val v"
+| RedResult: "\<lbrakk> get_store_total \<omega> 0 = Some v \<rbrakk> \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>Result; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
 \<comment>\<open>Binop and Unop\<close>
 | RedBinopLazy: 
@@ -275,12 +277,12 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 
 \<comment>\<open>Old\<close>
 | RedOld: 
-   "\<lbrakk> t l = Some \<phi> ; 
-     ctxt, R, \<omega>_def \<turnstile> \<langle>e; (\<sigma>, t, \<phi>)\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> 
-     ctxt, R, \<omega>_def \<turnstile> \<langle>Old l e; (\<sigma>, t, _)\<rangle> [\<Down>]\<^sub>t v"
+   "\<lbrakk> get_trace_total \<omega> l = Some \<phi> ; 
+     ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> 
+     ctxt, R, \<omega>_def \<turnstile> \<langle>Old l e; \<omega>\<rangle> [\<Down>]\<^sub>t v"
  | RedOldFailure: 
-   "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> 
-    ctxt, R, \<omega>_def \<turnstile> \<langle>Old l e ; (_, t, _)\<rangle> [\<Down>]\<^sub>t VFailure" 
+   "\<lbrakk> get_trace_total \<omega> l = None \<rbrakk> \<Longrightarrow> 
+    ctxt, R, \<omega>_def \<turnstile> \<langle>Old l e ; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" 
 
 \<comment>\<open>Heap lookup\<close>
 | RedField: 

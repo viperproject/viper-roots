@@ -108,8 +108,9 @@ definition exhale_state :: "'a full_total_state \<Rightarrow> mask \<times> 'a p
   where "exhale_state \<omega> m = 
     {\<omega>' | \<omega>'. get_store_total \<omega>' = get_store_total \<omega> \<and>
               get_trace_total \<omega>' = get_trace_total \<omega> \<and>
-              get_m_total_full \<omega>' = m \<and>
-              get_h_total_full \<omega>' \<in> 
+              m = (get_mh_total_full \<omega>', get_mp_total_full \<omega>') \<and>
+              wf_mask_simple (get_mh_total_full \<omega>') \<and>
+              (get_hh_total_full \<omega>', get_hp_total_full \<omega>') \<in> 
                    havoc_undef_locs (get_hh_total_full \<omega>) (get_hp_total_full \<omega>) (fst m) (snd m)}"
 
 lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
@@ -135,7 +136,6 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
        red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
-\<comment>\<open>TODO: duplicated from ViperLang\<close>
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
   "sub_expressions (If p _ _) = [p]"
 | "sub_expressions (LocalAssign _ e) = [e]"
@@ -143,7 +143,6 @@ fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
 | "sub_expressions (Unfold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
 | "sub_expressions (Fold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
 | "sub_expressions _ = []"
-
 
 \<comment>\<open>TODO: duplicated from Viper session\<close>
 fun modif :: "stmt \<Rightarrow> var set" where
@@ -191,13 +190,15 @@ always has at least one failure transition. This is in-sync with the recent Carb
      red_stmt_total ctxt R \<Lambda> (LocalAssign x e) \<omega> (RNormal (update_var_total \<omega> x v))"
  | RedFieldAssign: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
-      get_mh_total_full \<omega> (addr,f) = pwrite;
-      ctxt, R, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<rbrakk> \<Longrightarrow> 
+      (addr,f) \<in> get_writeable_locs \<omega>;
+      ctxt, R, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v;
+      declared_fields (program_total ctxt) f = Some ty;
+      get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
       red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (RNormal (update_hh_loc_total_full \<omega> (addr,f) v))"
 \<comment>\<open>Is null case handled in NestedPermSem?\<close>
  | RedFieldAssignFailure: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-      r = Null \<or> get_mh_total_full \<omega> (the_address r,f) \<noteq> pwrite \<rbrakk> \<Longrightarrow> 
+      r = Null \<or> (the_address r,f) \<notin>  get_writeable_locs \<omega> \<rbrakk> \<Longrightarrow> 
       red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
 
 | RedUnfold:
@@ -238,8 +239,8 @@ always has at least one failure transition. This is in-sync with the recent Carb
 \<comment>\<open>Composite statements\<close>
 | RedScope:
     "\<lbrakk>  v \<in> set_from_type (absval_interp_total ctxt) \<tau>;
-       red_stmt_total ctxt R \<Lambda> scopeBody (shift_and_add_state \<omega> v) res;
-       res_unshift = map_stmt_result_total (unshift_state 0) res \<rbrakk> \<Longrightarrow>
+       red_stmt_total ctxt R \<Lambda> scopeBody (shift_and_add_state_total \<omega> v) res;
+       res_unshift = map_stmt_result_total (unshift_state_total 0) res \<rbrakk> \<Longrightarrow>
 
       red_stmt_total ctxt R \<Lambda> (Scope \<tau> scopeBody) \<omega> res_unshift"
  | RedIfTrue: 
@@ -282,7 +283,7 @@ lemmas red_stmt_total_inversion_thms =
    RedSeqFailure_case
 
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
-  where "is_empty_total \<omega> \<equiv> get_m_total_full \<omega> = (zero_mask, zero_mask)"
+  where "is_empty_total \<omega> \<equiv> get_mh_total_full \<omega> = zero_mask \<and> get_mp_total_full \<omega> = zero_mask"
 
 subsection \<open>Correctness\<close>
 
