@@ -194,12 +194,12 @@ proof(rule exp_rel_vpr_bpl_intro)
 
   from HeapRel have
     "has_Some ((=) (val_rel_vpr_bpl (get_hh_total_full \<omega> (a,f))))
-            (h_bpl (Address a) (NormalField f_tr \<tau>))"
+            (h_bpl (Address a, NormalField f_tr \<tau>))"
     unfolding heap_rel_def
     using FieldTy \<open>field_translation Tr f = Some f_tr\<close>
     by (metis option.pred_inject(2) option.sel fst_conv snd_conv)
 
-  hence HeapValBpl:"h_bpl (Address a) (NormalField f_tr \<tau>) = Some (val_rel_vpr_bpl v1)"
+  hence HeapValBpl:"h_bpl (Address a, NormalField f_tr \<tau>) = Some (val_rel_vpr_bpl v1)"
     using HeapVal
     by (metis (full_types) has_Some_iff)
 

@@ -1094,7 +1094,7 @@ proof (rule wf_rel_intro)
 
   have RedFunHasPerm: "\<And>r. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef r)) \<Longrightarrow>
                    red_expr_bpl ctxt (FunExp (FunMap FHasPerm) ts [e_m_bpl, e_r_bpl, e_f_bpl]) ns 
-           (BoolV ((m_bpl r (NormalField f_bpl \<tau>)) > 0))"
+           (BoolV ((m_bpl (r, NormalField f_bpl \<tau>)) > 0))"
         apply (subst \<open>ts = _\<close>)
         apply (rule RedFunOp)
           apply (rule ctxt_wf_fun_interp[OF CtxtWf])
@@ -1105,7 +1105,7 @@ proof (rule wf_rel_intro)
 
   
   from MaskRel have MaskRelLoc:"\<And>a. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a))) \<Longrightarrow> 
-                               real_of_rat (Rep_prat ((get_mh_total_full \<omega>_def) (a, f))) = (m_bpl (Address a) (NormalField f_bpl \<tau>))"
+                               real_of_rat (Rep_prat ((get_mh_total_full \<omega>_def) (a, f))) = (m_bpl (Address a, NormalField f_bpl \<tau>))"
       using FieldTy FieldRel 
       unfolding mask_rel_def
       using if_SomeD by fastforce
@@ -1131,7 +1131,7 @@ proof (rule wf_rel_intro)
     from ValidLoc have VprHasPerm: "pgt (get_mh_total_full \<omega>_def (a,f)) pnone"
       by (simp add: get_valid_locs_def)
   
-    with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a) (NormalField f_bpl \<tau>) > 0"    
+    with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) > 0"    
       using prat_positive_transfer
       by blast
   
@@ -1163,7 +1163,7 @@ proof (rule wf_rel_intro)
       using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
       by (metis val_rel_vpr_bpl.simps(3))
 
-    have BplHasNoPerm: "m_bpl r (NormalField f_bpl \<tau>) = 0"
+    have BplHasNoPerm: "m_bpl (r, NormalField f_bpl \<tau>) = 0"
     proof (cases rule: disjE[OF RcvVal])
       case 1
       then show ?thesis 

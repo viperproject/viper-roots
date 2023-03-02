@@ -15,8 +15,8 @@ typ "'a bpl_val" \<comment>\<open>Boogie values with abstract carrier \<^typ>\<o
 typ "'a vbpl_val" \<comment>\<open>Boogie values with abstract carrier instantiated for Viper (i.e., 
 abstract carrier \<^typ>\<open>'a vbpl_absval\<close>\<close>
                                              
-type_synonym 'a bpl_heap_ty = "ref \<Rightarrow> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
-type_synonym 'a bpl_mask_ty = "ref \<Rightarrow> 'a vb_field \<Rightarrow> real"
+type_synonym 'a bpl_heap_ty = "ref \<times> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
+type_synonym 'a bpl_mask_ty = "ref \<times> 'a vb_field \<Rightarrow> real"
 
 datatype boogie_const =      
        CNoPerm
@@ -96,12 +96,12 @@ subsection \<open>State relationship\<close>
 definition heap_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 'a total_heap \<Rightarrow> 'a bpl_heap_ty \<Rightarrow> bool"
   where "heap_rel Pr tr_field h hb \<equiv> 
     \<forall> l :: heap_loc. if_Some 
-                       (\<lambda>field_vty. has_Some (\<lambda>res. val_rel_vpr_bpl (h l) = res) (hb (Address (fst l)) (NormalField (the (tr_field (snd l))) field_vty)))
+                       (\<lambda>field_vty. has_Some (\<lambda>res. val_rel_vpr_bpl (h l) = res) (hb (Address (fst l), NormalField (the (tr_field (snd l))) field_vty) ))
                        (declared_fields Pr (snd l))"
 
 lemma heap_rel_intro:
   assumes "\<And>l field_ty_vpr. declared_fields Pr (snd l) = Some field_ty_vpr \<Longrightarrow>
-                            hb (Address (fst l)) (NormalField (the (tr_field (snd l))) field_ty_vpr) = Some (val_rel_vpr_bpl (h l))"
+                            hb (Address (fst l), NormalField (the (tr_field (snd l))) field_ty_vpr) = Some (val_rel_vpr_bpl (h l))"
   shows "heap_rel Pr tr_field h hb"
   using assms
   unfolding heap_rel_def 
@@ -110,7 +110,8 @@ lemma heap_rel_intro:
 lemma heap_rel_elim:
   assumes "heap_rel Pr tr_field h hb" and
           "(\<And>l field_ty_vpr. declared_fields Pr (snd l) = Some field_ty_vpr \<Longrightarrow>
-                            hb (Address (fst l)) (NormalField (the (tr_field (snd l))) field_ty_vpr) = Some (val_rel_vpr_bpl (h l))) \<Longrightarrow> P"
+                            hb (Address (fst l), NormalField (the (tr_field (snd l))) field_ty_vpr) = Some (val_rel_vpr_bpl (h l))) \<Longrightarrow> 
+                            P"
         shows P
   using assms
   unfolding heap_rel_def
@@ -119,9 +120,9 @@ lemma heap_rel_elim:
 definition mask_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> mask \<Rightarrow> 'a bpl_mask_ty \<Rightarrow> bool"
   where "mask_rel Pr tr_field m mb \<equiv> 
     (\<forall> l :: heap_loc. if_Some 
-                       (\<lambda>field_vty. real_of_rat (Rep_prat (m l)) = (mb (Address (fst l)) (NormalField (the (tr_field (snd l))) field_vty)))
+                       (\<lambda>field_vty. real_of_rat (Rep_prat (m l)) = (mb (Address (fst l), NormalField (the (tr_field (snd l))) field_vty)))
                        (declared_fields Pr (snd l))) \<and>
-    (\<forall>f t. mb Null (NormalField f t) = 0)"
+    (\<forall>f t. mb (Null, NormalField f t) = 0)"
 
 text \<open>\<^const>\<open>heap_rel\<close> and \<^const>\<open>mask_rel\<close> depend on the program, since the Viper type of a Viper field is required (currently)
       to identify the corresponding Boogie field\<close>
@@ -140,7 +141,7 @@ definition heap_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Right
          ( (red_expr_bpl ctxt e_heap ns (AbsV (AHeap h)) \<and>
            vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[]) \<and>
           red_expr_bpl ctxt e_rcv ns (AbsV (ARef r)) \<and>
-          red_expr_bpl ctxt e_f ns (AbsV (AField f)) \<and> h r f = Some v \<and>
+          red_expr_bpl ctxt e_f ns (AbsV (AField f)) \<and> h (r, f) = Some v \<and>
           field_ty_fun_opt T f = Some (field_tcon, ty_args) ) \<longrightarrow>
             red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v ) \<and>
          ( (\<exists>v. red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v) \<longrightarrow>
@@ -151,7 +152,7 @@ definition mask_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Right
     "mask_read_wf T ctxt mread \<equiv> \<forall> e_mask e_rcv e_f m r f ns v field_tcon ty_args.
          ( (red_expr_bpl ctxt e_mask ns (AbsV (AMask m)) \<and> 
           red_expr_bpl ctxt e_rcv ns (AbsV (ARef r)) \<and>
-          red_expr_bpl ctxt e_f ns (AbsV (AField f)) \<and> m r f = v \<and>
+          red_expr_bpl ctxt e_f ns (AbsV (AField f)) \<and> m (r, f) = v \<and>
           field_ty_fun_opt T f = Some (field_tcon, ty_args)) \<longrightarrow>
             red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns (RealV v) ) \<and>
          ( (\<exists>v. red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns v) \<longrightarrow>
@@ -192,8 +193,8 @@ lemma mask_var_rel_stable:
   unfolding mask_var_rel_def
   by auto
                            
-abbreviation zero_mask_bpl :: "ref \<Rightarrow> 'a vb_field \<Rightarrow> real"
-  where "zero_mask_bpl \<equiv> \<lambda>r f. 0"
+abbreviation zero_mask_bpl :: "ref \<times> 'a vb_field \<Rightarrow> real"
+  where "zero_mask_bpl \<equiv> \<lambda> _. 0"
 
 lemma zero_mask_rel:
   shows "mask_rel Pr F zero_mask zero_mask_bpl"
@@ -968,7 +969,7 @@ lemma heap_var_rel_update:
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      FieldTranslationInj: "inj (field_translation Tr)"
   shows "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)
-     (update_var \<Lambda> ns (heap_var Tr) (AbsV (AHeap (hb(Address addr := hb (Address addr)(NormalField f_bpl ty_vpr \<mapsto> v_bpl))))))"
+     (update_var \<Lambda> ns (heap_var Tr) (AbsV (AHeap (hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> v_bpl) ))))"
       (is "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) ?\<omega>' ?ns'")
 proof -
   from HeapVarRel and LookupHeapVar have
@@ -983,7 +984,7 @@ proof -
   show ?thesis
   unfolding heap_var_rel_def
 proof (rule exI, intro conjI)
-  let ?hb' = "hb(Address addr := hb (Address addr)(NormalField f_bpl ty_vpr \<mapsto> v_bpl))"
+  let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> v_bpl)"
   show "lookup_var \<Lambda> ?ns' (heap_var Tr) = Some (AbsV (AHeap ?hb'))"
     by simp
 next
@@ -992,16 +993,16 @@ next
     unfolding heap_var_rel_def
     by auto
 next
-  let ?hb' = "hb(Address addr := hb (Address addr)(NormalField f_bpl ty_vpr \<mapsto> v_bpl))"
+  let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> v_bpl)"
   show "vbpl_absval_ty_opt TyRep (AHeap ?hb') = Some (THeapId TyRep, [])"
   proof (rule heap_bpl_well_typed)
     fix r f v fieldKind t
-    assume LookupF: "?hb' r f = Some v"
+    assume LookupF: "?hb' (r, f) = Some v"
     assume FieldTyF: "field_ty_fun_opt TyRep f = Some (TFieldId TyRep, [fieldKind, t])"
     show "case v of LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
     proof (cases "r = (Address addr) \<and> f = NormalField f_bpl ty_vpr")
       case True
-      hence "?hb' r f = Some v_bpl" by force
+      hence "?hb' (r, f) = Some v_bpl" by force
       moreover from True have "t = ty_bpl" using FieldTyF \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>
         by simp
       ultimately show ?thesis 
@@ -1011,7 +1012,7 @@ next
         by auto
     next
       case False
-      hence "?hb' r f = hb r f " by force
+      hence "?hb' (r, f) = hb (r, f)" by force
       then show ?thesis 
         using HeapRelFacts LookupF FieldTyF 
         apply (simp split: val.split val.split_asm)
@@ -1028,13 +1029,13 @@ next
     by (metis update_hh_loc_total_full_lookup_2)
    
 
-  let ?hb' = "hb(Address addr := hb (Address addr)(NormalField f_bpl ty_vpr \<mapsto> v_bpl))"
+  let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> v_bpl)"
   show "ViperBoogieBasicRel.heap_rel Pr (field_translation Tr) (get_hh_total_full ?\<omega>') ?hb'"    
   proof (rule heap_rel_intro)
     fix l :: heap_loc
     fix  field_ty_vpr
     assume LookupFieldL:"declared_fields Pr (snd l) = Some field_ty_vpr"
-    show "?hb' (Address (fst l))  (NormalField (the (field_translation Tr (snd l))) field_ty_vpr) = 
+    show "?hb' (Address (fst l),  NormalField (the (field_translation Tr (snd l))) field_ty_vpr) = 
              Some (val_rel_vpr_bpl (get_hh_total_full ?\<omega>' l))"
     proof (cases "l = (addr, f_vpr)")
       case True
@@ -1045,8 +1046,8 @@ next
         by (simp add: update_hh_loc_total_lookup_1)
     next
       case False
-      hence "(hb(Address addr := hb (Address addr)(NormalField f_bpl ty_vpr \<mapsto> v_bpl))) (Address (fst l))
-     (NormalField (the (field_translation Tr (snd l))) field_ty_vpr) = hb (Address (fst l)) (NormalField (the (field_translation Tr (snd l))) field_ty_vpr) "
+      hence "(hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> v_bpl)) (Address (fst l), NormalField (the (field_translation Tr (snd l))) field_ty_vpr)
+                = hb (Address (fst l), NormalField (the (field_translation Tr (snd l))) field_ty_vpr) "
         sorry
 
       show ?thesis 
@@ -1286,7 +1287,7 @@ lemma bg_expr_list_red_all2:
 
 lemma heap_read_wf_apply:
   assumes "heap_read_wf T ctxt hread" and
-          "h r f = Some v" and
+          "h (r, f) = Some v" and
           "red_expr_bpl ctxt e_heap ns (AbsV (AHeap h))" and 
           "vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])" and
           "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
@@ -1299,7 +1300,7 @@ lemma heap_read_wf_apply:
 
 lemma mask_read_wf_apply:
   assumes "mask_read_wf T ctxt mread" and
-          "m r f = p" and
+          "m (r, f) = p" and
           "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
           "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
           "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and

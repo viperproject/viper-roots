@@ -70,7 +70,7 @@ text \<open>select function for the heap: readHeap<A, B>(h: HeapType, r: Ref, f:
 definition select_heap_aux :: "'a ty_repr_bpl \<Rightarrow> bpl_ty \<Rightarrow> 'a heap_repr \<Rightarrow> ref \<Rightarrow> 'a vb_field \<Rightarrow> 'a vbpl_val"
   where 
     "select_heap_aux T ret_ty h r f = 
-       option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h r f)"
+       option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h (r, f))"
 
 (* This function was used before lifting of a function to only reduce if the argument types are 
 correct was defined separately.
@@ -100,7 +100,7 @@ fun store_heap :: "'a sem_fun_bpl"
     "store_heap ts vs = 
        (case (ts, vs) of 
           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
-            Some (AbsV (  AHeap (h( r := (h r)(f \<mapsto> v) ))  ))
+            Some (AbsV (  AHeap (h((r,f) \<mapsto> v))  ))
         | _ \<Rightarrow> None)"
 
 subsubsection \<open>Mask\<close>
@@ -111,7 +111,7 @@ fun select_mask :: "'a sem_fun_bpl"
     "select_mask ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             Some (RealV (m r f))
+             Some (RealV (m (r, f)))
         | _ \<Rightarrow> None)"
 
 lemma select_mask_some: 
@@ -133,7 +133,7 @@ fun has_perm_in_mask :: "'a sem_fun_bpl"
     "has_perm_in_mask ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             Some (BoolV ((m r f) > 0))
+             Some (BoolV (m (r, f) > 0))
         | _ \<Rightarrow> None)"
 
 lemma has_perm_in_mask_some: 
@@ -176,7 +176,7 @@ fun select_knownfolded_mask :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
     "select_knownfolded_mask T ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             Some (BoolV (m r f))
+             Some (BoolV (m (r, f)))
         | _ \<Rightarrow> None)"
 
 text \<open>store function for the knownfolded mask: updPMask<A, B>(PMaskType: PMaskType, obj: Ref, f_1: (Field A B), y: bool): PMaskType\<close>
@@ -186,7 +186,7 @@ fun store_knownfolded_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Righta
     "store_knownfolded_mask T ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f), BoolV b]) \<Rightarrow> 
-             Some (AbsV (AKnownFoldedMask (m(r := (m r)(f := b)))))
+             Some (AbsV (AKnownFoldedMask (m((r,f) := b))))
         | _ \<Rightarrow> None)"
 
 subsection \<open>Global function map\<close>

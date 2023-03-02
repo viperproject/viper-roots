@@ -34,9 +34,9 @@ datatype 'a vbpl_absval =
   | ADomainVal 'a
 \<comment>\<open>implementation detail\<close>
   | AField "'a vb_field"
-  | AHeap "ref \<times> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
-  | AMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> real"                      
-  | AKnownFoldedMask "ref \<Rightarrow> 'a vb_field \<Rightarrow> bool"         
+  | AHeap "(ref \<times> 'a vb_field) \<rightharpoonup> ('a vbpl_absval) bpl_val"
+  | AMask "(ref \<times> 'a vb_field) \<Rightarrow> real"                      
+  | AKnownFoldedMask "(ref \<times> 'a vb_field) \<Rightarrow> bool"         
   | AFrame  "(('a vbpl_absval) bpl_val) frame_fragment"
   | ADummy tcon_id "bpl_ty list" 
 
@@ -48,7 +48,7 @@ type_synonym 'a vbpl_val = "('a vbpl_absval) bpl_val"
 
 text \<open>\<^typ>\<open>'a vbpl_val\<close> is the instantiated version of the Boogie values.\<close>
 
-type_synonym 'a heap_repr = "ref \<Rightarrow> 'a vb_field \<rightharpoonup> 'a vbpl_val"
+type_synonym 'a heap_repr = "ref \<times> 'a vb_field \<rightharpoonup> 'a vbpl_val"
 
 subsection \<open>Translation interface\<close>
 
@@ -216,7 +216,7 @@ fun tcon_to_bplty :: "(tcon_id \<times> bpl_ty list) \<Rightarrow> bpl_ty"
   where "tcon_to_bplty tc = TCon (fst tc) (snd tc)"
 
 definition heap_rel :: "('a vbpl_absval \<times> 'a vbpl_absval) set"
-  where "heap_rel = {(y, (AHeap h)) | h r f y v. h r f = Some v \<and> y \<in> set_val v}"
+  where "heap_rel = {(y, (AHeap h)) | h r f y v. h (r, f) = Some v \<and> y \<in> set_val v}"
 
 lemma wf_heap_rel: "wf heap_rel"
   unfolding wf_def
@@ -229,9 +229,9 @@ primrec ty_inhabitant :: "tcon_enum \<rightharpoonup> (nat \<times> (Lang.ty lis
   where
     "ty_inhabitant TCRef      = Some (0, \<lambda>_.  ARef undefined)"
   | "ty_inhabitant TCField    = Some (2, \<lambda>ts. AField (DummyField (hd ts) (hd (tl ts))))"
-  | "ty_inhabitant TCHeap     = Some (0, \<lambda>_. AHeap (\<lambda> _ _. None))"
-  | "ty_inhabitant TCMask     = Some (0, \<lambda>_. AMask (\<lambda> _ _. 0))"
-  | "ty_inhabitant TCKnownFoldedMask = Some (0, \<lambda>_. AKnownFoldedMask (\<lambda> _ _. False))"
+  | "ty_inhabitant TCHeap     = Some (0, \<lambda>_. AHeap (\<lambda> _. None))"
+  | "ty_inhabitant TCMask     = Some (0, \<lambda>_. AMask (\<lambda> _. 0))"
+  | "ty_inhabitant TCKnownFoldedMask = Some (0, \<lambda>_. AKnownFoldedMask (\<lambda> _. False))"
   | "ty_inhabitant TCFrameFragment = Some (0, \<lambda>_. AFrame EmptyFrame)"
   | "ty_inhabitant TCNormalField = None"
 
@@ -252,7 +252,7 @@ function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbp
  | "vbpl_absval_ty_opt T (AHeap h) = 
       Some_if 
           (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
-             h r f = Some v \<and> field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<longrightarrow> 
+             h (r, f) = Some v \<and> field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<longrightarrow> 
              (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
                         AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)
           ) 
@@ -378,7 +378,7 @@ qed
 subsection \<open>Helper lemmas\<close>
 
 lemma heap_bpl_well_typed:
-  assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h r f = Some v \<Longrightarrow> 
+  assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
                    field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>                   
                    (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
                         AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)"
