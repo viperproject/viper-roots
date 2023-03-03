@@ -77,6 +77,18 @@ proof (rule allI | rule impI)+
   qed (insert * **, auto)
 qed
 
+lemma vpr_to_bpl_val_type:
+  assumes "get_type A v = ty_vpr" and
+          "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
+          "domain_type TyRep = A"
+  shows "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
+proof (cases v)
+  case (VAbs x5)
+  then show ?thesis 
+    using assms
+    using type_interp_rel_wf_def type_interp_rel_wf_vbpl by blast
+qed (insert assms, auto)
+
 subsection \<open>Statement relation - general statement\<close>
 
 text\<open> Points to think about:
@@ -480,10 +492,8 @@ proof (cases rule: stmt_rel_intro)
     let ?ns'' = "update_var (var_context ctxt) ns' x_bpl ?v_bpl"
 
     have RedBpl: "red_ast_bpl P ctxt ((?b, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ?ns'')"
-      unfolding red_ast_bpl_def
-      apply (rule converse_rtranclp_into_rtranclp)
-       apply rule
-       apply rule
+      apply (rule red_ast_bpl_one_simple_cmd)
+       apply (rule Semantics.RedAssign)
          apply (rule BplTy)
         apply (rule ValBplTy)
       using RedEBpl
@@ -525,37 +535,53 @@ definition field_rel_single :: "program \<Rightarrow> 'a ty_repr_bpl \<Rightarro
 
 
 lemma field_assign_rel:
-  assumes Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)" and
-    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) \<omega> ns" and
+  assumes 
+    HeapUpdWf: "heap_update_wf TyRep ctxt (heap_update Tr)" and
+               "domain_type TyRep = absval_interp_total ctxt_vpr" and
+               "type_interp ctxt = vbpl_absval_ty TyRep" and
+    Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"  and
     RcvWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
     RhsWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
     WriteableLocRel: "wf_rel_fieldacc get_writeable_locs Rext ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
                  \<gamma>2 
-                 ((BigBlock name ((Lang.Assign h_bpl rhs_bpl)#cs) str tr), cont)" and 
-    HeapUpdateBpl: "rhs_bpl = heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
-    HeapVar: "heap_var Tr = h_bpl" and
+                 ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
+                   "h_bpl = heap_var Tr" and
+                   HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))" and
+    HeapUpdateBpl: "h_upd_bpl = heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
     RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
-    FieldRel: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+    FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     RhsRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rhs_vpr rhs_bpl" and
 
-                    \<comment>\<open>Key field assignment property for R2\<close>
-          RAssign:  "\<And> \<omega> ns v . R \<omega> ns \<Longrightarrow>
-                           get_type (absval_interp_total ctxt_vpr) v = ty \<Longrightarrow>
-                           type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = ty_bpl \<Longrightarrow>
-                           R (update_hh_loc_total_full \<omega> (addr,f) v) (update_var (var_context ctxt) ns (heap_var Tr) (val_rel_vpr_bpl v))"
+    \<comment>\<open>Key field assignment property for R\<close>
+    RFieldAssign:  "\<And> \<omega> ns ty_vpr hb addr  f_bpl v . R \<omega> ns \<Longrightarrow>
+                     declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr \<Longrightarrow>
+                     field_translation Tr f_vpr = Some f_bpl \<Longrightarrow>
+                     vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>
+                     type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>
+                     (\<exists>hb f_bpl_val. 
+                       lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
+                       vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
+                       lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
+                       field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<and>
+                       vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, []) \<and>
+                       R (update_hh_loc_total_full \<omega> (addr,f_vpr) v) 
+                         (update_var (var_context ctxt) ns (heap_var Tr) 
+                               (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
+                         ))"
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
          \<gamma>
          (BigBlock name cs str tr, cont)" 
 proof (rule stmt_rel_intro)
-  let ?\<gamma>3="((BigBlock name ((Lang.Assign h_bpl rhs_bpl)#cs) str tr), cont)"
+  let ?\<gamma>3="((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)"
   fix \<omega> ns \<omega>'
-  assume "R \<omega> ns" 
+  assume "R \<omega> ns"
   hence "Rext \<omega> \<omega> ns" using Rext by simp
+
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> (RNormal \<omega>')"
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>' ns'"
   proof cases
-    case (RedFieldAssign addr v)
+    case (RedFieldAssign addr v ty_vpr)
     from this  obtain ns1 where
       "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
       using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
@@ -563,15 +589,75 @@ proof (rule stmt_rel_intro)
     from this RedFieldAssign obtain ns2 where "Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
       using wf_rel_normal_elim[OF RhsWfRel] red_ast_bpl_transitive
       by blast
-    from this RedFieldAssign obtain ns3 where "Rext \<omega> \<omega> ns3" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>3, Normal ns3)" 
+    from this RedFieldAssign obtain ns3 where "Rext \<omega> \<omega> ns3" and RedNs3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>3, Normal ns3)" 
       using wf_rel_normal_elim[OF WriteableLocRel] red_ast_bpl_transitive
       by blast
+    hence "R \<omega> ns3"
+      using Rext by simp
 
-    then show ?thesis 
-      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
-            wf_rel_normal_elim[OF RhsWfRel]
-            wf_rel_normal_elim[OF WriteableLocRel] RedFieldAssign
-      sorry
+    obtain  f_bpl where
+         "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
+         "field_translation Tr f_vpr = Some f_bpl" and 
+         "e_f_bpl = Lang.Var f_bpl"
+      using FieldRelSingle \<open>declared_fields _ f_vpr = Some ty_vpr\<close>
+      unfolding field_rel_single_def
+      using has_SomeD by force      
+ 
+   moreover have NewValTypeBpl: "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
+     using vpr_to_bpl_val_type[OF \<open>get_type _ v = ty_vpr\<close> \<open>vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl\<close>]
+           \<open>domain_type _ = _\<close>
+     by simp
+
+   ultimately obtain hb f_bpl_val
+     where LookupHeapVarBpl: "lookup_var (var_context ctxt) ns3 (heap_var Tr) = Some (AbsV (AHeap hb))" and 
+           HeapWellTyBpl:       "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
+           HeapUpdWellTyBpl: "vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, [])" and
+           LookupFieldVarBpl: "lookup_var (var_context ctxt) ns3 f_bpl = Some (AbsV (AField f_bpl_val))" and           
+           FieldTyBpl: "field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])" and
+           "R \<omega>'
+                   (update_var (var_context ctxt) ns3 (heap_var Tr) 
+                   (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
+             )" (is "R _ ?ns_upd")
+     using RFieldAssign[OF \<open>R \<omega> ns3\<close> \<open>declared_fields _ f_vpr = Some ty_vpr\<close>] \<open>\<omega>' = _\<close>
+     by blast
+
+   from RcvRel have RedRcvBpl: "red_expr_bpl ctxt rcv_bpl ns3 (AbsV (ARef (Address addr)))"
+     using \<open>Rext \<omega> \<omega> ns3\<close>  RedFieldAssign
+     by (metis exp_rel_vpr_bpl_elim val_rel_vpr_bpl.simps(3))
+
+   from RhsRel have RedRhsBpl: "red_expr_bpl ctxt rhs_bpl ns3 (val_rel_vpr_bpl v)" 
+     using \<open>Rext \<omega> \<omega> ns3\<close>  RedFieldAssign
+     by (meson  exp_rel_vpr_bpl_elim)
+
+   from HeapUpdWf have 
+      RedHeapUpdBpl:
+     "red_expr_bpl ctxt (heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])
+                             ns3 (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))"
+     apply (rule heap_update_wf_apply)
+     using  \<open>h_bpl = _\<close> Semantics.RedVar[OF LookupHeapVarBpl]
+           apply simp
+          apply (rule HeapWellTyBpl)
+         apply (rule RedRcvBpl)
+     using \<open>e_f_bpl = _\<close> Semantics.RedVar[OF LookupFieldVarBpl]
+        apply simp
+       apply (rule FieldTyBpl)
+      apply (rule RedRhsBpl)
+     apply (simp add: NewValTypeBpl)
+     done
+
+   have "red_ast_bpl P ctxt 
+           ((BigBlock name (Assign h_bpl h_upd_bpl # cs) str tr, cont), Normal ns3) 
+           ((BigBlock name cs str tr, cont), Normal ?ns_upd)"
+     apply (rule red_ast_bpl_one_simple_cmd)
+     apply (subst HOL.sym[OF \<open>h_bpl = _\<close>])
+     apply (rule Semantics.RedAssign)
+       apply (rule HeapLookupTyBpl)
+     using HeapUpdWellTyBpl \<open>type_interp ctxt = _\<close>
+      apply simp
+     by (fastforce intro: RedHeapUpdBpl simp: \<open>h_upd_bpl = _\<close>)
+    thus ?thesis
+      using RedNs3 \<open>R \<omega>' ?ns_upd\<close>
+      using red_ast_bpl_transitive by blast      
   qed
 next
   fix \<omega> ns 
@@ -580,11 +666,40 @@ next
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> RFailure"
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
   proof cases
-    case (RedFieldAssignFailure r)
-    then show ?thesis sorry
+    case (RedFieldAssignFailure r v)
+    from this obtain ns1 where
+      "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
+      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+      by auto      
+    from this RedFieldAssignFailure obtain ns2 where "Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+      using wf_rel_normal_elim[OF RhsWfRel] red_ast_bpl_transitive
+      by blast
+
+    with RedFieldAssignFailure obtain \<gamma>' where "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Failure)"
+      using wf_rel_failure_elim[OF WriteableLocRel \<open>Rext \<omega> \<omega> ns2\<close>] red_ast_bpl_transitive
+      by (metis (no_types, opaque_lifting) ref.exhaust ref.sel snd_conv surj_pair)
+    thus ?thesis
+      by (meson snd_conv)
   next
     case RedSubExpressionFailure
-    then show ?thesis sorry
+    hence RedSubExpFailureAux: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>) [rcv_vpr, rhs_vpr] \<omega> None"
+      by simp
+    show ?thesis
+    proof (cases  "ctxt_vpr, StateCons, (Some \<omega>) \<turnstile> \<langle>rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
+      case True
+      then show ?thesis 
+        using wf_rel_failure_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+        by blast
+    next
+      case False
+      from this obtain v where "ctxt_vpr, StateCons, (Some \<omega>) \<turnstile> \<langle>rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v" and
+                               "ctxt_vpr, StateCons, (Some \<omega>) \<turnstile> \<langle>rhs_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" 
+        using RedSubExpFailureAux
+        by (auto elim: red_pure_exp_total_elims)
+      then show ?thesis 
+        using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>] wf_rel_failure_elim[OF RhsWfRel] red_ast_bpl_transitive
+        by blast
+    qed
   qed
 qed
 
@@ -650,7 +765,6 @@ proof (rule exp_rel_equiv_vpr[OF _ assms])
       by (simp add: \<open>v2 = v1\<close>)
   qed
 qed
-
 
     
 end

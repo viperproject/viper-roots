@@ -31,6 +31,9 @@ type_synonym fun_repr_bpl = "fun_enum_bpl \<Rightarrow> fname"
 definition read_heap_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
   where "read_heap_concrete F h rcv f ts \<equiv> FunExp (F FReadHeap) ts [h, rcv, f]"
 
+definition update_heap_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
+  where "update_heap_concrete F h rcv f v ts \<equiv> FunExp (F FUpdateHeap) ts [h, rcv, f, v]"
+
 definition read_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
   where "read_mask_concrete F h rcv f ts \<equiv> FunExp (F FReadMask) ts [h, rcv, f]"
 
@@ -82,6 +85,19 @@ lemma instantiate_nil_id: "instantiate [] = id"
 lemma map_instantiate_nil: "map (instantiate []) ts = ts"
   by (simp add: List.List.list.map_id instantiate_nil_id)
 
+
+method red_fun_op_bpl_tac1 uses CtxtWf =
+    (rule RedFunOp,
+     insert CtxtWf,
+     unfold ctxt_wf_def fun_interp_vpr_bpl_wf_def,
+     blast,
+     ((rule RedExpListCons, blast)+, rule RedExpListNil),
+     (simp del: vbpl_absval_ty_opt.simps),
+     (rule lift_fun_decl_well_typed),
+     simp,
+     insert field_ty_fun_two_params,
+     fastforce)
+
 lemma heap_wf_concrete:
   assumes 
     TyRepWf: "wf_ty_repr_bpl TyRep" and
@@ -111,8 +127,63 @@ lemma heap_wf_concrete:
      apply (rule field_ty_fun_two_params)
     apply blast
      apply (simp only: map_instantiate_nil)
-  by (auto elim: cons_exp_elim simp: select_heap_aux_def)
+    by (auto elim: cons_exp_elim simp: select_heap_aux_def)
 
+lemma heap_upd_well_typed:
+  assumes 
+   HeapTy: "vbpl_absval_ty_opt TyRep (AHeap h) = Some (THeapId TyRep, [])" and
+   FieldTy:  "field_ty_fun_opt TyRep f = Some (field_tcon, ty_args)" and
+   NewValType: "type_of_vbpl_val TyRep new_val = ty_args ! 1" and
+   NewValNotDummy: "ty_args ! 1 \<noteq> TConSingle (TDummyId TyRep)"
+  shows "vbpl_absval_ty_opt TyRep (AHeap (h((r, f) \<mapsto> new_val))) = Some (THeapId TyRep, [])"
+proof (rule heap_bpl_well_typed)
+  fix r' f' v fieldKind t
+  assume A: "(h((r, f) \<mapsto> new_val)) (r', f') = Some v" 
+            "field_ty_fun_opt TyRep f' = Some (TFieldId TyRep, [fieldKind, t])"
+  show "case v of LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t
+       | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
+  proof (cases "(r',f') = (r,f)")
+    case True
+    hence "v = new_val" using A
+      by fastforce
+    moreover have "ty_args ! 1 = t" using True A FieldTy
+      by fastforce
+    ultimately show ?thesis 
+      using NewValType type_of_val_not_dummy[OF NewValType NewValNotDummy]
+      by blast      
+  next
+    case False
+    hence "h (r',f') = Some v" using A
+      by auto
+    thus ?thesis 
+      using heap_bpl_well_typed_elim[OF HeapTy] A
+      by meson
+  qed
+qed
+
+lemma heap_update_wf_concrete:
+  assumes 
+    TyRepWf: "wf_ty_repr_bpl TyRep" and
+    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" 
+  shows "heap_update_wf TyRep ctxt (update_heap_concrete FunMap)"
+  unfolding heap_update_wf_def
+  apply (rule allI)+
+  apply (rule conjI)
+   apply (rule impI)
+   apply (unfold update_heap_concrete_def)
+  apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
+    using field_ty_fun_opt_closed_args[OF TyRepWf] 
+       apply (fastforce simp: map_instantiate_nil)
+      apply (simp only: map_instantiate_nil)    
+      apply simp
+    using field_ty_fun_two_params field_ty_fun_opt_tcon
+        apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+     apply (rule field_ty_fun_two_params)
+    apply blast
+      apply (simp only: map_instantiate_nil)
+      apply simp
+    by (blast elim: cons_exp_elim)
+    
 lemma mask_read_wf_concrete:
   assumes 
     TyRepWf: "wf_ty_repr_bpl TyRep" and
@@ -123,16 +194,7 @@ lemma mask_read_wf_concrete:
   apply (rule conjI)
    apply (rule impI)
    apply (unfold read_mask_concrete_def)
-  apply (rule RedFunOp)
-       using CtxtWf
-    unfolding ctxt_wf_def fun_interp_vpr_bpl_wf_def
-       apply blast
-      apply ((rule RedExpListCons, blast)+, rule RedExpListNil)
-     apply (simp del: vbpl_absval_ty_opt.simps)
-     apply (rule lift_fun_decl_well_typed)
-         apply simp       
-    using field_ty_fun_two_params
-        apply fastforce    
+  apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
     using field_ty_fun_opt_closed_args[OF TyRepWf] 
        apply (fastforce simp: map_instantiate_nil)
       apply (simp only: map_instantiate_nil)    
@@ -142,7 +204,8 @@ lemma mask_read_wf_concrete:
      apply (rule field_ty_fun_two_params)
     apply blast
      apply (simp only: map_instantiate_nil)
-  by (auto elim: cons_exp_elim)
+    apply simp
+  by (blast elim: cons_exp_elim)
 
 subsection \<open>Translation interface\<close>
 
@@ -165,21 +228,10 @@ definition var_translation_example :: "ViperLang.var \<rightharpoonup> Lang.vnam
 fun fun_repr_concrete :: fun_repr_bpl 
   where 
     "fun_repr_concrete FReadHeap = ''readHeap''"
+  | "fun_repr_concrete FUpdateHeap = ''updHeap''"
   | "fun_repr_concrete FReadMask = ''readMask''"
   | "fun_repr_concrete FGoodState = ''state''"
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
-
-(*
-definition tr_vpr_bpl_example :: "fun_repr_bpl \<Rightarrow> tr_vpr_bpl"
-  where "tr_vpr_bpl_example F \<equiv>
-      \<lparr> heap_var = 0,
-       mask_var = 1,
-       mask_read = (read_mask_concrete F),
-      heap_read = (read_heap_concrete F),
-      field_translation = field_translation_example,
-      fun_translation = fun_translation_example,
-      var_translation = var_translation_example \<rparr>"
-*)
 
 method ctxt_wf_fun_tac for f :: fun_enum_bpl = (unfold ctxt_wf_def, erule allE[where ?x=f], simp)
 

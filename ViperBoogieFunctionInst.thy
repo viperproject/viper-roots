@@ -13,7 +13,8 @@ subsection \<open>General\<close>
 
 datatype fun_enum_bpl = 
      FGoodState
-     | FReadHeap 
+     | FReadHeap
+     | FUpdateHeap
      | FReadMask
      | FHasPerm
 
@@ -227,6 +228,8 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
        (good_state Pr F, (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool)))"
   | "fun_interp_vpr_bpl_aux Pr T F FReadHeap = 
        (select_heap T, (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TVar 1)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FUpdateHeap = 
+       (store_heap, (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TVar 1], TConSingle (THeapId T)))"
   | "fun_interp_vpr_bpl_aux Pr T F FReadMask =
        (select_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =

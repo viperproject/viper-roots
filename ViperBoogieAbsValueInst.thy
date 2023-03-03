@@ -375,7 +375,10 @@ next
   qed
 qed
 
-subsection \<open>Helper lemmas\<close>
+subsection \<open>Helper definitions and lemmas\<close>
+
+definition heap_bpl_upd_normal_field :: "'a heap_repr \<Rightarrow> ref \<Rightarrow> vname \<Rightarrow> vtyp \<Rightarrow> 'a vbpl_val \<Rightarrow> 'a heap_repr"
+  where "heap_bpl_upd_normal_field h r f vpr_ty v \<equiv> h((r, NormalField f vpr_ty) \<mapsto> v)"
 
 lemma heap_bpl_well_typed:
   assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
@@ -386,7 +389,17 @@ lemma heap_bpl_well_typed:
   using assms
   by simp
 
-  
+lemma heap_bpl_well_typed_elim:
+  assumes "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])" and
+          "(\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
+                   field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>                   
+                   (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
+                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)) \<Longrightarrow> P"
+  shows P
+  using assms
+  apply (simp)
+  by (metis option.distinct(1))
+
 lemma vbpl_absval_ty_not_dummy:
   assumes "vbpl_absval_ty TyRep absv = (tcon_id, t_args)" and
           "(tcon_id, t_args) \<noteq> (TDummyId TyRep, [])"

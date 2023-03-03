@@ -198,6 +198,9 @@ always has at least one failure transition. This is in-sync with the recent Carb
 \<comment>\<open>Is null case handled in NestedPermSem?\<close>
  | RedFieldAssignFailure: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+      \<comment>\<open>the reduction of the right-hand-side is technically not required for this rule 
+         (irrelevant if well-typed), but matches Viper's current reduction order\<close>
+      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
       r = Null \<or> (the_address r,f) \<notin>  get_writeable_locs \<omega> \<rbrakk> \<Longrightarrow> 
       red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
 
@@ -353,5 +356,45 @@ definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total
            predicate_obligations ctxt \<and>
            (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
                 red_stmt_total ctxt R \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure)"
+
+(* TODO loops
+
+definition havoc_vars_state :: "'a full_total_state \<Rightarrow> var set \<Rightarrow> 'a full_total_state set"
+  where "havoc_vars_state \<omega> havoced_vars = { update_store_total \<omega> \<sigma>' | \<sigma>'. 
+                                      dom \<sigma>' = dom (get_store_total \<omega>) \<and>
+                                      (\<forall> x \<in> dom (get_store_total \<omega>) - havoced_vars. get_store_total \<omega> x = \<sigma>' x) }"
+ | RedWhile:
+   "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh);
+      (\<And> \<omega>AfterHavoc \<omega>AfterInh \<omega>AfterBody res. havoc_vars \<omega>AfterExh (modif loop_body) \<omega>AfterHavoc \<Longrightarrow>
+          (ctxt, R, (Some \<omega>AfterHavoc) \<turnstile> \<langle>cond; \<omega>AfterHavoc\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<Longrightarrow>
+          red_inhale ctxt R invariant \<omega>AfterHavoc (RNormal \<omega>AfterInh) \<Longrightarrow>
+          red_stmt_total ctxt R \<Lambda> loop_body \<omega>AfterInh (RNormal \<omega>AfterBody) \<Longrightarrow>
+          red_stmt_total ctxt R \<Lambda> (Assert invariant) \<omega>AfterBody res \<Longrightarrow> 
+          res \<noteq> RFailure))      
+       \<rbrakk> \<Longrightarrow>
+      red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> \<omega>'"
+
+ | RedWhileNormal:
+    "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh);
+       \<omega>AfterHavoc \<in> havoc_vars_state \<omega>AfterExh (modif loop_body);
+       red_inhale ctxt R invariant \<omega>AfterHavoc (RNormal \<omega>AfterInh);
+       ctxt, R, (Some \<omega>AfterInh) \<turnstile> \<langle>cond; \<omega>AfterInh\<rangle> [\<Down>]\<^sub>t Val (VBool False)
+     \<rbrakk> \<Longrightarrow> red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> (RNormal \<omega>AfterInh)"
+
+\<comment>\<open>TODO: intermediate failures\<close>
+  | RedWhileFailure:
+   "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh); \<comment>\<open>failure option 1\<close>
+      \<omega>AfterHavoc \<in> havoc_vars_state \<omega>AfterExh (modif loop_body); 
+      red_inhale ctxt R invariant                                       \<comment>\<open>failure option 2\<close>
+            (empty_full_total_state 
+                        (get_store_total \<omega>AfterHavoc) 
+                        (get_trace_total \<omega>AfterHavoc)
+                        (get_h_total_full \<omega>AfterHavoc))
+            (RNormal \<omega>AfterInh);
+      ctxt, R, (Some \<omega>AfterInh) \<turnstile> \<langle>cond; \<omega>AfterInh\<rangle> [\<Down>]\<^sub>t Val (VBool True); \<comment>\<open>failure option 3\<close>
+      red_stmt_total ctxt R \<Lambda> loop_body \<omega> (RNormal \<omega>AfterInh);            \<comment>\<open>failure option 4\<close>
+      red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega>AfterInh RFailure \<rbrakk> \<Longrightarrow> \<comment>\<open>failure option 5\<close>
+      red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> RFailure"
+*)
 
 end
