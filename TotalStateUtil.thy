@@ -225,6 +225,11 @@ fun update_m_total_full :: "'a full_total_state \<Rightarrow> mask \<Rightarrow>
   where "update_m_total_full \<omega> m pm = 
               \<omega>\<lparr> get_total_full := update_mp_total (update_mh_total (get_total_full \<omega>) m) pm \<rparr>"
 
+lemma get_m_total_full_aux:
+  "get_m_total_full \<omega> = get_m_total_full (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)"
+  apply simp
+  by (simp add: update_hh_loc_total_mh_eq update_hh_loc_total_mp_eq)
+
 section \<open>Shifting stores\<close>
 
 fun shift_and_add_state_total :: "'a full_total_state \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
