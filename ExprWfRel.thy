@@ -1056,7 +1056,7 @@ next
 qed
 
 (* TODO: extract the common parts from this lemma *)
-lemma syn_field_access_wf_rel:
+lemma syn_field_access_valid_wf_rel:
   assumes 
          CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
          TyRepWf: "wf_ty_repr_bpl TyRep" and
@@ -1183,6 +1183,154 @@ proof (rule wf_rel_intro)
               ((BigBlock name cs str tr, cont), Failure)"
       using RedFunHasPerm[OF RedRcvBpl] BplHasNoPerm
       by (auto simp: HOL.sym[OF FunMap] intro!: red_ast_bpl_one_simple_cmd Semantics.RedAssertFail)
+    thus "?B" by auto      
+  qed
+qed
+
+\<comment>\<open>TODO: write more general lemma that captures wf_rel_field_acc in general (currently lots of duplication
+between the lemmas that show wf_rel_field_acc)\<close>
+lemma syn_field_access_writeable_wf_rel:
+  assumes 
+         CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
+         TyRepWf: "wf_ty_repr_bpl TyRep" and
+  \<comment>\<open>TODO: The following assumption needs to be changed once constructs are supported where the well-definedness
+     state and the evaluation state differ\<close>
+         StateRel: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<omega>_def = \<omega> \<and> state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns" and
+         MaskLookup: "mask_lookup = mask_read Tr e_m_bpl e_r_bpl e_f_bpl ts" and
+         MaskReadWf: "mask_read_wf TyRep ctxt (mask_read Tr)" and
+         WritePermConst: "const_repr Tr CWritePerm = writePermConst" and
+         ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
+         MaskExp:  "e_m_bpl = Lang.Var (mask_var Tr)" and
+         FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
+         TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
+   shows "wf_rel_fieldacc get_writeable_locs R ctxt_vpr StateCons P ctxt e f 
+           ((BigBlock name ((Assert ((Var writePermConst) \<guillemotleft>Eq\<guillemotright> mask_lookup))#cs) str tr), cont)
+           ((BigBlock name cs str tr), cont)"
+proof (rule wf_rel_intro)
+
+  from FieldRelSingle obtain \<tau> f_bpl where
+      FieldRel: "field_translation Tr f = Some f_bpl" and     
+         RcvExp:   "e_f_bpl = Lang.Var f_bpl" and
+          FieldTy: "declared_fields Pr f = Some \<tau>" and
+       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
+    by (auto elim: field_rel_single_elim)
+
+  note WdStateEq = conjunct1[OF StateRel]
+  note StateRel0 = state_rel_state_rel0[OF conjunct2[OF StateRel]]
+  fix v \<omega>_def \<omega> ns
+  assume R:"R \<omega>_def \<omega> ns" 
+  hence "\<omega>_def = \<omega>" and StateRelInst: "state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns"
+    using StateRel
+    by auto
+
+  have RedFieldBpl: "red_expr_bpl ctxt e_f_bpl ns ((AbsV (AField (NormalField f_bpl \<tau>))))"    
+    using \<open>e_f_bpl = _\<close> FieldRel FieldTy StateRel0[OF R]
+    unfolding state_rel0_def field_rel_def
+    by (fastforce intro: red_expr_red_exprs.intros)
+
+  obtain m_bpl where RedMaskBpl: "red_expr_bpl ctxt e_m_bpl ns (AbsV (AMask m_bpl))" and
+                 MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>_def) m_bpl"
+    using \<open>e_m_bpl = _\<close> state_rel0_mask_var_rel[OF StateRel0[OF R]] WdStateEq[OF R]
+    unfolding state_rel_def state_rel0_def mask_var_rel_def 
+    by (auto intro: red_expr_red_exprs.intros)
+
+  have RedMaskLookup: "\<And>r. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef r)) \<Longrightarrow>
+                   red_expr_bpl ctxt mask_lookup ns 
+           (RealV ((m_bpl (r, NormalField f_bpl \<tau>))))"
+    apply (subst \<open>mask_lookup = _\<close>)
+    apply (subst \<open>ts = _\<close>)    
+    apply (rule mask_read_wf_apply[OF MaskReadWf])
+        apply simp
+       apply (rule RedMaskBpl)
+      apply simp
+     apply (rule RedFieldBpl)
+    apply (simp add: FieldTyBpl)
+    done
+
+  have RedFullPerm: "red_expr_bpl ctxt (Var writePermConst) ns (RealV 1)"
+    using WritePermConst state_rel0_boogie_const[OF state_rel_state_rel0[OF StateRelInst]]
+    unfolding boogie_const_rel_def
+    by (auto intro: Semantics.RedVar)   
+
+  
+  from MaskRel have MaskRelLoc:"\<And>a. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a))) \<Longrightarrow> 
+                               real_of_rat (Rep_prat ((get_mh_total_full \<omega>_def) (a, f))) = (m_bpl (Address a, NormalField f_bpl \<tau>))"
+      using FieldTy FieldRel 
+      unfolding mask_rel_def
+      by (simp add: if_Some_iff)
+
+  text \<open>Show normal case\<close>
+  show "\<exists>a. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<and> (a, f) \<in> get_writeable_locs \<omega>_def \<Longrightarrow>
+          \<exists>ns'. red_ast_bpl P ctxt
+                 ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup) # cs) str tr, cont), Normal ns)
+                 ((BigBlock name cs str tr, cont), Normal ns') \<and>
+                R \<omega>_def \<omega> ns'" (is "?A \<Longrightarrow> ?B")
+  proof -
+    assume "?A"
+
+    from this obtain a where
+      RedRcv: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))" and
+      WriteableLocs: "(a, f) \<in> get_writeable_locs \<omega>_def"
+      by auto
+
+    hence RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a)))"
+      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      by (metis val_rel_vpr_bpl.simps(3))
+  
+    from WriteableLocs have VprHasPerm: "(get_mh_total_full \<omega>_def (a,f)) = pwrite"
+      by (simp add: get_writeable_locs_def)
+  
+    with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) = 1"    
+      by (simp add: pwrite.rep_eq)      
+  
+    have "red_ast_bpl P ctxt
+              ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup) # cs) str tr, cont), Normal ns)
+              ((BigBlock name cs str tr, cont), Normal ns)"
+      using BplHasPerm RedMaskLookup[OF RedRcvBpl] RedFullPerm
+      by (auto intro: red_expr_red_exprs.intros intro!: red_ast_bpl_one_simple_cmd Semantics.RedAssertOk)
+    
+    thus "?B" using R by blast
+  qed
+
+  text \<open>Show failure case\<close>
+  show "\<exists>v. ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and>
+           (v = VRef Null \<or> (\<exists>a. v = VRef (Address a) \<and> (a, f) \<notin> get_writeable_locs \<omega>_def)) \<Longrightarrow>
+       \<exists>c'. red_ast_bpl P ctxt
+             ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup) # cs) str tr, cont), Normal ns) c' \<and>
+            snd c' = Failure"
+       (is "?A \<Longrightarrow> ?B")
+  proof -
+    assume "?A"
+
+    from this obtain r where
+      RedRcv: "ctxt_vpr, StateCons, Some \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+      RcvVal: "r = Null \<or> (\<exists>a. r = Address a \<and> (a, f) \<notin> get_writeable_locs \<omega>_def)"
+      by blast
+
+    have RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef r))"
+      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      by (metis val_rel_vpr_bpl.simps(3))
+
+    have BplHasNoPerm: "m_bpl (r, NormalField f_bpl \<tau>) \<noteq> 1"
+    proof (cases rule: disjE[OF RcvVal])
+      case 1
+      then show ?thesis 
+        using MaskRel
+        unfolding mask_rel_def
+        by auto
+    next
+      case 2
+      then show ?thesis 
+        using MaskRel MaskRelLoc ExpRel
+        unfolding mask_rel_def get_writeable_locs_def  
+        using RedRcvBpl Rep_prat_inject pwrite.rep_eq by fastforce
+    qed
+
+    have "red_ast_bpl P ctxt
+              ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup)  # cs) str tr, cont), Normal ns)
+              ((BigBlock name cs str tr, cont), Failure)"
+      using BplHasNoPerm RedMaskLookup[OF RedRcvBpl] RedFullPerm
+      by (auto intro: red_expr_red_exprs.intros intro!: red_ast_bpl_one_simple_cmd Semantics.RedAssertFail)
     thus "?B" by auto      
   qed
 qed

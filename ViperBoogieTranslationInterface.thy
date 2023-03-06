@@ -37,6 +37,9 @@ definition update_heap_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rig
 definition read_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
   where "read_mask_concrete F h rcv f ts \<equiv> FunExp (F FReadMask) ts [h, rcv, f]"
 
+definition update_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
+  where "update_mask_concrete F h rcv f v ts \<equiv> FunExp (F FUpdateMask) ts [h, rcv, f, v]"
+
 lemma field_ty_fun_two_params:
   assumes "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
   obtains t1 t2
@@ -100,8 +103,8 @@ method red_fun_op_bpl_tac1 uses CtxtWf =
 
 lemma heap_wf_concrete:
   assumes 
-    TyRepWf: "wf_ty_repr_bpl TyRep" and
-    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" 
+    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
+    TyRepWf: "wf_ty_repr_bpl TyRep"
   shows "heap_read_wf TyRep ctxt (read_heap_concrete FunMap)"
   unfolding heap_read_wf_def
   apply (rule allI)+
@@ -163,8 +166,8 @@ qed
 
 lemma heap_update_wf_concrete:
   assumes 
-    TyRepWf: "wf_ty_repr_bpl TyRep" and
-    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" 
+    CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
+    TyRepWf: "wf_ty_repr_bpl TyRep"
   shows "heap_update_wf TyRep ctxt (update_heap_concrete FunMap)"
   unfolding heap_update_wf_def
   apply (rule allI)+
@@ -186,8 +189,8 @@ lemma heap_update_wf_concrete:
     
 lemma mask_read_wf_concrete:
   assumes 
-    TyRepWf: "wf_ty_repr_bpl TyRep" and
-    CtxtWf: "ctxt_wf Pr TyRep F fun_repr ctxt" 
+    CtxtWf: "ctxt_wf Pr TyRep F fun_repr ctxt" and
+    TyRepWf: "wf_ty_repr_bpl TyRep"
   shows "mask_read_wf TyRep ctxt (read_mask_concrete fun_repr)"   
   unfolding mask_read_wf_def
   apply (rule allI)+
@@ -230,6 +233,7 @@ fun fun_repr_concrete :: fun_repr_bpl
     "fun_repr_concrete FReadHeap = ''readHeap''"
   | "fun_repr_concrete FUpdateHeap = ''updHeap''"
   | "fun_repr_concrete FReadMask = ''readMask''"
+  | "fun_repr_concrete FUpdateMask = ''updMask''"
   | "fun_repr_concrete FGoodState = ''state''"
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
 
@@ -273,15 +277,15 @@ fun tcon_enum_to_id :: "tcon_enum \<Rightarrow> tcon_id"
 
 text \<open>Type representation instantiation without predicates and domains\<close>
 
-definition ty_repr_basic :: "'a ty_repr_bpl"
-  where "ty_repr_basic = 
+definition ty_repr_basic :: "('a \<Rightarrow> abs_type) \<Rightarrow> 'a ty_repr_bpl"
+  where "ty_repr_basic A = 
      \<lparr>  tcon_id_repr = tcon_enum_to_id,
         pred_snap_field_type = (\<lambda>_. None),
         pred_knownfolded_field_type = (\<lambda>_. None),
         domain_translation = (\<lambda>_. None),
-        domain_type = (\<lambda>_. ''placeholder'')  \<rparr>"
+        domain_type = A \<rparr>"
 
-lemma wf_ty_repr_basic: "wf_ty_repr_bpl ty_repr_basic"
+lemma wf_ty_repr_basic: "wf_ty_repr_bpl (ty_repr_basic A)"
   unfolding wf_ty_repr_bpl_def
   apply (intro conjI)
     apply clarify

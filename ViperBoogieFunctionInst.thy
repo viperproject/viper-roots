@@ -16,6 +16,7 @@ datatype fun_enum_bpl =
      | FReadHeap
      | FUpdateHeap
      | FReadMask
+     | FUpdateMask
      | FHasPerm
 
 text \<open>\<^typ>\<open>fun_enum_bpl\<close> enumerates the functions required for the encoding\<close>
@@ -42,12 +43,14 @@ fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup
            ([], [AbsV (AHeap h), AbsV (AMask m)]) \<Rightarrow> 
              Some (BoolV (\<exists> \<omega> :: 'a full_total_state. 
                                  \<comment>\<open>TODO: predicates \<longrightarrow> need state consistency\<close>
+                                 wf_mask_simple (get_mh_total_full \<omega>) \<and>
                                  heap_rel Pr F (get_hh_total_full \<omega>) h \<and> 
                                  mask_rel Pr F (get_mh_total_full \<omega>) m))
         | _ \<Rightarrow> None)"
 
 lemma good_state_Some_true:
-  assumes "heap_rel Pr F (get_hh_total_full \<omega>) hb" and
+  assumes "wf_mask_simple (get_mh_total_full \<omega>)" and 
+          "heap_rel Pr F (get_hh_total_full \<omega>) hb" and
           "mask_rel Pr F (get_mh_total_full \<omega>) mb"
   shows "good_state Pr F [] [AbsV (AHeap hb), AbsV (AMask mb)] = Some (BoolV True)"
   using assms
@@ -72,19 +75,6 @@ definition select_heap_aux :: "'a ty_repr_bpl \<Rightarrow> bpl_ty \<Rightarrow>
   where 
     "select_heap_aux T ret_ty h r f = 
        option_fold id (SOME v. type_of_val (vbpl_absval_ty T) v = ret_ty) (h (r, f))"
-
-(* This function was used before lifting of a function to only reduce if the argument types are 
-correct was defined separately.
-fun select_heap_old :: "'a ty_repr_bpl \<Rightarrow> 'a bpl_fun"
-  where 
-    "select_heap_old T ts vs = 
-        (case (ts, vs) of 
-           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
-             if (if_Some (\<lambda>res. res  = (t1, t2) \<and> vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])) (arg_types_of_field T f))
-             then Some (select_heap_aux T t2 h r f)
-             else None
-         | _ \<Rightarrow> None)"
-*)
 
 fun select_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
   where 
@@ -311,7 +301,7 @@ proof  -
       apply simp
     using Hty Mty
      apply (simp del: vbpl_absval_ty_opt.simps)    
-    using Hrel Mrel good_state_Some_true FieldTr
+    using Hrel Mrel good_state_Some_true FieldTr state_rel0_wf_mask_simple[OF state_rel_state_rel0[OF StateRel]]
     by blast
 qed
 

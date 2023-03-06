@@ -126,7 +126,6 @@ record 'a total_context =
   fun_interp_total :: "'a interp"
   absval_interp_total :: "'a \<Rightarrow> abs_type"
 
-
 text \<open>Expression evaluation, well-definedness of expressions and inhale are defined in a mutually
 inductive way. The reason is that well-definedness uses inhale to express well-definedness of 
 unfolding expressions and inhale fails if some subexpression is not well-defined. Expression evaluation
