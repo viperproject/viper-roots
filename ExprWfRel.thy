@@ -1066,15 +1066,19 @@ lemma syn_field_access_valid_wf_rel:
          ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
          FunMap:   "FunMap FHasPerm = has_perm_name" and
          MaskExp:  "e_m_bpl = Lang.Var (mask_var Tr)" and
-         FieldRel: "field_translation Tr f = Some f_bpl" and
-         RcvExp:   "e_f_bpl = Lang.Var f_bpl" and
-          FieldTy: "declared_fields Pr f = Some \<tau>" and
-       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and 
+         FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
        TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
    shows "wf_rel_fieldacc get_valid_locs R ctxt_vpr StateCons P ctxt e f 
            ((BigBlock name ((Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]))#cs) str tr), cont)
            ((BigBlock name cs str tr), cont)"
 proof (rule wf_rel_intro)
+
+  from FieldRelSingle obtain f_bpl \<tau> where
+    FieldRel: "field_translation Tr f = Some f_bpl" and
+    RcvExp:   "e_f_bpl = Lang.Var f_bpl" and
+    FieldTy: "declared_fields Pr f = Some \<tau>" and
+    FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
+    by (auto elim: field_rel_single_elim)
 
   note WdStateEq = conjunct1[OF StateRel]
   note StateRel0 = state_rel_state_rel0[OF conjunct2[OF StateRel]]

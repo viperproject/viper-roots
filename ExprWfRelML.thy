@@ -138,16 +138,13 @@ ML \<open>
 \<close>
 
 ML \<open>
-  fun field_access_wf_rel_tac_aux init_tac lookup_mask_var_tac field_rel_tac field_lookup_tac ty_args_eq_tac (exp_rel_info : exp_rel_info) ctxt =
+  fun field_access_wf_rel_tac_aux init_tac lookup_mask_var_tac field_rel_single_tac ty_args_eq_tac (exp_rel_info : exp_rel_info) ctxt =
     (Rmsg' "Wf Field Access 1" init_tac ctxt) THEN'
     (Rmsg' "Wf Field Access 2" assm_full_simp_solved_tac ctxt) THEN'
     (Rmsg' "Wf Field Access 3" (exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
     (Rmsg' "Wf Field Access 4" assm_full_simp_solved_tac ctxt) THEN'
     (Rmsg' "Wf Field Access 5" lookup_mask_var_tac ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 6" field_rel_tac ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 7" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 8" field_lookup_tac ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 9" assm_full_simp_solved_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 6" field_rel_single_tac ctxt |> SOLVED') THEN'
     (Rmsg' "Wf Field Access 10" ty_args_eq_tac ctxt |> SOLVED')
 
 \<close>

@@ -161,14 +161,18 @@ lemma exp_rel_field_access:
        StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr \<omega> ns" and
        HeapReadWf: "heap_read_wf TyRep ctxt (heap_read Tr)" and
        "e_bpl = (heap_read Tr) (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
-       FieldRel: "field_translation Tr f = Some f_tr" and
-       "e_f_bpl = Lang.Var f_tr" and    
-       FieldTy: "declared_fields Pr f = Some \<tau>" and
-       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl" and
+       FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
 \<comment>\<open>receiver relation last, since that is the "implementation-independent" premise\<close>
        RcvRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_rcv_bpl" 
      shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (FieldAcc e f) e_bpl"
 proof(rule exp_rel_vpr_bpl_intro)
+  from FieldRelSingle obtain f_tr \<tau> where
+       FieldRel: "field_translation Tr f = Some f_tr" and
+       "e_f_bpl = Lang.Var f_tr" and    
+       FieldTy: "declared_fields Pr f = Some \<tau>" and
+       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
+    by (auto elim: field_rel_single_elim)
+
   fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
   assume R:"R \<omega>_def \<omega> ns"
   assume RedVpr: "ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"

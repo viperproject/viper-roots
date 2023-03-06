@@ -95,15 +95,12 @@ and
 \<close>
 
 ML
- \<open> fun field_access_rel_pre_tac_aux heap_read_wf_tac head_read_match_tac field_rel_tac field_lookup_tac ctxt =
+ \<open> fun field_access_rel_pre_tac_aux heap_read_wf_tac head_read_match_tac field_rel_single_tac ctxt =
     resolve_tac ctxt [@{thm exp_rel_field_access} OF [@{thm state_rel_state_rel0}]] THEN'
     blast_tac ctxt THEN'
     heap_read_wf_tac ctxt THEN'
     head_read_match_tac ctxt THEN'
-    field_rel_tac ctxt THEN'
-    assm_full_simp_solved_tac ctxt THEN'
-    field_lookup_tac ctxt THEN'
-    assm_full_simp_solved_tac ctxt
+    field_rel_single_tac ctxt
 \<close>
 
 end
