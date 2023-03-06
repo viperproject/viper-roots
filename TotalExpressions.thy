@@ -18,9 +18,11 @@ for \<^term>\<open>(f::'a heapfun_repr) vs \<omega>\<close> are
 \<^item> \<^term>\<open>Some (Val v)\<close>: There is no typing issue and the function call is well-defined. The resulting value is \<^term>\<open>v\<close>.
 \<close>
 
-subsection\<open>Evaluation of pure expressions, well-definedness of pure expressions, inhale of assertions\<close>
+subsection\<open>General auxiliary definitions\<close>
 
 datatype 'a stmt_result_total = RMagic | RFailure | RNormal "'a full_total_state"
+
+text \<open>\<^typ>\<open>'a stmt_result_total\<close> expresses the possible states for statements.\<close>
 
 fun map_stmt_result_total :: "('a full_total_state \<Rightarrow> 'b full_total_state) \<Rightarrow> 'a stmt_result_total \<Rightarrow> 'b stmt_result_total"
   where
@@ -28,45 +30,19 @@ fun map_stmt_result_total :: "('a full_total_state \<Rightarrow> 'b full_total_s
   | "map_stmt_result_total f RMagic = RMagic"
   | "map_stmt_result_total f RFailure = RFailure"
 
-definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
-  where "get_valid_locs \<omega> = {lh |lh. pgt (get_mh_total_full \<omega> lh) pnone}"
-
-definition get_writeable_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
-  where "get_writeable_locs \<omega> = {lh |lh. (get_mh_total_full \<omega> lh) = pwrite}"
-
-text \<open>Construct the set of states that can be reached after an inhaling field permission.
-      \<^term>\<open>R\<close> expresses when a state is consistent. If \<^term>\<open>p_opt = Some q\<close> then precisely \<^term>\<open>q\<close> 
-      permission is added and otherwise there are no explicit constraints on the added permission
-      (useful to model adding wildcard permission).\<close>
-
-definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
-  where "inhale_perm_single R \<omega> lh p_opt =
-      {\<omega>'| \<omega>' q. R \<omega>' \<and>
-               option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
-               pgte pwrite (padd (get_mh_total_full \<omega> lh) q) \<and>
-               \<omega>' = update_mh_total_full \<omega> ((get_mh_total_full \<omega>)(lh := (padd (get_mh_total_full \<omega> lh) q)))
-       }"
-
-text \<open>Construct the set of states that can be reached after an inhaling predicate permission.\<close>
-
-definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
-  where "inhale_perm_single_pred R \<omega> lp p_opt = 
-      {\<omega>'| \<omega>' q. R \<omega>' \<and>  
-               option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
-               pgte pwrite (padd (get_mp_total_full \<omega> lp) q) \<and>
-               \<omega>' = update_mp_total_full \<omega> ((get_mp_total_full \<omega>)(lp := (padd (get_mp_total_full \<omega> lp) q)))
-       }"
-
 inductive th_result_rel :: "bool \<Rightarrow> bool \<Rightarrow> ('a full_total_state) set \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"  where
   THResultNormal: "\<lbrakk> \<omega> \<in> W \<rbrakk> \<Longrightarrow> th_result_rel True True W (RNormal \<omega>)"
 | THResultMagic: "th_result_rel True False W RMagic"
 | THResultFailure: "th_result_rel False b W RFailure"
 
-text \<open>\<^const>\<open>th_result_rel\<close> is an auxiliary relation. \<^term>\<open>th_result_rel bFailure bMagic W res\<close> is 
-used in the following way:
-  \<^item> \<^term>\<open>bFailure\<close> expresses a condition that must hold for \<^term>\<open>res\<close> not to be failing state 
-  \<^item> \<^term>\<open>bMagic\<close> expresses a condition that must hold for \<^term>\<open>res\<close> not to be magic state
-  \<^item> W expresses the set of possible normal states for \<^term>\<open>res\<close>
+text \<open>\<^const>\<open>th_result_rel\<close> is an auxiliary relation that is useful to express a state in terms of 
+conditions. \<^term>\<open>th_result_rel bSuccess bFeasible W res\<close> is used in the following way:
+
+  \<^item> \<^term>\<open>bSuccess\<close> expresses when \<^term>\<open>res\<close> is not a failing state 
+  \<^item> If \<^term>\<open>bSuccess\<close> holds (i.e., \<^term>\<open>res\<close> not a failing state), then 
+    \<^term>\<open>bFeasible\<close> expresses when res is a normal state.
+  \<^item> W expresses the set of possible normal states for \<^term>\<open>res\<close> if both \<^term>\<open>bSuccess\<close> and 
+    \<^term>\<open>bFeasible\<close> hold.
 \<close>
 
 inductive_cases THResultNormal_case: "th_result_rel True True W (RNormal \<omega>)"
@@ -81,7 +57,7 @@ lemma th_result_rel_normal:
   by (cases) auto
 
 lemma th_result_rel_failure: 
-  assumes "th_result_rel False  b W res"
+  assumes "th_result_rel False b W res"
   shows "res = RFailure"
   using assms
   by (cases) auto
@@ -92,14 +68,30 @@ lemma th_result_rel_magic:
   using assms
   by (cases) auto
 
-text \<open>To handle propagation of failure: If one sub_pure_exp fails, then the whole expression fails.
-This definition is almost identical to a similar definition in a more abstract Viper semantics.
-One potential difference is that here the body of an \<^const>\<open>Unfolding\<close> expression is not a 
-subexpression, since the well-definedness of a corresponding body must be evaluated in a separate 
-state.\<close>
+definition get_valid_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
+  where "get_valid_locs \<omega> = {lh |lh. pgt (get_mh_total_full \<omega> lh) pnone}"
+
+definition get_writeable_locs :: "'a full_total_state \<Rightarrow> heap_loc set"
+  where "get_writeable_locs \<omega> = {lh |lh. (get_mh_total_full \<omega> lh) = pwrite}"
+
+text \<open>If the evaluation of a subexpression fails, then the evaluation of the entire expression (or
+atomic assertion) fails.
+To avoid writing separate rules for every subexpression, we define auxiliary functions that capture
+the direct subexpressions, which are evaluated in the same state as the parent expression.
+
+Such auxiliary functions are also defined in the more abstract semantics (e.g., EquiSem). However, 
+there are at least two differences to those functions:
+
+ \<^item> In the semantics expressed here, the body of an \<^const>\<open>Unfolding\<close> expression must be evaluated in
+   a separate state. In a more abstract semantics, this may not be the case.
+ \<^item> In the semantics expressed here, the auxiliary subexpression functions return a list of expressions
+   reflecting the order in which the expressions should be evaluated (instead of using a set). This
+   leads to differences for ill-typed expressions.
+\<close>
 
 fun sub_pure_exp_total :: "pure_exp \<Rightarrow> pure_exp list" where
   "sub_pure_exp_total (Unop _ e) = [e]"
+\<comment>\<open>the second expression of a binary expression might not be evaluated due to lazy binary operators\<close>
 | "sub_pure_exp_total (Binop e _ _) = [e]"
 | "sub_pure_exp_total (FieldAcc e _) = [e]"
 | "sub_pure_exp_total (Let e _) = [e]"
@@ -110,16 +102,42 @@ fun sub_pure_exp_total :: "pure_exp \<Rightarrow> pure_exp list" where
 | "sub_pure_exp_total (Unfolding _ exps e) = exps"
 | "sub_pure_exp_total _ = []"
 
-(* potential duplicate *)
 fun sub_expressions_exp_or_wildcard :: "pure_exp exp_or_wildcard \<Rightarrow> pure_exp list" where
   "sub_expressions_exp_or_wildcard (PureExp e) = [e]"
 | "sub_expressions_exp_or_wildcard Wildcard = []"
 
-(* TODO: duplicate with ViperLang.SemanticsPerm, put in some common theory *)
 fun sub_expressions_atomic :: "pure_exp atomic_assert \<Rightarrow> pure_exp list" where
   "sub_expressions_atomic (Pure e) = [e]"
 | "sub_expressions_atomic (Acc x f p) = x # sub_expressions_exp_or_wildcard p"
 | "sub_expressions_atomic (AccPredicate P exps p) = exps @ sub_expressions_exp_or_wildcard p"
+
+subsection\<open>Auxiliary inhale definitions\<close>
+
+text \<open>Construct the set of states that can be reached after inhaling a field permission.
+      \<^term>\<open>R\<close> expresses when a state is consistent. If \<^term>\<open>p_opt = Some q\<close> then precisely \<^term>\<open>q\<close> 
+      permission is added and otherwise the added permission is just required to be positive without
+      any further constraints (useful to model adding wildcard permission).\<close>
+
+definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+  where "inhale_perm_single R \<omega> lh p_opt =
+      {\<omega>'| \<omega>' q. R \<omega>' \<and>
+               option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
+               pgte pwrite (padd (get_mh_total_full \<omega> lh) q) \<and> \<comment>\<open>There can be at most 1 field permission\<close>
+               \<omega>' = update_mh_total_full \<omega> ((get_mh_total_full \<omega>)(lh := padd (get_mh_total_full \<omega> lh) q))
+       }"
+
+text \<open>Construct the set of states that can be reached after inhaling a predicate permission.
+      \<^term>\<open>p_opt\<close> plays the same role as in \<^const>\<open>inhale_perm_single\<close>\<close>
+
+definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+  where "inhale_perm_single_pred R \<omega> lp p_opt = 
+      {\<omega>'| \<omega>' q. R \<omega>' \<and>  
+               option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
+               \<omega>' = update_mp_total_full \<omega> ((get_mp_total_full \<omega>)(lp := (padd (get_mp_total_full \<omega> lp) q)))
+       }"
+
+
+subsection\<open>Main definitions for evaluation,  well-definedness, and inhale\<close>
 
 record 'a total_context =
   program_total :: program
@@ -127,21 +145,25 @@ record 'a total_context =
   absval_interp_total :: "'a \<Rightarrow> abs_type"
 
 text \<open>Expression evaluation, well-definedness of expressions and inhale are defined in a mutually
-inductive way. The reason is that well-definedness uses inhale to express well-definedness of 
+inductive way. The reason is that well-definedness uses inhale to express the well-definedness of 
 unfolding expressions and inhale fails if some subexpression is not well-defined. Expression evaluation
 itself without well-definedness checks could be defined independently. However, since expression evaluation
 and well-definedness follow similar rules for many connectives, we decided to express them in the same
 relation, where one uses one of the parameters to distinguish expression evaluation from well-definedness.
 
+As part of this mutually inductive definition, we also define a relation that captures unfolding a
+single a predicate in a state (via an inhale). This relation is used to define the well-definedness
+of unfolding expressions.
+
 Expression evaluation either results in a value or in a failure. Failure occurs if some operation is 
-not defined (e.g., division by 0, null dereference,...). Importantly, expression evaluation is defined
+not defined (e.g., division by 0 and null dereference). Importantly, expression evaluation is defined
 for all field accesses (with a non-null receiver), since the heap is total. 
 Well-definedness is defined the same as expression evaluation, except that failure also occurs if
-a field is accesses for which no permission is held in the mask.
+a field is accessed for which no permission is held in the mask.
 
 All three relations (evaluation, well-definedness, inhale) take a unary relation \<^term>\<open>R\<close> on states 
-as input.This relation represents when a state is consistent. Inhale progresses after adding new permission only 
-if the resulting state is consistent.
+as input.This relation represents when a state is consistent. Inhale progresses after adding new 
+permission only if the resulting state is consistent.
 \<close>
 
 inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state option \<Rightarrow> pure_exp \<Rightarrow> 'a full_total_state \<Rightarrow> 'a extended_val \<Rightarrow> bool"
@@ -187,12 +209,12 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
        W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None;
        th_result_rel True (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>
        red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> res"
-| InhPureNormalMagic: 
+| InhPure: 
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
       red_inhale ctxt R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
-| InhSubFailure: 
+| InhSubAtomicFailure: 
     "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
-       red_pure_exps_total ctxt R (Some \<omega>_def) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
+       red_pure_exps_total ctxt R (Some \<omega>) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
       red_inhale ctxt R (Atomic A) \<omega> RFailure"
 
 \<comment>\<open>Connectives inhale\<close>
@@ -327,7 +349,7 @@ thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct
 
               
 
-subsubsection \<open>Elimination rules\<close>
+subsection \<open>Elimination rules\<close>
 
 inductive_cases RedVar_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
