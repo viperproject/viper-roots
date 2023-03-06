@@ -299,6 +299,9 @@ lemma wf_ty_repr_basic: "wf_ty_repr_bpl (ty_repr_basic A)"
   apply simp
   done
 
+lemma type_interp_rel_wf_vbpl_basic: "type_interp_rel_wf A_vpr (vbpl_absval_ty (ty_repr_basic A_vpr)) (ty_repr_basic A_vpr)"
+  unfolding ty_repr_basic_def
+  by (simp add: type_interp_rel_wf_vbpl_no_domains)
 
 subsection \<open>Helper definitions\<close>
 

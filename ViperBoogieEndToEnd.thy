@@ -1,5 +1,5 @@
 theory ViperBoogieEndToEnd
-imports ExpProofGenTest
+imports StmtRel
 begin
 
 definition stmt_correct_total_2 where

@@ -1,5 +1,5 @@
 theory StmtRelML
-imports Boogie_Lang.HelperML ExprWfRelML ExpProofGenTest 
+imports Boogie_Lang.HelperML ExprWfRelML StmtRel 
 begin
 
 ML \<open>

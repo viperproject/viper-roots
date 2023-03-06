@@ -1,4 +1,4 @@
-theory ExpProofGenTest
+theory StmtRel
 imports ExpRel ExprWfRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface
 begin
 
@@ -26,72 +26,6 @@ definition assert_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) ns
                     red_ast_bpl ctxt (\<gamma>, Normal ns) c'))"
 *)
 
-subsection \<open>Well formedness of type relation\<close>
-
-definition type_interp_rel_wf :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a vbpl_absval) absval_ty_fun  \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> bool"
-  where "type_interp_rel_wf A_vpr A_bpl Trep \<equiv> 
-    \<forall>v ty_vpr ty_bpl. get_type A_vpr v = ty_vpr \<longrightarrow>
-                      vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl \<longrightarrow>
-                      type_of_val A_bpl (val_rel_vpr_bpl v) = ty_bpl"
-
-lemma type_interp_rel_wf_vbpl: 
-  assumes "A_vpr = domain_type Trep"
-    shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d" and "ty_bpl = TCon (fst d) (snd d)"
-      by fastforce
-    hence "vbpl_absval_ty Trep (ADomainVal a) = d" using \<open>A_vpr = domain_type Trep\<close>
-      by simp
-    hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
-      by simp
-    thus ?thesis using VAbs
-      by simp     
-  qed (insert * **, auto)
-qed
-
-lemma type_interp_rel_wf_vbpl_no_domains:
-  assumes "\<And> d. domain_translation Trep d = None"
-  shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    fix contra
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d"
-      by fastforce
-    with assms show contra 
-      by simp
-  qed (insert * **, auto)
-qed
-
-lemma type_interp_rel_wf_vbpl_basic: "type_interp_rel_wf A_vpr (vbpl_absval_ty (ty_repr_basic A_vpr)) (ty_repr_basic A_vpr)"
-  unfolding ty_repr_basic_def
-  by (simp add: type_interp_rel_wf_vbpl_no_domains)
-
-lemma vpr_to_bpl_val_type:
-  assumes "get_type A v = ty_vpr" and
-          "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-          "domain_type TyRep = A"
-  shows "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
-proof (cases v)
-  case (VAbs x5)
-  then show ?thesis 
-    using assms
-    using type_interp_rel_wf_def type_interp_rel_wf_vbpl by blast
-qed (insert assms, auto)
 
 subsection \<open>Statement relation - general statement\<close>
 
@@ -181,6 +115,8 @@ lemma stmt_rel_failure_elim:
   unfolding stmt_rel_def
   by blast
 
+subsection \<open>Propagation rules\<close>
+
 lemma stmt_rel_propagate:
   assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
           "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
@@ -250,12 +186,13 @@ lemma stmt_rel_propagate_2_same_rel:
   using assms stmt_rel_propagate_2
   by blast
 
+subsection \<open>Structural rules\<close>
+
 lemma stmt_rel_seq:
   assumes "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s1_vpr \<gamma>1 \<gamma>2" and
           "stmt_rel R2 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt s2_vpr \<gamma>2 \<gamma>3"
   shows 
     "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) \<gamma>1 \<gamma>3"
-(* "stmt_rel R1 R3 ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Seq s1_vpr s2_vpr) (Seq s1_bpl s2_bpl)" *)
 proof (rule stmt_rel_intro)
   fix \<omega> ns \<omega>'
   assume R1:"R1 \<omega> ns" and RedStmt:"red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Seq s1_vpr s2_vpr) \<omega> (RNormal \<omega>')"
