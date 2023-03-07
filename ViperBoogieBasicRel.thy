@@ -1364,6 +1364,20 @@ lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None,
   unfolding red_ast_bpl_def
   by (fastforce intro: RedSkip)
 
+lemma red_ast_bpl_empty_else:
+  assumes CondFalse: "red_expr_bpl ctxt cond_bpl ns (BoolV False)" and
+          EmptyElse: "is_empty_bigblock empty_else_block"
+  shows "red_ast_bpl P ctxt ((if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont), Normal ns) 
+                            ((next, cont), Normal ns)"
+proof -
+  from EmptyElse obtain name where "empty_else_block = empty_bigblock name"
+    by (auto elim: is_empty_bigblock.elims)
+  show ?thesis    
+    apply (rule red_ast_bpl_transitive)
+     apply (fastforce intro!: red_ast_bpl_one_step_empty_simple_cmd RedParsedIfFalse simp: CondFalse \<open>empty_else_block = _\<close>)
+    by (fastforce intro!: red_ast_bpl_one_step_empty_simple_cmd RedSkip)
+qed 
+
 type_synonym viper_stmt = ViperLang.stmt
 
 subsection \<open>syntactic relations\<close>

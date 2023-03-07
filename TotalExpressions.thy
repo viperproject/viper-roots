@@ -346,9 +346,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
  "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
    red_inhale ctxt R (Imp e A) \<omega> RFailure"
 
-thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct
-
-              
+thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct             
 
 subsection \<open>Elimination rules\<close>
 
@@ -436,6 +434,8 @@ lemmas red_pure_exp_total_elims =
 
 subsubsection \<open>Inhale\<close>
 
+inductive_cases InhStar_case: "red_inhale ctxt R (A && B) \<omega> res"
+inductive_cases InhImp_case: "red_inhale ctxt R (Imp e A) \<omega> res"
 
 
 subsection \<open>Helper lemmas\<close>
