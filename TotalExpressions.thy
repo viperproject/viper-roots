@@ -173,86 +173,11 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
    unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool"
   where
-\<comment>\<open>unfold_rel\<close>
-
-  UnfoldRelStep: 
-    "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
-     ViperLang.predicate_decl.body pred_decl = Some pred_body;
-     m = get_mp_total_full \<omega>;
-     pgte (m (pred_id,vs)) q;
-     q \<noteq> pnone;
-     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q );
-     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
-     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
-     unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
-
-\<comment>\<open>Atomic inhale\<close>
-| InhAcc: 
-    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
-       ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
-       W' = inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p));
-       th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) W' res \<rbrakk> \<Longrightarrow>
-       red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
-| InhAccPred:
-    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
-       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p));
-       th_result_rel (p \<ge> 0) (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>       
-       red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> res"
-| InhAccWildcard: 
-    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-       W' = inhale_perm_single R \<omega> (the_address r,f) None;
-       th_result_rel True (W' \<noteq> {} \<and> r \<noteq> Null) W' res \<rbrakk> \<Longrightarrow>
-       red_inhale ctxt R (Atomic (Acc e_r f Wildcard)) \<omega> res"
-| InhAccPredWildcard: 
-    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None;
-       th_result_rel True (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>
-       red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> res"
-| InhPure: 
-    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-      red_inhale ctxt R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
-| InhSubAtomicFailure: 
-    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
-       red_pure_exps_total ctxt R (Some \<omega>) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
-      red_inhale ctxt R (Atomic A) \<omega> RFailure"
-
-\<comment>\<open>Connectives inhale\<close>
-| InhSepNormal: 
-   "\<lbrakk> red_inhale ctxt R A \<omega> (RNormal \<omega>''); 
-      red_inhale ctxt R B \<omega>'' res\<rbrakk> \<Longrightarrow>
-      red_inhale ctxt R (A && B) \<omega> res"
-| InhSepFailureMagic:
-   "\<lbrakk> red_inhale ctxt R A \<omega> resA; 
-      resA = RFailure \<or> resA = RMagic \<rbrakk> \<Longrightarrow>
-      red_inhale ctxt R (A && B) \<omega> resA"
-| InhImpTrue:
- "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)); 
-    red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
-    red_inhale ctxt R (Imp e A) \<omega> res"
-| InhImpFalse:
- "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-    red_inhale ctxt R (Imp e A) \<omega> (RNormal \<omega>)"
-| InhImpFailure:
- "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
-   red_inhale ctxt R (Imp e A) \<omega> RFailure"
 
 \<comment>\<open>Pure expression evaluation and well-definedness of pure expressions\<close>
 
-\<comment>\<open>List of expressions\<close>
-| RedExpListCons:
-  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
-     red_pure_exps_total ctxt R \<omega>_def es \<omega> res;
-     res' = map_option (\<lambda>vs. (v#vs)) res \<rbrakk> \<Longrightarrow>
-     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> res'"
-| RedExpListFailure:
-  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
-     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> None"
-| RedExpListNil:
-  "red_pure_exps_total ctxt R \<omega>_def Nil \<omega> (Some Nil)"
-
 \<comment>\<open>Atomic expressions\<close>
-| RedLit: "ctxt, R, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
+  RedLit: "ctxt, R, \<omega>_def \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>]\<^sub>t Val (val_of_lit l)"
 | RedVar: "\<lbrakk> (get_store_total \<omega>) n = Some v \<rbrakk> \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 | RedResult: "\<lbrakk> get_store_total \<omega> 0 = Some v \<rbrakk> \<Longrightarrow> ctxt, R, \<omega>_def \<turnstile> \<langle>Result; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
@@ -345,11 +270,89 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      red_pure_exps_total ctxt R \<omega>_def (sub_pure_exp_total e') \<omega> None \<rbrakk> \<Longrightarrow> 
      ctxt, R, \<omega>_def \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 
+\<comment>\<open>List of expressions\<close>
+| RedExpListCons:
+  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
+     red_pure_exps_total ctxt R \<omega>_def es \<omega> res;
+     res' = map_option (\<lambda>vs. (v#vs)) res \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> res'"
+| RedExpListFailure:
+  "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+     red_pure_exps_total ctxt R \<omega>_def (e#es) \<omega> None"
+| RedExpListNil:
+  "red_pure_exps_total ctxt R \<omega>_def Nil \<omega> (Some Nil)"
+
+\<comment>\<open>unfold_rel\<close>
+
+| UnfoldRelStep: 
+    "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
+     ViperLang.predicate_decl.body pred_decl = Some pred_body;
+     m = get_mp_total_full \<omega>;
+     pgte (m (pred_id,vs)) q;
+     q \<noteq> pnone;
+     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q );
+     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
+     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
+
+\<comment>\<open>Atomic inhale\<close>
+| InhAcc: 
+    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
+       ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
+       W' = inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p));
+       th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) W' res \<rbrakk> \<Longrightarrow>
+       red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
+| InhAccPred:
+    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
+       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p));
+       th_result_rel (p \<ge> 0) (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>       
+       red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> res"
+| InhAccWildcard: 
+    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+       W' = inhale_perm_single R \<omega> (the_address r,f) None;
+       th_result_rel True (W' \<noteq> {} \<and> r \<noteq> Null) W' res \<rbrakk> \<Longrightarrow>
+       red_inhale ctxt R (Atomic (Acc e_r f Wildcard)) \<omega> res"
+| InhAccPredWildcard: 
+    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) None;
+       th_result_rel True (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>
+       red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega> res"
+| InhPure: 
+    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+      red_inhale ctxt R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
+| InhSubAtomicFailure: 
+    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
+       red_pure_exps_total ctxt R (Some \<omega>) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
+      red_inhale ctxt R (Atomic A) \<omega> RFailure"
+
+\<comment>\<open>Connectives inhale\<close>
+| InhStarNormal: 
+   "\<lbrakk> red_inhale ctxt R A \<omega> (RNormal \<omega>''); 
+      red_inhale ctxt R B \<omega>'' res\<rbrakk> \<Longrightarrow>
+      red_inhale ctxt R (A && B) \<omega> res"
+| InhStarFailureMagic:
+   "\<lbrakk> red_inhale ctxt R A \<omega> resA; 
+      resA = RFailure \<or> resA = RMagic \<rbrakk> \<Longrightarrow>
+      red_inhale ctxt R (A && B) \<omega> resA"
+| InhImpTrue:
+ "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)); 
+    red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
+    red_inhale ctxt R (Imp e A) \<omega> res"
+| InhImpFalse:
+ "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+    red_inhale ctxt R (Imp e A) \<omega> (RNormal \<omega>)"
+| InhImpFailure:
+ "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
+   red_inhale ctxt R (Imp e A) \<omega> RFailure"
+
 thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct
 
               
 
 subsection \<open>Elimination rules\<close>
+
+subsubsection \<open>Expression evaluation and well-definedness\<close>
 
 inductive_cases RedVar_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
@@ -430,6 +433,10 @@ lemma red_pure_exps_total_singleton:
 lemmas red_pure_exp_total_elims = 
   RedUnop_case RedBinop_case RedFunApp_case  
   red_exp_list_normal_elim red_exp_list_failure_elim
+
+subsubsection \<open>Inhale\<close>
+
+
 
 subsection \<open>Helper lemmas\<close>
 
@@ -550,7 +557,6 @@ inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total
                  \<exists>\<omega>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<omega> \<omega>' \<and> total_heap_consistent ctxt \<omega>';
                  pheap_consistent ctxt \<omega> \<rbrakk> \<Longrightarrow>
                  total_heap_consistent ctxt \<omega>"
-
 
 abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where "red_inhale_th_cons ctxt A \<omega> res \<equiv> red_inhale ctxt (total_heap_consistent ctxt) A \<omega> res"
