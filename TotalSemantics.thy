@@ -24,71 +24,71 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
   where
 
 \<comment>\<open>exhale acc(e.f, p)\<close>
-    ExhAcc: 
-    "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
-       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
-       a = the_address r \<rbrakk> \<Longrightarrow>
-       red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
-                           (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
+  ExhAcc: 
+  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
+     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
+     a = the_address r \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
+                         (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
 
- \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
-  | ExhAccWildcard:
-    "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-       q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
-       red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
-                           (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
-                                         (m( (a,f) := q),pm))"
+\<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
+| ExhAccWildcard:
+  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+     q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
+                         (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
+                                       (m( (a,f) := q),pm))"
 
 \<comment>\<open>exhale acc(P(es), p)\<close>
-  | ExhAccPred:
-     "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
-      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
-              (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
-                            (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
-  | ExhAccPredWildcard:
-    "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
-       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-       q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
-       red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
-                           (exh_if_total (m(a,f) \<noteq> pnone)
-                                         (m, pm ( (pred_id, v_args) := q )))"
+| ExhAccPred:
+   "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+     red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
+            (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
+                          (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
+| ExhAccPredWildcard:
+  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+     red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
+                         (exh_if_total (m(a,f) \<noteq> pnone)
+                                       (m, pm ( (pred_id, v_args) := q )))"
 
-  | ExhPure:
-    "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
-       ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-       red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
-  | SubAtomicFailure: 
-    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
-       red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
-       red_exhale ctxt R \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
+| ExhPure:
+  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
+     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
+| SubAtomicFailure: 
+  "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
+     red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
+     red_exhale ctxt R \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
 
 \<comment>\<open>exhale A && B\<close>
-  |  ExhSepNormal: 
-   "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm (ExhaleNormal m_pm'); 
-      red_exhale ctxt R \<omega>0 B m_pm' res\<rbrakk> \<Longrightarrow>
-      red_exhale ctxt R \<omega>0 (A && B) m_pm res"
- | ExhSepFailureMagic: 
-   "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm ExhaleFailure \<rbrakk> \<Longrightarrow>
-      red_exhale ctxt R \<omega>0 (A && B) m_pm ExhaleFailure"
+| ExhStarNormal: 
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm (ExhaleNormal m_pm'); 
+    red_exhale ctxt R \<omega>0 B m_pm' res\<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (A && B) m_pm res"
+| ExhStarFailure: 
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm ExhaleFailure \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (A && B) m_pm ExhaleFailure"
 
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
- | ExhImpTrue: 
-   "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
-      red_exhale ctxt R \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
-      red_exhale ctxt R \<omega>0 (Imp e A) m_pm res" 
- | ExhImpFalse:  
-   "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-      red_exhale ctxt R \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
- | ExhImpFailure:
-   "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm); 
-      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
-     red_exhale ctxt R \<omega>0 (Imp e A) m_pm ExhaleFailure"
+| ExhImpTrue: 
+ "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
+    ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+    red_exhale ctxt R \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (Imp e A) m_pm res" 
+| ExhImpFalse:  
+ "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
+    ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+    red_exhale ctxt R \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
+| ExhImpFailure:
+ "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm); 
+    ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+   red_exhale ctxt R \<omega>0 (Imp e A) m_pm ExhaleFailure"
 
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 
