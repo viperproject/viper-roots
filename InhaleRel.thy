@@ -212,5 +212,25 @@ proof (rule inhale_rel_intro_2)
    qed
  qed
 
+subsection \<open>Field access predicate rule\<close>
+
+
+lemma inhale_rel_field_acc:
+  assumes "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>2" and
+          "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_p \<gamma>2 \<gamma>3" and
+          "wf_rel (state_rel_ext R)
+                  Rext' 
+                  (\<lambda> \<omega>def \<omega>. \<exists>p r. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0 \<and>
+                                   ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef r)) \<and> (p > 0 \<longrightarrow> r = Null))  
+                  (\<lambda> \<omega>def \<omega>. \<exists>p. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0)
+                  P ctxt \<gamma>3 ((BigBlock name ((Lang.Assign m_bpl m_upd_bpl)#cs) str tr), cont)" and
+                   "m_bpl = mask_var Tr" and
+    HeapUpdateBpl: "m_upd_bpl = mask_update Tr (Lang.Var m_bpl) e_rcv_bpl e_f_bpl new_perm_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
+    RcvRel: "exp_rel_vpr_bpl Rext' ctxt_vpr ctxt e_rcv_vpr rcv_bpl" and
+    FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+    NewPermRel: "exp_rel_vpr_bpl Rext' ctxt_vpr ctxt (ViperLang.Binop (Perm e_rcv_vpr f) ViperLang.Add e_p) new_perm_bpl" 
+    
+  shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
+  oops
 
 end

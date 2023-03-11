@@ -300,7 +300,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
        ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
        W' = inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p));
-       th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> r \<noteq> Null) W' res \<rbrakk> \<Longrightarrow>
+       th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res \<rbrakk> \<Longrightarrow>
        red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
 | InhAccPred:
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);

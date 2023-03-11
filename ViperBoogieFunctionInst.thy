@@ -117,6 +117,16 @@ lemma select_mask_none:
   using assms select_mask_some option.exhaust_sel 
   by blast
 
+text \<open>store function for the heap: updMask<A, B>(h: MaskType, r: Ref, f: (Field A B), y: Perm): Perm\<close>
+
+fun store_mask :: "'a sem_fun_bpl"
+  where
+    "store_mask ts vs = 
+       (case (ts, vs) of 
+          ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f), RealV p]) \<Rightarrow>
+            Some (AbsV (  AMask (m((r,f) := p))  ))
+        | _ \<Rightarrow> None)"
+
 text \<open>function for checking whether there is nonzero permission in mask\<close>
 
 fun has_perm_in_mask :: "'a sem_fun_bpl"
@@ -222,6 +232,8 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
        (store_heap, (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TVar 1], TConSingle (THeapId T)))"
   | "fun_interp_vpr_bpl_aux Pr T F FReadMask =
        (select_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FUpdateMask =
+       (store_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], (TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =
        (has_perm_in_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
 
@@ -250,7 +262,7 @@ lemma ctxt_wf_fun_interp:
 lemma assume_state_normal:
   assumes CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
           FieldTr: "field_translation Tr = F" and
-          StateRel: "state_rel Pr TyRep Tr ctxt wd_mask_var \<omega>_def \<omega> ns" and 
+          StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and 
           Heq: "heap_var Tr = h" and
           Meq: "mask_var Tr = m" and
           StateName: "FunMap FGoodState = state_name"

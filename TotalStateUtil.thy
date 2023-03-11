@@ -44,6 +44,9 @@ section \<open>update heap and mask total\<close>
 definition update_hh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a total_state"
   where "update_hh_loc_total \<phi> l v = \<phi>\<lparr>get_hh_total := (get_hh_total \<phi>)(l := v)\<rparr>"
 
+definition update_mh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
+  where "update_mh_loc_total \<phi> l p = \<phi>\<lparr>get_mh_total := (get_mh_total \<phi>)(l := p)\<rparr>"
+
 definition update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> 'a total_state"
   where "update_mh_total \<phi> mh = \<phi>\<lparr>get_mh_total := mh\<rparr>"
 
@@ -175,6 +178,10 @@ fun update_mh_total_full :: "'a full_total_state \<Rightarrow> mask \<Rightarrow
 fun update_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a full_total_state"
   where "update_mp_total_full \<omega> mp = \<omega>\<lparr> get_total_full := update_mp_total (get_total_full \<omega>) mp \<rparr>"
 
+fun update_mh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a full_total_state"
+  where "update_mh_loc_total_full \<omega> l p = 
+        \<omega>\<lparr> get_total_full := update_mh_loc_total (get_total_full \<omega>) l p \<rparr>"
+
 lemma update_hh_loc_total_full_mask_same: "get_mh_total_full (update_hh_loc_total_full \<omega> l v) = get_mh_total_full \<omega>"
   by (simp add: update_hh_loc_total_mh_eq)
 
@@ -187,6 +194,22 @@ lemma get_update_mh_total_full:
 lemma update_mh_total_full_same:
   "(update_mh_total_full \<omega> (get_mh_total_full \<omega>)) = \<omega>"
   by (simp add: update_mh_total_def)
+
+lemma update_mh_loc_total_mh_eq: "get_hh_total (update_mh_loc_total \<phi> l v) = get_hh_total \<phi>"
+  by (simp add: update_mh_loc_total_def)
+
+lemma update_mh_loc_total_mp_eq: "get_hp_total (update_mh_loc_total \<phi> l v) = get_hp_total \<phi>"
+  by (simp add: update_mh_loc_total_def)
+
+thm update_hh_loc_total_fupd
+lemma update_mh_loc_total_fupd: "get_mh_total (update_mh_loc_total \<phi> l1 v) = (get_mh_total \<phi>)(l1 := v)"
+  by (simp add: update_mh_loc_total_def)
+
+lemma update_mh_loc_total_full_lookup_1: "get_mh_total_full (update_mh_loc_total_full \<phi> l v) l = v"
+  by (simp add: update_mh_loc_total_fupd)
+
+lemma update_mh_loc_total_full_lookup_2: "l1 \<noteq> l2 \<Longrightarrow> get_mh_total_full (update_mh_loc_total_full \<phi> l1 v) l2 = get_mh_total_full \<phi> l2"
+  by (simp add: update_mh_loc_total_fupd)
 
 (*
 lemma update_mp_total_h_eq: 
@@ -217,6 +240,13 @@ lemma update_mh_total_full_multiple:
   using update_mh_total_multiple 
   by (metis full_total_state.select_convs(3) full_total_state.surjective full_total_state.update_convs(3) update_mh_total_full.simps)
 
+lemma update_mh_loc_total_lookup_1: "get_mh_total (update_mh_loc_total \<phi> l v) l = v"
+  using update_mh_loc_total_fupd
+  by (metis fun_upd_same)
+
+lemma update_mh_loc_total_lookup_2: "l1 \<noteq> l2 \<Longrightarrow> get_mh_total (update_mh_loc_total \<phi> l1 v) l2 = get_mh_total \<phi> l2"
+  using update_mh_loc_total_fupd
+  by (metis fun_upd_apply)
 
 fun get_m_total_full :: "'a full_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
   where "get_m_total_full \<omega> = (get_mh_total_full \<omega>, get_mp_total_full \<omega>)"
@@ -229,6 +259,11 @@ lemma get_m_total_full_aux:
   "get_m_total_full \<omega> = get_m_total_full (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)"
   apply simp
   by (simp add: update_hh_loc_total_mh_eq update_hh_loc_total_mp_eq)
+
+lemma get_h_total_full_aux:
+  "get_h_total_full \<omega> = get_h_total_full (update_mh_loc_total_full \<omega> (addr, f_vpr) v_vpr)"
+  apply simp
+  by (simp add: update_mh_loc_total_mh_eq update_mh_loc_total_mp_eq)
 
 section \<open>Shifting stores\<close>
 

@@ -38,7 +38,7 @@ definition read_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Right
   where "read_mask_concrete F h rcv f ts \<equiv> FunExp (F FReadMask) ts [h, rcv, f]"
 
 definition update_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
-  where "update_mask_concrete F h rcv f v ts \<equiv> FunExp (F FUpdateMask) ts [h, rcv, f, v]"
+  where "update_mask_concrete F m rcv f p ts \<equiv> FunExp (F FUpdateMask) ts [m, rcv, f, p]"
 
 lemma field_ty_fun_two_params:
   assumes "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
@@ -208,7 +208,30 @@ lemma mask_read_wf_concrete:
     apply blast
      apply (simp only: map_instantiate_nil)
     apply simp
-  by (blast elim: cons_exp_elim)
+    by (blast elim: cons_exp_elim)
+
+lemma mask_update_wf_concrete:
+  assumes 
+    CtxtWf: "ctxt_wf Pr TyRep F fun_repr ctxt" and
+    TyRepWf: "wf_ty_repr_bpl TyRep"
+  shows "mask_update_wf TyRep ctxt (update_mask_concrete fun_repr)"  
+  unfolding mask_update_wf_def
+  apply (rule allI)+
+  apply (rule conjI)
+   apply (rule impI)
+   apply (unfold update_mask_concrete_def)
+   apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
+    using field_ty_fun_opt_closed_args[OF TyRepWf] 
+       apply (fastforce simp: map_instantiate_nil)
+      apply (simp only: map_instantiate_nil)    
+      apply simp
+    using field_ty_fun_two_params field_ty_fun_opt_tcon
+    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+     apply (rule field_ty_fun_two_params)
+    apply blast
+     apply (simp only: map_instantiate_nil)
+    apply simp
+    by (blast elim: cons_exp_elim)
 
 subsection \<open>Translation interface\<close>
 

@@ -49,6 +49,8 @@ type_synonym 'a vbpl_val = "('a vbpl_absval) bpl_val"
 text \<open>\<^typ>\<open>'a vbpl_val\<close> is the instantiated version of the Boogie values.\<close>
 
 type_synonym 'a heap_repr = "ref \<times> 'a vb_field \<rightharpoonup> 'a vbpl_val"
+type_synonym 'a mask_repr = "ref \<times> 'a vb_field \<Rightarrow> real"
+
 
 subsection \<open>Translation interface\<close>
 
@@ -379,6 +381,9 @@ subsection \<open>Helper definitions and lemmas\<close>
 
 definition heap_bpl_upd_normal_field :: "'a heap_repr \<Rightarrow> ref \<Rightarrow> vname \<Rightarrow> vtyp \<Rightarrow> 'a vbpl_val \<Rightarrow> 'a heap_repr"
   where "heap_bpl_upd_normal_field h r f vpr_ty v \<equiv> h((r, NormalField f vpr_ty) \<mapsto> v)"
+
+definition mask_bpl_upd_normal_field :: "'a mask_repr \<Rightarrow> ref \<Rightarrow> vname \<Rightarrow> vtyp \<Rightarrow> real \<Rightarrow>'a mask_repr"
+  where "mask_bpl_upd_normal_field h r f vpr_ty p \<equiv> h((r, NormalField f vpr_ty) := p)"
 
 lemma heap_bpl_well_typed:
   assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
