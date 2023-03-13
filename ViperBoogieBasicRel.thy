@@ -832,6 +832,18 @@ lemma state_rel_store_update_2:
     apply (simp add: update_var_binder_same)   
    using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
    by blast
+
+lemma state_rel_new_auxvar:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+     AuxVarFresh: "aux_var \<notin> 
+                      ({heap_var Tr, mask_var Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)"  and
+           "P aux_val"
+   shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega> (update_var \<Lambda> ns aux_var aux_val)"
+  sorry
                    
 lemma state_rel0_heap_update:
   assumes  
