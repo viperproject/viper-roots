@@ -163,18 +163,6 @@ lemma stmt_rel_seq_same_rel:
   using assms stmt_rel_seq
   by blast
 
-lemma wf_rel_general:
-  "wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns) IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow>
-   rel_general R R' (\<lambda>\<omega> \<omega>'. IsNormal \<omega> \<omega> \<and> \<omega> = \<omega>') (\<lambda>\<omega>. IsFailure \<omega> \<omega>) P ctxt \<gamma> \<gamma>'"
-  unfolding wf_rel_def rel_general_def
-  by auto
-
-lemma wf_rel_general_1:
-  "wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns) IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<Longrightarrow>
-   rel_general R R' (\<lambda>\<omega> \<omega>'. IsNormal \<omega> \<omega> \<and> \<omega> = \<omega>') (\<lambda>\<omega>. IsFailure \<omega> \<omega>) P ctxt \<gamma> \<gamma>'"
-  unfolding wf_rel_def rel_general_def
-  by auto
-
 lemma stmt_rel_if:
   assumes \<comment>\<open>When invoking the wf_rel tactic, apply one of the wf_rel extension lemmas such that the 
             wf_rel tactic itself need not guarantee progress to the if block\<close>

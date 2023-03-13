@@ -90,6 +90,12 @@ lemma red_ast_bpl_empty_block: "red_ast_bpl P ctxt ((BigBlock name [] None None,
   unfolding red_ast_bpl_def
   by (fastforce intro: RedSkip)
 
+lemma red_ast_bpl_empty_block_2: 
+  assumes "is_empty_bigblock empty_block"
+  shows "red_ast_bpl P ctxt ((empty_block, KSeq b cont), Normal ns) ((b, cont), Normal ns)"
+  using assms red_ast_bpl_empty_block
+  by (metis is_empty_bigblock.elims(2))
+
 lemma red_ast_bpl_empty_else:
   assumes CondFalse: "red_expr_bpl ctxt cond_bpl ns (BoolV False)" and
           EmptyElse: "is_empty_bigblock empty_else_block"

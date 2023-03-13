@@ -1,5 +1,5 @@
 theory InhaleRel
-  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface StmtRel
+  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation
 begin
 
 definition inhale_rel ::
@@ -102,77 +102,40 @@ lemma inhale_rel_imp:
    ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl" and
    RhsRel: "inhale_rel R ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
                 (is "inhale_rel R _ _ _ _ _ ?\<gamma>_thn (next, cont)")
- shows "inhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
-proof (rule inhale_rel_intro_2)
-  fix \<omega> ns res
-  assume "R \<omega> ns" and RedInh: "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> res"
-
-  from RedInh 
-  show "inhale_rel_aux R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont) \<omega> ns res"
-  proof (cases)
-    case InhImpTrue
-
-    from this obtain ns' where
-      "R \<omega> ns'" and RedToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns) (?\<gamma>_if, Normal ns')"
-      using wf_rel_normal_elim ExpWfRel \<open>R \<omega> ns\<close>
-      by blast
-
-    from InhImpTrue have  RedCondBplTrue: "red_expr_bpl ctxt cond_bpl ns' (BoolV True)"
-      using  exp_rel_vpr_bpl_elim_2[OF ExpRel] \<open>R \<omega> ns'\<close>
-      by (metis val_rel_vpr_bpl.simps(2))
-
-    hence RedToThn: "red_ast_bpl P ctxt (\<gamma>1, Normal ns) (?\<gamma>_thn, Normal ns')"
-      using RedToIf red_ast_bpl_transitive
-      by (blast intro!: red_ast_bpl_one_step_empty_simple_cmd RedParsedIfTrue)
-         
-    show ?thesis
-    proof (rule inhale_rel_aux_intro)
-     \<comment>\<open>Normal case\<close>
-      fix \<omega>'
-      assume "res = RNormal \<omega>'"
-      with inhale_rel_normal_elim[OF RhsRel \<open>R \<omega> ns'\<close>] \<open>red_inhale ctxt_vpr StateCons A \<omega> res\<close> obtain ns''
-        where "R \<omega>' ns''" and "red_ast_bpl P ctxt (\<gamma>1, Normal ns) ((next, cont), Normal ns'')"
-        using red_ast_bpl_transitive RedToThn
-        by blast
-
-      thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) ((next, cont), Normal ns') \<and> R \<omega>' ns'"
-        by fast
-    next
-      \<comment>\<open>Failure case\<close>
-      assume "res = RFailure"
-      with inhale_rel_failure_elim[OF RhsRel \<open>R \<omega> ns'\<close>] \<open>red_inhale ctxt_vpr StateCons A \<omega> res\<close>
-      show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) c' \<and> snd c' = Failure"
-        using red_ast_bpl_transitive RedToThn
-        by blast
-    qed
-  next
-    case InhImpFalse
-     from this obtain ns' where
-      "R \<omega> ns'" and RedToIf: "red_ast_bpl P ctxt (\<gamma>1, Normal ns) (?\<gamma>_if, Normal ns')"
-      using wf_rel_normal_elim ExpWfRel \<open>R \<omega> ns\<close>
-      by blast
-
-     from InhImpFalse have  RedCondBplFalse: "red_expr_bpl ctxt cond_bpl ns' (BoolV False)"
-      using  exp_rel_vpr_bpl_elim_2[OF ExpRel] \<open>R \<omega> ns'\<close>
-      by (metis val_rel_vpr_bpl.simps(2))
-
-    hence "red_ast_bpl P ctxt (?\<gamma>_if, Normal ns') ((next, cont), Normal ns')"
-      using red_ast_bpl_empty_else EmptyElse
-      by fast
-
-     thus ?thesis 
-       using RedToIf \<open>R \<omega> ns'\<close> red_ast_bpl_transitive  \<open>res = RNormal \<omega>\<close>
-       by (blast intro!: inhale_rel_aux_intro)          
-   next
-     case InhImpFailure
-     thus ?thesis
-       using wf_rel_failure_elim[OF ExpWfRel] \<open>R \<omega> ns\<close>
-       by (blast intro!: inhale_rel_aux_intro)
-   qed
- qed
+              shows "inhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
+  using wf_rel_general_1[OF ExpWfRel] RhsRel
+  unfolding inhale_rel_def
+proof (rule rel_general_cond)
+  show "rel_general R R (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
+    apply (rule rel_intro)
+    using red_ast_bpl_empty_block_2[OF EmptyElse]
+    apply fastforce
+    by simp
+next
+  fix \<omega> \<omega>' ns
+  assume "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> (RNormal \<omega>')" and "R \<omega> ns"
+  thus "((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> red_inhale ctxt_vpr StateCons A \<omega> (RNormal \<omega>') \<or>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> \<omega> = \<omega>')"
+    apply (cases)
+    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
+    apply (metis val_rel_vpr_bpl.simps(2))
+    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
+    by (metis val_rel_vpr_bpl.simps(2))
+next
+  fix \<omega> ns
+  assume "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> RFailure" and "R \<omega> ns"
+  thus "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+       ((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> red_inhale ctxt_vpr StateCons A \<omega> RFailure \<or>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> False)"
+    apply (cases)
+    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
+     apply (metis val_rel_vpr_bpl.simps(2))
+    by auto
+qed
 
 subsection \<open>Field access predicate rule\<close>
-
 
 lemma inhale_rel_field_acc:
   assumes 
