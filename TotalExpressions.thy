@@ -62,6 +62,12 @@ lemma th_result_rel_failure:
   using assms
   by (cases) auto
 
+lemma th_result_rel_failure_2: 
+  assumes "th_result_rel a b W RFailure"
+  shows "\<not>a"
+  using assms
+  by (cases) auto
+
 lemma th_result_rel_magic: 
   assumes "th_result_rel True False W res"
   shows "res = RMagic"
@@ -299,7 +305,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | InhAcc: 
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
        ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
-       W' = inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p));
+       W' = (if r = Null then {\<omega>} else inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p)));
        th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res \<rbrakk> \<Longrightarrow>
        red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
 | InhAccPred:

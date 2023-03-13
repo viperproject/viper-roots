@@ -94,7 +94,7 @@ lemma exp_rel_vpr_bpl_elim:
 
 lemma exp_rel_vpr_bpl_elim_2:
   assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl" and
-          "(\<And> \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
+          "(\<And> \<omega> \<omega>_def1 ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
                     (ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
                     red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)) \<Longrightarrow> P"
   shows P
