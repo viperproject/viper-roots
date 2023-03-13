@@ -44,6 +44,29 @@ definition wf_rel ::
         snd c' = Failure)
      )"
 
+\<comment>\<open>TODO: replace wf_rel by wf_rel_inst and reuse propagation lemmas from rel_general\<close>
+definition wf_rel_inst ::
+  "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow> 
+   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow>
+   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> bool) \<Rightarrow>
+   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> bool) \<Rightarrow>
+   ast \<Rightarrow>
+   'a econtext_bpl \<Rightarrow>
+   (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont)  \<Rightarrow> 
+   bool" where
+  "wf_rel_inst R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<equiv>
+        rel_general 
+            (\<lambda> \<omega>def_\<omega> ns. R (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns)
+            (\<lambda> \<omega>def_\<omega> ns. R' (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns)
+            (\<lambda>\<omega>def_\<omega> \<omega>def_\<omega>'. \<omega>def_\<omega> = \<omega>def_\<omega>' \<and> IsNormal (fst \<omega>def_\<omega>) (snd (\<omega>def_\<omega>)))
+            (\<lambda>\<omega>def_\<omega>. IsFailure (fst \<omega>def_\<omega>) (snd (\<omega>def_\<omega>)))
+            P ctxt \<gamma> \<gamma>'"
+
+lemma wf_rel_inst_eq:
+  "wf_rel R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow> wf_rel_inst R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>'"
+  unfolding wf_rel_def wf_rel_inst_def rel_general_def
+  by auto
+
 lemma wf_rel_general:
   "wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns) IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow>
    rel_general R R' (\<lambda>\<omega> \<omega>'. IsNormal \<omega> \<omega> \<and> \<omega> = \<omega>') (\<lambda>\<omega>. IsFailure \<omega> \<omega>) P ctxt \<gamma> \<gamma>'"
