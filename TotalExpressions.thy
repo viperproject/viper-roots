@@ -129,7 +129,7 @@ definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rig
       {\<omega>'| \<omega>' q. R \<omega>' \<and>
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
                pgte pwrite (padd (get_mh_total_full \<omega> lh) q) \<and> \<comment>\<open>There can be at most 1 field permission\<close>
-               \<omega>' = update_mh_total_full \<omega> ((get_mh_total_full \<omega>)(lh := padd (get_mh_total_full \<omega> lh) q))
+               \<omega>' = update_mh_loc_total_full \<omega> lh (padd (get_mh_total_full \<omega> lh) q)
        }"
 
 text \<open>Construct the set of states that can be reached after inhaling a predicate permission.

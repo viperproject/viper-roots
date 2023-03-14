@@ -549,6 +549,16 @@ lemma state_rel_state_rel0:
   using assms
   by (simp add: state_rel_def)
 
+lemma state_rel_obtain_mask:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns"
+  obtains mb 
+  where "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+        "lookup_var_ty (var_context ctxt) (mask_var Tr) = Some (TConSingle (TMaskId TyRep))" and
+        "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+  using state_rel0_mask_var_rel[OF state_rel_state_rel0[OF StateRel]]
+  unfolding mask_var_rel_def
+  by blast
+
 lemma state_rel_boogie_const:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" 
   shows "boogie_const_rel (const_repr Tr) (var_context ctxt) ns"
@@ -557,6 +567,40 @@ lemma state_rel_boogie_const:
   by simp
 
 lemmas state_rel_well_state_well_typed = state_rel0_state_well_typed[OF state_rel_state_rel0]
+
+lemma state_rel_aux_pred_sat_lookup:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred aux_var = Some P"
+  shows "has_Some P  (lookup_var (var_context ctxt) ns aux_var)"
+  using assms state_rel0_aux_pred_sat
+  unfolding state_rel_def aux_vars_pred_sat_def
+  by blast
+
+lemma state_rel_aux_pred_sat_lookup_2:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred aux_var = Some P"
+  shows "\<exists>v. lookup_var (var_context ctxt) ns aux_var = Some v \<and> P v"
+  using assms state_rel0_aux_pred_sat has_Some_iff state_rel_aux_pred_sat_lookup
+  unfolding state_rel_def
+  by fastforce
+
+lemma state_rel_aux_pred_weaken:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "dom AuxPred' \<subseteq> dom AuxPred" and
+          "\<And>x P' P v. AuxPred x = Some P \<Longrightarrow> AuxPred' x = Some P' \<Longrightarrow> P v \<Longrightarrow> P' v"
+        shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega> ns"
+  sorry
+
+lemma state_rel_aux_pred_remove:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred' \<subseteq>\<^sub>m AuxPred"
+        shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega> ns"
+      apply (rule state_rel_aux_pred_weaken[OF assms(1)])
+       apply (rule map_le_implies_dom_le[OF assms(2)])
+    using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
+    by (metis (no_types, lifting) dom_fun_upd fun_upd_triv insertCI map_le_def option.distinct(1) option.sel)
+
+(*  by (smt (verit) domI map_le_def map_le_implies_dom_le option.inject) *)
 
 lemma lookup_disj_aux:
   assumes "\<And>x. x \<notin> M \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
@@ -1153,7 +1197,7 @@ proof -
     unfolding state_rel_def state_rel0_def heap_var_rel_def
     by blast
 
-  from StateRel have 
+  have
     LookupFieldVar: "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField (NormalField f_bpl ty_vpr)))" 
     using FieldLookup FieldTranslation TyTranslation
           state_rel0_field_rel[OF state_rel_state_rel0[OF StateRel]]
@@ -1175,6 +1219,7 @@ proof -
     unfolding heap_bpl_upd_normal_field_def
     by auto
 qed
+
 
 lemma state_rel0_mask_update:
   assumes StateRel: "state_rel0 Pr (vbpl_absval_ty TyRep) \<Lambda> TyRep Tr AuxPred \<omega> ns" and
@@ -1341,10 +1386,11 @@ lemma state_rel_mask_update_3:
                     "pgte pwrite p" and
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
-     TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl"
+     TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
+                    "p_bpl = real_of_rat (Rep_prat p)"
       shows "state_rel Pr TyRep Tr AuxPred ctxt 
                       (update_mh_loc_total_full \<omega> (addr, f_vpr) p) 
-                      (update_var \<Lambda> ns (mask_var Tr) (AbsV (AMask (mask_bpl_upd_normal_field mb (Address addr) f_bpl ty_vpr (real_of_rat (Rep_prat p))))))"
+                      (update_var \<Lambda> ns (mask_var Tr) (AbsV (AMask (mask_bpl_upd_normal_field mb (Address addr) f_bpl ty_vpr p_bpl))))"
             (is "state_rel Pr TyRep Tr AuxPred ctxt ?\<omega>' ?ns'")
   unfolding state_rel_def TypeInterp
 proof (rule state_rel0_mask_update)
@@ -1445,11 +1491,10 @@ next
       by auto
   qed
 
-
   thus "mask_var_rel Pr (var_context ctxt) TyRep Tr (mask_var Tr) ?\<omega>' ?ns'"
     using state_rel0_mask_var_rel[OF state_rel_state_rel0[OF StateRel]]
     unfolding mask_var_rel_def
-    using \<open>\<Lambda> = _\<close> update_var_same by blast
+    using \<open>\<Lambda> = _\<close> update_var_same \<open>p_bpl = _\<close> by blast
 next
   show "\<And>x. map_of (snd (var_context ctxt)) x \<noteq> None \<Longrightarrow>
          global_state ?ns' x = global_state ns x"
@@ -1566,6 +1611,18 @@ lemma mask_read_wf_apply:
   shows "red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns (RealV p)"
   using assms
   unfolding mask_read_wf_def
+  by blast
+
+lemma mask_update_wf_apply:
+  assumes "mask_update_wf T ctxt mupdate" and       
+          "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
+          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
+          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and      
+          "red_expr_bpl ctxt e_new_perm ns (RealV p)" and
+          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
+  shows "red_expr_bpl ctxt (mupdate e_mask e_rcv e_f e_new_perm ty_args) ns (AbsV (AMask (m( (r,f) := p ))))"
+  using assms
+  unfolding mask_update_wf_def
   by blast
 
 subsection \<open>Well formedness of type relation\<close>
