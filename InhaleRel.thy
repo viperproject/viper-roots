@@ -137,19 +137,27 @@ qed
 
 subsection \<open>Field access predicate rule\<close>
 
+definition inhale_acc_normal_premise
+  where "inhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega> \<omega>' \<equiv>
+       ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r) \<and>
+       ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 
+       p \<ge> 0 \<and>
+       (p > 0 \<longrightarrow> r \<noteq> Null) \<and>
+       (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
+       (W' \<noteq> {} \<and> \<omega>' \<in> W'))"
+
 lemma inhale_rel_field_acc:
   assumes 
     MaskUpdWf: "mask_update_wf TyRep ctxt mask_upd_bpl" and
     WfRcv: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
     WfPerm: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and
   
-    PosPermRel:  "rel_general R
-                  R'
-                  (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
-                  (\<lambda> \<omega>. (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
+    PosPermRel:  "\<And>p. rel_general R R'
+                  (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
+                  (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
                   P ctxt \<gamma>2 \<gamma>3" and
-    UpdInhRel: "rel_general R' R
-                  (\<lambda> \<omega> \<omega>'. red_inhale ctxt_vpr StateCons (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega> (RNormal \<omega>'))
+     UpdInhRel: "\<And>p r. rel_general R' R
+                  (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r \<omega> \<omega>')
                   (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'"
   shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
@@ -181,12 +189,16 @@ proof (rule inhale_rel_intro_2)
       using th_result_rel_normal InhAcc
       by blast+
 
-      with InhAcc obtain ns3 where "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R' \<omega> ns3" 
+      with InhAcc and \<open>res = _\<close> have InhNormalPremise:"inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r \<omega> \<omega>'"
+        unfolding inhale_acc_normal_premise_def 
+        by presburger
+
+      from InhAcc \<open>0 \<le> p\<close> obtain ns3 where "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R' \<omega> ns3" 
         using rel_success_elim[OF PosPermRel \<open>R \<omega> ns2\<close>] Red2 red_ast_bpl_transitive
         by blast
 
       thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-        using rel_success_elim[OF UpdInhRel] RedInh \<open>res = _\<close> red_ast_bpl_transitive
+        using rel_success_elim[OF UpdInhRel _ InhNormalPremise] RedInh \<open>res = _\<close> red_ast_bpl_transitive 
         by blast
     next
       \<comment>\<open>Failure case\<close>
@@ -238,20 +250,18 @@ lemma pos_perm_rel:
 
 \<comment>\<open>TODO: handle case e_p is statically determined to be non-negative\<close>
   shows "rel_general R
-                  (\<lambda> \<omega> ns.
-                           (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and>
-                           state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns))
-                  (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
-                  (\<lambda> \<omega>. (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
+                  (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+                  (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
+                  (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
                   P ctxt 
                   ((BigBlock name (Lang.Assign temp_perm e_p_bpl # Assert ((Var temp_perm) \<guillemotleft>Ge\<guillemotright> (Var zero_perm)) # cs) s tr), cont) 
                   (BigBlock name cs s tr, cont)" (is "rel_general R ?R' ?Success ?Fail  P ctxt ?\<gamma> ?\<gamma>'")
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" and
-         A: "\<omega> = \<omega>' \<and> (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)"
-  from this obtain p
-    where RedPerm: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and "0 \<le> p" 
+         A: "\<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p"
+  from this have
+    RedPerm:  "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and "0 \<le> p" 
     by auto
 
   note StateRelInst = StateRel[OF \<open>R \<omega> ns\<close>]
@@ -282,17 +292,15 @@ proof (rule rel_intro)
                         boogie_const_rel_lookup[OF state_rel0_boogie_const[OF state_rel_state_rel0[OF StateRelInst2]]] 
                 simp: \<open>zero_perm = _\<close>)
 
-  ultimately show "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) ((BigBlock name cs s tr, cont), Normal ns') \<and>
-                         (\<exists>p. ctxt_vpr, StateCons, Some \<omega>' \<turnstile> \<langle>e_p;\<omega>'\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and>
-                              state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>' ns')"
+  ultimately show "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) ((BigBlock name cs s tr, cont), Normal ns') \<and>                         
+                              state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>' ns'"
     using RedPerm red_ast_bpl_transitive A
     by fast
 next
   fix \<omega> ns
   assume "R \<omega> ns"
-  assume "\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0"
-  from this obtain p
-    where RedPerm: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and "p < 0" 
+  assume "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0"
+  from this have RedPerm: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and "p < 0" 
     by auto
 
   note StateRelInst = StateRel[OF \<open>R \<omega> ns\<close>]
@@ -329,12 +337,10 @@ next
     by fastforce
 qed
 
-
 lemma upd_inh_rel:
   assumes
-    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> 
-                           (\<exists>p. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and>
-                           state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns)" and
+    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
+                           state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -347,33 +353,35 @@ lemma upd_inh_rel:
     RcvRel: "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
   shows "rel_general R 
                   (state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt)
-                  (\<lambda> \<omega> \<omega>'. red_inhale ctxt_vpr StateCons (Atomic (Acc e_rcv_vpr f_vpr (PureExp e_p))) \<omega> (RNormal \<omega>'))
+                  (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
                   (\<lambda> \<omega>. False) P ctxt 
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
                   (BigBlock name cs str tr, cont)"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
 
-  assume "red_inhale ctxt_vpr StateCons (Atomic (Acc e_rcv_vpr f_vpr (PureExp e_p))) \<omega> (RNormal \<omega>')" and
+  assume "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
          "R \<omega> ns"
+  from this obtain W' where InhAccNormal: 
+       "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+       "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+       "p \<ge> 0"
+       "(p > 0 \<longrightarrow> r \<noteq> Null)"
+       "W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r, f_vpr) (Some (Abs_prat p)))"
+       "W' \<noteq> {}" 
+       "\<omega>' \<in> W'"
+    unfolding inhale_acc_normal_premise_def
+    by metis
 
-  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign m_bpl m_upd_bpl # cs) str tr, cont), Normal ns) 
+  show "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign m_bpl m_upd_bpl # cs) str tr, cont), Normal ns) 
                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
              state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega>' ns'"
-  proof cases
-    case (InhAcc r p W')
-    hence "p \<ge> 0" and "(0 < p \<longrightarrow> r \<noteq> Null)" and "W' \<noteq> {}" and "\<omega>' \<in> W'"
-      using th_result_rel_normal 
-      by blast+
-
-    from \<open>R \<omega> ns\<close> InhAcc have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
+  proof -
+    from \<open>R \<omega> ns\<close> InhAccNormal have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
       using exp_rel_vpr_bpl_elim_2[OF RcvRel] 
       by (metis val_rel_vpr_bpl.simps(3))
-  
-    from InhAcc and \<open>R \<omega> ns\<close> have 
-        StateRelInst: "state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns"
-      using StateRel
-      sorry \<comment>\<open>need determinism to resolve this\<close>
+
+    note StateRelInst = StateRel[OF \<open>R \<omega> ns\<close>]
 
     hence LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV (real_of_rat p))"
       using state_rel_aux_pred_sat_lookup_2
@@ -444,7 +452,7 @@ proof (rule rel_intro)
         using update_var_same_state[OF LookupMask]
         by (simp add: \<open>m_bpl = _\<close>)
       moreover have "\<omega>' = \<omega>"
-        using True \<open>\<omega>' \<in> W'\<close> InhAcc by fastforce
+        using True \<open>\<omega>' \<in> W'\<close> InhAccNormal by fastforce
       ultimately show ?thesis 
         using RedAstBpl StateRelInst2 
         by auto
@@ -453,8 +461,8 @@ proof (rule rel_intro)
       from this obtain a where "r = Address a" 
         using ref.exhaust by auto
       hence InhSingle: "\<omega>' \<in> inhale_perm_single StateCons \<omega> (a, f_vpr) (Some (Abs_prat p))"
-        using InhAcc th_result_rel_normal
-        by auto
+        using InhAccNormal 
+        by simp        
 
       let ?\<omega>_perm = "get_mh_total_full \<omega> (a, f_vpr)"       
 

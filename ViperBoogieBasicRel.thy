@@ -308,9 +308,6 @@ lemma boogie_const_lit_rel:
       apply (unfold boogie_const_rel_def)
   by (auto intro: RedVar RedLit)
 
-definition disjoint_list :: " ('a set) list \<Rightarrow> bool"
-  where "disjoint_list xs = (\<forall>i j. 0 \<le> i \<and> i < length xs \<and> 0 \<le> j \<and> j < length xs \<and> i \<noteq> j \<longrightarrow> disjnt (xs ! i) (xs ! j))"
-
 definition store_rel :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> var_context \<Rightarrow> tr_vpr_bpl \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "store_rel A \<Lambda> Tr \<omega> ns \<equiv> 
           inj_on (var_translation Tr) (dom (var_translation Tr)) \<and>
@@ -412,6 +409,29 @@ type_synonym 'a aux_vars_pred = "Lang.vname \<rightharpoonup> ('a vbpl_val \<Rig
 
 definition aux_vars_pred_sat :: "var_context \<Rightarrow> 'a aux_vars_pred \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "aux_vars_pred_sat \<Lambda> AuxPred ns = (\<forall> x p. AuxPred x = Some p \<longrightarrow> has_Some (\<lambda>v. p v) (lookup_var \<Lambda> ns x))"
+
+lemma aux_vars_pred_sat_update:
+  assumes "aux_vars_pred_sat (var_context ctxt) AuxPred ns" and
+          "P aux_val"
+  shows "aux_vars_pred_sat (var_context ctxt) (AuxPred(aux_var \<mapsto> P)) 
+                                               (update_var (var_context ctxt) ns aux_var aux_val)"
+  unfolding aux_vars_pred_sat_def
+proof (rule allI | rule impI)+
+  fix x p
+  assume "(AuxPred(aux_var \<mapsto> P)) x = Some p"
+  show "has_Some p (lookup_var (var_context ctxt) (update_var (var_context ctxt) ns aux_var aux_val) x)"
+  proof (cases "aux_var = x")
+    case True
+    then show ?thesis 
+      using \<open>P aux_val\<close> \<open>(AuxPred(aux_var \<mapsto> P)) x = Some p\<close> by auto
+  next
+    case False
+    then show ?thesis
+      using  \<open>(AuxPred(aux_var \<mapsto> P)) x = Some p\<close>
+      by (metis assms(1) aux_vars_pred_sat_def map_upd_Some_unfold update_var_other)
+  qed
+qed
+
 
 definition state_rel0 :: "ViperLang.program \<Rightarrow> 
                           ('a vbpl_absval) absval_ty_fun \<Rightarrow> 
@@ -599,8 +619,6 @@ lemma state_rel_aux_pred_remove:
        apply (rule map_le_implies_dom_le[OF assms(2)])
     using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
     by (metis (no_types, lifting) dom_fun_upd fun_upd_triv insertCI map_le_def option.distinct(1) option.sel)
-
-(*  by (smt (verit) domI map_le_def map_le_implies_dom_le option.inject) *)
 
 lemma lookup_disj_aux:
   assumes "\<And>x. x \<notin> M \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
@@ -884,10 +902,76 @@ lemma state_rel_new_auxvar:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)"  and
-           "P aux_val"
-   shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega> (update_var \<Lambda> ns aux_var aux_val)"
-  sorry
+                      dom AuxPred)"  and   
+           "P aux_val" and
+                 "type_interp ctxt = vbpl_absval_ty TyRep" and
+     LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
+               "type_of_val (type_interp ctxt) aux_val = \<tau>"
+   shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+  
+proof -
+
+  note StateRel0 = state_rel_state_rel0[OF StateRel]
+
+  from AuxVarFresh have
+    "aux_var \<notin> {heap_var Tr, mask_var Tr}" and
+    "aux_var \<notin> ran (var_translation Tr)" and
+    "aux_var \<notin> ran (field_translation Tr)" and
+    "aux_var \<notin> range (const_repr Tr)" and
+    "aux_var \<notin> dom AuxPred"
+    by blast+
+
+  show ?thesis
+    unfolding state_rel_def state_rel0_def
+  proof (intro conjI)
+    show "store_rel (type_interp ctxt) (var_context ctxt) Tr \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+      using store_rel_stable[OF state_rel0_store_rel[OF StateRel0]] AuxVarFresh
+      by fastforce
+  next
+    from state_rel0_disjoint[OF StateRel0]
+    have *:"disjoint_list 
+       ([{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr)]@
+       [ dom AuxPred])"
+      by simp
+
+    show "disjoint_list
+     [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
+      dom (AuxPred(aux_var \<mapsto> P))]"
+      using AuxVarFresh disjoint_list_add[OF *]
+      by auto
+  next
+    show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+      using heap_var_rel_stable[OF state_rel0_heap_var_rel[OF StateRel0]] AuxVarFresh
+      by simp
+  next
+    show "mask_var_rel Pr (var_context ctxt) TyRep Tr (mask_var Tr) \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+      using mask_var_rel_stable[OF state_rel0_mask_var_rel[OF StateRel0]] AuxVarFresh
+      by auto
+  next
+    show "field_rel Pr (var_context ctxt) Tr (update_var (var_context ctxt) ns aux_var aux_val)"
+      using field_rel_stable[OF state_rel0_field_rel[OF StateRel0]] AuxVarFresh
+      by fastforce
+  next
+    show "boogie_const_rel (const_repr Tr) (var_context ctxt) (update_var (var_context ctxt) ns aux_var aux_val)"
+      using boogie_const_rel_stable[OF state_rel0_boogie_const[OF StateRel0]] AuxVarFresh
+      by fastforce
+  next
+    show "aux_vars_pred_sat (var_context ctxt) (AuxPred(aux_var \<mapsto> P)) 
+                                               (update_var (var_context ctxt) ns aux_var aux_val)"  
+      using aux_vars_pred_sat_update state_rel0_aux_pred_sat[OF StateRel0] \<open>P aux_val\<close>
+      by blast
+  next
+    show "state_well_typed (type_interp ctxt) (var_context ctxt) [] (update_var (var_context ctxt) ns aux_var aux_val)"
+      using LookupTy state_rel0_state_well_typed[OF StateRel0]
+      by (metis instantiate_nil update_var_state_wt)
+  next
+    show "wf_mask_simple (get_mh_total_full \<omega>)"
+      using StateRel0 state_rel0_wf_mask_simple by blast
+  next
+    show "type_interp ctxt = vbpl_absval_ty TyRep"
+      by (simp add: \<open>type_interp ctxt = _\<close>)
+  qed
+qed
                    
 lemma state_rel0_heap_update:
   assumes  
