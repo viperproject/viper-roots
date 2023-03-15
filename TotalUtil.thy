@@ -351,5 +351,13 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+lemma disjoint_list_subset: 
+  assumes "disjoint_list xs" and
+          "length xs = length xs'" and
+          "\<And> i j. 0 \<le> i \<Longrightarrow> i < length xs \<Longrightarrow> xs' ! i \<subseteq> xs ! i"
+        shows "disjoint_list xs'"
+  using assms
+  unfolding disjoint_list_def
+  by (metis disjnt_subset1 disjnt_subset2)
 
 end

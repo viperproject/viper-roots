@@ -246,6 +246,7 @@ lemma pos_perm_rel:
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
           StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
          LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_perm = Some (TPrim TReal)" and
+         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
          WritePermConst: "zero_perm = const_repr Tr CNoPerm"
 
 \<comment>\<open>TODO: handle case e_p is statically determined to be non-negative\<close>
@@ -274,7 +275,7 @@ proof (rule rel_intro)
   let ?ns' = "update_var (var_context ctxt) ns temp_perm (RealV ?p_bpl)"
 
   have StateRelInst2: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV ?p_bpl))) ctxt \<omega> ?ns'"
-    using  state_rel_new_auxvar[OF StateRelInst DisjAux]
+    using state_rel_new_auxvar[OF StateRelInst DisjAux _ TyInterp LookupTyTemp]
     unfolding pred_eq_def
     by simp
 
@@ -313,7 +314,7 @@ next
   let ?ns' = "update_var (var_context ctxt) ns temp_perm (RealV ?p_bpl)"
 
   have StateRelInst2: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV ?p_bpl))) ctxt \<omega> ?ns'"
-    using  state_rel_new_auxvar[OF StateRelInst DisjAux]
+    using  state_rel_new_auxvar[OF StateRelInst DisjAux _ TyInterp LookupTyTemp]
     unfolding pred_eq_def
     by simp
   

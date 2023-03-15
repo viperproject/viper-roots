@@ -408,7 +408,7 @@ lemma field_rel_stable:
 type_synonym 'a aux_vars_pred = "Lang.vname \<rightharpoonup> ('a vbpl_val \<Rightarrow> bool)"
 
 definition aux_vars_pred_sat :: "var_context \<Rightarrow> 'a aux_vars_pred \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
-  where "aux_vars_pred_sat \<Lambda> AuxPred ns = (\<forall> x p. AuxPred x = Some p \<longrightarrow> has_Some (\<lambda>v. p v) (lookup_var \<Lambda> ns x))"
+  where "aux_vars_pred_sat \<Lambda> AuxPred ns = (\<forall> x P. AuxPred x = Some P \<longrightarrow> has_Some (\<lambda>v. P v) (lookup_var \<Lambda> ns x))"
 
 lemma aux_vars_pred_sat_update:
   assumes "aux_vars_pred_sat (var_context ctxt) AuxPred ns" and
@@ -605,11 +605,61 @@ lemma state_rel_aux_pred_sat_lookup_2:
   by fastforce
 
 lemma state_rel_aux_pred_weaken:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
           "dom AuxPred' \<subseteq> dom AuxPred" and
-          "\<And>x P' P v. AuxPred x = Some P \<Longrightarrow> AuxPred' x = Some P' \<Longrightarrow> P v \<Longrightarrow> P' v"
+          WeakerPred: "\<And>x P' P v. AuxPred x = Some P \<Longrightarrow> AuxPred' x = Some P' \<Longrightarrow> P v \<Longrightarrow> P' v"
         shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega> ns"
-  sorry
+  unfolding state_rel_def state_rel0_def
+proof (intro conjI)
+  note StateRel0 = state_rel_state_rel0[OF StateRel]
+
+  show "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
+  unfolding aux_vars_pred_sat_def
+  proof (rule allI | rule impI)+
+    fix x P'
+    assume "AuxPred' x = Some P'"
+    moreover from this obtain P where "AuxPred x = Some P"
+      using \<open>dom _ \<subseteq> dom _\<close>
+      by blast
+
+    ultimately show "has_Some P' (lookup_var (var_context ctxt) ns x)"
+      using state_rel0_aux_pred_sat[OF StateRel0] WeakerPred
+      unfolding aux_vars_pred_sat_def
+      by (metis has_Some_iff)
+  qed   
+
+  show "disjoint_list
+     [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
+      dom AuxPred']" (is "disjoint_list ?A'")
+  proof (rule disjoint_list_subset[OF state_rel0_disjoint[OF StateRel0]], simp)
+    fix i j
+    assume "0 \<le> i" and
+           "i < length
+                [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
+                 dom AuxPred]" (is "i < length ?A")
+    show "?A' ! i \<subseteq> ?A ! i"            
+      apply (cases i)
+       apply simp
+      apply (rename_tac i1)
+      apply (case_tac i1)
+       apply simp
+      apply (rename_tac i2)
+      apply (case_tac i2)
+      apply simp
+      apply (rename_tac i3)
+      apply (case_tac i3)
+       apply simp
+      apply (rename_tac i4)
+      apply (case_tac i4)
+       apply simp
+      apply (rename_tac i5)
+      apply (case_tac i5)
+       apply (simp add: \<open>dom _ \<subseteq> dom _\<close>)
+      apply (simp add: \<open>i < _\<close>)
+      done
+  qed  
+qed (insert StateRel, unfold state_rel_def state_rel0_def, auto)
+
 
 lemma state_rel_aux_pred_remove:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
@@ -910,16 +960,7 @@ lemma state_rel_new_auxvar:
    shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
   
 proof -
-
   note StateRel0 = state_rel_state_rel0[OF StateRel]
-
-  from AuxVarFresh have
-    "aux_var \<notin> {heap_var Tr, mask_var Tr}" and
-    "aux_var \<notin> ran (var_translation Tr)" and
-    "aux_var \<notin> ran (field_translation Tr)" and
-    "aux_var \<notin> range (const_repr Tr)" and
-    "aux_var \<notin> dom AuxPred"
-    by blast+
 
   show ?thesis
     unfolding state_rel_def state_rel0_def
