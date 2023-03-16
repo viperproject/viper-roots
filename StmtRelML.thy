@@ -75,7 +75,7 @@ and
       | IfHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
            (Rmsg' "If0" (resolve_tac ctxt [@{thm stmt_rel_if}]) ctxt) THEN'
            (
-             (Rmsg' "If1" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
+             (Rmsg' "If1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
              (Rmsg' "If wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
              (Rmsg' "If2" ((progress_tac ctxt) |> SOLVED') ctxt)
            ) THEN'
@@ -128,7 +128,7 @@ ML \<open>
     
     (* well-def RHS *)
     (* begin *)
-    (Rmsg' "Assign4" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
+    (Rmsg' "Assign4" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
     (Rmsg' "Assign Wf RHS" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
     (Rmsg' "Assign5" (progress_tac ctxt) ctxt) THEN'
     (* end *)
@@ -161,7 +161,7 @@ ML \<open>
   fun wf_writeable_field_rel_tac rcv_exp_rel_info (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =
      (* need to first progress the configuration in case the currently active bigblock is not unfolded or
         if the current bigblock is empty *)
-     resolve_tac ctxt [@{thm wf_rel_extend_2}] THEN' 
+     resolve_tac ctxt [@{thm wf_rel_extend_2_same_rel}] THEN' 
      progress_tac ctxt THEN'
      (Rmsg' "WfWriteableField1" (resolve_tac ctxt [@{thm syn_field_access_writeable_wf_rel} OF 
                                                      [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]

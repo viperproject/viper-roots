@@ -1,5 +1,5 @@
 theory StmtRel
-imports ExpRel ExprWfRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
+imports ExpRel ExprWfRel InhaleRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
 begin
 
 text \<open>
@@ -551,6 +551,15 @@ proof (rule field_assign_rel)
     unfolding heap_var_rel_def
     by auto
 qed (insert assms, auto)
+
+subsection \<open>Inhale statement relation\<close>
+
+lemma inhale_stmt_rel:
+  assumes "inhale_rel R ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
+  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
+  apply (rule stmt_rel_intro)
+  using inhale_rel_normal_elim[OF assms] inhale_rel_failure_elim[OF assms]
+  by (auto elim: RedInhale_case)
 
 subsection \<open>Misc\<close>
 

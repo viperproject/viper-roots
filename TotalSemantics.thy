@@ -277,6 +277,7 @@ inductive_cases RedSeqFailure_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2)
 inductive_cases RedIfNormal_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> (RNormal \<omega>')"
 inductive_cases RedIfFailure_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> RFailure"
 inductive_cases RedIf_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
+inductive_cases RedInhale_case: "red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
 
 lemmas red_stmt_total_inversion_thms =
    RedSkip_case
@@ -284,6 +285,7 @@ lemmas red_stmt_total_inversion_thms =
    RedIf_case
    RedSeqNormal_case
    RedSeqFailure_case
+   RedInhale_case
 
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_mh_total_full \<omega> = zero_mask \<and> get_mp_total_full \<omega> = zero_mask"

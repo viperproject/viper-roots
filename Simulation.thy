@@ -91,7 +91,7 @@ qed
 lemma rel_propagate_post:
   assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1" and
           "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
-  shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
+        shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and
@@ -113,6 +113,36 @@ next
     by meson
 qed
 
+text \<open>If failure is infeasible, then we can assume success when propagating\<close>
+
+lemma rel_propagate_pre_success:
+  assumes NoFailure: "\<And> \<omega>. \<not> Fail \<omega>"
+          "\<And> \<omega> \<omega>' ns. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
+          "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
+        shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
+
+  with assms(2) obtain ns1 where
+    "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    by blast
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
+    using rel_success_elim[OF assms(3)] \<open>Success \<omega> \<omega>'\<close> red_ast_bpl_transitive
+    by blast
+qed (simp add: NoFailure)
+
+lemma rel_propagate_pre_success_2:
+  assumes NoFailure: "\<And> \<omega>. \<not> Fail \<omega>"
+          "\<And> \<omega> \<omega>' ns. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R0 \<omega> ns'" and
+          "rel_general R0 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+        shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  apply (rule rel_propagate_pre_success)
+  using assms
+  by auto
+  
+
 subsection \<open>General structural rules\<close>
 
 text \<open>Composition rule\<close>
@@ -124,7 +154,7 @@ lemma rel_general_comp:
    SuccessComp: "\<And> \<omega> \<omega>'. Success3 \<omega> \<omega>' \<Longrightarrow> (\<exists> \<omega>''. Success1 \<omega> \<omega>'' \<and> Success2 \<omega>'' \<omega>')" and
    FailComp: "\<And> \<omega>. Fail3 \<omega> \<Longrightarrow> (Fail1 \<omega> \<or> (\<exists>\<omega>''. Success1 \<omega> \<omega>'' \<and> Fail2 \<omega>''))"
  shows 
-   "rel_general R1 R3 Success3 Fail3 P ctxt \<gamma>1 \<gamma>3"
+   "rel_general R1 R3 Success3 Fail3 P ctxt \<gamma>1 \<gamma>3"  
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R1 \<omega> ns" and "Success3 \<omega> \<omega>'"

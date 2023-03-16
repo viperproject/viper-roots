@@ -29,7 +29,7 @@ ML \<open>
         (inhale_rel_tac ctxt info right_hint |> SOLVED')
     | ImpInhHint (exp_wf_rel_info, exp_rel_info, right_hint) => 
          (
-           (Rmsg' "ImpInh 1" (resolve_tac ctxt [@{thm wf_rel_extend_1}]) ctxt) THEN'
+           (Rmsg' "ImpInh 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
            (Rmsg' "ImpInh wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
            (Rmsg' "ImpInh 2" ((progress_tac ctxt) |> SOLVED') ctxt)
          ) THEN'

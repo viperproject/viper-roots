@@ -264,6 +264,15 @@ proof (rule wf_rel_intro)
     by blast
 qed (insert assms, unfold wf_rel_def, blast)
 
+lemma wf_rel_extend_1_same_rel:
+  assumes 
+   "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>2" and
+   "\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3) \<and> R \<omega>_def \<omega> ns3"
+ shows 
+  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  using assms wf_rel_extend_1
+  by blast
+
 lemma wf_rel_extend_2:
   assumes 
    Red:"\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R' \<omega>_def \<omega> ns3" and
@@ -292,6 +301,15 @@ next
     unfolding red_ast_bpl_def
     by (metis (no_types, lifting) Wf red_ast_bpl_def rtranclp_trans wf_rel_failure_elim)
 qed
+
+lemma wf_rel_extend_2_same_rel:
+  assumes 
+   Red:"\<And>\<omega>_def \<omega> ns2. R \<omega>_def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R \<omega>_def \<omega> ns3" and
+   Wf:"wf_rel R R IsNormal IsFailure P ctxt \<gamma>2 \<gamma>3"
+ shows 
+  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  using assms wf_rel_extend_2
+  by blast
 
 abbreviation wf_rel_bop_op 
   where "wf_rel_bop_op R R' ctxt_vpr StateCons P ctxt e1 bop e2 \<equiv>  wf_rel R R'

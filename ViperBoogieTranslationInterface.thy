@@ -290,7 +290,7 @@ subsection \<open>Boogie Type representation instantiation\<close>
 
 fun tcon_enum_to_id :: "tcon_enum \<Rightarrow> tcon_id"
   where
-    "tcon_enum_to_id TCRef = ''ref''"
+    "tcon_enum_to_id TCRef = ''Ref''"
   | "tcon_enum_to_id TCField = ''Field''"
   | "tcon_enum_to_id TCHeap = ''HeapType''"
   | "tcon_enum_to_id TCMask = ''MaskType''"
@@ -338,5 +338,11 @@ fun const_repr_basic :: "boogie_const \<Rightarrow> vname"
   | "const_repr_basic CNull = 0"
   | "const_repr_basic CZeroMask = 1"
 
+lemma const_repr_basic_bound: "const_repr_basic c = x \<Longrightarrow> x \<le> 4"
+  by (cases c) auto
+
+lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<le> 4"
+  using const_repr_basic_bound
+  by fastforce  
 
 end

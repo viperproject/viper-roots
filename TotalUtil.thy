@@ -31,6 +31,33 @@ abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option"
 abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
   "Some_if b x \<equiv> option_if b (Some x)"
 
+text \<open>Disjointness helper lemmas\<close>
+
+lemma list_all_ran_map_of: 
+  assumes "list_all (\<lambda> x. P (snd x)) xs"
+  shows "\<forall>y \<in> ran (map_of xs). P y"
+proof (rule ballI)
+  fix y
+  assume "y \<in> ran (map_of xs)"
+  from this obtain x where "(map_of xs) x = Some y "
+    unfolding ran_def
+    by blast
+
+  hence "(x,y) \<in> set xs"
+    by (simp add: map_of_SomeD)
+
+  thus "P y"
+    using assms
+    by (metis list.pred_set snd_conv)
+qed
+
+lemma not_satisfies_prop_in_set:
+  assumes "\<forall>x \<in> xs. P x" and
+          "\<not> P y"
+        shows "y \<notin> xs"
+  using assms
+  by force
+
 text \<open>Some helper definitions for trivial Viper programs\<close>
 
 fun f_None :: "'a \<Rightarrow> 'b option"

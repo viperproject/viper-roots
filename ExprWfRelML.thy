@@ -53,7 +53,7 @@ ML \<open>
   fun bop_wf_rel_div_mod exp_rel_info ctxt = 
       (* need to first progress the configuration in case the currently active bigblock is not unfolded or
          if the current bigblock is empty *)
-      resolve_tac ctxt [@{thm wf_rel_extend_2}] THEN' 
+      resolve_tac ctxt [@{thm wf_rel_extend_2_same_rel}] THEN' 
       progress_tac ctxt THEN'
       resolve_tac ctxt [@{thm syn_bop_op_non_trivial_wf_rel}] THEN'
       (Rmsg' "div_rel_1" assm_full_simp_solved_tac ctxt) (* bop *) THEN'
@@ -130,7 +130,7 @@ ML \<open>
      field_access_wf_rel_tac (exp_wf_rel_info : exp_wf_rel_info) exp_rel_info ctxt =
        (
          (* progress to field access *)
-         resolve_tac ctxt [@{thm wf_rel_extend_2}] THEN' 
+         resolve_tac ctxt [@{thm wf_rel_extend_2_same_rel}] THEN' 
          progress_tac ctxt THEN'
          (Rmsg' "Wf Rcv Field Access" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN'  (* receiver *)
          (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
