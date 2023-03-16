@@ -80,6 +80,24 @@ lemma inhale_rel_failure_elim:
   unfolding inhale_rel_def rel_general_def
   by auto
 
+subsection \<open>Propagation rules\<close>
+
+lemma inhale_propagate_pre:
+  assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
+          "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  using assms rel_propagate_pre
+  unfolding inhale_rel_def
+  by blast
+
+lemma inhale_propagate_post:
+  assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" and
+          "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
+  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  using assms rel_propagate_post
+  unfolding inhale_rel_def
+  by blast
+
 subsection \<open>Structural rules\<close>
 
 lemma inhale_rel_star: 
@@ -158,7 +176,7 @@ lemma inhale_rel_field_acc:
                   P ctxt \<gamma>2 \<gamma>3" and
      UpdInhRel: "\<And>p r. rel_general R' R
                   (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r \<omega> \<omega>')
-                  (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'"
+                  (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" \<comment>\<open>Here, the simulation needs to revert back to R\<close>
   shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
   fix \<omega> ns res
@@ -240,6 +258,7 @@ qed
 definition pred_eq
   where "pred_eq x v = (x = v)"
 
+\<comment>\<open>Factor out temporary variable\<close>
 lemma pos_perm_rel:
   assumes ExpRel: "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_p e_p_bpl" and
          DisjAux: "temp_perm \<notin> {heap_var Tr, mask_var Tr} \<union> ran (var_translation Tr) \<union> 
@@ -337,6 +356,19 @@ next
     using red_ast_bpl_transitive
     by fastforce
 qed
+
+lemma non_null_receiver_inh_rel:
+  assumes "R \<omega> ns" and
+    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
+                           state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+          "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
+          "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+  shows 
+          "\<exists>ns'. red_ast_bpl P ctxt 
+               ( (BigBlock name ((Assume (((Var temp_perm) \<guillemotleft>Gt\<guillemotright> no_perm_const) \<guillemotleft>Imp\<guillemotright> (e_rcv_bpl \<guillemotleft>Neq\<guillemotright> null_const))) # cs) str tr, cont) , Normal ns) 
+                (\<gamma>1, Normal ns') \<and> 
+                 R1 \<omega> ns'"
+  sorry
 
 lemma upd_inh_rel:
   assumes
@@ -513,5 +545,7 @@ proof (rule rel_intro)
     qed
   qed
 qed (simp)
+
+
 
 end

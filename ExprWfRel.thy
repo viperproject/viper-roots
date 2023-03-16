@@ -1038,7 +1038,7 @@ next
     by (auto intro: ExpRel)
 qed
 
-(* remove syn_lazy_bop_wf_rel_2 and just use syn_laxy_bop_wf_rel *)
+(* remove syn_lazy_bop_wf_rel_2 and just use syn_lazy_bop_wf_rel *)
 lemma syn_lazy_bop_wf_rel_2:
   assumes
    Lazy: "binop_lazy bop = Some (b1 :: 'a ValueAndBasicState.val, bResult)" and

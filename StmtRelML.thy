@@ -1,5 +1,5 @@
 theory StmtRelML
-imports Boogie_Lang.HelperML ExprWfRelML StmtRel 
+imports Boogie_Lang.HelperML ExprWfRelML StmtRel InhaleRelML
 begin
 
 ML \<open>
@@ -40,17 +40,7 @@ ML \<open>
        exp_rel_info *
        ('a stmt_rel_hint) * (* thn branch *)
        ('a stmt_rel_hint)   (* els branch *)
-  | NoHint (* used for debugging purposes *) 
-     
-
-  type basic_stmt_rel_info = {
-      ctxt_wf_thm: thm,
-      tr_def_thm: thm,
-      var_rel_tac: (Proof.context -> int -> tactic),
-      var_context_vpr_tac: (Proof.context -> int -> tactic),
-      field_rel_single_tac : (Proof.context -> int -> tactic), 
-      type_interp_econtext: thm  
-  }
+  | NoHint (* used for debugging purposes *)      
 
   type 'a atomic_rel_tac = (Proof.context -> basic_stmt_rel_info -> 'a -> int -> tactic)
 
@@ -126,6 +116,7 @@ ML \<open>
        exp_wf_rel_info * (* well-definedness rhs *)
        exp_rel_info * (* receiver *)
        exp_rel_info   (* rhs *)
+  | InhaleHint of (atomic_inhale_rel_hint inhale_rel_hint)
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)

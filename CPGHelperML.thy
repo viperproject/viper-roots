@@ -75,6 +75,19 @@ fun progress_tac ctxt =
    (resolve_tac ctxt [@{thm red_ast_bpl_empty_block}] ORELSE'
     resolve_tac ctxt [@{thm red_ast_bpl_refl}]) THEN'
    assm_full_simp_solved_tac ctxt
+
+(* general information for tactics *)
+  (* TODO rename *)
+  type basic_stmt_rel_info = {
+      ctxt_wf_thm: thm,
+      tr_def_thm: thm,
+      var_rel_tac: (Proof.context -> int -> tactic),
+      var_context_vpr_tac: (Proof.context -> int -> tactic),
+      field_rel_single_tac : (Proof.context -> int -> tactic), 
+      type_interp_econtext: thm  
+  }
+
+
 \<close>
 
 

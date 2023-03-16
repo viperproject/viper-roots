@@ -118,7 +118,6 @@ lemma stmt_rel_propagate:
   unfolding stmt_rel_def
   using rel_propagate_pre
   by blast
-  
 
 lemma stmt_rel_propagate_same_rel:
   assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
