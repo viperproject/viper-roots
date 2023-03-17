@@ -61,14 +61,14 @@ lemma rel_failure_elim:
 subsection \<open>Propagation rules\<close>
 
 lemma rel_propagate_pre:
-  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
           "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
         shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"  
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
 
-  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
+  with \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
     "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
     by blast
 
@@ -79,7 +79,7 @@ next
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and "Fail \<omega>"
 
-  from \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
+  with \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
     "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
     by blast
 
@@ -87,6 +87,14 @@ next
     using rel_failure_elim[OF assms(2)] \<open>Fail \<omega>\<close>
     by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 qed
+
+text \<open>Same as rel_propagate_pre but where \<^prop>\<open>R1 = R2\<close>\<close>
+lemma rel_propagate_pre_2: 
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
+          "rel_general R1 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+   shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2" 
+  using assms rel_propagate_pre
+  by blast
 
 lemma rel_propagate_post:
   assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1" and
@@ -140,8 +148,7 @@ lemma rel_propagate_pre_success_2:
         shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
   apply (rule rel_propagate_pre_success)
   using assms
-  by auto
-  
+  by auto  
 
 subsection \<open>General structural rules\<close>
 
