@@ -31,6 +31,9 @@ abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option"
 abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
   "Some_if b x \<equiv> option_if b (Some x)"
 
+definition pred_eq
+  where "pred_eq x v = (x = v)"
+
 text \<open>Disjointness helper lemmas\<close>
 
 lemma list_all_ran_map_of: 
