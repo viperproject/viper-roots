@@ -1,5 +1,5 @@
 theory InhaleRel
-  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation SimulationInstUtil
+  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation
 begin
 
 definition inhale_rel ::
@@ -164,7 +164,7 @@ definition inhale_acc_normal_premise
        (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
        (W' \<noteq> {} \<and> \<omega>' \<in> W'))"
 
-lemma inhale_rel_field_acc:
+lemma inhale_field_acc_rel:
   assumes 
     WfRcv: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
     WfPerm: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and 
@@ -253,7 +253,7 @@ proof (rule inhale_rel_intro_2)
   qed
 qed
 
-lemma pos_perm_rel_1:
+lemma store_temporary_perm_rel:
   assumes
   StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" (is "?R \<omega> ns") and
   RedPerm:  "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and
@@ -289,9 +289,21 @@ proof (rule exI, rule conjI)
     by blast
 qed
 
-lemma pos_perm_rel_2:
+lemma pos_perm_rel_trivial:
+  assumes  "e_p = ELit lit" and
+           "val_of_lit lit = ((VPerm p2) :: 'a ValueAndBasicState.val)" and
+           "p2 \<ge> 0"
+  shows "rel_general R
+                     R
+       (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)
+       (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p :: 'a ValueAndBasicState.val) \<and> p < 0) P ctxt
+       \<gamma> \<gamma>"
+  apply (rule rel_general_success_refl)
+  using assms TotalExpressions.RedLit_case extended_val.inject 
+   apply fastforce
+  by simp
 
-\<comment>\<open>TODO: handle case e_p is statically determined to be non-negative\<close>
+lemma pos_perm_rel_nontrivial:
 assumes  WritePermConst: "zero_perm = const_repr Tr CNoPerm"
 
 shows "rel_general (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
@@ -352,10 +364,10 @@ next
     by fastforce
 qed
 
-lemma non_null_receiver_inh_rel:
-  assumes  StateRel: "state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
+lemma inhale_field_acc_non_null_rcv_rel:
+  assumes  StateRel: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
        InhAccNormal: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
- RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
+ RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" and
  NullConst: "null_const = const_repr Tr CNull" and
  NoPermConst: "no_perm_const = const_repr Tr CNoPerm"
@@ -390,10 +402,10 @@ proof (rule exI[where ?x="ns"])
     by blast
 qed
 
-lemma upd_inh_rel:
+lemma inhale_rel_field_acc_upd_rel:
   assumes
     StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
-                           state_rel (program_total ctxt_vpr) TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+                           state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -402,10 +414,10 @@ lemma upd_inh_rel:
     HeapUpdateBpl: "m_upd_bpl = mask_upd_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl new_perm [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
                    "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Add\<guillemotright> (Var temp_perm)" and
     MaskVar: "m_bpl = mask_var Tr " and
-    FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+    FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     RcvRel: "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
   shows "rel_general R 
-                  (state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt)
+                  (state_rel Pr TyRep Tr AuxPred ctxt)
                   (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
                   (\<lambda> \<omega>. False) P ctxt 
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
@@ -428,7 +440,7 @@ proof (rule rel_intro)
 
   show "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign m_bpl m_upd_bpl # cs) str tr, cont), Normal ns) 
                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
-             state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega>' ns'"
+             state_rel Pr TyRep Tr AuxPred ctxt \<omega>' ns'"
   proof -
     from \<open>R \<omega> ns\<close> InhAccNormal have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
       using exp_rel_vpr_bpl_elim_2[OF RcvRel] 
@@ -441,12 +453,12 @@ proof (rule rel_intro)
       unfolding pred_eq_def      
       by (metis (full_types) fun_upd_same)
 
-    have StateRelInst2: "state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns"
+    have StateRelInst2: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns"
       using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove[OF StateRelInst]
       by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
       
     obtain f_bpl \<tau>_vpr where
-      FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some \<tau>_vpr" and
+      FieldLookup: "declared_fields Pr f_vpr = Some \<tau>_vpr" and
       TyTr: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl" and
       FieldTr: "field_translation Tr f_vpr = Some f_bpl" and
       "e_f_bpl = Lang.Var f_bpl"
@@ -466,7 +478,7 @@ proof (rule rel_intro)
     obtain mb where
           LookupMask: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
           LookupMaskTy: "lookup_var_ty (var_context ctxt) (mask_var Tr) = Some (TConSingle (TMaskId TyRep))" and
-          MaskRel: "mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) mb"
+          MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
       using state_rel_obtain_mask[OF StateRelInst]
       by blast
 
@@ -546,7 +558,7 @@ proof (rule rel_intro)
         by (simp add: of_rat_add)
       qed
 
-      have "state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega>' ?ns'"
+      have "state_rel Pr TyRep Tr AuxPred ctxt \<omega>' ?ns'"
         apply (subst \<open>\<omega>' = _\<close>)
         apply (subst \<open>?mb' = _\<close>)
         apply (subst \<open>m_bpl = _\<close>)

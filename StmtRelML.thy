@@ -1,5 +1,5 @@
 theory StmtRelML
-imports Boogie_Lang.HelperML ExprWfRelML StmtRel InhaleRelML
+imports Boogie_Lang.HelperML ExprWfRelML StmtRel InhaleRelML ViperBoogieHelperML
 begin
 
 ML \<open>
@@ -12,26 +12,6 @@ ML \<open>
     assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt THEN'
     assm_full_simp_solved_tac ctxt
 
-  fun red_assume_good_state_tac ctxt ctxt_wf_thm tr_def_thm = 
-    resolve_tac ctxt [@{thm RedAssumeOk}] THEN'
-    resolve_tac ctxt [@{thm assume_state_normal} OF [ctxt_wf_thm]] THEN'
-    resolve_tac ctxt [@{thm tr_def_field_translation} OF [tr_def_thm]] THEN'
-    fastforce_tac ctxt [] THEN'
-    assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt THEN'
-    assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt THEN'
-    assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt THEN'
-    assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
-  
-  fun progress_assume_good_state_tac ctxt ctxt_wf_thm tr_def_thm =
-    resolve_tac ctxt [@{thm exI}] THEN'
-    resolve_tac ctxt [@{thm red_ast_bpl_propagate_same_rel}] THEN'
-    resolve_tac ctxt [@{thm red_ast_bpl_one_simple_cmd}] THEN'
-    red_assume_good_state_tac ctxt ctxt_wf_thm tr_def_thm THEN'
-    assume_tac ctxt THEN'
-    resolve_tac ctxt [@{thm conjI}] THEN'
-    resolve_tac ctxt [@{thm red_ast_bpl_refl}] THEN'
-    assume_tac ctxt
-
   datatype 'a stmt_rel_hint = 
     AtomicHint of 'a 
   | SeqnHint of ('a stmt_rel_hint) list
@@ -42,14 +22,15 @@ ML \<open>
        ('a stmt_rel_hint)   (* els branch *)
   | NoHint (* used for debugging purposes *)      
 
-  type 'a atomic_rel_tac = (Proof.context -> basic_stmt_rel_info -> 'a -> int -> tactic)
+  type ('a,'i) atomic_rel_tac = (Proof.context -> 'i inhale_rel_info ->  basic_stmt_rel_info -> 'a -> int -> tactic)
 
-  type 'a stmt_rel_info = {
+  type ('a, 'i) stmt_rel_info = {
     basic_stmt_rel_info: basic_stmt_rel_info,
-    atomic_rel_tac: 'a atomic_rel_tac
+    atomic_rel_tac: ('a,'i) atomic_rel_tac,
+    inhale_rel_info: 'i inhale_rel_info
   }
 
- fun stmt_rel_tac ctxt (info: 'a stmt_rel_info)(stmt_rel_hint: 'a stmt_rel_hint) =
+ fun stmt_rel_tac ctxt (info: ('a, 'i) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
        SeqnHint [] => resolve_tac ctxt [@{thm stmt_rel_skip}]
     |  SeqnHint [_] => error "SeqnHint with single node appears"
@@ -57,21 +38,21 @@ ML \<open>
     | _ => stmt_rel_single_stmt_tac ctxt info stmt_rel_hint
 and
      stmt_rel_tac_seq _ _ [] = K all_tac
-   | stmt_rel_tac_seq ctxt (info: 'a stmt_rel_info) [h] =
+   | stmt_rel_tac_seq ctxt (info: ('a, 'i) stmt_rel_info) [h] =
        stmt_rel_tac ctxt info h
-   | stmt_rel_tac_seq ctxt (info: 'a stmt_rel_info) (h1 :: h2 :: hs) = 
+   | stmt_rel_tac_seq ctxt (info: ('a, 'i) stmt_rel_info) (h1 :: h2 :: hs) = 
        resolve_tac ctxt [@{thm stmt_rel_seq_same_rel}] THEN'
        stmt_rel_tac ctxt info h1 THEN'
        stmt_rel_tac_seq ctxt info (h2 :: hs)
 and 
      stmt_rel_single_stmt_tac _ _ NoHint = K all_tac
-   | stmt_rel_single_stmt_tac ctxt (info: 'a stmt_rel_info) hint_hd =
+   | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i) stmt_rel_info) hint_hd =
     (* Each statement associated with a hint is translated by the actual encoding followed by 
        \<open>assume state(Heap, Mask)\<close>. This is why we apply a propagation rule first. *)
     resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}] THEN'
     (
       case hint_hd of
-        AtomicHint a => (#atomic_rel_tac info) ctxt (#basic_stmt_rel_info info) a
+        AtomicHint a => (#atomic_rel_tac info) ctxt (#inhale_rel_info info) (#basic_stmt_rel_info info) a
       | IfHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
            (Rmsg' "If0" (resolve_tac ctxt [@{thm stmt_rel_if}]) ctxt) THEN'
            (
@@ -204,11 +185,14 @@ ML \<open>
     | _ => error "field assign rel tac only handles field assignment"
     )
 
-  fun atomic_rel_inst_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
+  fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
         AssignHint (exp_wf_rel_info, exp_rel_info, lookup_bpl_target_thm) => 
-               red_assign_tac ctxt basic_stmt_rel_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
-     |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_stmt_rel_info atomic_hint
+               red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
+     |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
+     | InhaleHint inh_rel_hint => 
+        resolve_tac ctxt @{thms inhale_stmt_rel} THEN'
+        inhale_rel_tac ctxt inhale_info inh_rel_hint        
     )
 \<close>
 

@@ -314,6 +314,15 @@ next
     qed
   qed
 qed
+
+subsection \<open>Misc rules\<close>
+
+lemma rel_general_success_refl:
+  assumes "\<And> \<omega>. \<not> Fail \<omega>" and
+          "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
+        shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
+  using assms
+  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
     
 
 end

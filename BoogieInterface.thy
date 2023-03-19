@@ -110,5 +110,22 @@ proof -
     by (fastforce intro!: red_ast_bpl_one_step_empty_simple_cmd RedSkip)
 qed 
 
+lemma red_ast_bpl_propagate_rel:
+  assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
+          "R1 \<omega> ns1" and
+          "R1 \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
+        shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
+  using assms
+  unfolding red_ast_bpl_def
+  by auto
+
+lemma red_ast_bpl_propagate_same_rel:
+    assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
+          "R \<omega> ns1" and
+          "R \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
+        shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
+  using assms
+  unfolding red_ast_bpl_def
+  by auto
 
 end

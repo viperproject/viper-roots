@@ -111,13 +111,15 @@ lemma stmt_rel_failure_elim:
 subsection \<open>Propagation rules\<close>
 
 lemma stmt_rel_propagate:
+          \<comment>\<open>We could weaken this assumption by adding that success or failure must occur, but until
+            now we have not required this.\<close>
   assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
           "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
         shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"  
   using assms
   unfolding stmt_rel_def
   using rel_propagate_pre
-  by blast
+  by metis
 
 lemma stmt_rel_propagate_same_rel:
   assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
@@ -568,30 +570,6 @@ lemma init_state:
           "is_empty_total \<omega>" 
   shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name cs str tr,cont), Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'"
   oops
-
-lemma red_ast_bpl_propagate_rel:
-  assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
-          "R1 \<omega> ns1" and
-          "R1 \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
-        shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R2 \<omega> ns2"
-  using assms
-  unfolding red_ast_bpl_def
-  by auto
-
-lemma red_ast_bpl_propagate_same_rel:
-    assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
-          "R \<omega> ns1" and
-          "R \<omega> ns1 \<Longrightarrow> red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
-        shows "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> R \<omega> ns2"
-  using assms
-  unfolding red_ast_bpl_def
-  by auto
-
-lemma tr_def_field_translation:
-  assumes "tr = tr_def" and
-          "field_translation tr_def = F"
-        shows "field_translation tr = F"
-  using assms by simp
 
 lemma exp_rel_true_imp_1:
   assumes  "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"

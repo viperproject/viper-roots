@@ -45,6 +45,12 @@ record tr_vpr_bpl =
  (*TODO: bound vars*)
 (*  result_var :: "string" *)
 
+lemma tr_def_field_translation:
+  assumes "tr = tr_def" and
+          "field_translation tr_def = F"
+        shows "field_translation tr = F"
+  using assms by simp
+
 text \<open>
 Some parts here are irrelevant for the semantic relationship. For example, \<^const>\<open>mask_read\<close>
 and \<^const>\<open>heap_read\<close> abstract over how the mask and heap read accesses are encoded as Boogie 
