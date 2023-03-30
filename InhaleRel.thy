@@ -16,7 +16,6 @@ definition inhale_rel ::
            (\<lambda> \<omega>. red_inhale ctxt_vpr StateCons assertion_vpr \<omega> RFailure)
            P ctxt \<gamma> \<gamma>'"
 
-
 lemma inhale_rel_intro:
   assumes
     "\<And>\<omega> ns \<omega>'. 

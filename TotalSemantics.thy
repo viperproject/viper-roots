@@ -60,7 +60,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhPure:
   "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-     red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (if b then ExhaleNormal (m,pm) else ExhaleFailure)"
+     red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (exh_if_total b (m,pm))"
 | SubAtomicFailure: 
   "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
      red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
