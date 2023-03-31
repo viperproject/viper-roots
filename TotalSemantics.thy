@@ -6,9 +6,9 @@ begin
 
 datatype 'a exhale_result = ExhaleNormal "'a full_total_state" | ExhaleFailure
 
-fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a exhale_result"  where
-  "exh_if_total False _ = ExhaleFailure"
-| "exh_if_total True m = ExhaleNormal m"
+fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total"  where
+  "exh_if_total False _ = RFailure"
+| "exh_if_total True \<omega> = RNormal \<omega>"
 
 
 definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> mask set"
@@ -19,7 +19,7 @@ definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat
                m' = m(lh := psub (m lh) q)
        }"
 
-inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a  exhale_result \<Rightarrow> bool"
+inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool" and \<omega>0 :: "'a full_total_state"
   where
 
@@ -30,8 +30,9 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
      a = the_address r \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
-                          ( exh_if_total (p \<ge> 0 \<and> pgte (mh (a,f)) (Abs_prat p) \<and> r \<noteq> Null)
-                                         (update_mh_total_full \<omega> (mh( (a,f) := psub (mh (a,f)) (Abs_prat p)))) )"
+                          ( exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (mh (a,f)) (Abs_prat p)))
+                                         (if r = Null then \<omega> else update_mh_total_full \<omega> (mh( (a,f) := psub (mh (a,f)) (Abs_prat p)))) 
+                          )"
 
 \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
 | ExhAccWildcard:
@@ -63,16 +64,16 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | SubAtomicFailure: 
   "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
      red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
-     red_exhale ctxt R \<omega>0 (Atomic A) \<omega> ExhaleFailure"
+     red_exhale ctxt R \<omega>0 (Atomic A) \<omega> RFailure"
 
 \<comment>\<open>exhale A && B\<close>
 | ExhStarNormal: 
- "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> (ExhaleNormal \<omega>'); 
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> (RNormal \<omega>'); 
     red_exhale ctxt R \<omega>0 B \<omega>' res\<rbrakk> \<Longrightarrow>
     red_exhale ctxt R \<omega>0 (A && B) \<omega> res"
 | ExhStarFailure: 
- "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
-    red_exhale ctxt R \<omega>0 (A && B) \<omega> ExhaleFailure"
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> RFailure \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (A && B) \<omega> RFailure"
 
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
 | ExhImpTrue: 
@@ -81,10 +82,10 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
     red_exhale ctxt R \<omega>0 (Imp e A) \<omega> res" 
 | ExhImpFalse:  
  "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-    red_exhale ctxt R \<omega>0 (Imp e A) \<omega> (ExhaleNormal \<omega>)"
+    red_exhale ctxt R \<omega>0 (Imp e A) \<omega> (RNormal \<omega>)"
 | ExhImpFailure:
  "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
-   red_exhale ctxt R \<omega>0 (Imp e A) \<omega> ExhaleFailure"
+   red_exhale ctxt R \<omega>0 (Imp e A) \<omega> RFailure"
 
 
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
@@ -124,14 +125,14 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
       "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) (ExhaleNormal \<omega>');   
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) (RNormal \<omega>');   
        \<omega>2 = update_mp_total_full \<omega>' ( (get_mp_total_full \<omega>')( (pred_id,vs) :=  padd (m (pred_id, vs)) q)) \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>2)"
   | FoldRelFailure:
        "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) ExhaleFailure \<rbrakk> \<Longrightarrow> 
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) RFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
@@ -161,17 +162,17 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
    "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
  | RedExhale:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (ExhaleNormal \<omega>_exh);
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
       \<omega>' \<in> exhale_state \<omega>_exh (get_m_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
  | RedExhaleFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
  | RedAssert:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (ExhaleNormal \<omega>_exh) \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>)"
  | RedAssertFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
 
 \<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
