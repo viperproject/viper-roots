@@ -4,12 +4,27 @@ theory TotalSemantics
 imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
 begin
 
-datatype 'a exhale_result = ExhaleNormal "'a full_total_state" | ExhaleFailure
-
 fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total"  where
   "exh_if_total False _ = RFailure"
 | "exh_if_total True \<omega> = RNormal \<omega>"
 
+lemma exh_if_total_normal:
+  assumes "exh_if_total b \<omega> = RNormal \<omega>"
+  shows b
+  using assms
+  by (auto elim: exh_if_total.elims)
+
+lemma exh_if_total_normal_2:
+  assumes "exh_if_total b \<omega> = RNormal \<omega>'"
+  shows "\<omega> = \<omega>'"
+  using assms
+  by (auto elim: exh_if_total.elims)
+
+lemma exh_if_total_failure:
+  assumes "exh_if_total b \<omega> = RFailure"
+  shows "\<not>b"
+  using assms
+  by (auto elim: exh_if_total.elims)
 
 definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> mask set"
   where "exhale_perm_single m lh p_opt =

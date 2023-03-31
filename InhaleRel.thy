@@ -153,9 +153,9 @@ lemma inhale_field_acc_rel:
                   (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
                   (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
                   P ctxt \<gamma>2 \<gamma>3" and
-     UpdInhRel: "\<And>p r. rel_general (R' p) R
+     UpdInhRel: "\<And>p r. rel_general (R' p) R \<comment>\<open>Here, the simulation needs to revert back to R\<close>
                   (inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r)
-                  (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" \<comment>\<open>Here, the simulation needs to revert back to R\<close>
+                  (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" 
   shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
   fix \<omega> ns res
