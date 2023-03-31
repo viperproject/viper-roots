@@ -1,5 +1,5 @@
 theory InhaleRel
-  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation
+  imports ExpRel ExprWfRel ViperBoogieTranslationInterface Simulation
 begin
 
 definition inhale_rel ::
@@ -232,42 +232,6 @@ proof (rule inhale_rel_intro_2)
       qed
     qed (simp add: \<open>res = _\<close>)
   qed
-qed
-
-lemma store_temporary_perm_rel:
-  assumes
-  StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" (is "?R \<omega> ns") and
-  RedPerm:  "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and
-  ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel Pr TyRep Tr AuxPred ctxt)) ctxt_vpr ctxt e_p e_p_bpl" and
-         DisjAux: "temp_perm \<notin> {heap_var Tr, mask_var Tr} \<union> ran (var_translation Tr) \<union> 
-                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
-         LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_perm = Some (TPrim TReal)" and
-         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep"
-   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign temp_perm e_p_bpl # cs) s tr), cont), Normal ns)
-                                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
-                (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns')"
-           (is "\<exists>ns'. ?red ns' \<and> ?R' \<omega> ns'")
-proof (rule exI, rule conjI)
-  let ?p_bpl = "RealV (real_of_rat p)"
-
-  from RedPerm have RedPermBpl: "red_expr_bpl ctxt e_p_bpl ns ?p_bpl"
-    using exp_rel_vpr_bpl_elim[OF ExpRel] \<open>?R \<omega> ns\<close>
-    by (metis val_rel_vpr_bpl.simps(5))
-
-  let ?ns' = "update_var (var_context ctxt) ns temp_perm ?p_bpl"
-
-  have StateRel2: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq ?p_bpl)) ctxt \<omega> ?ns'"
-    using state_rel_new_auxvar[OF \<open>?R \<omega> ns\<close> DisjAux _ TyInterp LookupTyTemp]
-    unfolding pred_eq_def
-    by simp
-
-  show "?red ?ns'"
-    apply (rule red_ast_bpl_one_simple_cmd)
-    by (fastforce intro!: RedAssign LookupTyTemp RedPermBpl)
-
-  show "?R' \<omega> ?ns'"
-    using StateRel2
-    by blast
 qed
 
 lemma pos_perm_rel_trivial:
