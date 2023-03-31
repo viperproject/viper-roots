@@ -67,6 +67,8 @@ lemma wf_rel_inst_eq:
   unfolding wf_rel_def wf_rel_inst_def rel_general_def
   by auto
 
+lemmas wf_rel_inst_eq_1 = HOL.iffD1[OF wf_rel_inst_eq]
+
 lemma wf_rel_general:
   "wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns) IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow>
    rel_general R R' (\<lambda>\<omega> \<omega>'. IsNormal \<omega> \<omega> \<and> \<omega> = \<omega>') (\<lambda>\<omega>. IsFailure \<omega> \<omega>) P ctxt \<gamma> \<gamma>'"

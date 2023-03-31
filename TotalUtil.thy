@@ -34,6 +34,9 @@ abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
 definition pred_eq
   where "pred_eq x v = (x = v)"
 
+lemma rev_iffD1_def: "P \<Longrightarrow> P \<equiv> Q \<Longrightarrow> Q"
+  by blast
+
 text \<open>Disjointness helper lemmas\<close>
 
 lemma list_all_ran_map_of: 
