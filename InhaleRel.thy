@@ -83,11 +83,11 @@ subsection \<open>Propagation rules\<close>
 
 lemma inhale_propagate_pre:
   assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
-          "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+          "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
   shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   using assms rel_propagate_pre
   unfolding inhale_rel_def
-  by blast
+  by metis
 
 lemma inhale_propagate_post:
   assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" and
