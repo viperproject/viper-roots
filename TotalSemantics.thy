@@ -4,9 +4,9 @@ theory TotalSemantics
 imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
 begin
 
-datatype 'a exhale_result = ExhaleNormal "mask \<times> 'a predicate_mask" | ExhaleFailure
+datatype 'a exhale_result = ExhaleNormal "'a full_total_state" | ExhaleFailure
 
-fun exh_if_total :: "bool \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a exhale_result"  where
+fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a exhale_result"  where
   "exh_if_total False _ = ExhaleFailure"
 | "exh_if_total True m = ExhaleNormal m"
 
@@ -19,76 +19,75 @@ definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat
                m' = m(lh := psub (m lh) q)
        }"
 
-inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a  exhale_result \<Rightarrow> bool"
+inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a  exhale_result \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool" and \<omega>0 :: "'a full_total_state"
   where
 
 \<comment>\<open>exhale acc(e.f, p)\<close>
   ExhAcc: 
-  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+  "\<lbrakk>  mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
      a = the_address r \<rbrakk> \<Longrightarrow>
-     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) (m,pm) 
-                         (exh_if_total (p \<ge> 0 \<and> pgte (m(a,f)) (Abs_prat p) \<and> r \<noteq> Null) (m( (a,f) := psub (m (a,f)) (Abs_prat p)),pm)) "
+     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
+                          ( exh_if_total (p \<ge> 0 \<and> pgte (mh (a,f)) (Abs_prat p) \<and> r \<noteq> Null)
+                                         (update_mh_total_full \<omega> (mh( (a,f) := psub (mh (a,f)) (Abs_prat p)))) )"
 
 \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
 | ExhAccWildcard:
-  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+  "\<lbrakk> mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-     q = (SOME p. p \<noteq> pnone \<and> pgt (m(a,f)) q) \<rbrakk> \<Longrightarrow>
-     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) (m,pm) 
-                         (exh_if_total (m(a,f) \<noteq> pnone \<and> r \<noteq> Null) 
-                                       (m( (a,f) := q),pm))"
-
+     q = (SOME p. p \<noteq> pnone \<and> pgt (mh (a,f)) p) \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
+                         (exh_if_total (mh (a,f) \<noteq> pnone \<and> r \<noteq> Null) 
+                                       (update_mh_total_full \<omega> (mh( (a,f) := q))))"
 \<comment>\<open>exhale acc(P(es), p)\<close>
 | ExhAccPred:
-   "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
-    red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) (m,pm)
-            (exh_if_total (p \<ge> 0 \<and> pgte (pm(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
-                          (m, pm( (pred_id, v_args) := psub (pm (pred_id, v_args)) (Abs_prat p))))"
+     red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
+            (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
+                          (update_mp_total_full \<omega> (mp( (pred_id, v_args) := psub (mp (pred_id, v_args)) (Abs_prat p)))))"
 | ExhAccPredWildcard:
-  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m;
+  "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-     q \<in> {p. p \<noteq> pnone \<and> pgt (m(a,f)) q} \<rbrakk> \<Longrightarrow>
-     red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) (m,pm) 
-                         (exh_if_total (m(a,f) \<noteq> pnone)
-                                       (m, pm ( (pred_id, v_args) := q )))"
+     q = (SOME p. p \<noteq> pnone \<and> pgt (mp (a,f)) p) \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>
+                         (exh_if_total (mp (a,f) \<noteq> pnone)
+                                       (update_mp_total_full \<omega> (mp ( (pred_id, v_args) := q ))))"
 
 | ExhPure:
-  "\<lbrakk> \<omega> = update_mh_total_full \<omega>0 m; 
-     ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
-     red_exhale ctxt R \<omega>0 (Atomic (Pure e)) (m,pm) (exh_if_total b (m,pm))"
+  "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
+     red_exhale ctxt R \<omega>0 (Atomic (Pure e)) \<omega> (exh_if_total b \<omega>)"
 | SubAtomicFailure: 
   "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
      red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
-     red_exhale ctxt R \<omega>0 (Atomic A) (m,pm) ExhaleFailure"
+     red_exhale ctxt R \<omega>0 (Atomic A) \<omega> ExhaleFailure"
 
 \<comment>\<open>exhale A && B\<close>
 | ExhStarNormal: 
- "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm (ExhaleNormal m_pm'); 
-    red_exhale ctxt R \<omega>0 B m_pm' res\<rbrakk> \<Longrightarrow>
-    red_exhale ctxt R \<omega>0 (A && B) m_pm res"
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> (ExhaleNormal \<omega>'); 
+    red_exhale ctxt R \<omega>0 B \<omega>' res\<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (A && B) \<omega> res"
 | ExhStarFailure: 
- "\<lbrakk> red_exhale ctxt R \<omega>0 A m_pm ExhaleFailure \<rbrakk> \<Longrightarrow>
-    red_exhale ctxt R \<omega>0 (A && B) m_pm ExhaleFailure"
+ "\<lbrakk> red_exhale ctxt R \<omega>0 A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (A && B) \<omega> ExhaleFailure"
 
 \<comment>\<open>exhale A \<longrightarrow> B\<close>
 | ExhImpTrue: 
- "\<lbrakk>  \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-    ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
-    red_exhale ctxt R \<omega>0 A m_pm res \<rbrakk> \<Longrightarrow>
-    red_exhale ctxt R \<omega>0 (Imp e A) m_pm res" 
+ "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+    red_exhale ctxt R \<omega>0 A \<omega> res \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (Imp e A) \<omega> res" 
 | ExhImpFalse:  
- "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm);
-    ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
-    red_exhale ctxt R \<omega>0 (Imp e A) m_pm (ExhaleNormal m_pm)"
+ "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
+    red_exhale ctxt R \<omega>0 (Imp e A) \<omega> (ExhaleNormal \<omega>)"
 | ExhImpFailure:
- "\<lbrakk> \<omega> = update_m_total_full \<omega>0 (fst m_pm) (snd m_pm); 
-    ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
-   red_exhale ctxt R \<omega>0 (Imp e A) m_pm ExhaleFailure"
+ "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
+   red_exhale ctxt R \<omega>0 (Imp e A) \<omega> ExhaleFailure"
+
+
+inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 
@@ -125,15 +124,14 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
       "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) (ExhaleNormal m');    
-       mp'' = (snd m')( (pred_id,vs) :=  padd (m (pred_id, vs)) q);
-       \<omega>2 = update_m_total_full \<omega> (fst m') mp''\<rbrakk> \<Longrightarrow> 
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) (ExhaleNormal \<omega>');   
+       \<omega>2 = update_mp_total_full \<omega>' ( (get_mp_total_full \<omega>')( (pred_id,vs) :=  padd (m (pred_id, vs)) q)) \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>2)"
   | FoldRelFailure:
        "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow> 
+       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) ExhaleFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
@@ -163,17 +161,17 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
    "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
  | RedExhale:
-   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m');
-      \<omega>' \<in> exhale_state \<omega> m' \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (ExhaleNormal \<omega>_exh);
+      \<omega>' \<in> exhale_state \<omega>_exh (get_m_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
  | RedExhaleFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
  | RedAssert:
-   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) (ExhaleNormal m') \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (ExhaleNormal \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>)"
  | RedAssertFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A (get_m_total_full \<omega>) ExhaleFailure \<rbrakk> \<Longrightarrow>
+   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> ExhaleFailure \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
 
 \<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
