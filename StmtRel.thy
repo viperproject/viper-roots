@@ -62,32 +62,15 @@ lemma stmt_rel_intro[case_names base step]:
   unfolding stmt_rel_def 
   by (auto intro: rel_intro)
 
-definition stmt_rel_aux 
-  where "stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res \<equiv>             
-          (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
-                 (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns'))) \<and>
-             (res = RFailure \<longrightarrow> 
-                (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure))"
-
-lemma stmt_rel_aux_intro:
-  assumes "\<And>\<omega>'. res = RNormal \<omega>' \<Longrightarrow>
-            \<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns')" and
-          "res = RFailure \<Longrightarrow> 
-            (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
-  shows "stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res"
-  using assms
-  unfolding stmt_rel_aux_def
-  by blast
-
 lemma stmt_rel_intro_2:
   assumes 
   "\<And>\<omega> ns res. 
           R \<omega> ns \<Longrightarrow> 
           red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> res \<Longrightarrow>
-          stmt_rel_aux R' \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>' ns res"
+          rel_vpr_aux R' P ctxt \<gamma> \<gamma>' ns res"
 shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda> P ctxt stmt_vpr \<gamma> \<gamma>'"
   using assms
-  unfolding stmt_rel_def stmt_rel_aux_def 
+  unfolding stmt_rel_def rel_vpr_aux_def 
   by (auto intro: rel_intro)
 
 lemma stmt_rel_normal_elim:
@@ -216,9 +199,9 @@ proof (rule stmt_rel_intro_2)
   hence "res = RNormal \<omega>"
     by (auto elim: RedSkip_case)
 
-  thus "stmt_rel_aux R2 \<Lambda>_vpr P ctxt Skip \<gamma> \<gamma> ns res"
-    unfolding stmt_rel_aux_def
-    using \<open>R2 \<omega> ns\<close> red_ast_bpl_refl by blast
+  thus "rel_vpr_aux R2 P ctxt \<gamma> \<gamma> ns res"    
+    using \<open>R2 \<omega> ns\<close> red_ast_bpl_refl 
+    by (blast intro: rel_vpr_aux_intro)
 qed
 
 subsection \<open>Local variable assignment relation\<close>

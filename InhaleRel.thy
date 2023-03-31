@@ -32,34 +32,16 @@ lemma inhale_rel_intro:
   unfolding inhale_rel_def
   by (auto intro: rel_intro)
 
-definition inhale_rel_aux
-  where "inhale_rel_aux R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<omega> ns res \<equiv>
-             (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
-                   \<comment>\<open>Normal Viper inhale executions can be simulated by normal Boogie executions\<close>
-                   (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'))) \<and>
-             (res = RFailure \<longrightarrow> 
-                   \<comment>\<open>If a Viper inhale executions fails, then there is a failing Boogie execution\<close>
-                   (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure))"
-
 lemma inhale_rel_intro_2:
   assumes
     "\<And>\<omega> ns res. 
       R \<omega> ns \<Longrightarrow> 
       red_inhale ctxt_vpr StateCons assertion_vpr \<omega> res \<Longrightarrow>
-      inhale_rel_aux R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<omega> ns res"
+      rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
   shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
   using assms
-  unfolding inhale_rel_def inhale_rel_aux_def
+  unfolding inhale_rel_def rel_vpr_aux_def
   by (auto intro: rel_intro)
-
-lemma inhale_rel_aux_intro:
-  assumes "\<And>\<omega>'. res = RNormal \<omega>' \<Longrightarrow>
-           (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'))" and
-          "res = RFailure \<Longrightarrow> (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
-        shows "inhale_rel_aux R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<omega> ns res"
-  using assms
-  unfolding inhale_rel_aux_def
-  by blast
 
 lemma inhale_rel_normal_elim:
   assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and 
@@ -172,7 +154,7 @@ lemma inhale_field_acc_rel:
                   (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
                   P ctxt \<gamma>2 \<gamma>3" and
      UpdInhRel: "\<And>p r. rel_general (R' p) R
-                  (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r \<omega> \<omega>')
+                  (inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r)
                   (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" \<comment>\<open>Here, the simulation needs to revert back to R\<close>
   shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
@@ -182,7 +164,7 @@ proof (rule inhale_rel_intro_2)
     by simp
 
   assume RedInh: "red_inhale ctxt_vpr StateCons (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega> res"
-  thus "inhale_rel_aux R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>' \<omega> ns res"
+  thus "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
   proof (cases)
     case (InhAcc r p W')
     from this obtain ns1 where Rext1: "state_rel_ext R \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
@@ -195,7 +177,7 @@ proof (rule inhale_rel_intro_2)
       by simp
 
     show ?thesis
-    proof (rule inhale_rel_aux_intro)
+    proof (rule rel_vpr_aux_intro)
       \<comment>\<open>Normal case\<close>
       
       fix \<omega>'
@@ -234,7 +216,7 @@ proof (rule inhale_rel_intro_2)
                 ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure)"
       by (auto elim: red_exp_list_failure_elim)  
     show ?thesis
-    proof (rule inhale_rel_aux_intro)
+    proof (rule rel_vpr_aux_intro)
       show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
       proof (cases "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
         case True

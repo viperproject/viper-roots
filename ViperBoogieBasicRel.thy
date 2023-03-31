@@ -1679,6 +1679,24 @@ type_synonym 'a vast_config = "('a vbpl_absval) vast_config_general"
 
 type_synonym viper_stmt = ViperLang.stmt
 
+subsection \<open>Auxiliary definitions for simulation\<close>
+
+definition rel_vpr_aux
+  where "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res \<equiv>
+             (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow>
+                   (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'))) \<and>
+             (res = RFailure \<longrightarrow> 
+                   (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure))"
+
+lemma rel_vpr_aux_intro:
+  assumes "\<And>\<omega>'. res = RNormal \<omega>' \<Longrightarrow>
+           (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'))" and
+          "res = RFailure \<Longrightarrow> (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
+        shows "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
+  using assms
+  unfolding rel_vpr_aux_def
+  by blast
+
 subsection \<open>syntactic relations\<close>
 
 lemma var_context_aux:
