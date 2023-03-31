@@ -93,10 +93,13 @@ lemma update_m_total_eq:
 *)
 
 lemma get_update_mh_total: 
-  assumes "wf_mask_simple m0"
   shows   "get_mh_total (update_mh_total mh m0) = m0"
   unfolding update_mh_total_def
-  using assms
+  by simp
+
+lemma get_update_mp_total:
+  shows "get_mp_total (update_mp_total mp m0) = m0"
+  unfolding update_mp_total_def
   by simp
 
 lemma update_mh_total_multiple: 
@@ -186,9 +189,8 @@ lemma update_hh_loc_total_full_mask_same: "get_mh_total_full (update_hh_loc_tota
   by (simp add: update_hh_loc_total_mh_eq)
 
 lemma get_update_mh_total_full: 
-  assumes "wf_mask_simple m0"
   shows   "get_mh_total_full (update_mh_total_full mh m0) = m0"
-  using assms get_update_mh_total
+  using get_update_mh_total
   by auto
 
 lemma update_mh_total_full_same:
