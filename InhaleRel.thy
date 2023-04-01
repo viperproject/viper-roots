@@ -1,5 +1,5 @@
 theory InhaleRel
-  imports ExpRel ExprWfRel ViperBoogieTranslationInterface Simulation
+  imports ExpRel ExprWfRel ViperBoogieTranslationInterface Simulation ViperBoogieRelUtil
 begin
 
 definition inhale_rel ::
@@ -248,66 +248,17 @@ lemma pos_perm_rel_trivial:
    apply fastforce
   by simp
 
-lemma pos_perm_rel_nontrivial:
-assumes  WritePermConst: "zero_perm = const_repr Tr CNoPerm"
-
+lemma pos_perm_rel_nontrivial_inh:
+assumes "zero_perm = const_repr Tr CNoPerm"
 shows "rel_general (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
                    (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
      (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)
      (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0) P ctxt
      (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
      (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
-proof (rule rel_intro)
-  fix \<omega> ns \<omega>'
-  assume "?R \<omega> ns" and
-         A: "\<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p"
-
-  let ?p_bpl = "RealV (real_of_rat p)"
-
-  have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some ?p_bpl"
-    using state_rel_aux_pred_sat_lookup_2[OF \<open>?R \<omega> ns\<close>]
-    unfolding pred_eq_def
-    by (metis (full_types) fun_upd_same)
-
-  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns)"
-    apply (rule red_ast_bpl_one_simple_cmd)
-    using A
-    by (auto intro!: RedAssertOk Semantics.RedBinOp Semantics.RedVar 
-                        boogie_const_rel_lookup[OF state_rel0_boogie_const[OF state_rel_state_rel0[OF \<open>?R \<omega> ns\<close>]]] 
-             intro: LookupTempPerm
-                simp: \<open>zero_perm = _\<close>)
-
-  thus "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns') \<and>                         
-                              state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq ?p_bpl)) ctxt \<omega>' ns'"
-    using \<open>?R \<omega> ns\<close> A
-    by fast        
-next
-  fix \<omega> ns
-  assume "?R \<omega> ns"
-  assume "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0"
-  from this have "p < 0" 
-    by auto
-
-  let ?p_bpl = "RealV (real_of_rat p)"
-
-  have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some ?p_bpl"
-    using state_rel_aux_pred_sat_lookup_2[OF \<open>?R \<omega> ns\<close>]
-    unfolding pred_eq_def
-    by (metis (full_types) fun_upd_same)
-
-  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Failure)"
-    apply (rule red_ast_bpl_one_simple_cmd)
-    using \<open>p < 0\<close>
-    by (auto intro!: RedAssertFail Semantics.RedBinOp Semantics.RedVar 
-                        boogie_const_rel_lookup[OF state_rel0_boogie_const[OF state_rel_state_rel0[OF \<open>?R \<omega> ns\<close>]]]
-             intro: LookupTempPerm
-                simp: \<open>zero_perm = _\<close> )
-
-  thus 
-       "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (?\<gamma>, Normal ns) c'"
-    using red_ast_bpl_transitive
-    by fastforce
-qed
+  apply (rule pos_perm_rel_nontrivial)
+  using assms
+  by auto
 
 lemma inhale_field_acc_non_null_rcv_rel:
   assumes  StateRel: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and

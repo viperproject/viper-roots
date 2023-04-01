@@ -1,5 +1,5 @@
 theory ViperBoogieRelUtil
-imports ViperBoogieTranslationInterface ExpRel
+  imports ViperBoogieTranslationInterface ExpRel Simulation
 begin
 
 subsection \<open>Temporary variable management\<close>
@@ -67,6 +67,72 @@ lemma store_temporary_perm_rel:
                 (state_rel Pr TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns')"
            (is "\<exists>ns'. ?red ns' \<and> ?R' \<omega> ns'")
    using store_vpr_exp_to_temporary_var[OF StateRel TyInterp DisjAux LookupTyTemp RedPerm ExpRel]
-   by simp     
+   by simp
+
+subsection \<open>Permission checks\<close>
+
+lemma assert_single_step_rel:
+  assumes SuccessCond: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> cond \<omega>" and
+          FailCond: "\<And>\<omega>. Fail \<omega> \<Longrightarrow> \<not>cond \<omega>" and
+          RedBpl: "\<And>\<omega> ns. R \<omega> ns \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (cond \<omega>))"
+shows "rel_general R R
+     Success
+     Fail
+     P ctxt
+     (BigBlock name (cmd.Assert e_bpl # cs) s tr, cont)
+     (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
+
+  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns)"
+    apply (rule red_ast_bpl_one_simple_cmd)
+    using SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
+    by (auto intro!: RedAssertOk)
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns)
+            ((BigBlock name cs s tr, cont), Normal ns') \<and>
+           R \<omega>' ns'"
+    using \<open>R \<omega> ns\<close> SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>]
+    by blast
+next
+  fix \<omega> ns
+  assume "R \<omega> ns" and "Fail \<omega>"
+  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Failure)"
+    apply (rule red_ast_bpl_one_simple_cmd)
+    using FailCond[OF \<open>Fail \<omega>\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
+    by (auto intro!: RedAssertFail)
+
+  thus "\<exists>c'. snd c' = Failure \<and>
+          red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns) c'"
+    by auto
+qed
+
+lemma pos_perm_rel_nontrivial:
+  assumes "zero_perm = const_repr Tr CNoPerm" and
+          SuccessCond:"\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> p \<ge> 0" and
+          FailCond: "\<And> \<omega>. Fail \<omega> \<Longrightarrow> p < 0"
+shows "rel_general (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+                   (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+     Success Fail
+     P ctxt
+     (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
+     (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
+proof (rule assert_single_step_rel[where ?cond="\<lambda>_. p \<ge> 0"])
+  fix \<omega> ns
+  assume StateRel: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns"
+  let ?p_bpl = "RealV (real_of_rat p)"
+
+  have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some ?p_bpl"
+    using state_rel_aux_pred_sat_lookup_2[OF StateRel]
+    unfolding pred_eq_def
+    by (metis (full_types) fun_upd_same)
+  thus "red_expr_bpl ctxt (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) ns (BoolV (0 \<le> p))"
+        by (auto intro!: red_expr_red_exprs.intros                         
+             intro: LookupTempPerm
+                    boogie_const_rel_lookup[OF state_rel0_boogie_const[OF state_rel_state_rel0[OF StateRel]]]
+             simp: \<open>zero_perm = _\<close> )
+qed (insert assms, auto)
+
+
 
 end
