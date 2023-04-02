@@ -71,42 +71,6 @@ lemma store_temporary_perm_rel:
 
 subsection \<open>Permission checks\<close>
 
-lemma assert_single_step_rel:
-  assumes SuccessCond: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> cond \<omega>" and
-          FailCond: "\<And>\<omega>. Fail \<omega> \<Longrightarrow> \<not>cond \<omega>" and
-          RedBpl: "\<And>\<omega> ns. R \<omega> ns \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (cond \<omega>))"
-shows "rel_general R R
-     Success
-     Fail
-     P ctxt
-     (BigBlock name (cmd.Assert e_bpl # cs) s tr, cont)
-     (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
-proof (rule rel_intro)
-  fix \<omega> ns \<omega>'
-  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
-
-  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns)"
-    apply (rule red_ast_bpl_one_simple_cmd)
-    using SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
-    by (auto intro!: RedAssertOk)
-  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns)
-            ((BigBlock name cs s tr, cont), Normal ns') \<and>
-           R \<omega>' ns'"
-    using \<open>R \<omega> ns\<close> SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>]
-    by blast
-next
-  fix \<omega> ns
-  assume "R \<omega> ns" and "Fail \<omega>"
-  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Failure)"
-    apply (rule red_ast_bpl_one_simple_cmd)
-    using FailCond[OF \<open>Fail \<omega>\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
-    by (auto intro!: RedAssertFail)
-
-  thus "\<exists>c'. snd c' = Failure \<and>
-          red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns) c'"
-    by auto
-qed
-
 lemma pos_perm_rel_nontrivial:
   assumes "zero_perm = const_repr Tr CNoPerm" and
           SuccessCond:"\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> p \<ge> 0" and

@@ -128,4 +128,22 @@ lemma red_ast_bpl_propagate_same_rel:
   unfolding red_ast_bpl_def
   by auto
 
+subsection \<open>Single step lemmas for concrete simple commands\<close>
+
+lemma red_ast_bpl_one_assert:
+  assumes "red_expr_bpl ctxt e ns (BoolV b)" and
+          "s' = (if b then Normal ns else Failure)" 
+  shows "red_ast_bpl P ctxt ((BigBlock name (Assert e#cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), s')"
+  apply (rule red_ast_bpl_one_simple_cmd)
+  using assms
+  by (auto intro: RedAssertOk RedAssertFail)
+
+lemma red_ast_bpl_one_assume:
+  assumes "red_expr_bpl ctxt e ns (BoolV b)" and
+          "s' = (if b then Normal ns else Magic)"
+  shows "red_ast_bpl P ctxt ((BigBlock name (Assume e#cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), s')"
+  apply (rule red_ast_bpl_one_simple_cmd)
+  using assms
+  by (auto intro: RedAssumeOk RedAssumeMagic)
+
 end

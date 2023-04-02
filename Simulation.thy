@@ -148,7 +148,74 @@ lemma rel_propagate_pre_success_2:
         shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
   apply (rule rel_propagate_pre_success)
   using assms
-  by auto  
+  by auto
+
+lemma assert_single_step_rel:
+  assumes SuccessCond: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> cond \<omega>" and
+          FailCond: "\<And>\<omega>. Fail \<omega> \<Longrightarrow> \<not>cond \<omega>" and
+          RedBpl: "\<And>\<omega> ns. R \<omega> ns \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (cond \<omega>))"
+shows "rel_general R R
+     Success
+     Fail
+     P ctxt
+     (BigBlock name (cmd.Assert e_bpl # cs) s tr, cont)
+     (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
+
+  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns)"
+    apply (rule red_ast_bpl_one_simple_cmd)
+    using SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
+    by (auto intro!: RedAssertOk)
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns)
+            ((BigBlock name cs s tr, cont), Normal ns') \<and>
+           R \<omega>' ns'"
+    using \<open>R \<omega> ns\<close> SuccessCond[OF \<open>Success \<omega> \<omega>'\<close>]
+    by blast
+next
+  fix \<omega> ns
+  assume "R \<omega> ns" and "Fail \<omega>"
+  have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Failure)"
+    apply (rule red_ast_bpl_one_simple_cmd)
+    using FailCond[OF \<open>Fail \<omega>\<close>] RedBpl[OF \<open>R \<omega> ns\<close>]
+    by (auto intro!: RedAssertFail)
+
+  thus "\<exists>c'. snd c' = Failure \<and>
+          red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) s tr, cont), Normal ns) c'"
+    by auto
+qed
+
+lemma rel_propagate_pre_assert:
+  assumes Success: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV True)" and
+          Fail: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Fail \<omega>  \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
+          Rel: "rel_general R0 R1 
+                       Success (\<lambda>\<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (BigBlock name cs str tr, cont) \<gamma>2"
+        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assert e_bpl)#cs) str tr, cont) \<gamma>2"
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
+  have "red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal ns)"     
+    by (auto intro: red_ast_bpl_one_assert RedAssertOk Success[OF \<open>R0 \<omega> ns\<close> \<open>Success _ _\<close>])
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) (\<gamma>2, Normal ns') \<and> R1 \<omega>' ns'"
+    using rel_success_elim[OF Rel \<open>R0 \<omega> ns\<close> \<open>Success _ _\<close>] red_ast_bpl_transitive
+    by blast
+next
+  fix \<omega> ns
+  assume "R0 \<omega> ns" and "Fail \<omega>"
+  let ?s' = "if b \<omega> then Normal ns else Failure"
+  have "red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), ?s')"
+   by (auto intro: red_ast_bpl_one_assert RedAssertOk Fail[OF \<open>R0 \<omega> ns\<close> \<open>Fail _\<close>])
+
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) c'"
+    using rel_failure_elim[OF Rel \<open>R0 \<omega> ns\<close>] 
+    apply (cases "b \<omega>")
+    using \<open>Fail _\<close> red_ast_bpl_transitive
+     apply fastforce
+    by auto
+qed
+
 
 subsection \<open>General structural rules\<close>
 
