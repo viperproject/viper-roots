@@ -592,6 +592,15 @@ lemma state_rel_boogie_const:
   unfolding state_rel_def state_rel0_def
   by simp
 
+lemma state_rel_boogie_const_2:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "C = const_repr Tr"
+  shows "boogie_const_rel C (var_context ctxt) ns"
+  using assms
+  unfolding state_rel_def state_rel0_def
+  by simp
+
+
 lemmas state_rel_well_state_well_typed = state_rel0_state_well_typed[OF state_rel_state_rel0]
 
 lemma state_rel_aux_pred_sat_lookup:
@@ -609,6 +618,27 @@ lemma state_rel_aux_pred_sat_lookup_2:
   using assms state_rel0_aux_pred_sat has_Some_iff state_rel_aux_pred_sat_lookup
   unfolding state_rel_def
   by fastforce
+
+lemma state_rel_aux_pred_sat_lookup_2_elim:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred aux_var = Some P"
+        obtains v where "lookup_var (var_context ctxt) ns aux_var = Some v" and "P v"
+  using assms state_rel_aux_pred_sat_lookup_2
+  by blast
+
+lemma state_rel_aux_pred_sat_lookup_3:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred aux_var = Some (pred_eq v)"
+  shows "lookup_var (var_context ctxt) ns aux_var = Some v"
+  using state_rel_aux_pred_sat_lookup_2[OF assms]
+  by (simp add: pred_eq_def)
+
+lemma state_rel_aux_pred_sat_lookup_3_elim:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "AuxPred aux_var = Some (pred_eq v)"
+  shows "lookup_var (var_context ctxt) ns aux_var = Some v"
+  using state_rel_aux_pred_sat_lookup_2[OF assms]
+  by (simp add: pred_eq_def)
 
 lemma state_rel_aux_pred_weaken:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
