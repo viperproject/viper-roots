@@ -216,6 +216,34 @@ next
     by auto
 qed
 
+lemma rel_propagate_pre_assert_2:
+  assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
+          Success: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> b \<omega>" and
+          Rel: "rel_general R0 R1 
+                       Success (\<lambda>\<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
+        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assert e_bpl)#cs) str tr, cont) \<gamma>'"
+  apply (rule rel_propagate_pre_assert[OF _ _ Rel])
+  using assms
+   apply fastforce
+  using assms
+  by blast
+
+lemma rel_propagate_pre_assume:
+  assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV True)" and
+                     "rel_general R0 R1 Success Fail P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
+  shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assume e_bpl)#cs) str tr, cont) \<gamma>'"
+proof (rule rel_propagate_pre[OF _ assms(2)])
+  fix \<omega> ns
+  assume local_assms: "R0 \<omega> ns" "(\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>"
+  hence "red_expr_bpl ctxt e_bpl ns (BoolV True)"
+    using RedExpBpl
+    by blast
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assume e_bpl # cs) str tr, cont), Normal ns)
+              ((BigBlock name cs str tr, cont), Normal ns') \<and>
+             R0 \<omega> ns'"
+    using red_ast_bpl_one_assume[OF RedExpBpl] local_assms
+    by metis
+qed
 
 subsection \<open>General structural rules\<close>
 
