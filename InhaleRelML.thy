@@ -24,7 +24,7 @@ ML \<open>
   fun inhale_rel_aux_tac ctxt (info: 'a inhale_rel_info) (hint: 'a inhale_rel_hint) =
     case hint of
       StarInhHint (left_hint, right_hint) => 
-        resolve_tac ctxt [@{thm inhale_rel_star}] THEN' 
+        (Rmsg' "InhaleRel Star" (resolve_tac ctxt [@{thm inhale_rel_star}]) ctxt) THEN' 
         (inhale_rel_aux_tac ctxt info left_hint |> SOLVED') THEN'
         (inhale_rel_aux_tac ctxt info right_hint |> SOLVED')
     | ImpInhHint (exp_wf_rel_info, exp_rel_info, right_hint) => 
@@ -55,9 +55,9 @@ ML \<open>
            Might want to control this via the hints *)    
   fun inhale_rel_tac ctxt (info: 'a inhale_rel_info) (hint: 'a inhale_rel_hint) =
    (let val basic_info = #basic_info info in
-     (resolve_tac ctxt @{thms inhale_propagate_post}) THEN'
+     (Rmsg' "InhaleRel 1" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
      inhale_rel_aux_tac ctxt info hint THEN'
-     progress_assume_good_state_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)
+     (Rmsg' "InhaleRel 2 Progress" (progress_assume_good_state_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
     end)
 \<close>
 
@@ -89,7 +89,7 @@ ML \<open>
     (Rmsg' "non-null noperm const" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt)
 
   fun inhale_rel_field_acc_upd_rel_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
-    (resolve_tac ctxt @{thms inhale_rel_field_acc_upd_rel}) THEN'
+    (Rmsg' "inh field acc upd 0" (resolve_tac ctxt @{thms inhale_rel_field_acc_upd_rel}) ctxt) THEN'
     (Rmsg' "inh field acc upd 1" (assume_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd aux var disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd wf ty repr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
@@ -109,13 +109,13 @@ ML \<open>
           (Rmsg' "InhField wf rcv" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
           (Rmsg' "InhField wf perm" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
   
-          (resolve_tac ctxt @{thms rel_propagate_pre_2}) THEN'
+          (Rmsg' "InhField 2 propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2}) ctxt) THEN'
             (store_temporary_perm_tac ctxt info exp_rel_info lookup_aux_var_ty_thm) THEN'
-            (resolve_tac ctxt @{thms pos_perm_rel_nontrivial}) THEN'
+            (Rmsg' "InhField Pos Perm Nontrivial" (resolve_tac ctxt @{thms pos_perm_rel_nontrivial_inh}) ctxt) THEN'
               (Rmsg' "InhField zero perm const" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
   
-          (resolve_tac ctxt @{thms rel_propagate_pre_success_2}) THEN'
-            (assm_full_simp_solved_tac ctxt) THEN'
+          (Rmsg' "InhField 3 propagate" (resolve_tac ctxt @{thms rel_propagate_pre_success_2}) ctxt) THEN'
+            (Rmsg' "InhField 4" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
             (non_null_rcv_tac ctxt info exp_rel_info) THEN'
             (inhale_rel_field_acc_upd_rel_tac ctxt (info: basic_stmt_rel_info) exp_rel_info)
     | _ => error("only support FieldAccInhHint")

@@ -191,8 +191,8 @@ ML \<open>
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
      |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
      | InhaleHint inh_rel_hint => 
-        resolve_tac ctxt @{thms inhale_stmt_rel} THEN'
-        inhale_rel_tac ctxt inhale_info inh_rel_hint        
+        (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
+        (inhale_rel_tac ctxt inhale_info inh_rel_hint)
     )
 \<close>
 
