@@ -17,6 +17,11 @@ fun REPEAT_DETERM' tac x =
 
 fun apply_tacs_seq [] = K (all_tac)
  | apply_tacs_seq (tac :: tacs) = tac THEN' (apply_tacs_seq tacs)
+
+(* This basically applies the cut rule \<lbrakk>P; P \<Longrightarrow> Q\<rbrakk> \<Longrightarrow> Q. It has the same effect as
+   cut_tac, except that one must first prove P (while in cut_tac one must first prove P \<Longrightarrow> Q) *)
+fun revcut_tac rule i = resolve0_tac [revcut_rl] i THEN resolve0_tac [rule] i
+
 \<close>
 
 end
