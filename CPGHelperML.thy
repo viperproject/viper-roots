@@ -4,6 +4,9 @@ begin
 
 ML \<open>
 
+(* Maybe move this? *)
+fun force_tac ctxt thms = Clasimp.force_tac (add_simps thms ctxt)
+
 fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
 
 fun unfold_bigblock_atomic ctxt bigblock =
@@ -89,6 +92,43 @@ fun progress_tac ctxt =
   }
 
 
+(* Tactic for proving that a Boogie expression reduces, i.e., goals of the form
+   "red_expr_bpl ctxt e ns v" (where v is either a fixed value or contains schematic variables).
+   The tactic only deals in a custom way with certain operators in the expression. For other
+   operators assume_tac is invoked. For example, lookup facts about variables should
+   already be in the context or in the goal.
+ *)
+fun prove_red_expr_bpl_tac ctxt =
+  FIRST_AND_THEN' 
+    [
+   (* we first check whether we can solve the goal directly via an assumption. If we do
+      not do this first, then certain assumptions might not apply later and as a result the tactic
+      could fail *)
+      assume_tac ctxt, 
+      resolve_tac ctxt [@{thm Semantics.RedVar}],
+      resolve_tac ctxt [@{thm Semantics.RedLit}],
+      resolve_tac ctxt [@{thm Semantics.RedBinOp}],
+      resolve_tac ctxt [@{thm Semantics.RedUnOp}]
+    ]
+
+    [
+      fn _ => fn st => all_tac st,
+      fn i => fn st => assm_full_simp_solved_tac ctxt i st,
+      fn _ => fn st => all_tac st,
+      fn i => fn st =>
+        (i,st) |->
+        (
+          (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e1 *) THEN' 
+          (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e2 *) THEN'
+          (force_tac ctxt [] |> SOLVED')           (* binop_eval *)
+        ),
+     fn i => fn st =>
+       (i,st) |->
+       (
+          (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e *) THEN' 
+          (force_tac ctxt [] |> SOLVED')           (* unop_eval *)
+       )
+    ]
 \<close>
 
 
