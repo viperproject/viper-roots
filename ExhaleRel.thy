@@ -41,19 +41,19 @@ lemma exhale_rel_intro_2:
   unfolding exhale_rel_def rel_vpr_aux_def
   by (auto intro: rel_intro)
 
-lemma exhal_rel_normal_elim:
+lemma exhale_rel_normal_elim:
   assumes "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and
-          "R \<omega>0 m ns" and
-          "red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr m (RNormal m')"
-  shows "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>0 m' ns'"
+          "R \<omega>0 \<omega> ns" and
+          "red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr \<omega> (RNormal \<omega>')"
+  shows "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>0 \<omega>' ns'"
   using assms
   unfolding exhale_rel_def rel_general_def
   by (metis fst_eqD snd_conv)
 
 lemma exhale_rel_failure_elim:
   assumes "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and
-          "R \<omega>0 m ns" and
-          "red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr m RFailure"
+          "R \<omega>0 \<omega> ns" and
+          "red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr \<omega> RFailure"
         shows "\<exists>\<gamma>'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Failure)"  
   using assms
   unfolding exhale_rel_def rel_general_def
@@ -62,7 +62,7 @@ lemma exhale_rel_failure_elim:
 subsection \<open>Propagation rules\<close>
 
 lemma exhale_rel_propagate_pre:
-  assumes "\<And> \<omega>0 m ns. R \<omega>0 m ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega>0 m ns'" and
+  assumes "\<And> \<omega>0 \<omega> ns. R \<omega>0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega>0 \<omega> ns'" and
           "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
         shows "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   using assms(2)
@@ -71,7 +71,7 @@ lemma exhale_rel_propagate_pre:
 
 lemma exhale_rel_propagate_post:
   assumes "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" and
-          "\<And> \<omega>0 m ns. R \<omega>0 m ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>0 m ns'"
+          "\<And> \<omega>0 \<omega> ns. R \<omega>0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>0 \<omega> ns'"
   shows "exhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   using assms
   unfolding exhale_rel_def
