@@ -1,5 +1,5 @@
 theory StmtRel
-imports ExpRel ExprWfRel InhaleRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
+imports ExpRel ExprWfRel InhaleRel ExhaleRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
 begin
 
 text \<open>
@@ -545,6 +545,59 @@ lemma inhale_stmt_rel:
   apply (rule stmt_rel_intro)
   using inhale_rel_normal_elim[OF assms] inhale_rel_failure_elim[OF assms]
   by (auto elim: RedInhale_case)
+
+subsection \<open>Exhale statement relation\<close>
+
+lemma exhale_stmt_rel:
+  assumes 
+          \<comment>\<open>Since the well-definedness must be differentiated from the evaluation state during the exhale,
+            there is potentially a step in the Boogie program that sets this differentiation up resulting a new
+            relation that tracks both states (where in the beginning both states are the same)\<close>
+          R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'" and                   
+          ExhaleRel: "exhale_rel Rexh ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+          \<comment>\<open>At the end of the exhale we require the Boogie program to reestablish the original relation on the 
+             evaluation state\<close>
+          Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
+          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_m_total_full \<omega>) \<Longrightarrow>
+                                 \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+proof (rule stmt_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" 
+  with R_to_Rexh obtain ns1 where Red1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "Rexh \<omega> \<omega> ns1"
+    by blast
+
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>')"
+  thus "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>') \<Longrightarrow>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+  proof cases
+    case (RedExhale \<omega>_exh)
+    with exhale_rel_normal_elim[OF ExhaleRel \<open>Rexh \<omega> \<omega> ns1\<close>] obtain ns2 where 
+      "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)" and "Rexh \<omega> \<omega>_exh ns2"
+      using red_ast_bpl_transitive[OF Red1]
+      by blast
+    with Rexh_to_R obtain ns3 where 
+     "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R \<omega>_exh ns3"
+      using red_ast_bpl_transitive
+      by blast
+    with ExhaleState RedExhale show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+      using red_ast_bpl_transitive
+      by blast
+  qed
+next
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" 
+  with R_to_Rexh obtain ns1 where Red1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "Rexh \<omega> \<omega> ns1"
+    by blast
+
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> RFailure"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
+  proof cases
+    case RedExhaleFailure
+    with exhale_rel_failure_elim[OF ExhaleRel \<open>Rexh \<omega> \<omega> ns1\<close>] show ?thesis
+      using red_ast_bpl_transitive[OF Red1]
+      by fastforce
+  qed (simp)
+qed
 
 subsection \<open>Misc\<close>
 
