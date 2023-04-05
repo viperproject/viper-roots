@@ -420,4 +420,23 @@ lemma rel_general_success_refl:
   by (auto intro!: rel_intro intro: red_ast_bpl_refl)
     
 
+lemma rel_general_if:
+  assumes  "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
+           "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega> \<and> b \<omega>) (\<lambda> \<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+           "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega> \<and> \<not> (b \<omega>)) (\<lambda> \<omega>. Fail \<omega> \<and> \<not>(b \<omega>)) P ctxt 
+                                     (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+  shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) (next, cont)"
+  oops
+
+lemma rel_general_if_2:
+  assumes  "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
+           "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> b \<omega>) R_thn Success Fail P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+           "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
+                                     (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+           "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
+  shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
+  oops
+
+
+
 end
