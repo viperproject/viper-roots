@@ -234,7 +234,7 @@ proof (rule inhale_rel_intro_2)
   qed
 qed
 
-lemma pos_perm_rel_trivial:
+lemma pos_perm_rel_trivial_inh:
   assumes  "e_p = ELit lit" and
            "val_of_lit lit = ((VPerm p2) :: 'a ValueAndBasicState.val)" and
            "p2 \<ge> 0"
@@ -259,6 +259,16 @@ shows "rel_general (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (
   apply (rule pos_perm_rel_nontrivial)
   using assms
   by auto
+
+lemma inhale_rcv_lookup:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+          "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
+          ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel Pr TyRep Tr AuxPred ctxt))
+                          ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" 
+        shows "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" 
+  using assms(1-2) exp_rel_vpr_bpl_elim_2[OF ExpRel] 
+  unfolding inhale_acc_normal_premise_def  
+  by (metis val_rel_vpr_bpl.simps(3))
 
 lemma inhale_field_acc_non_null_rcv_rel:
   assumes  StateRel: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
