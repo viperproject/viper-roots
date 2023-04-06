@@ -248,22 +248,27 @@ lemma pos_perm_rel_trivial_inh:
    apply fastforce
   by simp
 
+
+
 lemma pos_perm_rel_nontrivial_inh:
 assumes "zero_perm = const_repr Tr CNoPerm"
-shows "rel_general (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
-                   (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+shows "rel_general (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+                   (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
      (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)
      (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0) P ctxt
      (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
      (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
+  apply (rule rel_general_convert)
   apply (rule pos_perm_rel_nontrivial)
-  using assms
-  by auto
+     apply (rule \<open>zero_perm = _\<close>)
+    apply simp  
+   apply force
+  by simp
 
 lemma inhale_rcv_lookup:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+  assumes "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and
           "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
-          ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel Pr TyRep Tr AuxPred ctxt))
+          ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr TyRep Tr AuxPred ctxt))
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" 
         shows "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" 
   using assms(1-2) exp_rel_vpr_bpl_elim_2[OF ExpRel] 
@@ -271,9 +276,9 @@ lemma inhale_rcv_lookup:
   by (metis val_rel_vpr_bpl.simps(3))
 
 lemma inhale_field_acc_non_null_rcv_rel:
-  assumes  StateRel: "state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
+  assumes  StateRel: "state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
        InhAccNormal: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
- RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
+ RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" and
  NullConst: "null_const = const_repr Tr CNull" and
  NoPermConst: "no_perm_const = const_repr Tr CNoPerm"
@@ -299,7 +304,7 @@ proof (rule exI[where ?x="ns"])
 
   have "red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns)"
     apply (rule red_ast_bpl_one_simple_cmd)
-    by (fastforce intro!: Semantics.RedAssumeOk RedVar Semantics.RedBinOp LookupTempPerm boogie_const_rel_lookup[OF state_rel0_boogie_const[OF state_rel_state_rel0[OF \<open>?R \<omega> ns\<close>]]] 
+    by (fastforce intro!: Semantics.RedAssumeOk RedVar Semantics.RedBinOp LookupTempPerm boogie_const_rel_lookup[OF state_rel0_boogie_const_rel[OF state_rel_state_rel0[OF \<open>?R \<omega> ns\<close>]]] 
                  intro: RedRcvBpl
                  simp: \<open>p > 0 \<longrightarrow> r \<noteq> Null\<close> \<open>null_const = _\<close> \<open>no_perm_const = _\<close>)
 
@@ -311,9 +316,10 @@ qed
 lemma inhale_rel_field_acc_upd_rel:
   assumes
     StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
-                           state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+                           state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
+    MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
     MaskUpdateWf: "mask_update_wf TyRep ctxt mask_upd_bpl" and
     MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
@@ -323,7 +329,7 @@ lemma inhale_rel_field_acc_upd_rel:
     FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     RcvRel: "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
   shows "rel_general R 
-                  (state_rel Pr TyRep Tr AuxPred ctxt)
+                  (state_rel_def_same Pr TyRep Tr AuxPred ctxt)
                   (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
                   (\<lambda> \<omega>. False) P ctxt 
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
@@ -346,7 +352,7 @@ proof (rule rel_intro)
 
   show "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign m_bpl m_upd_bpl # cs) str tr, cont), Normal ns) 
                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
-             state_rel Pr TyRep Tr AuxPred ctxt \<omega>' ns'"
+             state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ns'"
   proof -
     from \<open>R \<omega> ns\<close> InhAccNormal have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
       using exp_rel_vpr_bpl_elim_2[OF RcvRel] 
@@ -359,7 +365,7 @@ proof (rule rel_intro)
       unfolding pred_eq_def      
       by (metis (full_types) fun_upd_same)
 
-    have StateRelInst2: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> ns"
+    have StateRelInst2: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns"
       using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove[OF StateRelInst]
       by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
       
@@ -464,12 +470,14 @@ proof (rule rel_intro)
         by (simp add: of_rat_add)
       qed
 
-      have "state_rel Pr TyRep Tr AuxPred ctxt \<omega>' ?ns'"
-        apply (subst \<open>\<omega>' = _\<close>)
+      have "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ?ns'"
+        apply (subst \<open>\<omega>' = _\<close>)+
         apply (subst \<open>?mb' = _\<close>)
         apply (subst \<open>m_bpl = _\<close>)
         apply (rule state_rel_mask_update_3[OF StateRelInst2])
-               apply simp
+                 apply simp
+                apply simp
+               apply (simp add: MaskVarDefSame)
               apply (simp add: TyInterp)
              apply (simp add: LookupMask)
             apply (rule \<open>pgte pwrite _ \<close>)

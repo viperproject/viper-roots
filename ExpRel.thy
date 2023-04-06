@@ -158,7 +158,7 @@ qed
 lemma exp_rel_field_access:
   assumes 
        (* TODO: weaken assumption on R *)
-       StateRel0: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega> ns" and
+       StateRel0: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns" and
        HeapReadWf: "heap_read_wf TyRep ctxt (heap_read Tr)" and
        "e_bpl = (heap_read Tr) (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and

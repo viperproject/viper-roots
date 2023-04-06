@@ -1,7 +1,7 @@
 section \<open>Generic definitions for simulations between front-ends and Boogie\<close>
 
 theory Simulation
-imports BoogieInterface
+imports BoogieInterface TotalUtil
 begin
 
 definition rel_general :: "('v \<Rightarrow> 'a nstate \<Rightarrow> bool) \<Rightarrow>
@@ -57,6 +57,21 @@ lemma rel_failure_elim:
   using assms
   unfolding rel_general_def
   by blast
+
+subsection \<open>Conversions\<close>
+
+definition rel_ext 
+  where "rel_ext R \<equiv> (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"
+
+
+lemma rel_general_convert:
+assumes "rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)) (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns))
+                     (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (fst \<omega>) (fst \<omega>'))
+                     (\<lambda>\<omega>. fst \<omega> = snd \<omega> \<and> Fail (fst \<omega>))  P ctxt \<gamma> \<gamma>'"
+shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
+  using assms
+  unfolding rel_general_def rel_ext_def
+  by auto
 
 subsection \<open>Propagation rules\<close>
 
@@ -191,24 +206,24 @@ lemma rel_propagate_pre_assert:
           Fail: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Fail \<omega>  \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
           Rel: "rel_general R0 R1 
                        Success (\<lambda>\<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (BigBlock name cs str tr, cont) \<gamma>2"
-        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assert e_bpl)#cs) str tr, cont) \<gamma>2"
+        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Lang.Assert e_bpl)#cs) str tr, cont) \<gamma>2"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
-  have "red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal ns)"     
+  have "red_ast_bpl P ctxt ((BigBlock name (Lang.Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal ns)"     
     by (auto intro: red_ast_bpl_one_assert RedAssertOk Success[OF \<open>R0 \<omega> ns\<close> \<open>Success _ _\<close>])
 
-  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) (\<gamma>2, Normal ns') \<and> R1 \<omega>' ns'"
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Lang.Assert e_bpl # cs) str tr, cont), Normal ns) (\<gamma>2, Normal ns') \<and> R1 \<omega>' ns'"
     using rel_success_elim[OF Rel \<open>R0 \<omega> ns\<close> \<open>Success _ _\<close>] red_ast_bpl_transitive
     by blast
 next
   fix \<omega> ns
   assume "R0 \<omega> ns" and "Fail \<omega>"
   let ?s' = "if b \<omega> then Normal ns else Failure"
-  have "red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), ?s')"
+  have "red_ast_bpl P ctxt ((BigBlock name (Lang.Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), ?s')"
    by (auto intro: red_ast_bpl_one_assert RedAssertOk Fail[OF \<open>R0 \<omega> ns\<close> \<open>Fail _\<close>])
 
-  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt ((BigBlock name (Assert e_bpl # cs) str tr, cont), Normal ns) c'"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt ((BigBlock name (Lang.Assert e_bpl # cs) str tr, cont), Normal ns) c'"
     using rel_failure_elim[OF Rel \<open>R0 \<omega> ns\<close>] 
     apply (cases "b \<omega>")
     using \<open>Fail _\<close> red_ast_bpl_transitive
@@ -221,7 +236,7 @@ lemma rel_propagate_pre_assert_2:
           Success: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> b \<omega>" and
           Rel: "rel_general R0 R1 
                        Success (\<lambda>\<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
-        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assert e_bpl)#cs) str tr, cont) \<gamma>'"
+        shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Lang.Assert e_bpl)#cs) str tr, cont) \<gamma>'"
   apply (rule rel_propagate_pre_assert[OF _ _ Rel])
   using assms
    apply fastforce
@@ -231,14 +246,14 @@ lemma rel_propagate_pre_assert_2:
 lemma rel_propagate_pre_assume:
   assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV True)" and
                      "rel_general R0 R1 Success Fail P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
-  shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Assume e_bpl)#cs) str tr, cont) \<gamma>'"
+  shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Lang.Assume e_bpl)#cs) str tr, cont) \<gamma>'"
 proof (rule rel_propagate_pre[OF _ assms(2)])
   fix \<omega> ns
   assume local_assms: "R0 \<omega> ns" "(\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>"
   hence "red_expr_bpl ctxt e_bpl ns (BoolV True)"
     using RedExpBpl
     by blast
-  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assume e_bpl # cs) str tr, cont), Normal ns)
+  thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Lang.Assume e_bpl # cs) str tr, cont), Normal ns)
               ((BigBlock name cs str tr, cont), Normal ns') \<and>
              R0 \<omega> ns'"
     using red_ast_bpl_one_assume[OF RedExpBpl] local_assms

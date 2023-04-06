@@ -7,7 +7,7 @@ ML \<open>
 
   fun zero_mask_lookup_tac ctxt tr_def_thm =
     resolve_tac ctxt [@{thm boogie_const_rel_lookup_2[where ?const = CZeroMask]}] THEN'
-    resolve_tac ctxt [@{thm state_rel_boogie_const}] THEN'
+    resolve_tac ctxt [@{thm state_rel_boogie_const_rel}] THEN'
     blast_tac ctxt THEN'
     assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt THEN'
     assm_full_simp_solved_tac ctxt

@@ -149,6 +149,14 @@ lemma[fundef_cong]:
   "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some P x = if_Some Q y"
   by (cases y; simp)
 
+subsection \<open>uncurry\<close>
+
+fun uncurry :: "('a \<Rightarrow> 'b \<Rightarrow> 'c) \<Rightarrow> 'a \<times> 'b \<Rightarrow> 'c"
+  where "uncurry f = (\<lambda>a. f (fst a) (snd a))"
+
+lemma uncurry_case_prod: "uncurry = case_prod"
+  by fastforce
+
 subsection \<open>Positive rationals\<close>
 
 lemma prat_positive_transfer:

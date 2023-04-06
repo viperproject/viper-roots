@@ -471,7 +471,8 @@ text \<open>Version of generic field assignment relation rule where state relati
 lemma field_assign_rel_inst:
   assumes 
     WfTyRep: "wf_ty_repr_bpl TyRep" and
-    RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns" and
+    RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns" and
+    HeapVarDefSame: "heap_var_def Tr = heap_var Tr" and
     HeapUpdWf: "heap_update_wf TyRep ctxt (heap_update Tr)" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -498,7 +499,7 @@ proof (rule field_assign_rel)
          TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
          NewValBplTy: "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
 
-  from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns"
+  from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
 
   have HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
@@ -509,16 +510,16 @@ proof (rule field_assign_rel)
   let ?\<omega>' = "(update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
-                         )"
-
-  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst FieldLookup FieldTranslation TyTranslation NewValBplTy]
+                         )"      
+  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ FieldLookup FieldTranslation TyTranslation NewValBplTy]
   obtain hb f_bpl_val where
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
     "field_ty_fun_opt TyRep f_bpl_val = Some (TFieldId TyRep, [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])" and
-    StateRelInstUpd: "state_rel (program_total ctxt_vpr) TyRep Tr AuxPred ctxt ?\<omega>'
+    StateRelInstUpd: "state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt ?\<omega>'
      (update_var (var_context ctxt) ns (heap_var Tr) (AbsV (AHeap (hb((Address addr, f_bpl_val) \<mapsto> val_rel_vpr_bpl v)))))"
-    by blast
+    using HeapVarDefSame
+    by fastforce
 
   thus "(\<exists>hb f_bpl_val. lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and>
                        lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
