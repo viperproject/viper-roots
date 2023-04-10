@@ -561,7 +561,7 @@ lemma exhale_stmt_rel:
           Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
           ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_m_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+        shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" 
@@ -599,6 +599,22 @@ next
       by fastforce
   qed (simp)
 qed
+
+
+text \<open>The following theorem is the same as exhale_stmt_rel except that Rext has been instantiated.
+      It seems cumbersome to instantiate Rext properly during the proof generation (with a naive approach
+      Isabelle picks a version that ignores the well-definedness state)\<close>
+
+lemma exhale_stmt_rel_inst:
+  assumes 
+      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns')" and                   
+      "exhale_rel (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr AuxPred ctxt) \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
+      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_m_total_full \<omega>) \<Longrightarrow>
+                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+        shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+  using assms 
+  by (rule exhale_stmt_rel)
 
 subsection \<open>Misc\<close>
 

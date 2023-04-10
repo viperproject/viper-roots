@@ -61,7 +61,7 @@ fun unfold_bigblock_in_goal_aux ctxt (t,i) =
 bigblock if the currently active bigblock is empty.
 The goal is to make sure that after this tactic the (bigblock, continuation) configuration is in 
 a form where bigblock is unfolded and not empty. The nonemptiness guarantee relies on the assumption
- that an empty bigblocks is not succeeded by another empty bigblock. *)
+ that an empty bigblock is not succeeded by another empty bigblock. *)
 fun unfold_bigblock_in_goal ctxt =
   SUBGOAL (fn (t,i) => unfold_bigblock_in_goal_aux ctxt (Logic.strip_assums_concl t, i))
 

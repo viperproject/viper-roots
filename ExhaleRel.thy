@@ -166,7 +166,7 @@ subsection \<open>Field access predicate rule\<close>
 definition exhale_field_acc_rel_perm_success
   where "exhale_field_acc_rel_perm_success ctxt_vpr StateCons \<omega> r p f \<equiv>
           p \<ge> 0 \<and>
-         (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (the_address r,f)) (Abs_prat p))"
+         (if r = Null then p = 0 else (Rep_prat (get_mh_total_full \<omega> (the_address r,f))) \<ge> p)"
 
 definition exhale_field_acc_rel_assms
   where "exhale_field_acc_rel_assms ctxt StateCons e_r f e_p r p \<omega>0 \<omega>  \<equiv>
@@ -246,8 +246,8 @@ proof (rule exhale_rel_intro_2)
         using exh_if_total_failure by fastforce \<comment>\<open>using exh_if_total_normal seems to be surprisingly slower\<close>
       hence PermSuccess: "exhale_field_acc_rel_perm_success ctxt_vpr StateCons \<omega> r p f"
         unfolding exhale_field_acc_rel_perm_success_def
-        using \<open>mh = _\<close> \<open>a = _\<close>
-        by blast     
+        using \<open>mh = _\<close> \<open>a = _\<close> pgte.rep_eq Abs_prat_inverse
+        by auto
       from this obtain ns3 where Red3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and R3: "R' r p (\<omega>0, \<omega>) ns3"
         thm rel_success_elim[OF CorrectPermRel] R2_conv
 
@@ -270,8 +270,9 @@ proof (rule exhale_rel_intro_2)
         using exh_if_total_failure by fastforce \<comment>\<open>using exh_if_total_normal seems to be surprisingly slower\<close>
       thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
         using ExhAcc BasicAssms rel_failure_elim[OF CorrectPermRel R2_conv] red_ast_bpl_transitive[OF Red2]
-        unfolding exhale_field_acc_rel_perm_success_def
-        by (metis fst_conv snd_conv)
+              Abs_prat_inverse pgte.rep_eq
+        unfolding exhale_field_acc_rel_perm_success_def        
+        by (metis fst_conv mem_Collect_eq snd_conv)
     qed
   next
     case SubAtomicFailure

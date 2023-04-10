@@ -214,6 +214,34 @@ proof(rule exp_rel_vpr_bpl_intro)
                   simp:  \<open>e_f_bpl = expr.Var f_tr\<close> FieldTyBpl)+
 qed
 
+lemma exp_rel_perm_access:
+  assumes 
+       MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
+       StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+       RcvRedVpr: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+       FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
+       RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl"               
+     shows "red_expr_bpl ctxt (mask_read_bpl (expr.Var (mask_var_def Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
+                              ns 
+                              (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
+  sorry
+
+
+lemma exp_rel_perm_access_2:
+  assumes 
+       MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
+       StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+       RcvRedVpr: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+       FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
+             "mvar_def = (mask_var_def Tr)" and
+             "f_ty_bpl = TConSingle (TNormalFieldId TyRep)" and
+       RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl" and
+             "e_bpl = (mask_read_bpl (expr.Var mvar_def) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl])"
+     shows "red_expr_bpl ctxt e_bpl 
+                              ns 
+                              (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
+  sorry
+
 lemma exp_rel_unop:
   assumes 
     UopRel:"unop_rel uop = uopb" and 

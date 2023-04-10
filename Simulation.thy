@@ -40,6 +40,13 @@ lemma rel_intro:
   unfolding rel_general_def 
   by blast
 
+lemma rel_general_success_refl:
+  assumes "\<And> \<omega>. \<not> Fail \<omega>" and
+          "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
+        shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
+  using assms
+  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
+
 lemma rel_success_elim:
   assumes "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'" and
           "R \<omega> ns" and
@@ -72,6 +79,28 @@ shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   using assms
   unfolding rel_general_def rel_ext_def
   by auto
+
+lemma rel_general_conseq:
+assumes Rel: "rel_general R0' R1' Success Fail P ctxt \<gamma> \<gamma>'" and
+        Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns" and
+        Output: "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+      shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
+  apply (rule rel_intro)
+  using Input Output rel_success_elim[OF Rel] rel_failure_elim[OF Rel]
+  by blast+
+
+lemma rel_general_conseq_output:
+assumes Rel: "rel_general R0' R1 Success Fail P ctxt \<gamma> \<gamma>'" and
+        Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns"
+      shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
+  using assms
+  by (rule rel_general_conseq)
+
+lemma rel_general_conseq_input:
+assumes Rel: "rel_general R0 R1' Success Fail P ctxt \<gamma> \<gamma>'" and
+        Output: "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+      shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
+  by (rule rel_general_conseq[OF Rel _ Output])
 
 subsection \<open>Propagation rules\<close>
 
@@ -135,6 +164,13 @@ next
     using assms(1) rel_failure_elim 
     by meson
 qed
+
+lemma rel_propagate_post_2:
+  assumes "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>1" and
+          "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R0 \<omega> ns'"
+        shows "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  using assms rel_propagate_post
+  by blast
 
 text \<open>If failure is infeasible, then we can assume success when propagating\<close>
 
@@ -424,34 +460,35 @@ next
     qed
   qed
 qed
-
-subsection \<open>Misc rules\<close>
-
-lemma rel_general_success_refl:
-  assumes "\<And> \<omega>. \<not> Fail \<omega>" and
-          "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
-        shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
-  using assms
-  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
     
-
-lemma rel_general_if:
-  assumes  "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
-           "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega> \<and> b \<omega>) (\<lambda> \<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
-           "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega> \<and> \<not> (b \<omega>)) (\<lambda> \<omega>. Fail \<omega> \<and> \<not>(b \<omega>)) P ctxt 
-                                     (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+lemma rel_general_cond_2:
+  assumes  RedCond: "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt cond_bpl ns (BoolV (b \<omega>))" and
+           RelThn: "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega>' \<and> b \<omega>) (\<lambda> \<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+           RelEls: "\<And> \<omega> \<omega>'. rel_general R R (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega>' \<and> \<not> (b \<omega>)) (\<lambda> \<omega>. Fail \<omega> \<and> \<not>(b \<omega>)) P ctxt 
+                                     (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
   shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) (next, cont)"
-  oops
-
+  apply (rule rel_general_cond[where ?SuccessExp="\<lambda>\<omega> \<omega>'. \<omega> = \<omega>'" and ?FailExp="\<lambda>_. False"])
+      apply (rule rel_general_success_refl)
+       apply simp
+      apply simp
+     apply (rule RelThn)
+    apply (rule RelEls)
+  using RedCond
+   apply (metis (full_types))
+  using RedCond
+  apply (metis (full_types))
+  done
+  
 lemma rel_general_if_2:
   assumes  "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
            "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> b \<omega>) R_thn Success Fail P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
            "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
-                                     (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
+                                     (thn_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)" and
            "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
   shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
   oops
 
+subsection \<open>Misc rules\<close>
 
 
 end

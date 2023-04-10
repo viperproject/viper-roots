@@ -132,6 +132,13 @@ definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rig
                \<omega>' = update_mh_loc_total_full \<omega> lh (padd (get_mh_total_full \<omega> lh) q)
        }"
 
+lemma inhale_perm_single_nonempty:
+  assumes "inhale_perm_single R \<omega> lh (Some p) \<noteq> {}"
+  shows "inhale_perm_single R \<omega> lh (Some p) = {update_mh_loc_total_full \<omega> lh (padd (get_mh_total_full \<omega> lh) p)}"
+  using assms
+  unfolding inhale_perm_single_def
+  by fastforce
+
 text \<open>Construct the set of states that can be reached after inhaling a predicate permission.
       \<^term>\<open>p_opt\<close> plays the same role as in \<^const>\<open>inhale_perm_single\<close>\<close>
 

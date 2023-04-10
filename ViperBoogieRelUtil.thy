@@ -69,6 +69,82 @@ lemma store_temporary_perm_rel:
    using store_vpr_exp_to_temporary_var[OF StateRel TyInterp DisjAux LookupTyTemp RedPerm ExpRel]
    by simp
 
+subsection \<open>Store well-definedness state in fresh variables\<close>
+
+lemma store_new_mask_def:
+  assumes
+  StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
+         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
+         DisjAux: "mvar_def' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
+                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
+         LookupTy: "lookup_var_ty (var_context ctxt) mvar_def' = Some (TConSingle (TMaskId TyRep))" and
+                  "mvar_def = mask_var_def Tr"
+   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign mvar_def' (Var mvar_def) # cs) s tr), cont), Normal ns)
+                                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
+                (state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns')"
+proof -
+  from state_rel_mask_var_def_rel[OF StateRel] obtain m where 
+    LookupMaskVarDef: "lookup_var (var_context ctxt) ns (mask_var_def Tr) = Some (AbsV (AMask m))"    
+    unfolding mask_var_rel_def
+    by blast
+
+  let ?ns' = "(update_var (var_context ctxt) ns mvar_def' (AbsV (AMask m)))"
+
+  have StateRelUpd: "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
+    using state_rel_mask_var_def_update[OF StateRel DisjAux LookupTy LookupMaskVarDef]
+    by blast
+
+  show ?thesis
+    apply (rule exI)
+    apply (rule conjI)
+     apply (rule red_ast_bpl_one_assign)
+       apply (rule LookupTy)
+      apply (fastforce intro: RedVar LookupMaskVarDef simp: \<open>mvar_def = _\<close>)
+     apply (simp add: TyInterp)
+    apply (rule StateRelUpd)
+    done
+qed
+
+lemma store_new_heap_def:
+  assumes
+  StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
+         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
+         DisjAux: "hvar_def' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
+                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
+         LookupTy: "lookup_var_ty (var_context ctxt) hvar_def' = Some (TConSingle (THeapId TyRep))" and
+                  "hvar_def = heap_var_def Tr"
+   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign hvar_def' (Var hvar_def) # cs) s tr), cont), Normal ns)
+                                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
+                (state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns')"
+proof -
+  from state_rel_heap_var_def_rel[OF StateRel] obtain h where 
+    LookupMaskVarDef: "lookup_var (var_context ctxt) ns (heap_var_def Tr) = Some (AbsV (AHeap h))"  and
+                      "vbpl_absval_ty_opt TyRep (AHeap h) = Some (THeapId TyRep, [])"
+    unfolding heap_var_rel_def
+    by blast
+
+  hence HeapType: "type_of_val (type_interp ctxt) (AbsV (AHeap h)) = TConSingle (THeapId TyRep)"
+    using TyInterp
+    by simp
+
+  let ?ns' = "(update_var (var_context ctxt) ns hvar_def' (AbsV (AHeap h)))"
+
+  have StateRelUpd: "state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
+    using state_rel_heap_var_def_update[OF StateRel DisjAux LookupTy LookupMaskVarDef]
+    by blast
+
+  show ?thesis
+    apply (rule exI)
+    apply (rule conjI)
+     apply (rule red_ast_bpl_one_assign)
+       apply (rule LookupTy)
+      apply (fastforce intro: RedVar LookupMaskVarDef simp: \<open>hvar_def = _\<close>)
+     apply (simp only: instantiate_nil)
+     apply (rule HeapType)
+    apply (rule StateRelUpd)
+    done
+qed
+
 subsection \<open>Permission checks\<close>
 
 lemma pos_perm_rel_nontrivial:

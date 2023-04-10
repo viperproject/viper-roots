@@ -146,4 +146,13 @@ lemma red_ast_bpl_one_assume:
   using assms
   by (auto intro: RedAssumeOk RedAssumeMagic)
 
+lemma red_ast_bpl_one_assign:
+  assumes "lookup_var_ty (var_context ctxt) x = Some ty" and
+          "red_expr_bpl ctxt e ns v" and
+          "type_of_val (type_interp ctxt) v = instantiate [] ty"
+  shows "red_ast_bpl P ctxt ((BigBlock name (Assign x e#cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal (update_var (var_context ctxt) ns x v))"
+  apply (rule red_ast_bpl_one_simple_cmd)
+  using assms
+  by (auto intro: RedAssign)
+
 end

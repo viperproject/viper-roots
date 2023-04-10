@@ -1902,6 +1902,45 @@ next
     by (metis StateRel state_rel_state_well_typed state_well_typed_def update_var_binder_same)
 qed (insert assms, auto)
 
+(*
+
+     AuxVarFresh: "aux_var \<notin> 
+                      ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)"  and   
+           "P aux_val" and
+                 "type_interp ctxt = vbpl_absval_ty TyRep" and
+     LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
+               "type_of_val (type_interp ctxt) aux_val = \<tau>"
+   shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"  
+*)
+lemma state_rel_mask_var_def_update:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          "mvar_def' \<notin> ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)" and
+          "lookup_var_ty (var_context ctxt) mvar_def' = Some (TConSingle (TMaskId TyRep))" and
+          "lookup_var (var_context ctxt) ns (mask_var_def Tr) = Some m" 
+        shows "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns mvar_def' m)"
+  sorry
+
+lemma state_rel_heap_var_def_update:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          "hvar_def' \<notin> ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)" and
+          "lookup_var_ty (var_context ctxt) hvar_def' = Some (TConSingle (THeapId TyRep))" and
+          "lookup_var (var_context ctxt) ns (heap_var_def Tr) = Some h" 
+        shows "state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns hvar_def' h)"
+  sorry
+
+
 subsection\<open>function relation\<close>
 
 (* TODO: maybe make parametric *)

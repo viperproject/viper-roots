@@ -143,7 +143,7 @@ definition inhale_acc_normal_premise
        p \<ge> 0 \<and>
        (p > 0 \<longrightarrow> r \<noteq> Null) \<and>
        (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
-       (W' \<noteq> {} \<and> \<omega>' \<in> W'))"
+       (W' \<noteq> {} \<and> \<omega>' \<in> W'))"                       
 
 lemma inhale_field_acc_rel:
   assumes 
@@ -248,8 +248,6 @@ lemma pos_perm_rel_trivial_inh:
    apply fastforce
   by simp
 
-
-
 lemma pos_perm_rel_nontrivial_inh:
 assumes "zero_perm = const_repr Tr CNoPerm"
 shows "rel_general (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
@@ -312,6 +310,124 @@ proof (rule exI[where ?x="ns"])
     using StateRel
     by blast
 qed
+
+lemma mask_upd_rel:
+  assumes
+   StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
+                           state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and      
+(*              "temp_perm \<notin> dom AuxPred" and *)
+    WfTyRep:  "wf_ty_repr_bpl TyRep" and
+    MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
+    TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+    MaskUpdateWf: "mask_update_wf TyRep ctxt mask_upd_bpl" and
+  (*  MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and *)
+    MaskUpdateBpl: "m_upd_bpl = mask_upd_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl new_perm_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
+                 (*  "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Add\<guillemotright> (Var temp_perm)" and*)
+    MaskVar: "m_bpl = mask_var Tr " and
+    FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+(* New *)
+    Success: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow>
+                         \<omega>' = (if r = Null then \<omega> else 
+                                      update_mh_loc_total_full \<omega> (the_address r,f_vpr) (p_prat \<omega>))" and
+    RedRcvBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" and
+    RedPermBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> red_expr_bpl ctxt new_perm_bpl ns (RealV (real_of_rat (Rep_prat (p_prat \<omega>))))"    
+  shows "rel_general R 
+                  (state_rel_def_same Pr TyRep Tr AuxPred ctxt)
+                  Success
+                  (\<lambda> \<omega>. False) P ctxt 
+                  (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
+                  (BigBlock name cs str tr, cont)"
+  sorry
+
+lemma mask_read_aux:
+  assumes
+      FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" 
+
+  shows "red_expr_bpl ctxt
+     (mask_read_bpl (expr.Var m_bpl) e_rcv_bpl e_f_bpl
+       [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) ns 
+       (RealV (real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f_vpr)))))"
+  oops
+
+lemma inhale_rel_field_acc_upd_rel_temp:
+  assumes
+    StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
+                           state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+              "temp_perm \<notin> dom AuxPred" and
+    WfTyRep:  "wf_ty_repr_bpl TyRep" and
+    MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
+    TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+    MaskUpdateWf: "mask_update_wf TyRep ctxt mask_upd_bpl" and
+    MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
+    MaskUpdateBpl: "m_upd_bpl = mask_upd_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl new_perm [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
+                   "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Add\<guillemotright> (Var temp_perm)" and
+    MaskVar: "m_bpl = mask_var Tr " and
+    FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
+    RcvRel: "exp_rel_vpr_bpl (state_rel_ext R) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+  shows "rel_general R 
+                  (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+                  (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
+                  (\<lambda> \<omega>. False) P ctxt 
+                  (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
+                  (BigBlock name cs str tr, cont)"
+proof (rule mask_upd_rel[OF StateRel WfTyRep MaskVarDefSame TyInterp MaskUpdateWf MaskUpdateBpl MaskVar FieldRelSingle])
+  fix \<omega> ns
+  assume "R \<omega> ns"
+  thus "R \<omega> ns"
+    by simp
+next
+  let ?lh = "(the_address r, f_vpr)"
+  fix \<omega> \<omega>'
+  assume InhPremise: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
+  hence 
+    "\<omega>' \<in> (if (r = Null) then {\<omega>} else (inhale_perm_single StateCons \<omega> ?lh (Some (Abs_prat p))))"
+       (is "\<omega>' \<in> ?W'")
+    unfolding inhale_acc_normal_premise_def
+    by metis
+
+  show " \<omega>' = ite_vc (r = Null) \<omega> (update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_prat p)))"
+   
+  proof (cases "r = Null")
+    case True
+    then show ?thesis 
+      using InhPremise
+      unfolding inhale_acc_normal_premise_def
+      by simp
+  next
+    case False
+    have "inhale_perm_single StateCons \<omega> ?lh (Some (Abs_prat p)) = 
+          {update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> ?lh) (Abs_prat p))}"
+      apply (rule inhale_perm_single_nonempty)
+      using \<open>\<omega>' \<in> _\<close> False
+      by fastforce
+    thus ?thesis 
+      using \<open>\<omega>' \<in> _\<close> False
+      by auto
+  qed
+next
+  fix \<omega> \<omega>' ns
+  assume "R \<omega> ns" 
+
+  assume "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
+  hence "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+    unfolding inhale_acc_normal_premise_def
+    by blast
+
+  thus "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
+    using exp_rel_vpr_bpl_elim_2[OF RcvRel] \<open>R \<omega> ns\<close>
+    by (metis val_rel_vpr_bpl.simps(3))
+next
+  fix \<omega> \<omega>' ns
+  assume "R \<omega> ns" 
+
+  assume "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
+
+  thm \<open>new_perm = _\<close>
+
+  show "red_expr_bpl ctxt new_perm ns
+        (RealV (real_of_rat (Rep_prat (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_prat p)))))"
+    apply (subst \<open>new_perm = _\<close>)
+   
 
 lemma inhale_rel_field_acc_upd_rel:
   assumes
@@ -379,7 +495,7 @@ proof (rule rel_intro)
 
     hence FieldLookupBpl: "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField (NormalField f_bpl \<tau>_vpr)))"
         (is "_ = Some (AbsV (AField ?f_bpl_val))")
-      using state_rel0_field_rel[OF state_rel_state_rel0[OF StateRelInst]]
+      using state_rel_field_rel[OF StateRelInst]
       unfolding field_rel_def
       by fastforce
     
@@ -423,16 +539,10 @@ proof (rule rel_intro)
     show ?thesis
     proof (cases "r = Null")
       case True
-      hence "p = 0"
-        using \<open>0 < p \<longrightarrow> r \<noteq> Null\<close> \<open>0 \<le> p\<close> by linarith
-      hence "ns = ?ns'"
-        using update_var_same_state[OF LookupMask]
-        by (simp add: \<open>m_bpl = _\<close>)
-      moreover have "\<omega>' = \<omega>"
-        using True \<open>\<omega>' \<in> W'\<close> InhAccNormal by fastforce
-      ultimately show ?thesis 
-        using RedAstBpl StateRelInst2 
-        by auto
+      thus ?thesis
+        using update_var_same_state[OF LookupMask] \<open>\<omega>' \<in> W'\<close> InhAccNormal RedAstBpl StateRelInst2
+              \<open>m_bpl = _\<close>
+        by fastforce
     next
       case False
       from this obtain a where "r = Address a" 
@@ -454,21 +564,10 @@ proof (rule rel_intro)
         by (simp add: \<open>r = _\<close>)
 
       have Aux: "mb (r, NormalField f_bpl \<tau>_vpr) + real_of_rat p = real_of_rat (Rep_prat (padd (get_mh_total_full \<omega> (a, f_vpr)) (Abs_prat p)))"
-      proof -
-        have "(Rep_prat (Abs_prat p)) = p"
-          using Abs_prat_inverse \<open>p \<ge> 0\<close> 
-          by simp
-
-        have "(Rep_prat (padd (get_mh_total_full \<omega> (a, f_vpr)) (Abs_prat p))) = (Rep_prat (get_mh_total_full \<omega> (a, f_vpr))) + (Rep_prat (Abs_prat p))"
-          by (simp add: padd.rep_eq)
-        also have "... = (Rep_prat (get_mh_total_full \<omega> (a, f_vpr))) + p"
-          using \<open>p \<ge> 0\<close> Abs_prat_inverse
-          by simp
-        finally show ?thesis
+        apply (rule padd_aux[OF \<open>p \<ge> 0\<close>])
         using MaskRel FieldLookup FieldTr \<open>r = Address a\<close>
         unfolding mask_rel_def
         by (simp add: of_rat_add)
-      qed
 
       have "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ?ns'"
         apply (subst \<open>\<omega>' = _\<close>)+
@@ -491,7 +590,6 @@ proof (rule rel_intro)
     qed
   qed
 qed (simp)
-
 
 
 end
