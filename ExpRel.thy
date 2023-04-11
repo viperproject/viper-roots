@@ -110,6 +110,12 @@ lemma exp_rel_equiv_vpr:
   using assms
   by (blast intro: exp_rel_vpr_bpl_intro elim: exp_rel_vpr_bpl_elim)
 
+lemma exp_rel_conseq:
+  assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e1_vpr e_bpl" and
+          "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> R' \<omega>def \<omega> ns"
+  shows "exp_rel_vpr_bpl R' ctxt_vpr ctxt e1_vpr e_bpl"
+  oops
+
 lemma exp_rel_equiv_bpl:
   assumes "\<And>ns v. red_expr_bpl ctxt e1_bpl ns v \<Longrightarrow>
                     red_expr_bpl ctxt e2_bpl ns v" and
@@ -218,29 +224,104 @@ lemma exp_rel_perm_access:
   assumes 
        MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
        StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-       RcvRedVpr: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
-       RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl"               
-     shows "red_expr_bpl ctxt (mask_read_bpl (expr.Var (mask_var_def Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
+       RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"               
+     shows "red_expr_bpl ctxt (mask_read_bpl (expr.Var (mask_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
                               ns 
                               (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
-  sorry
+proof -  
 
+  from FieldRelSingle obtain f_tr \<tau> where
+       FieldRel: "field_translation Tr f = Some f_tr" and
+       "e_f_bpl = Lang.Var f_tr" and    
+       FieldTy: "declared_fields Pr f = Some \<tau>" and
+       FieldTyBpl: "vpr_to_bpl_ty TyRep \<tau> = Some \<tau>_bpl"
+    by (auto elim: field_rel_single_elim)
 
+  from FieldTy FieldRel have 
+    LookupField:"lookup_var (var_context ctxt) ns f_tr = Some (AbsV (AField (NormalField f_tr \<tau>)))"
+    using state_rel_field_rel[OF StateRel]
+    unfolding field_rel_def
+    by fastforce
+
+  from state_rel_mask_var_rel[OF StateRel] obtain mb
+    where LookupMaskVar: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+          MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+    unfolding mask_var_rel_def
+    by auto
+
+  show ?thesis
+  proof (cases "r = Null")
+    case True
+    hence MaskZeroPerm: "mb (r, (NormalField f_tr \<tau>)) = 0" 
+      using MaskRel
+      unfolding mask_rel_def
+      by blast
+
+    have "red_expr_bpl ctxt
+                        (mask_read_bpl (expr.Var (mask_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
+                        ns (RealV 0)"
+      apply (rule mask_read_wf_apply[OF MaskReadWf])
+          apply (rule MaskZeroPerm)
+         apply (fastforce intro: RedVar LookupMaskVar)
+        apply (rule RedRcvBpl)
+       apply (fastforce intro: RedVar LookupField simp: \<open>e_f_bpl = _\<close>)
+      using FieldTyBpl
+      by simp
+    thus ?thesis
+      using \<open>r = Null\<close>
+      by simp
+  next
+    case False
+    from this obtain a where "r = Address a"
+      by (auto elim: ref.exhaust)
+
+    let ?p = "real_of_rat (Rep_prat (get_mh_total_full \<omega> (a,f)))"
+    have MaskZeroPerm: "mb (Address a, (NormalField f_tr \<tau>)) = ?p" 
+      using MaskRel FieldTy FieldRel
+      unfolding mask_rel_def
+      by fastforce
+
+    have "red_expr_bpl ctxt
+                        (mask_read_bpl (expr.Var (mask_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
+                        ns (RealV ?p)"
+      apply (rule mask_read_wf_apply[OF MaskReadWf])
+          apply (rule MaskZeroPerm)
+         apply (fastforce intro: RedVar LookupMaskVar)     
+      using RedRcvBpl \<open>r = _\<close>
+        apply blast
+       apply (fastforce intro: RedVar LookupField simp: \<open>e_f_bpl = _\<close>)
+      using FieldTyBpl
+      by simp
+      
+    then show ?thesis
+      using \<open>r = _\<close>
+      by simp
+  qed
+qed
+
+text \<open>This is the same lemma as above but expressed in a way such that the conclusion can be matched 
+      directly in more cases and where the receiver requirement are phrased in terms of the expression relation
+      judgment.\<close>
 lemma exp_rel_perm_access_2:
   assumes 
        MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
        StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-       RcvRedVpr: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+       RedRcvVpr: "ctxt_vpr, StateCons, \<omega>def_opt \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
-             "mvar_def = (mask_var_def Tr)" and
+             "mvar = mask_var Tr" and
              "f_ty_bpl = TConSingle (TNormalFieldId TyRep)" and
        RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl" and
-             "e_bpl = (mask_read_bpl (expr.Var mvar_def) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl])"
+             "e_bpl = (mask_read_bpl (expr.Var mvar) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl])"
      shows "red_expr_bpl ctxt e_bpl 
                               ns 
                               (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
-  sorry
+  apply (subst \<open>e_bpl = _\<close>)
+  apply (subst \<open>f_ty_bpl = _\<close>)
+  apply (subst \<open>mvar = _\<close>)
+  apply (rule exp_rel_perm_access[OF MaskReadWf StateRel FieldRelSingle])
+  using RcvRel RedRcvVpr StateRel
+  by (fastforce elim: exp_rel_vpr_bpl_elim_2)
 
 lemma exp_rel_unop:
   assumes 
