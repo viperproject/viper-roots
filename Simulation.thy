@@ -73,7 +73,16 @@ definition rel_ext
 
 lemma rel_general_convert:
 assumes "rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)) (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns))
-                     (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (fst \<omega>) (fst \<omega>'))
+                     (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (snd \<omega>) (snd \<omega>'))
+                     (\<lambda>\<omega>. fst \<omega> = snd \<omega> \<and> Fail (fst \<omega>))  P ctxt \<gamma> \<gamma>'"
+shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
+  using assms
+  unfolding rel_general_def rel_ext_def
+  by auto
+
+lemma rel_general_convert_2:
+assumes "rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)) (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns))
+                     (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (snd \<omega>) (snd \<omega>'))
                      (\<lambda>\<omega>. fst \<omega> = snd \<omega> \<and> Fail (fst \<omega>))  P ctxt \<gamma> \<gamma>'"
 shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   using assms
@@ -81,26 +90,34 @@ shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   by auto
 
 lemma rel_general_conseq:
-assumes Rel: "rel_general R0' R1' Success Fail P ctxt \<gamma> \<gamma>'" and
+assumes Rel: "rel_general R0' R1' Success' Fail' P ctxt \<gamma> \<gamma>'" and
         Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns" and
-        Output: "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+        Output: "\<And> \<omega> \<omega>' ns. R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns" and
+        Success: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> Success' \<omega> \<omega>'" and
+        Fail: "\<And> \<omega>. Fail \<omega>  \<Longrightarrow> Fail' \<omega>"
       shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
   apply (rule rel_intro)
-  using Input Output rel_success_elim[OF Rel] rel_failure_elim[OF Rel]
+  using Input Output Success Fail rel_success_elim[OF Rel] rel_failure_elim[OF Rel]
   by blast+
 
-lemma rel_general_conseq_output:
+lemma rel_general_conseq_input:
 assumes Rel: "rel_general R0' R1 Success Fail P ctxt \<gamma> \<gamma>'" and
         Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns"
       shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
   using assms
   by (rule rel_general_conseq)
 
-lemma rel_general_conseq_input:
+lemma rel_general_conseq_output:
 assumes Rel: "rel_general R0 R1' Success Fail P ctxt \<gamma> \<gamma>'" and
-        Output: "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+        Output: "\<And> \<omega> \<omega>' ns. R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns"
       shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
   by (rule rel_general_conseq[OF Rel _ Output])
+
+lemma rel_general_conseq_fail:
+  assumes  Rel: "rel_general R0 R1 Success Fail' P ctxt \<gamma> \<gamma>'" and
+           Fail: "\<And> \<omega>. Fail \<omega>  \<Longrightarrow> Fail' \<omega>"
+         shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
+  by (rule rel_general_conseq[OF Rel _ _ _ Fail])
 
 subsection \<open>Propagation rules\<close>
 
