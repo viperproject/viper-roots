@@ -172,6 +172,19 @@ definition heap_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Right
          ( (\<exists>v. red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v) \<longrightarrow>
              (\<exists>v. red_expr_bpl ctxt e_rcv ns v) \<and> (\<exists>v. red_expr_bpl ctxt e_f ns v) )"
 
+lemma heap_read_wf_apply:
+  assumes "heap_read_wf T ctxt hread" and
+          "h (r, f) = Some v" and
+          "red_expr_bpl ctxt e_heap ns (AbsV (AHeap h))" and 
+          "vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])" and
+          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
+          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and
+          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
+  shows "red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v"
+  using assms
+  unfolding heap_read_wf_def
+  by blast
+
 definition heap_update_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rightarrow> (boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> boogie_expr) \<Rightarrow> bool"
   where 
     "heap_update_wf T ctxt hupdate \<equiv> \<forall> e_heap e_rcv e_f e_new_val h r f ns new_val field_tcon ty_args. 
@@ -188,6 +201,20 @@ definition heap_update_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rig
            (\<exists>v. red_expr_bpl ctxt e_rcv ns v) \<and> (\<exists>v. red_expr_bpl ctxt e_f ns v) \<and>
             (\<exists>v. red_expr_bpl ctxt e_new_val ns v) )"
 
+lemma heap_update_wf_apply:
+  assumes "heap_update_wf T ctxt hupdate" and
+          "red_expr_bpl ctxt e_heap ns (AbsV (AHeap h))" and
+          "vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])" and
+          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
+          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and 
+          "field_ty_fun_opt T f = Some (field_tcon, ty_args)" and 
+          "red_expr_bpl ctxt e_new_val ns new_val" and
+          "type_of_vbpl_val T new_val = ty_args ! 1"
+  shows "red_expr_bpl ctxt (hupdate e_heap e_rcv e_f e_new_val ty_args) ns (AbsV (AHeap (h((r,f) \<mapsto> new_val ))))"
+  using assms
+  unfolding heap_update_wf_def
+  by blast
+
 definition mask_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rightarrow> (boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> boogie_expr) \<Rightarrow> bool"
   where 
     "mask_read_wf T ctxt mread \<equiv> \<forall> e_mask e_rcv e_f m r f ns v field_tcon ty_args.
@@ -198,6 +225,18 @@ definition mask_read_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Right
             red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns (RealV v) ) \<and>
          ( (\<exists>v. red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns v) \<longrightarrow>
              (\<exists>v. red_expr_bpl ctxt e_rcv ns v) \<and> (\<exists>v. red_expr_bpl ctxt e_f ns v) )"
+
+lemma mask_read_wf_apply:
+  assumes "mask_read_wf T ctxt mread" and
+          "m (r, f) = p" and
+          "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
+          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
+          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and
+          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
+  shows "red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns (RealV p)"
+  using assms
+  unfolding mask_read_wf_def
+  by blast
 
 definition mask_update_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rightarrow> (boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> boogie_expr) \<Rightarrow> bool"
   where 
@@ -210,6 +249,18 @@ definition mask_update_wf :: "'a ty_repr_bpl \<Rightarrow> 'a econtext_bpl \<Rig
             red_expr_bpl ctxt (mupdate e_mask e_rcv e_f e_p ty_args) ns (AbsV (AMask (m((r,f) := p))))) \<and>
          ( (\<exists>v. red_expr_bpl ctxt (mupdate e_mask e_rcv e_f e_p ty_args) ns v) \<longrightarrow>
              (\<exists>v. red_expr_bpl ctxt e_rcv ns v) \<and> (\<exists>v. red_expr_bpl ctxt e_f ns v) )"
+
+lemma mask_update_wf_apply:
+  assumes "mask_update_wf T ctxt mupdate" and       
+          "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
+          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
+          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and      
+          "red_expr_bpl ctxt e_new_perm ns (RealV p)" and
+          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
+  shows "red_expr_bpl ctxt (mupdate e_mask e_rcv e_f e_new_perm ty_args) ns (AbsV (AMask (m( (r,f) := p ))))"
+  using assms
+  unfolding mask_update_wf_def
+  by blast
 
 definition heap_var_rel :: "ViperLang.program \<Rightarrow>  var_context \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> tr_vpr_bpl \<Rightarrow> vname \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where
@@ -1621,7 +1672,7 @@ lemma state_rel0_mask_update:
                      just the evaluation mask. For unfolding expressions, we will need to weaken this
                      assumption to also allow updating just the well-definedness mask.
                      \<close>                    
-          WellDefSame: "mask_var Tr = mask_var_def Tr \<Longrightarrow> \<omega>def = \<omega> \<and> \<omega>def' = \<omega>'"
+          WellDefSame: "mask_var Tr = mask_var_def Tr \<Longrightarrow> \<omega>def' = \<omega>'"
                        "mask_var Tr \<noteq> mask_var_def Tr \<Longrightarrow> \<omega>def' = \<omega>def"  and
           OnlyMaskAffected: "\<And>x. x \<noteq> mask_var Tr \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
           OnlyMaskAffectedVpr: "get_store_total \<omega> = get_store_total \<omega>'" 
@@ -1654,14 +1705,37 @@ lemma state_rel0_mask_update:
       using OnlyMaskAffectedVpr
        apply simp
       using OnlyMaskAffected heap_var_disjoint[OF StateRel]
-      by presburger
+      by presburger 
   next
-    show "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var_def Tr) \<omega>def' ns'"
-      apply (rule heap_var_rel_stable[OF state_rel0_heap_var_def_rel[OF StateRel]])
-      using WellDefSame OnlyMaskAffectedVpr
-       apply fastforce
-      using OnlyMaskAffected heap_var_disjoint[OF StateRel]
-      by presburger
+    have HeapSame: "get_h_total_full \<omega> = get_h_total_full \<omega>def"
+      using StateRel
+      unfolding state_rel0_def
+      by argo
+
+    show "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var_def Tr) \<omega>def' ns'"          
+    proof (cases "mask_var Tr = mask_var_def Tr")
+      case True
+      hence "\<omega>def' = \<omega>'"
+        using WellDefSame by blast            
+      show ?thesis 
+        apply (rule heap_var_rel_stable[OF state_rel0_heap_var_def_rel[OF StateRel]])
+        using \<open>\<omega>def' = \<omega>'\<close> HeapSame \<open>get_h_total_full \<omega> = get_h_total_full \<omega>'\<close> 
+         apply force
+        using OnlyMaskAffected heap_var_disjoint[OF StateRel]
+        by presburger 
+    next
+      case False
+      hence "\<omega>def' = \<omega>def"
+        using WellDefSame
+        by blast
+
+      show ?thesis 
+        apply (rule heap_var_rel_stable[OF state_rel0_heap_var_def_rel[OF StateRel]])
+        using \<open>\<omega>def' = \<omega>def\<close>
+         apply simp
+        using OnlyMaskAffected heap_var_disjoint[OF StateRel]
+        by presburger    
+    qed
   next
     show "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var Tr) \<omega>' ns'"
       by (rule MaskVarRel)
@@ -1773,7 +1847,7 @@ lemma state_rel_mask_update_2:
 lemma state_rel_mask_update_3:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
                     "\<Lambda> = (var_context ctxt)" and
-          WellDefSame: "mask_var Tr = mask_var_def Tr \<Longrightarrow> \<omega>def = \<omega> \<and> \<omega>def' = update_mh_loc_total_full \<omega> (addr, f_vpr) p"
+          WellDefSame: "mask_var Tr = mask_var_def Tr \<Longrightarrow> \<omega>def' = update_mh_loc_total_full \<omega> (addr, f_vpr) p"
                        "mask_var Tr \<noteq> mask_var_def Tr \<Longrightarrow> \<omega>def' = \<omega>def"  and
         TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
         LookupMask: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
@@ -2025,57 +2099,6 @@ lemma bg_expr_list_red_all2:
 \<comment>\<open>Taken from Benjamin's BoogieWrapper.thy: TODO proper merge\<close>
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>es, s\<rangle> [\<Down>] vs) = list_all2 (\<lambda>e v. A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e, s\<rangle> \<Down> v) es vs"
   by (induct es arbitrary:vs; simp add:bg_expr_list_red_iff list_all2_Cons1)
-
-lemma heap_read_wf_apply:
-  assumes "heap_read_wf T ctxt hread" and
-          "h (r, f) = Some v" and
-          "red_expr_bpl ctxt e_heap ns (AbsV (AHeap h))" and 
-          "vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])" and
-          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
-          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and
-          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
-  shows "red_expr_bpl ctxt (hread e_heap e_rcv e_f ty_args) ns v"
-  using assms
-  unfolding heap_read_wf_def
-  by blast
-
-lemma heap_update_wf_apply:
-  assumes "heap_update_wf T ctxt hupdate" and
-          "red_expr_bpl ctxt e_heap ns (AbsV (AHeap h))" and
-          "vbpl_absval_ty_opt T (AHeap h) = Some ((THeapId T) ,[])" and
-          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
-          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and 
-          "field_ty_fun_opt T f = Some (field_tcon, ty_args)" and 
-          "red_expr_bpl ctxt e_new_val ns new_val" and
-          "type_of_vbpl_val T new_val = ty_args ! 1"
-  shows "red_expr_bpl ctxt (hupdate e_heap e_rcv e_f e_new_val ty_args) ns (AbsV (AHeap (h((r,f) \<mapsto> new_val ))))"
-  using assms
-  unfolding heap_update_wf_def
-  by blast
-
-lemma mask_read_wf_apply:
-  assumes "mask_read_wf T ctxt mread" and
-          "m (r, f) = p" and
-          "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
-          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
-          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and
-          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
-  shows "red_expr_bpl ctxt (mread e_mask e_rcv e_f ty_args) ns (RealV p)"
-  using assms
-  unfolding mask_read_wf_def
-  by blast
-
-lemma mask_update_wf_apply:
-  assumes "mask_update_wf T ctxt mupdate" and       
-          "red_expr_bpl ctxt e_mask ns (AbsV (AMask m))"and 
-          "red_expr_bpl ctxt e_rcv ns (AbsV (ARef r))" and
-          "red_expr_bpl ctxt e_f ns (AbsV (AField f))" and      
-          "red_expr_bpl ctxt e_new_perm ns (RealV p)" and
-          "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
-  shows "red_expr_bpl ctxt (mupdate e_mask e_rcv e_f e_new_perm ty_args) ns (AbsV (AMask (m( (r,f) := p ))))"
-  using assms
-  unfolding mask_update_wf_def
-  by blast
 
 subsection \<open>Well formedness of type relation\<close>
 
