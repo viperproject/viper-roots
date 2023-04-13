@@ -155,4 +155,19 @@ lemma red_ast_bpl_one_assign:
   using assms
   by (auto intro: RedAssign)
 
+lemma red_ast_bpl_havoc_assume:
+assumes "lookup_var_decl (var_context ctxt) x = Some (ty,w)" and
+        "type_of_val (type_interp ctxt) v = instantiate [] ty" and
+        "\<And>cond. w = Some cond \<Longrightarrow> red_expr_bpl ctxt cond (update_var (var_context ctxt) ns x v) (BoolV True)" and
+        "red_expr_bpl ctxt e (update_var (var_context ctxt) ns x v) (BoolV True)"
+shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont), Normal ns) 
+                            ((BigBlock name cs str tr, cont) , Normal (update_var (var_context ctxt) ns x v))"
+  apply (rule red_ast_bpl_transitive)
+   apply (rule red_ast_bpl_one_simple_cmd)
+  using assms
+   apply (fastforce intro: RedHavocNormal)
+   apply (rule red_ast_bpl_one_simple_cmd)
+  using assms(4) RedAssumeOk
+  by blast
+
 end
