@@ -18,6 +18,7 @@ datatype fun_enum_bpl =
      | FReadMask
      | FUpdateMask
      | FHasPerm
+     | FIdenticalOnKnownLocs
 
 text \<open>\<^typ>\<open>fun_enum_bpl\<close> enumerates the functions required for the encoding\<close>
 
@@ -167,7 +168,6 @@ next
     by (metis option.map_disc_iff)
 qed
 
-
 subsubsection \<open>Knownfolded Mask\<close>
 
 text \<open>select function for the knownfolded mask: readPMask<A, B>(pm: PMaskType, r: Ref, f: (Field A B)): bool\<close>
@@ -189,6 +189,16 @@ fun store_knownfolded_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Righta
            ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f), BoolV b]) \<Rightarrow> 
              Some (AbsV (AKnownFoldedMask (m((r,f) := b))))
         | _ \<Rightarrow> None)"
+
+subsubsection \<open>Identical on known locations\<close>
+
+fun identical_on_known_locs ::  "'a sem_fun_bpl"
+  where 
+    "identical_on_known_locs ts vs = 
+      (case (ts, vs) of 
+         ([], [AbsV (AHeap h), AbsV (AHeap h_exhale), AbsV (AMask m)]) \<Rightarrow>
+           Some (BoolV (\<forall>r f t. m (r, NormalField f t) > 0 \<longrightarrow> h (r, NormalField f t) = h_exhale (r, NormalField f t)))
+       | _ \<Rightarrow> None)"
 
 subsection \<open>Global function map\<close>
 
@@ -236,6 +246,8 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
        (store_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], (TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =
        (has_perm_in_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FIdenticalOnKnownLocs =
+       (identical_on_known_locs, (0,[TConSingle (THeapId T), TConSingle (THeapId T), TConSingle (TMaskId T)], (TPrim TBool)))"
 
 fun fun_interp_vpr_bpl :: " ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 
                                 fun_enum_bpl \<Rightarrow> 'a sem_fun_bpl"
@@ -268,10 +280,6 @@ lemma assume_state_normal:
           StateName: "FunMap FGoodState = state_name"
         shows "red_expr_bpl ctxt (FunExp state_name [] [Var h, Var m]) ns (BoolV True)"
 proof  -
-  let ?\<Gamma> = "fun_interp ctxt"
-  let ?f = "good_state Pr (field_translation Tr)"
-  let ?fdecl = "(0,[((TCon ''HeapType'') []),((TCon ''MaskType'') [])],(TPrim TBool))"
-
   from StateRel obtain hb where
        HLookup: "lookup_var (var_context ctxt) ns h = Some (AbsV (AHeap hb))" and
        "vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])" and
@@ -316,6 +324,46 @@ proof  -
     using Hrel Mrel good_state_Some_true FieldTr state_rel0_wf_mask_simple[OF state_rel_state_rel0[OF StateRel]]
     by blast
 qed
+
+lemma red_ast_bpl_identical_on_known_locs:
+  assumes CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
+          "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          LookupDeclExhaleHeap: "lookup_var_decl (var_context ctxt) hvar_exh = Some (TConSingle (THeapId TyRep), None)" and
+          LookupHeapVar: "lookup_var (var_context ctxt) ns hvar = Some (AbsV (AHeap h))" and
+          LookupMaskVar: "lookup_var (var_context ctxt) ns mvar = Some (AbsV (AMask m))" and 
+          ExhaleHeapFresh: "hvar_exh \<notin> {hvar , mvar}" and
+          HeapTy: "vbpl_absval_ty_opt TyRep (AHeap h) = Some ((THeapId TyRep) ,[])" and
+          NewHeapTy: "vbpl_absval_ty_opt TyRep (AHeap h_new) = Some ((THeapId TyRep) ,[])" and
+          MaskTy: "vbpl_absval_ty_opt TyRep (AMask m) = Some ((TMaskId TyRep), [])" and
+          IdenticalOnKnownCond: "(\<forall>r f t. m (r, NormalField f t) > 0 \<longrightarrow> h (r, NormalField f t) = h_new (r, NormalField f t))"
+        shows "red_ast_bpl P ctxt 
+                                   ((BigBlock name (Havoc hvar_exh # 
+                                                    Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) #                                                    
+                                                    cs) str tr,
+                                     cont),
+                                     Normal ns)
+                                   ((BigBlock name cs str tr, cont), 
+                                       Normal (update_var (var_context ctxt) ns hvar_exh (AbsV (AHeap h_new))))"
+proof (rule red_ast_bpl_havoc_assume[OF LookupDeclExhaleHeap])
+  show "red_expr_bpl ctxt (FunExp id_on_known_locs_name [] [expr.Var hvar, expr.Var hvar_exh, expr.Var mvar])
+                          (update_var (var_context ctxt) ns hvar_exh (AbsV (AHeap h_new))) (BoolV True)"
+    apply (subst \<open>id_on_known_locs_name = _\<close>)
+    apply (rule RedFunOp)
+      apply (rule ctxt_wf_fun_interp[OF CtxtWf])
+
+    using ExhaleHeapFresh
+    apply (fastforce intro: RedExpListCons RedExpListNil RedVar LookupHeapVar LookupMaskVar)
+    apply simp
+    apply (rule lift_fun_decl_well_typed)
+        apply simp
+       apply simp
+      apply simp
+    using TypeInterp HeapTy NewHeapTy MaskTy
+     apply simp
+    apply (simp add: IdenticalOnKnownCond)
+    done
+qed (insert assms, auto)
 
 
 end
