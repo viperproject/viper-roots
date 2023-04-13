@@ -2,28 +2,6 @@ theory ViperBoogieTranslationInterface
   imports ViperBoogieBasicRel ViperBoogieFunctionInst
 begin
 
-text \<open>concrete function declarations\<close>
-definition fdecls
-  where
-    "fdecls  = [(''state'',0,[((TCon ''HeapType'') []),((TCon ''MaskType'') [])],(TPrim TBool)),(''succHeap'',0,[((TCon ''HeapType'') []),((TCon ''HeapType'') [])],(TPrim TBool)),(''succHeapTrans'',0,[((TCon ''HeapType'') []),((TCon ''HeapType'') [])],(TPrim TBool)),(''IdenticalOnKnownLocations'',0,[((TCon ''HeapType'') []),((TCon ''HeapType'') []),((TCon ''MaskType'') [])],(TPrim TBool)),(''readHeap'',2,[((TCon ''HeapType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TVar 1)),(''updHeap'',2,[((TCon ''HeapType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)]),(TVar 1)],((TCon ''HeapType'') [])),(''IsPredicateField'',2,[((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TBool)),(''IsWandField'',2,[((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TBool)),(''getPredicateId'',2,[((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TInt)),(''PredicateMaskField'',1,[((TCon ''Field'') [(TVar 0),((TCon ''FrameType'') [])])],((TCon ''Field'') [(TVar 0),((TCon ''PMaskType'') [])])),(''WandMaskField'',1,[((TCon ''Field'') [(TVar 0),((TCon ''FrameType'') [])])],((TCon ''Field'') [(TVar 0),((TCon ''PMaskType'') [])])),(''Perm'',0,[(TPrim TReal),(TPrim TReal)],(TPrim TReal)),(''readMask'',2,[((TCon ''MaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TReal)),(''updMask'',2,[((TCon ''MaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)]),(TPrim TReal)],((TCon ''MaskType'') [])),(''readPMask'',2,[((TCon ''PMaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TBool)),(''updPMask'',2,[((TCon ''PMaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)]),(TPrim TBool)],((TCon ''PMaskType'') [])),(''GoodMask'',0,[((TCon ''MaskType'') [])],(TPrim TBool)),(''HasDirectPerm'',2,[((TCon ''MaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TBool)),(''sumMask'',0,[((TCon ''MaskType'') []),((TCon ''MaskType'') []),((TCon ''MaskType'') [])],(TPrim TBool)),(''FrameFragment'',1,[(TVar 0)],((TCon ''FrameType'') [])),(''ConditionalFrame'',0,[(TPrim TReal),((TCon ''FrameType'') [])],((TCon ''FrameType'') [])),(''dummyFunction'',1,[(TVar 0)],(TPrim TBool)),(''CombineFrames'',0,[((TCon ''FrameType'') []),((TCon ''FrameType'') [])],((TCon ''FrameType'') [])),(''InsidePredicate'',2,[((TCon ''Field'') [(TVar 0),((TCon ''FrameType'') [])]),((TCon ''FrameType'') []),((TCon ''Field'') [(TVar 1),((TCon ''FrameType'') [])]),((TCon ''FrameType'') [])],(TPrim TBool))]"
-
-lemma mfun_readHeap:
-shows "((map_of fdecls ''readHeap'') = (Some (2,[((TCon ''HeapType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TVar 1))))"
-by (simp add:fdecls_def)
-
-lemma mfun_updHeap:
-shows "((map_of fdecls ''updHeap'') = (Some (2,[((TCon ''HeapType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)]),(TVar 1)],((TCon ''HeapType'') []))))"
-by (simp add:fdecls_def)
-
-lemma mfun_readMask:
-shows "((map_of fdecls ''readMask'') = (Some (2,[((TCon ''MaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)])],(TPrim TReal))))"
-by (simp add:fdecls_def)
-
-lemma mfun_updMask:
-shows "((map_of fdecls ''updMask'') = (Some (2,[((TCon ''MaskType'') []),((TCon ''Ref'') []),((TCon ''Field'') [(TVar 0),(TVar 1)]),(TPrim TReal)],((TCon ''MaskType'') []))))"
-  by (simp add:fdecls_def)
-
-
 subsection \<open>Boogie translation representation instantiation\<close>
 
 type_synonym fun_repr_bpl = "fun_enum_bpl \<Rightarrow> fname"
