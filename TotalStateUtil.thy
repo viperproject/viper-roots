@@ -53,6 +53,12 @@ definition update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> '
 definition update_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a total_state"
   where "update_mp_total \<phi> mp = \<phi>\<lparr>get_mp_total := mp\<rparr>"
 
+definition update_hh_total :: "'a total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a total_state"
+  where "update_hh_total \<phi> hh = \<phi>\<lparr>get_hh_total := hh\<rparr>"
+
+definition update_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a total_state"
+  where "update_hp_total \<phi> hp = \<phi>\<lparr>get_hp_total := hp\<rparr>"
+
 (*
 definition update_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state"
   where "update_m_total \<phi> m = Abs_total_state (get_h_total \<phi>, m)"
@@ -161,6 +167,16 @@ lemma update_hh_loc_total_overwrite: "update_hh_loc_total (update_hh_loc_total \
 
 fun get_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
   where "get_h_total_full \<omega> = (get_hh_total_full \<omega>, get_hp_total_full \<omega>)"
+
+fun update_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
+  where "update_h_total_full \<omega> hh hp = 
+              \<omega>\<lparr> get_total_full := update_hp_total (update_hh_total (get_total_full \<omega>) hh) hp \<rparr>"
+
+fun update_hh_total_full ::  "'a full_total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a full_total_state"
+  where "update_hh_total_full \<omega> hh = \<omega>\<lparr> get_total_full := update_hh_total (get_total_full \<omega>) hh \<rparr>"
+
+fun update_hp_total_full ::  "'a full_total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
+  where "update_hp_total_full \<omega> hp = \<omega>\<lparr> get_total_full := update_hp_total (get_total_full \<omega>) hp \<rparr>"
 
 fun update_hh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
   where "update_hh_loc_total_full \<omega> l v = 
