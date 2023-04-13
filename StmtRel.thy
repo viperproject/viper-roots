@@ -559,7 +559,7 @@ lemma exhale_stmt_rel:
           \<comment>\<open>At the end of the exhale we require the Boogie program to reestablish the original relation on the 
              evaluation state\<close>
           Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_m_total_full \<omega>) \<Longrightarrow>
+          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
@@ -609,12 +609,80 @@ lemma exhale_stmt_rel_inst:
   assumes 
       "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns')" and                   
       "exhale_rel (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
-      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr AuxPred ctxt) \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_m_total_full \<omega>) \<Longrightarrow>
+      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr AuxPred ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
+                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
+      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms 
   by (rule exhale_stmt_rel)
+
+lemma exhale_stmt_rel_finish:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
+          WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          "\<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>)" and
+          "hvar = heap_var Tr" and
+          "mvar = mask_var Tr" and
+          LookupDeclExhaleHeap: "lookup_var_decl (var_context ctxt) hvar_exh = Some (TConSingle (THeapId TyRep), None)" and
+          ExhaleHeapFresh: "hvar_exh \<notin> ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)"                           
+  shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar_exh # 
+                                                   Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) # 
+                                                   Assign hvar (Var hvar_exh) #
+                                                   cs) str tr, cont), Normal ns)
+                             ((BigBlock name cs str tr, cont), Normal ns') \<and>
+               state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega>' ns'" (is "\<exists>ns'. ?red ns' \<and> ?rel ns'")
+proof -
+ (* "vbpl_absval_ty_opt TyRep (AHeap h_new) = Some ((THeapId TyRep) ,[])" *)
+  from state_rel_heap_var_rel[OF StateRel]
+  obtain hb where LookupHeapVar: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and  
+                    HeapVarWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
+                    HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb"
+      unfolding heap_var_rel_def
+      by blast
+
+    from state_rel_mask_var_rel[OF StateRel]
+    obtain mb where LookupMaskVar: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+                    "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+      unfolding mask_var_rel_def 
+      by blast
+
+    obtain hb' where HeapRel': "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
+                     NewHeapWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
+      using WfTyRepr construct_bpl_heap_from_vpr_heap_correct by blast
+
+    have IdOnKnownCond: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb' (r, NormalField f t)"
+    proof clarify
+      fix r f t 
+      assume "0 < mb (r, NormalField f t)"
+
+    let ?ns1 = "(update_var (var_context ctxt) ns hvar_exh (AbsV (AHeap hb')))"
+    have "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar_exh # 
+                                                   Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) # 
+                                                   Assign hvar (Var hvar_exh) #
+                                                   cs) str tr, cont), Normal ns)
+                             ((BigBlock name (Assign hvar (Var hvar_exh) # cs) str tr, cont), Normal ?ns1)"
+      apply (subst \<open>hvar = _\<close>)+
+      apply (subst \<open>mvar = _\<close>)+
+      apply (rule red_ast_bpl_identical_on_known_locs[OF CtxtWf \<open>id_on_known_locs_name = _\<close> \<open>type_interp ctxt = _\<close> LookupDeclExhaleHeap])
+            apply (rule LookupHeapVar)
+           apply (rule LookupMaskVar)
+      using ExhaleHeapFresh
+          apply blast
+         apply (rule HeapVarWellTy)
+        apply (rule NewHeapWellTy)
+       apply simp
+      apply (rule IdOnKnownCond)
+      done
+
+
+
 
 subsection \<open>Misc\<close>
 

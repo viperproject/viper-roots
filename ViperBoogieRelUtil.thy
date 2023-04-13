@@ -71,6 +71,7 @@ lemma store_temporary_perm_rel:
 
 subsection \<open>Store well-definedness state in fresh variables\<close>
 
+(*
 lemma store_new_mask_def:
   assumes
   StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
@@ -144,7 +145,7 @@ proof -
     apply (rule StateRelUpd)
     done
 qed
-
+*)
 subsection \<open>Permission checks\<close>
 
 lemma pos_perm_rel_nontrivial:
@@ -202,7 +203,8 @@ lemma mask_upd_rel:
   shows "rel_general R 
                   (uncurry (state_rel Pr TyRep Tr AuxPred ctxt))
                   Success
-                  (\<lambda> \<omega>. False) P ctxt 
+                  (\<lambda> \<omega>. False) 
+                  P ctxt 
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
                   (BigBlock name cs str tr, cont)"
 proof (rule rel_intro)
@@ -345,6 +347,18 @@ lemma mask_upd_rel_2:
          rule mask_upd_rel[where ?p_prat="p_prat \<circ> snd" and r=r])
   using assms
   by fastforce+
+
+subsection \<open>Constructing a well-typed Boogie heap from a Viper heap\<close>
+
+fun construct_bpl_heap_from_vpr_heap :: "'a total_heap \<Rightarrow> 'a bpl_heap_ty"
+  where "construct_bpl_heap_from_vpr_heap h = undefined" \<comment>\<open>TODO\<close>
+
+
+lemma construct_bpl_heap_from_vpr_heap_correct:
+  assumes "wf_ty_repr_bpl TyRep"
+  shows "\<exists>hb. heap_rel Pr tr_field h hb \<and>
+              vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
+  sorry
 
 
 end

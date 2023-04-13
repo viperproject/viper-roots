@@ -2000,7 +2000,7 @@ lemma state_rel_mask_var_def_update:
           "lookup_var_ty (var_context ctxt) mvar_def' = Some (TConSingle (TMaskId TyRep))" and
           "lookup_var (var_context ctxt) ns (mask_var_def Tr) = Some m" 
         shows "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns mvar_def' m)"
-  sorry
+  oops
 
 lemma state_rel_heap_var_def_update:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
@@ -2012,7 +2012,7 @@ lemma state_rel_heap_var_def_update:
           "lookup_var_ty (var_context ctxt) hvar_def' = Some (TConSingle (THeapId TyRep))" and
           "lookup_var (var_context ctxt) ns (heap_var_def Tr) = Some h" 
         shows "state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns hvar_def' h)"
-  sorry
+  oops
 
 
 subsection\<open>function relation\<close>
