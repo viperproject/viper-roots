@@ -46,7 +46,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      a = the_address r \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
                           ( exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (mh (a,f)) (Abs_prat p)))
-                                         (if r = Null then \<omega> else update_mh_total_full \<omega> (mh( (a,f) := psub (mh (a,f)) (Abs_prat p)))) 
+                                         (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) (psub (mh (a,f)) (Abs_prat p)))
                           )"
 
 \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
@@ -105,6 +105,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 
+(* old version with predicate heap
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 
            { (hh', hp') | hh' hp'. 
@@ -118,21 +119,26 @@ text\<open>\<^term>\<open>havoc_undef_locs hh hp mh mp\<close> denotes the set o
 the permission masks \<^term>\<open>(mh,mp)\<close>. This means the heaps agree on all heap and predicate locations for 
 which direct permission is held in \<^term>\<open>(mh,mp)\<close> or which is part of a predicate snapshot in \<^term>\<open>hp\<close> 
 of a directly owned (w.r.t. \<^term>\<open>mp\<close>) predicate\<close>
+*)
 
-definition exhale_state :: "'a full_total_state \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a full_total_state set"
-  where "exhale_state \<omega> m = 
-    {\<omega>' | \<omega>'. get_store_total \<omega>' = get_store_total \<omega> \<and>
-              get_trace_total \<omega>' = get_trace_total \<omega> \<and>
-              m = (get_mh_total_full \<omega>', get_mp_total_full \<omega>') \<and>
-              wf_mask_simple (get_mh_total_full \<omega>') \<and>
-              (get_hh_total_full \<omega>', get_hp_total_full \<omega>') \<in> 
-                   havoc_undef_locs (get_hh_total_full \<omega>) (get_hp_total_full \<omega>) (fst m) (snd m)}"
+definition havoc_undef_locs :: "'a total_heap \<Rightarrow> mask \<Rightarrow> 'a total_heap set"
+  where "havoc_undef_locs hh mh = { hh' | hh'. (\<forall>lh. mh lh \<noteq> pnone \<longrightarrow> hh' lh = hh lh) }"
+
+text\<open>\<^term>\<open>havoc_undef_locs hh mh\<close> denotes the set of heaps that coincide with \<^term>\<open>hh\<close> w.r.t.
+the permission masks \<^term>\<open>mh\<close>.\<close>
+
+definition exhale_state :: "'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state set"
+  where "exhale_state \<omega> mh = 
+    { update_hh_total_full \<omega> hh' | (\<omega>' :: 'a full_total_state) (hh' :: 'a total_heap). 
+                                   hh' \<in> havoc_undef_locs (get_hh_total_full \<omega>) mh}"
 
 lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
-  by (simp add: exhale_state_def)
+  unfolding exhale_state_def
+  by force
 
 lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
-  by (simp add: exhale_state_def)
+  unfolding exhale_state_def
+  by force
 
 inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where 
@@ -178,7 +184,10 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
       red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
  | RedExhale:
    "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
-      \<omega>' \<in> exhale_state \<omega>_exh (get_m_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
+      \<comment>\<open>Here, we havoc all locations that for which there is no direct permission. This is sound but 
+        incomplete, because locations that are folded under a predicate need not be havoced. This should
+        be revisited.\<close>
+      \<omega>' \<in> exhale_state \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
  | RedExhaleFailure:
    "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
