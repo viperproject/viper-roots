@@ -301,6 +301,11 @@ fun shift_and_add_state_total :: "'a full_total_state \<Rightarrow> 'a val \<Rig
 fun unshift_state_total :: "nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state"
   where
    "unshift_state_total n \<omega> = update_store_total \<omega> (unshift n (get_store_total \<omega>))"         
-                                                            
+
+subsection \<open>Well-typed states\<close>
+
+definition total_heap_well_typed :: "program \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> 'a total_heap \<Rightarrow> bool"
+  where "total_heap_well_typed Pr \<Delta> h \<equiv>                      
+           \<forall>loc \<tau>. declared_fields Pr (snd loc) = Some \<tau> \<longrightarrow> has_type \<Delta> \<tau> (h loc)"
 
 end
