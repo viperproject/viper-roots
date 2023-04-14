@@ -175,6 +175,9 @@ fun update_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<Ri
 fun update_hh_total_full ::  "'a full_total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a full_total_state"
   where "update_hh_total_full \<omega> hh = \<omega>\<lparr> get_total_full := update_hh_total (get_total_full \<omega>) hh \<rparr>"
 
+lemma update_hh_total_full_lookup_1: "get_hh_total_full (update_hh_total_full \<omega> h) = h"
+  by (simp add: update_hh_total_def)
+
 fun update_hp_total_full ::  "'a full_total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
   where "update_hp_total_full \<omega> hp = \<omega>\<lparr> get_total_full := update_hp_total (get_total_full \<omega>) hp \<rparr>"
 
@@ -282,6 +285,12 @@ lemma get_h_total_full_aux:
   "get_h_total_full \<omega> = get_h_total_full (update_mh_loc_total_full \<omega> (addr, f_vpr) v_vpr)"
   apply simp
   by (simp add: update_mh_loc_total_mh_eq update_mh_loc_total_mp_eq)
+
+lemma update_hh_loc_total_full_m_eq: "get_m_total_full (update_hh_loc_total_full \<omega> l v) = get_m_total_full \<omega>"
+  by (simp add: update_hh_loc_total_mh_eq update_hh_loc_total_mp_eq)
+
+lemma update_hh_total_full_m_eq: "get_m_total_full (update_hh_total_full \<omega> h) = get_m_total_full \<omega>"
+  by (simp add: update_hh_total_def)
 
 section \<open>Shifting stores\<close>
 
