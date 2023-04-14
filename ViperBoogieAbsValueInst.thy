@@ -413,7 +413,7 @@ lemma vbpl_absval_ty_not_dummy:
   by (cases "vbpl_absval_ty_opt TyRep absv") auto
 
 text \<open>If we know that the type of a Boogie value is \<^emph>\<open>not\<close> the dummy type, then we know that the 
-      type must be provided by \<^const>\<open>vbpl_absval_ty_opt\<close> (or is a primitve type)\<close>
+      type must be provided by \<^const>\<open>vbpl_absval_ty_opt\<close> (or is a primitive type)\<close>
 
 lemma type_of_val_not_dummy:
   assumes "type_of_val (vbpl_absval_ty TyRep) v = t" and
