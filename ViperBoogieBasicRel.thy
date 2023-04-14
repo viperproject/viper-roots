@@ -118,6 +118,92 @@ lemma heap_rel_elim:
   using assms
   unfolding heap_rel_def
   by blast
+                                               
+definition vpr_heap_locations_bpl :: "program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (ref \<times> 'a vb_field) set"
+  where "vpr_heap_locations_bpl Pr tr_field \<equiv> 
+            { (a_bpl,f_bpl). (\<exists>field_bpl heap_loc field_ty_vpr. 
+                               a_bpl = Address (fst heap_loc) \<and>
+                               f_bpl = NormalField field_bpl field_ty_vpr \<and>
+                               declared_fields Pr (snd heap_loc) = Some field_ty_vpr \<and> 
+                               tr_field (snd heap_loc) = Some field_bpl) }"
+
+lemma heap_rel_stable:
+  assumes "heap_rel Pr tr_field h hb"
+  shows "\<And> hb'. (\<forall> loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field. hb loc_bpl = hb' loc_bpl) \<Longrightarrow> heap_rel Pr tr_field h hb'"
+  using assms
+  unfolding heap_rel_def vpr_heap_locations_bpl_def
+  by (metis (mono_tags, lifting) case_prodI mem_Collect_eq)  
+
+lemma split_fun_aux:
+  shows "\<exists> hb'. (\<forall> loc_bpl. P loc_bpl \<longrightarrow> hb' loc_bpl = hb0 loc_bpl) \<and>
+                (\<forall> loc_bpl. \<not> P loc_bpl \<longrightarrow> hb' loc_bpl = hb1 loc_bpl)"
+proof -
+  let ?hb' = "\<lambda>loc_bpl. if P loc_bpl then hb0 loc_bpl else hb1 loc_bpl"
+  show ?thesis
+    apply (rule exI[where ?x="?hb'"])
+    by auto
+qed
+
+lemma heap_rel_stable_2:
+  assumes "heap_rel Pr tr_field h hb0"
+  shows "\<exists> hb'. heap_rel Pr tr_field h hb' \<and>
+                (\<forall> loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field. hb' loc_bpl = hb0 loc_bpl) \<and>
+                (\<forall> loc_bpl. loc_bpl \<notin> vpr_heap_locations_bpl Pr tr_field \<longrightarrow> hb' loc_bpl = hb1 loc_bpl)"
+  using split_fun_aux[where ?P = "\<lambda>loc_bpl. loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field"]
+        heap_rel_stable[OF assms] 
+  by (metis (full_types))
+
+lemma heap_rel_stable_2_well_typed:
+  assumes "heap_rel Pr tr_field h hb0" and
+        Heap0WellTy: "vbpl_absval_ty_opt TyRep (AHeap hb0) = Some (THeapId TyRep, [])" and
+        Heap1WellTy:  "vbpl_absval_ty_opt TyRep (AHeap hb1) = Some (THeapId TyRep, [])"
+shows "\<exists> hb'. heap_rel Pr tr_field h hb' \<and>
+              vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, []) \<and>
+                (\<forall> loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field. hb' loc_bpl = hb0 loc_bpl) \<and>
+                (\<forall> loc_bpl. loc_bpl \<notin> vpr_heap_locations_bpl Pr tr_field \<longrightarrow> hb' loc_bpl = hb1 loc_bpl)"
+proof -
+  from split_fun_aux[where ?P = "\<lambda>loc_bpl. loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field"] obtain hb'
+    where HeapProperties:
+          "(\<forall>loc_bpl. loc_bpl \<in> vpr_heap_locations_bpl Pr tr_field \<longrightarrow> hb' loc_bpl = hb0 loc_bpl)"
+          "(\<forall>loc_bpl. loc_bpl \<notin> vpr_heap_locations_bpl Pr tr_field \<longrightarrow> hb' loc_bpl = hb1 loc_bpl)"
+    by blast
+
+  hence "heap_rel Pr tr_field h hb'"
+    using heap_rel_stable[OF assms(1)] 
+    by metis
+
+  moreover have "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
+  proof (rule heap_bpl_well_typed)
+    fix r f fieldKind t v
+    assume FieldTy: "field_ty_fun_opt TyRep f = Some (TFieldId TyRep, [fieldKind, t])" and
+           "hb' (r, f) = Some v"
+
+    thus "case v of 
+            LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t
+          | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
+    proof (cases "(r,f) \<in> vpr_heap_locations_bpl Pr tr_field")
+      case True
+      hence "hb0 (r,f) = Some v"
+        using HeapProperties \<open>hb' (r, f) = Some v\<close>
+        by simp
+      with True show ?thesis
+        using Heap0WellTy FieldTy          
+        by (metis heap_bpl_well_typed_elim)
+    next
+      case False
+      hence "hb1 (r,f) = Some v"
+        using HeapProperties \<open>hb' (r, f) = Some v\<close>
+        by simp
+      with False show ?thesis
+        using Heap1WellTy FieldTy          
+        by (metis heap_bpl_well_typed_elim)
+    qed
+  qed
+
+  ultimately show ?thesis
+    using HeapProperties
+    by blast
+qed
 
 definition mask_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> mask \<Rightarrow> 'a bpl_mask_ty \<Rightarrow> bool"
   where "mask_rel Pr tr_field m mb \<equiv> 
@@ -1990,6 +2076,13 @@ qed (insert assms, auto)
                "type_of_val (type_interp ctxt) aux_val = \<tau>"
    shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"  
 *)
+
+lemma state_rel_switch_to_def_same:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  shows "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>) AuxPred ctxt \<omega> \<omega> ns"
+  oops
+
+
 lemma state_rel_mask_var_def_update:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "mvar_def' \<notin> ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
