@@ -2,31 +2,6 @@ theory StmtRel
 imports ExpRel ExprWfRel InhaleRel ExhaleRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
 begin
 
-text \<open>
-The goal is to generate proofs of Viper programs containing a single \<open>x := e\<close> statement. I will
-pursue this goal in three phases:
-
-  \<^item> Phase 1: \<open>e\<close> contains no lazy operations and is trivially well-defined
-  \<^item> Phase 2: \<open>e\<close> is trivially well-defined
-  \<^item> Phase 3: No restrictions on \<open>e\<close> other than general subset restriction
-\<close>
-
-(*
-definition assert_rel :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> ViperLang.program \<Rightarrow> 'a total_context \<Rightarrow>  'a astcontext_bpl \<Rightarrow>
-       viper_expr \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont)  \<Rightarrow> bool"
-  where
-   "assert_rel R Pr ctxt_vpr ctxt e_vpr \<gamma> \<gamma>' \<equiv> 
-    \<forall> \<omega> ns res. R \<omega> ns \<longrightarrow> 
-           red_exhale Pr ctxt_vpr \<omega> (Atomic (Pure e_vpr)) (get_m_total_full \<omega>) res \<longrightarrow>
-
-           (res \<noteq> ExhaleFailure \<longrightarrow> \<comment>\<open>for general exhales would have to take resulting mask into account\<close>
-               (\<exists>\<gamma>' ns'. red_ast_bpl ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega> ns')) \<and>
-           (res = ExhaleFailure \<longrightarrow> 
-              (\<exists>c'.  snd c' = Failure \<and>
-                    red_ast_bpl ctxt (\<gamma>, Normal ns) c'))"
-*)
-
-
 subsection \<open>Statement relation - general statement\<close>
 
 text\<open> Points to think about:
