@@ -607,20 +607,21 @@ text \<open>The following theorem is the same as exhale_stmt_rel except that Rex
 
 lemma exhale_stmt_rel_inst:
   assumes 
-      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns')" and                   
-      "exhale_rel (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
-      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr AuxPred ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
+      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')" and                   
+      "exhale_rel (state_rel Pr TyRep Tr' AuxPred' ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
       "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
-  using assms 
+  using assms
   by (rule exhale_stmt_rel)
 
 lemma exhale_stmt_rel_finish:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel_def_same Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and
           CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
           WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          WellDefSame: "heap_var Tr = heap_var_def Tr \<and> mask_var Tr = mask_var_def Tr" and 
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           "\<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>)" and
@@ -637,52 +638,162 @@ lemma exhale_stmt_rel_finish:
                                                    Assign hvar (Var hvar_exh) #
                                                    cs) str tr, cont), Normal ns)
                              ((BigBlock name cs str tr, cont), Normal ns') \<and>
-               state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega>' ns'" (is "\<exists>ns'. ?red ns' \<and> ?rel ns'")
+               state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ns'" (is "\<exists>ns'. ?red ns' \<and> ?rel ns'")
 proof -
- (* "vbpl_absval_ty_opt TyRep (AHeap h_new) = Some ((THeapId TyRep) ,[])" *)
   from state_rel_heap_var_rel[OF StateRel]
-  obtain hb where LookupHeapVar: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and  
+  obtain hb where   LookupHeapVarTy: "lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep))" and
+                    LookupHeapVar: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and  
                     HeapVarWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
                     HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb"
       unfolding heap_var_rel_def
       by blast
 
-    from state_rel_mask_var_rel[OF StateRel]
-    obtain mb where LookupMaskVar: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
-                    "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
-      unfolding mask_var_rel_def 
-      by blast
+  from state_rel_mask_var_rel[OF StateRel]
+  obtain mb where LookupMaskVar: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+                  MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+    unfolding mask_var_rel_def 
+    by blast
 
-    obtain hb' where HeapRel': "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
-                     NewHeapWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
-      using WfTyRepr construct_bpl_heap_from_vpr_heap_correct by blast
+  obtain hb' where *: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
+                   **: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
+    using WfTyRepr construct_bpl_heap_from_vpr_heap_correct by blast
 
-    have IdOnKnownCond: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb' (r, NormalField f t)"
-    proof clarify
-      fix r f t 
-      assume "0 < mb (r, NormalField f t)"
+  \<comment>\<open>We derive a heap which coincides with \<^term>\<open>hb'\<close> on the locations related to Viper locations
+     and matches \<^term>\<open>hb\<close> on all other locations. This approach allows one to have strictly positive
+     permissions at the Boogie level for locations that have no Viper counterpart. Alternatively,
+     one could enforce in the state relation that that permission amount must be 0 for locations without
+     a Viper counterpart (but then one would have to also prove that property when establishing the
+     state relation). \<close>
 
-    let ?ns1 = "(update_var (var_context ctxt) ns hvar_exh (AbsV (AHeap hb')))"
-    have "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar_exh # 
-                                                   Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) # 
-                                                   Assign hvar (Var hvar_exh) #
-                                                   cs) str tr, cont), Normal ns)
-                             ((BigBlock name (Assign hvar (Var hvar_exh) # cs) str tr, cont), Normal ?ns1)"
+  obtain hb'' where 
+            NewHeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb''" and
+            NewHeapWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb'') = Some (THeapId TyRep, [])" and
+            NewHeapProperty:
+                "\<forall> loc_bpl. loc_bpl \<notin> (vpr_heap_locations_bpl Pr (field_translation Tr) ) \<longrightarrow> 
+                                                     hb'' loc_bpl = hb loc_bpl"
+    using heap_rel_stable_2_well_typed[OF * ** HeapVarWellTy]
+    by blast 
+
+  have IdOnKnownCond: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb'' (r, NormalField f t)"
+  proof clarify
+    fix r f t 
+    assume PermPos: "0 < mb (r, (NormalField f t))"    
+
+    show "hb (r, NormalField f t) = hb'' (r, NormalField f t)"
+
+     \<comment>\<open>Need to put the \<^typ>\<open>(ref \<times> 'a vb_field) set\<close> explicitly here, otherwise the proof does not work
+       (most likely due to the type parameter).\<close>
+    proof (cases "(r, NormalField f t) \<in> (vpr_heap_locations_bpl Pr (field_translation Tr)  :: (ref \<times> 'a vb_field) set)")
+      case True
+      from this obtain heap_loc where
+         HeapLocProperties:
+         "r = Address (fst heap_loc)"
+         "declared_fields Pr (snd heap_loc) = Some t"
+         "(field_translation Tr) (snd heap_loc) = Some f"
+        unfolding vpr_heap_locations_bpl_def
+        by blast
+
+      hence "mb (r, (NormalField f t)) = real_of_rat (Rep_prat (get_mh_total_full \<omega> heap_loc))"
+        using MaskRel
+        unfolding mask_rel_def
+        by blast
+      hence "get_mh_total_full \<omega> heap_loc \<noteq> pnone"
+        using PermPos pnone.rep_eq by fastforce
+
+      hence "get_hh_total_full \<omega> heap_loc = get_hh_total_full \<omega>' heap_loc"
+        using \<open>\<omega>' \<in> _\<close> update_hh_total_full_lookup_1
+        unfolding exhale_state_def havoc_undef_locs_def
+        by (smt (z3) mem_Collect_eq) (* SMT proof *)
+
+      then show ?thesis 
+        using HeapRel NewHeapRel HeapLocProperties
+        unfolding heap_rel_def
+        by presburger
+    next
+      case False
+      thus "hb (r, NormalField f t) = hb'' (r, NormalField f t)"
+        using NewHeapProperty
+        by presburger  
+    qed
+  qed
+
+  let ?ns1 = "update_var (var_context ctxt) ns hvar_exh (AbsV (AHeap hb''))"
+  have Red1:  "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar_exh # 
+                                                 Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) # 
+                                                 Assign hvar (Var hvar_exh) #
+                                                 cs) str tr, cont), Normal ns)
+                           ((BigBlock name (Assign hvar (Var hvar_exh) # cs) str tr, cont), Normal ?ns1)"
+    apply (subst \<open>hvar = _\<close>)+
+    apply (subst \<open>mvar = _\<close>)+
+    apply (rule red_ast_bpl_identical_on_known_locs[OF CtxtWf \<open>id_on_known_locs_name = _\<close> \<open>type_interp ctxt = _\<close> LookupDeclExhaleHeap])
+          apply (rule LookupHeapVar)
+         apply (rule LookupMaskVar)
+    using ExhaleHeapFresh
+        apply blast
+       apply (rule HeapVarWellTy)
+      apply (rule NewHeapWellTy)
+     apply simp
+    apply (rule IdOnKnownCond)
+    done
+
+  have StateRel1: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ?ns1"
+    using StateRel
+    sorry
+
+  let ?ns2 = "update_var (var_context ctxt) ?ns1 hvar (AbsV (AHeap hb''))"
+  have "red_ast_bpl P ctxt ((BigBlock name (Assign hvar (Var hvar_exh) # cs) str tr, cont), Normal ?ns1)
+                           ((BigBlock name cs str tr, cont), Normal ?ns2)"      
+    apply (subst \<open>hvar = _\<close>)+
+    apply (rule red_ast_bpl_one_assign)
+    using NewHeapWellTy TypeInterp LookupHeapVarTy
+    by (auto intro: RedVar)
+
+  moreover have "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ?ns2"
+  proof (rule state_rel_heap_update[OF StateRel1])
+    show " \<omega> = \<omega> \<and> \<omega>' = \<omega>' \<and> heap_var Tr = heap_var_def Tr"
+      using WellDefSame
+      by simp
+  next
+    fix x
+    assume "x \<noteq> heap_var Tr"
+    thus "lookup_var (var_context ctxt) ?ns1 x = lookup_var (var_context ctxt) ?ns2 x"
+      apply (subst \<open>hvar = _\<close>)
+      by simp
+  next
+    show "get_store_total \<omega> = get_store_total \<omega>'"
+      using \<open>\<omega>' \<in> _\<close> exhale_state_same_store
+      by metis
+  next
+    show "get_m_total_full \<omega> = get_m_total_full \<omega>'"
+      using \<open>\<omega>' \<in> _\<close> exhale_state_same_mask
+      by metis
+  next
+    show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) \<omega>' ?ns2"
+      unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
-      apply (subst \<open>mvar = _\<close>)+
-      apply (rule red_ast_bpl_identical_on_known_locs[OF CtxtWf \<open>id_on_known_locs_name = _\<close> \<open>type_interp ctxt = _\<close> LookupDeclExhaleHeap])
-            apply (rule LookupHeapVar)
-           apply (rule LookupMaskVar)
-      using ExhaleHeapFresh
-          apply blast
-         apply (rule HeapVarWellTy)
-        apply (rule NewHeapWellTy)
-       apply simp
-      apply (rule IdOnKnownCond)
-      done
+      by (fastforce intro: LookupHeapVarTy NewHeapWellTy NewHeapRel)      
+  next
+    fix x
+    assume "map_of (snd (var_context ctxt)) x \<noteq> None"
+    thus "global_state ?ns2 x = global_state ?ns1 x"
+      by (metis global_state_update_local global_state_update_other option.exhaust)
+  next
+    show "old_global_state ?ns2 = old_global_state ?ns1"
+      by (simp add: update_var_old_global_same)
+  next
+    from state_rel_state_well_typed[OF StateRel1] have "binder_state ?ns1 = Map.empty"
+      unfolding state_well_typed_def
+      by blast
+      
+    thus "binder_state ?ns2 = Map.empty"
+      by (simp add: update_var_binder_same)
+  qed (insert assms, auto)
 
-
-
+  ultimately show "\<exists>ns'. ?red ns' \<and> ?rel ns'"
+    using Red1 red_ast_bpl_transitive
+    by blast
+qed
+        
 
 subsection \<open>Misc\<close>
 

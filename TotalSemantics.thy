@@ -140,6 +140,11 @@ lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longri
   unfolding exhale_state_def
   by force
 
+lemma exhale_state_same_mask: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
+  unfolding exhale_state_def
+  using update_hh_total_full_m_eq  
+  by blast
+
 inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where 
     FoldRelNormal: 
