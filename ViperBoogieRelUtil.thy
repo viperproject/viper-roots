@@ -350,15 +350,146 @@ lemma mask_upd_rel_2:
 
 subsection \<open>Constructing a well-typed Boogie heap from a Viper heap\<close>
 
-fun construct_bpl_heap_from_vpr_heap :: "'a total_heap \<Rightarrow> 'a bpl_heap_ty"
-  where "construct_bpl_heap_from_vpr_heap h = undefined" \<comment>\<open>TODO\<close>
+typ "ref \<times> 'a vb_field \<rightharpoonup> ('a vbpl_absval) bpl_val"
 
+fun construct_bpl_heap_from_vpr_heap :: "program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 'a total_heap \<Rightarrow> 'a bpl_heap_ty"
+  where "construct_bpl_heap_from_vpr_heap Pr tr_field h = 
+          (\<lambda> loc_bpl. 
+                  case (snd loc_bpl) of
+                    NormalField f t \<Rightarrow> 
+                      if (\<exists>loc_vpr. fst loc_bpl = Address (fst loc_vpr) \<and>
+                                    declared_fields Pr (snd loc_vpr) = Some t \<and> 
+                                    tr_field (snd loc_vpr) = Some f) then
+                        Some (val_rel_vpr_bpl (h (the_address (fst loc_bpl), 
+                                              (SOME fid_vpr. declared_fields Pr fid_vpr = Some t \<and> tr_field fid_vpr = Some f))))
+                      else 
+                        None
+                  | _ \<Rightarrow> None
+             )"
+
+lemma construct_bpl_heap_from_vpr_heap_aux:
+assumes "declared_fields Pr fid = Some t" and
+        "tr_field fid = Some fid_bpl" and
+        "inj_on tr_field (dom tr_field)"
+      shows "construct_bpl_heap_from_vpr_heap Pr tr_field h (Address a, NormalField fid_bpl t) = Some (val_rel_vpr_bpl (h (a, fid)))"
+  using assms  
+proof -
+  have 
+  "construct_bpl_heap_from_vpr_heap Pr tr_field h (Address a, NormalField fid_bpl t) =
+       Some (val_rel_vpr_bpl (h (a, (SOME fid_vpr. declared_fields Pr fid_vpr = Some t \<and> tr_field fid_vpr = Some fid_bpl)))) "
+    using assms
+    by auto
+
+  moreover have "(SOME fid_vpr. declared_fields Pr fid_vpr = Some t \<and> tr_field fid_vpr = Some fid_bpl) = fid"
+    using assms(2-)
+    by (metis (mono_tags, lifting) assms(1) domI inj_onD someI_ex)
+
+  ultimately show ?thesis
+    by blast
+qed
+
+lemma construct_bpl_heap_from_vpr_heap_aux_2:
+  assumes "construct_bpl_heap_from_vpr_heap Pr tr_field h (r, f) = Some v"
+  shows "\<exists>a t fid fid_bpl. r = Address a \<and> 
+                           declared_fields Pr fid = Some t \<and>
+                           tr_field fid = Some fid_bpl \<and>
+                           f = NormalField fid_bpl t \<and>                          
+                           v = (val_rel_vpr_bpl (h (a, fid)))"
+proof -
+  from assms obtain fid_bpl t where "f = NormalField fid_bpl t"
+    by (simp split: vb_field.split_asm)
+    
+  have  "(\<exists>loc_vpr. r = Address (fst loc_vpr) \<and>
+                                    declared_fields Pr (snd loc_vpr) = Some t \<and>                                
+                                    tr_field (snd loc_vpr) = Some fid_bpl)"
+    using assms
+    apply (simp add: \<open>f = _\<close>)
+    by (meson option.distinct(1))
+
+  from this obtain a fid_vpr where "r = Address a" and 
+                           *: "declared_fields Pr fid_vpr = Some t" and 
+                           **: "tr_field fid_vpr = Some fid_bpl"
+    by auto
+
+  hence
+  ***: "construct_bpl_heap_from_vpr_heap Pr tr_field h (Address a, f) =
+       Some (val_rel_vpr_bpl (h (a, (SOME fid_vpr. declared_fields Pr fid_vpr = Some t \<and> tr_field fid_vpr = Some fid_bpl)))) "
+    by (auto simp: \<open>f = _\<close>)  
+  
+  with * ** obtain fid_vpr2 where 
+    "declared_fields Pr fid_vpr2 = Some t" and 
+    "tr_field fid_vpr2 = Some fid_bpl" and
+    "fid_vpr2 = (SOME fid_vpr. declared_fields Pr fid_vpr = Some t \<and> tr_field fid_vpr = Some fid_bpl)"
+    
+    by (metis (mono_tags, lifting) someI2)
+
+  thus ?thesis
+    using \<open>r = _\<close> \<open>f = _\<close> *** assms
+    by force
+qed
 
 lemma construct_bpl_heap_from_vpr_heap_correct:
-  assumes "wf_ty_repr_bpl TyRep"
+  assumes WfTyRep: "wf_ty_repr_bpl TyRep" and
+          HeapWellTyVpr: "total_heap_well_typed Pr \<Delta> h" and
+          DomainType: "domain_type TyRep = \<Delta>" and
+          Inj: "inj_on tr_field (dom tr_field)"
   shows "\<exists>hb. heap_rel Pr tr_field h hb \<and>
               vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
-  sorry
+proof -
+  let ?hb = "construct_bpl_heap_from_vpr_heap Pr tr_field h"
 
+  have "heap_rel Pr tr_field h ?hb"
+    unfolding heap_rel_def
+  proof (rule allI | rule impI)+
+    fix l :: heap_loc
+    fix field_ty_vpr field_bpl
+    assume "declared_fields Pr (snd l) = Some field_ty_vpr" and
+           "tr_field (snd l) = Some field_bpl"
 
+    thus "?hb (Address (fst l), NormalField field_bpl field_ty_vpr) = Some (val_rel_vpr_bpl (h l))"
+      using construct_bpl_heap_from_vpr_heap_aux Inj
+      by (metis prod.collapse)
+  qed
+
+  moreover have "vbpl_absval_ty_opt TyRep (AHeap ?hb) = Some ((THeapId TyRep) ,[])"
+  proof (rule heap_bpl_well_typed)
+    fix r f v fieldKind \<tau>_bpl
+    assume "construct_bpl_heap_from_vpr_heap Pr tr_field h (r, f) = Some v" and
+           FieldTyFun: "field_ty_fun_opt TyRep f = Some (TFieldId TyRep, [fieldKind, \<tau>_bpl])"
+
+    from this obtain a \<tau>_vpr fid fid_bpl
+      where "r = Address a" and 
+            "tr_field fid = Some fid_bpl" and
+            "declared_fields Pr fid = Some \<tau>_vpr" and
+            "f = NormalField fid_bpl \<tau>_vpr" and
+            "v = val_rel_vpr_bpl (h (a, fid))"
+      using construct_bpl_heap_from_vpr_heap_aux_2
+      by blast
+
+    from \<open>f = _\<close> FieldTyFun have "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
+      by simp
+
+    moreover from HeapWellTyVpr \<open>declared_fields Pr fid = Some \<tau>_vpr\<close> have
+      "has_type \<Delta> \<tau>_vpr (h (a, fid))"
+      unfolding total_heap_well_typed_def
+      by simp
+
+    ultimately have "type_of_vbpl_val TyRep (val_rel_vpr_bpl (h (a, fid))) = \<tau>_bpl"
+      using vpr_to_bpl_val_type has_type_get_type DomainType
+      by blast
+      
+
+    thus "case v of 
+             LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = \<tau>_bpl
+           | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some \<tau>_bpl"
+      apply (subst \<open>v = _\<close>)
+      using type_of_val_not_dummy
+            vpr_to_bpl_ty_not_dummy[OF WfTyRep \<open>vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl\<close>] 
+      by blast
+  qed
+
+  ultimately show ?thesis
+    by blast
+qed
+         
 end

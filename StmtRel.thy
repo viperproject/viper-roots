@@ -534,7 +534,7 @@ lemma exhale_stmt_rel:
           \<comment>\<open>At the end of the exhale we require the Boogie program to reestablish the original relation on the 
              evaluation state\<close>
           Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
+          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
@@ -586,7 +586,7 @@ lemma exhale_stmt_rel_inst:
       "exhale_rel (state_rel Pr TyRep Tr' AuxPred' ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
       "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
+      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms
@@ -596,10 +596,12 @@ lemma exhale_stmt_rel_finish:
   assumes StateRel: "state_rel_def_same Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and
           CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
           WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          ProgramTotal: "Pr = program_total ctxt_vpr" and
+          DomainType:  "domain_type TyRep = absval_interp_total ctxt_vpr" and
           WellDefSame: "heap_var Tr = heap_var_def Tr \<and> mask_var Tr = mask_var_def Tr" and 
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
-          "\<omega>' \<in> exhale_state \<omega> (get_mh_total_full \<omega>)" and
+          "\<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>)" and
           "hvar = heap_var Tr" and
           "mvar = mask_var Tr" and
           LookupDeclExhaleHeap: "lookup_var_decl (var_context ctxt) hvar_exh = Some (TConSingle (THeapId TyRep), None)" and
@@ -629,10 +631,16 @@ proof -
     unfolding mask_var_rel_def 
     by blast
 
-  obtain hb' where *: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
-                   **: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
-    using WfTyRepr construct_bpl_heap_from_vpr_heap_correct by blast
+  from state_rel_field_rel[OF StateRel] 
+  have "inj_on (field_translation Tr) (dom (field_translation Tr))"
+    unfolding field_rel_def
+    by blast 
 
+  from this obtain hb' where *: "heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
+                   **: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
+    using  construct_bpl_heap_from_vpr_heap_correct[OF WfTyRepr exhale_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] DomainType]                
+    by blast
+                                          
   \<comment>\<open>We derive a heap which coincides with \<^term>\<open>hb'\<close> on the locations related to Viper locations
      and matches \<^term>\<open>hb\<close> on all other locations. This approach allows one to have strictly positive
      permissions at the Boogie level for locations that have no Viper counterpart. Alternatively,
@@ -641,13 +649,13 @@ proof -
      state relation). \<close>
 
   obtain hb'' where 
-            NewHeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>') hb''" and
+            NewHeapRel: "heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>') hb''" and
             NewHeapWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb'') = Some (THeapId TyRep, [])" and
             NewHeapProperty:
-                "\<forall> loc_bpl. loc_bpl \<notin> (vpr_heap_locations_bpl Pr (field_translation Tr) ) \<longrightarrow> 
+                "\<forall> loc_bpl. loc_bpl \<notin> (vpr_heap_locations_bpl (program_total ctxt_vpr) (field_translation Tr) ) \<longrightarrow> 
                                                      hb'' loc_bpl = hb loc_bpl"
     using heap_rel_stable_2_well_typed[OF * ** HeapVarWellTy]
-    by blast 
+    by blast    
 
   have IdOnKnownCond: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb'' (r, NormalField f t)"
   proof clarify
@@ -656,7 +664,7 @@ proof -
 
     show "hb (r, NormalField f t) = hb'' (r, NormalField f t)"
 
-     \<comment>\<open>Need to put the \<^typ>\<open>(ref \<times> 'a vb_field) set\<close> explicitly here, otherwise the proof does not work
+     \<comment>\<open>Need to put the type \<^typ>\<open>(ref \<times> 'a vb_field) set\<close> explicitly here, otherwise the proof does not work
        (most likely due to the type parameter).\<close>
     proof (cases "(r, NormalField f t) \<in> (vpr_heap_locations_bpl Pr (field_translation Tr)  :: (ref \<times> 'a vb_field) set)")
       case True
@@ -681,14 +689,14 @@ proof -
         by (smt (z3) mem_Collect_eq) (* SMT proof *)
 
       then show ?thesis 
-        using HeapRel NewHeapRel HeapLocProperties
+        using HeapRel NewHeapRel HeapLocProperties ProgramTotal
         unfolding heap_rel_def
-        by presburger
+        by simp
     next
       case False
       thus "hb (r, NormalField f t) = hb'' (r, NormalField f t)"
-        using NewHeapProperty
-        by presburger  
+        using NewHeapProperty ProgramTotal
+        by simp 
     qed
   qed
 
@@ -713,7 +721,16 @@ proof -
 
   have StateRel1: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ?ns1"
     using StateRel
-    sorry
+    apply (rule state_rel_independent_var)
+    using ExhaleHeapFresh
+       apply blast
+    using TypeInterp
+      apply simp
+    using LookupDeclExhaleHeap
+    unfolding lookup_var_decl_def lookup_var_ty_def
+     apply simp
+    using NewHeapWellTy TypeInterp
+    by auto  
 
   let ?ns2 = "update_var (var_context ctxt) ?ns1 hvar (AbsV (AHeap hb''))"
   have "red_ast_bpl P ctxt ((BigBlock name (Assign hvar (Var hvar_exh) # cs) str tr, cont), Normal ?ns1)
@@ -744,6 +761,7 @@ proof -
       by metis
   next
     show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) \<omega>' ?ns2"
+      using ProgramTotal
       unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
       by (fastforce intro: LookupHeapVarTy NewHeapWellTy NewHeapRel)      

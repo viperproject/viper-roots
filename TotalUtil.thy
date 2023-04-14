@@ -34,6 +34,9 @@ abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
 definition pred_eq
   where "pred_eq x v = (x = v)"
 
+lemma pred_eq_refl: "pred_eq a a"
+  by (simp add: pred_eq_def)
+
 lemma rev_iffD1_def: "P \<Longrightarrow> P \<equiv> Q \<Longrightarrow> Q"
   by blast
 

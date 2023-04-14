@@ -1422,6 +1422,31 @@ proof -
       by (simp add: \<open>type_interp ctxt = _\<close>)
   qed (insert StateRel0, unfold state_rel0_def, auto)
 qed
+
+lemma state_rel_independent_var:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+     AuxVarFresh: "aux_var \<notin> 
+                      ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)"  and   
+     TypeInterp:       "type_interp ctxt = vbpl_absval_ty TyRep" and
+     LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
+               "type_of_val (type_interp ctxt) aux_val = \<tau>"
+             shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+
+proof -
+  have StateRelUpd: "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> pred_eq aux_val)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"    
+    by (rule state_rel_new_auxvar[OF StateRel AuxVarFresh pred_eq_refl TypeInterp LookupTy])
+
+  from AuxVarFresh have "aux_var \<notin> dom AuxPred"
+    by blast
+  show ?thesis
+    apply (rule state_rel_aux_pred_remove[OF StateRelUpd])
+    using \<open>aux_var \<notin> dom AuxPred\<close>
+    by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
+qed 
                    
 lemma state_rel0_heap_update:
   assumes  
