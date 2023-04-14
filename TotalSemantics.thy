@@ -127,23 +127,39 @@ definition havoc_undef_locs :: "'a total_heap \<Rightarrow> mask \<Rightarrow> '
 text\<open>\<^term>\<open>havoc_undef_locs hh mh\<close> denotes the set of heaps that coincide with \<^term>\<open>hh\<close> w.r.t.
 the permission masks \<^term>\<open>mh\<close>.\<close>
 
-definition exhale_state :: "'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state set"
-  where "exhale_state \<omega> mh = 
+definition exhale_state :: "'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state set"
+  where "exhale_state ctxt \<omega> mh = 
     { update_hh_total_full \<omega> hh' | (\<omega>' :: 'a full_total_state) (hh' :: 'a total_heap). 
+                                   total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh' \<and>
                                    hh' \<in> havoc_undef_locs (get_hh_total_full \<omega>) mh}"
 
-lemma exhale_state_same_store: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
+lemma exhale_state_same_store: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
   unfolding exhale_state_def
   by force
 
-lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
+lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
   unfolding exhale_state_def
   by force
 
-lemma exhale_state_same_mask: "\<omega>' \<in> exhale_state \<omega> m \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
+lemma exhale_state_same_mask: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
   unfolding exhale_state_def
   using update_hh_total_full_m_eq  
   by blast
+
+lemma exhale_state_well_typed_heap: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> 
+                                    total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>')"  
+proof -
+  assume "\<omega>' \<in> exhale_state ctxt \<omega> m"
+
+  from this obtain hh' where "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'" and
+                            "\<omega>' = update_hh_total_full \<omega> hh'"
+    unfolding exhale_state_def
+    by blast
+
+  thus ?thesis
+    using update_hh_total_full_lookup_1
+    by metis
+qed
 
 inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where 
@@ -192,7 +208,7 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
       \<comment>\<open>Here, we havoc all locations that for which there is no direct permission. This is sound but 
         incomplete, because locations that are folded under a predicate need not be havoced. This should
         be revisited.\<close>
-      \<omega>' \<in> exhale_state \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
+      \<omega>' \<in> exhale_state ctxt \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
  | RedExhaleFailure:
    "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
