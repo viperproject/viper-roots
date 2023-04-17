@@ -466,13 +466,11 @@ proof (induction es arbitrary: vs)
     by (auto elim: red_pure_exp_total_elims)
 next
   case (Cons e es)
-  hence RedCons: "red_pure_exps_total ctxt R \<omega>_def (e # es) \<omega> (Some vs)" by simp
   from this obtain vs_hd vs_tail where 
      "vs = vs_hd # vs_tail" and
      "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val vs_hd" and
      "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs_tail)"
-    using RedExpList_case[OF RedCons] list.distinct(1) list.inject
-    by (smt (verit, best) map_option_eq_Some)
+     by (auto elim: red_exp_list_normal_elim)
   with Cons.IH show ?case
     by blast
 qed
