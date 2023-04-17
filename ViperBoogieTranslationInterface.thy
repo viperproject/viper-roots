@@ -237,6 +237,7 @@ fun fun_repr_concrete :: fun_repr_bpl
   | "fun_repr_concrete FUpdateMask = ''updMask''"
   | "fun_repr_concrete FGoodState = ''state''"
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
+  | "fun_repr_concrete FIdenticalOnKnownLocs = ''IdenticalOnKnownLocations''"
 
 method ctxt_wf_fun_tac for f :: fun_enum_bpl = (unfold ctxt_wf_def, erule allE[where ?x=f], simp)
 
