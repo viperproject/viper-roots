@@ -1,5 +1,5 @@
 theory StmtRelML
-imports Boogie_Lang.HelperML ExprWfRelML StmtRel InhaleRelML ViperBoogieHelperML
+imports Boogie_Lang.HelperML ExprWfRelML StmtRel InhaleRelML ExhaleRelML ViperBoogieHelperML
 begin
 
 ML \<open>
@@ -98,6 +98,8 @@ ML \<open>
        exp_rel_info * (* receiver *)
        exp_rel_info   (* rhs *)
   | InhaleHint of (atomic_inhale_rel_hint inhale_rel_hint)
+  | ExhaleHint of (atomic_exhale_rel_hint exhale_rel_complete_hint)
+
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)
@@ -193,6 +195,8 @@ ML \<open>
      | InhaleHint inh_rel_hint => 
         (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
+     | ExhaleHint _ =>
+        error "exhale not supported"
     )
 \<close>
 
