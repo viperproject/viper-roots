@@ -224,7 +224,7 @@ qed
 
 lemma disjoint_list_add:
   assumes Disj: "disjoint_list (xs@(M#ys))" and
-          Fresh: "\<forall>A \<in> set (xs@(M#ys)). m \<notin> A" \<comment>\<open>Can weaken this s.t. m can be included in M\<close>
+          Fresh: "\<forall>A \<in> set (xs@ys). m \<notin> A"
         shows "disjoint_list (xs@((M \<union> {m})#ys))"
   unfolding disjoint_list_def
 proof (rule allI | rule impI)+
