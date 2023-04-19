@@ -110,6 +110,8 @@ proof -
     by (fastforce intro!: red_ast_bpl_one_step_empty_simple_cmd RedSkip)
 qed 
 
+subsection \<open>Reducing Boogie programs while preserving a property\<close>
+
 lemma red_ast_bpl_propagate_rel:
   assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and
           "R1 \<omega> ns1" and
@@ -127,6 +129,14 @@ lemma red_ast_bpl_propagate_same_rel:
   using assms
   unfolding red_ast_bpl_def
   by auto
+
+\<comment>\<open>TODO: Should use a definition for \<^term>\<open>\<exists>ns1. red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1) \<and> Q1 ns1\<close>\<close>
+
+lemma red_ast_bpl_propagate_transitive:
+  assumes "\<exists>ns1. red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1) \<and> Q1 ns1" and
+          "\<And>ns1. Q1 ns1 \<Longrightarrow> \<exists>ns2. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2) \<and> Q2 ns2"
+        shows "\<exists>ns2. red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> Q2 ns2"
+  using assms red_ast_bpl_transitive by blast
 
 subsection \<open>Single step lemmas for concrete simple commands\<close>
 
