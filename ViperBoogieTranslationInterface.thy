@@ -324,4 +324,26 @@ lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<le
   using const_repr_basic_bound
   by fastforce  
 
+subsubsection \<open> \<^const>\<open>const_repr_basic\<close> helper lemmas \<close>
+
+lemma lookup_no_perm_const: 
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 3 = Some (boogie_const_val CNoPerm)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemma lookup_write_perm_const: 
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 4 = Some (boogie_const_val CWritePerm)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemma lookup_null_const:
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 0 = Some (boogie_const_val CNull)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemma lookup_zero_mask_const: 
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 1 = Some (boogie_const_val CZeroMask)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
 end
