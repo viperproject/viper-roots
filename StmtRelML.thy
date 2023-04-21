@@ -22,15 +22,16 @@ ML \<open>
        ('a stmt_rel_hint)   (* els branch *)
   | NoHint (* used for debugging purposes *)      
 
-  type ('a,'i) atomic_rel_tac = (Proof.context -> 'i inhale_rel_info ->  basic_stmt_rel_info -> 'a -> int -> tactic)
+  type ('a, 'i, 'e) atomic_rel_tac = (Proof.context -> 'i inhale_rel_info -> 'e exhale_rel_info ->  basic_stmt_rel_info -> 'a -> int -> tactic)
 
-  type ('a, 'i) stmt_rel_info = {
+  type ('a, 'i, 'e) stmt_rel_info = {
     basic_stmt_rel_info: basic_stmt_rel_info,
-    atomic_rel_tac: ('a,'i) atomic_rel_tac,
-    inhale_rel_info: 'i inhale_rel_info
+    atomic_rel_tac: ('a, 'i, 'e) atomic_rel_tac,
+    inhale_rel_info: 'i inhale_rel_info,
+    exhale_rel_info: 'e exhale_rel_info
   }
 
- fun stmt_rel_tac ctxt (info: ('a, 'i) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
+ fun stmt_rel_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
        SeqnHint [] => resolve_tac ctxt [@{thm stmt_rel_skip}]
     |  SeqnHint [_] => error "SeqnHint with single node appears"
@@ -38,21 +39,21 @@ ML \<open>
     | _ => stmt_rel_single_stmt_tac ctxt info stmt_rel_hint
 and
      stmt_rel_tac_seq _ _ [] = K all_tac
-   | stmt_rel_tac_seq ctxt (info: ('a, 'i) stmt_rel_info) [h] =
+   | stmt_rel_tac_seq ctxt (info: ('a, 'i, 'e) stmt_rel_info) [h] =
        stmt_rel_tac ctxt info h
-   | stmt_rel_tac_seq ctxt (info: ('a, 'i) stmt_rel_info) (h1 :: h2 :: hs) = 
+   | stmt_rel_tac_seq ctxt (info: ('a, 'i, 'e) stmt_rel_info) (h1 :: h2 :: hs) = 
        resolve_tac ctxt [@{thm stmt_rel_seq_same_rel}] THEN'
        stmt_rel_tac ctxt info h1 THEN'
        stmt_rel_tac_seq ctxt info (h2 :: hs)
 and 
      stmt_rel_single_stmt_tac _ _ NoHint = K all_tac
-   | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i) stmt_rel_info) hint_hd =
+   | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) hint_hd =
     (* Each statement associated with a hint is translated by the actual encoding followed by 
        \<open>assume state(Heap, Mask)\<close>. This is why we apply a propagation rule first. *)
     resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}] THEN'
     (
       case hint_hd of
-        AtomicHint a => (#atomic_rel_tac info) ctxt (#inhale_rel_info info) (#basic_stmt_rel_info info) a
+        AtomicHint a => (#atomic_rel_tac info) ctxt (#inhale_rel_info info) (#exhale_rel_info info) (#basic_stmt_rel_info info) a
       | IfHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
            (Rmsg' "If0" (resolve_tac ctxt [@{thm stmt_rel_if}]) ctxt) THEN'
            (
@@ -82,7 +83,7 @@ and
       | _ => error "unsupported hint in stmt_rel_single_stmt_tac"
     ) THEN'
     (* now reduce \<open>assume state(Heap, Mask)\<close> *)
-    progress_assume_good_state_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))
+    (Rmsg' "Progress Good State" (progress_assume_good_state_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ctxt)
 \<close>
 
 ML \<open>
@@ -159,9 +160,7 @@ ML \<open>
      (Rmsg' "WfWriteableField7 (exp rel rcv)" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField8" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField9 (single field rel)" ((#field_rel_single_tac basic_stmt_rel_info) ctxt) ctxt) THEN'
-     (Rmsg' "WfWriteableField10" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt)
-
-     
+     (Rmsg' "WfWriteableField10" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt)     
 
   fun field_assign_rel_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) atomic_hint =
     (case atomic_hint of 
@@ -187,7 +186,41 @@ ML \<open>
     | _ => error "field assign rel tac only handles field assignment"
     )
 
-  fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
+  fun exhale_revert_state_relation ctxt (basic_info: basic_stmt_rel_info) =
+    revcut_tac @{thm state_rel_set_def_to_eval} THEN'
+    (assm_full_simp_solved_tac ctxt) THEN'
+    (resolve_tac ctxt @{thms exI}) THEN'
+    (resolve_tac ctxt @{thms conjI}) THEN'
+    (resolve_tac ctxt @{thms red_ast_bpl_refl}) THEN'
+    (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt)
+                                                                                   
+  fun exhale_finish_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
+    let val basic_info = #basic_info info
+        val tr_thm = #tr_def_thm basic_info in
+      (Rmsg' "exhale finish 1" (resolve_tac ctxt @{thms exhale_stmt_rel_finish}) ctxt) THEN'
+      (Rmsg' "exhale finish StateRel"  (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish CtxtWf"  (resolve_tac ctxt [#ctxt_wf_thm basic_info]) ctxt) THEN'
+      (Rmsg' "exhale finish WfTyRepr"  (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
+      (Rmsg' "exhale finish ProgramTotal" (resolve_tac ctxt [@{thm HOL.sym} OF [#vpr_program_ctxt_eq_thm basic_info]]) ctxt) THEN'
+      (Rmsg' "exhale finish DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish WellDefSame" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish ElemExhaleState" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def}, #lookup_decl_exhale_heap hint] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish ExhaleHeapFresh" (#aux_var_disj_tac basic_info ctxt) ctxt)
+
+    end
+
+  fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
+    setup_well_def_state_tac (#basic_info info) (#lookup_ty_mask_def_thm hint) (#lookup_ty_heap_def_thm hint) ctxt THEN'
+    exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
+    (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
+    exhale_finish_tac ctxt info hint
+
+  fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
         AssignHint (exp_wf_rel_info, exp_rel_info, lookup_bpl_target_thm) => 
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
@@ -195,8 +228,10 @@ ML \<open>
      | InhaleHint inh_rel_hint => 
         (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
-     | ExhaleHint _ =>
-        error "exhale not supported"
+     | ExhaleHint exh_complete_hint =>
+        (Rmsg' "AtomicExh1" (resolve_tac ctxt @{thms exhale_stmt_rel_inst}) ctxt) THEN'
+      (*  setup_well_def_state_tac basic_info (#lookup_ty_mask_def_thm exh_complete_hint) (#lookup_ty_heap_def_thm exh_complete_hint) ctxt THEN'*)
+        (exhale_rel_tac ctxt exhale_info exh_complete_hint)
     )
 \<close>
 

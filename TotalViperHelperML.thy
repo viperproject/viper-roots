@@ -1,5 +1,5 @@
 theory TotalViperHelperML
-imports Main
+imports Boogie_Lang.HelperML
 begin
 
 ML \<open>
@@ -21,6 +21,8 @@ fun apply_tacs_seq [] = K (all_tac)
 (* This basically applies the cut rule \<lbrakk>P; P \<Longrightarrow> Q\<rbrakk> \<Longrightarrow> Q. It has the same effect as
    cut_tac, except that one must first prove P (while in cut_tac one must first prove P \<Longrightarrow> Q) *)
 fun revcut_tac rule i = resolve0_tac [revcut_rl] i THEN resolve0_tac [rule] i
+
+fun force_tac_with_simps ctxt thms = Clasimp.force_tac (add_simps thms ctxt)
 
 \<close>
 

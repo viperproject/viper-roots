@@ -492,6 +492,9 @@ qed
 
 subsection \<open>Introducing new Boogie variables for the well-definedness state\<close>
 
+text \<open>The premises of the following lemma should be in-sync with the analogous lemma that updates the heap.
+      If they are not in-sync, then need to change the corresponding tactics.\<close>
+
 lemma mask_def_var_upd_red_ast_bpl_propagate:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           LookupTyNewVar: "lookup_var_ty (var_context ctxt) mvar_def' = Some (TConSingle (TMaskId TyRep))" and
@@ -548,6 +551,9 @@ proof -
   with Red show ?thesis
     by fast
 qed
+
+text \<open>The premises of the following lemma should be in-sync with the analogous lemma that updates the mask.
+      If they are not in-sync, then need to change the corresponding tactics.\<close>
 
 lemma heap_def_var_upd_red_ast_bpl_propagate:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and

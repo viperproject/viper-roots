@@ -301,7 +301,7 @@ proof -
 qed
 
 text \<open>This is the same lemma as above but expressed in a way such that the conclusion can be matched 
-      directly in more cases and where the receiver requirement are phrased in terms of the expression relation
+      directly in more cases and where the receiver requirement is phrased in terms of the expression relation
       judgment.\<close>
 lemma exp_rel_perm_access_2:
   assumes 
@@ -312,7 +312,7 @@ lemma exp_rel_perm_access_2:
              "mvar = mask_var Tr" and
              "f_ty_bpl = TConSingle (TNormalFieldId TyRep)" and
        RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl" and
-             "e_bpl = (mask_read_bpl (expr.Var mvar) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl])"
+             "e_bpl = mask_read_bpl (expr.Var mvar) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl]"
      shows "red_expr_bpl ctxt e_bpl 
                               ns 
                               (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"

@@ -1,11 +1,10 @@
 theory CPGHelperML
-  imports ViperBoogieBasicRel Boogie_Lang.HelperML
+  imports ViperBoogieRelUtil TotalViperHelperML ExpRelML  "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools"
 begin
 
 ML \<open>
 
-(* Maybe move this? *)
-fun force_tac ctxt thms = Clasimp.force_tac (add_simps thms ctxt)
+val Rmsg' = run_and_print_if_fail_2_tac' 
 
 fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
 
@@ -58,7 +57,7 @@ fun unfold_bigblock_in_goal_aux ctxt (t,i) =
   
 
 (* The following tactic unfolds in certain contexts the currently active bigblock or the next 
-bigblock if the currently active bigblock is empty.
+bigblock if the currently active bigblock is empty.?aux_var
 The goal is to make sure that after this tactic the (bigblock, continuation) configuration is in 
 a form where bigblock is unfolded and not empty. The nonemptiness guarantee relies on the assumption
  that an empty bigblock is not succeeded by another empty bigblock. *)
@@ -79,11 +78,16 @@ fun progress_tac ctxt =
     resolve_tac ctxt [@{thm red_ast_bpl_refl}]) THEN'
    assm_full_simp_solved_tac ctxt
 
+(* unfolds the active big block (as described above) for a rel_general goal *)
+fun unfold_bigblock_in_rel_general ctxt =
+  (resolve_tac ctxt @{thms rel_propagate_pre_2} THEN' progress_tac ctxt)
+
 (* general information for tactics *)
   (* TODO rename *)
   type basic_stmt_rel_info = {
       ctxt_wf_thm: thm,
       tr_def_thm: thm,
+      vpr_program_ctxt_eq_thm: thm,
       var_rel_tac: (Proof.context -> int -> tactic),
       var_context_vpr_tac: (Proof.context -> int -> tactic),
       field_rel_single_tac : (Proof.context -> int -> tactic),
@@ -101,7 +105,7 @@ fun progress_tac ctxt =
 fun prove_red_expr_bpl_tac ctxt =
   FIRST_AND_THEN' 
     [
-   (* we first check whether we can solve the goal directly via an assumption. If we do
+   (* We first check whether we can solve the goal directly via an assumption. If we do
       not do this first, then certain assumptions might not apply later and as a result the tactic
       could fail *)
       assume_tac ctxt, 
@@ -120,15 +124,83 @@ fun prove_red_expr_bpl_tac ctxt =
         (
           (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e1 *) THEN' 
           (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e2 *) THEN'
-          (force_tac ctxt [] |> SOLVED')           (* binop_eval *)
+          (force_tac_with_simps ctxt [] |> SOLVED')           (* binop_eval *)
         ),
      fn i => fn st =>
        (i,st) |->
        (
           (prove_red_expr_bpl_tac ctxt |> SOLVED') (* e *) THEN' 
-          (force_tac ctxt [] |> SOLVED')           (* unop_eval *)
+          (force_tac_with_simps ctxt [] |> SOLVED')           (* unop_eval *)
        )
     ]
+
+fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm errorMsgPrefix ctxt =
+  (Rmsg' (errorMsgPrefix^"DefVar2") (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar3") (assm_full_simp_solved_with_thms_tac [lookup_ty_new_var_thm, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar4") (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
+  (Rmsg' (errorMsgPrefix^"DefVarAuxVarDisj") ((#aux_var_disj_tac basic_stmt_rel_info) ctxt) ctxt)
+
+fun upd_mask_def_var_tac (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm ctxt =
+  (Rmsg' "UpdMaskDefVar1" (resolve_tac ctxt @{thms mask_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
+  (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdMask" ctxt)
+
+fun upd_heap_def_var_tac (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm ctxt =
+  (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms heap_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
+  (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdHeap" ctxt)
+
+fun setup_well_def_state_tac (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_mask_var_thm lookup_ty_heap_var_thm ctxt =
+  (Rmsg' "SetupDefState" (resolve_tac ctxt @{thms red_ast_bpl_propagate_transitive}) ctxt) THEN'
+  (upd_mask_def_var_tac basic_stmt_rel_info lookup_ty_mask_var_thm ctxt) THEN'
+  (upd_heap_def_var_tac basic_stmt_rel_info lookup_ty_heap_var_thm ctxt)
+
+(* tactic for introducing temporary perm variable *)
+fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm eval_vpr_perm_tac =
+  (Rmsg' "store perm 1" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
+  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+  (Rmsg' "store perm eval vpr perm" (eval_vpr_perm_tac ctxt) ctxt) THEN'
+  (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
+  (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
+  (Rmsg' "store perm lookup" (assm_full_simp_solved_with_thms_tac [lookup_aux_var_ty_thm] ctxt) ctxt) THEN'
+  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt)
+
+\<close>
+
+ML \<open>
+
+(* tactics for introducing facts into goals *)
+
+fun intro_fact_lookup_no_perm_const_tac ctxt tr_def_thm = 
+  revcut_tac @{thm lookup_no_perm_const[OF state_rel_boogie_const_rel_2]} THEN'
+  fastforce_tac ctxt [] THEN'
+  assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
+
+fun intro_fact_lookup_null_const_tac ctxt tr_def_thm = 
+  revcut_tac @{thm lookup_null_const[OF state_rel_boogie_const_rel_2]} THEN'
+  fastforce_tac ctxt [] THEN'
+  assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
+
+(* lookup_aux_var_thm should already instantiate the auxiliary variable *)
+fun intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_thm = 
+  revcut_tac lookup_aux_var_thm THEN'
+  fastforce_tac ctxt [] THEN'    
+  assm_full_simp_solved_tac ctxt
+
+(* the Viper field name must be instantiated in exp_rel_perm_access_thm *)
+fun intro_fact_mask_lookup_reduction ctxt (info: basic_stmt_rel_info) exp_rel_info exp_rel_perm_access_thm vpr_rcv_red_tac =
+  (Rmsg' "intro mask lookup red 1" (revcut_tac exp_rel_perm_access_thm) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 2" (resolve_tac ctxt @{thms mask_read_wf_concrete} THEN'
+                                    resolve_tac ctxt [#ctxt_wf_thm info])
+                                      ctxt) THEN'
+  (Rmsg' "intro mask lookup red 4" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 5" (blast_tac ctxt) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 6" (vpr_rcv_red_tac ctxt |> SOLVED') ctxt) THEN'
+  (Rmsg' "intro mask lookup red 7" ((#field_rel_single_tac info) ctxt |> SOLVED') ctxt) THEN'
+  (Rmsg' "intro mask lookup red 8" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 9" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 10" (exp_rel_tac exp_rel_info ctxt) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 11" (assm_full_simp_solved_with_thms_tac @{thms read_mask_concrete_def} ctxt) ctxt)
+
 \<close>
 
 
