@@ -1369,7 +1369,6 @@ lemma state_rel_store_update_2:
   assumes 
          StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
-          WdEq: "wd_mask_var = mask_var Tr" and
          VarCtxt: "\<Lambda> = var_context ctxt" and
          VarTr: "var_translation Tr x_vpr = Some x_bpl" and
          "v' = val_rel_vpr_bpl v" and
@@ -1377,7 +1376,7 @@ lemma state_rel_store_update_2:
               "type_of_val (type_interp ctxt) v' = ty"
        shows "state_rel Pr TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"  
   apply (rule state_rel_store_update[OF StateRel])
-       apply (simp add: WdEq)
+       apply simp
          apply (simp add: VarCtxt)
          apply (simp add: WellDefSame)
         apply simp

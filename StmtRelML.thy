@@ -104,10 +104,10 @@ ML \<open>
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)
-    (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple}]) ctxt) THEN'
-    (Rmsg' "Assign2" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-    (Rmsg' "Assign3" ((#var_context_vpr_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
-    (Rmsg' "Assign3b" (simp_only_tac [#type_interp_econtext basic_stmt_rel_info] ctxt THEN'
+    (Rmsg' "Assign 1" (resolve_tac ctxt [@{thm assign_rel_simple}]) ctxt) THEN'
+    (Rmsg' "Assign R_def" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign VprTy" ((#var_context_vpr_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
+    (Rmsg' "Assign TyRelWf" (simp_only_tac [#type_interp_econtext basic_stmt_rel_info] ctxt THEN'
                         resolve_tac ctxt @{thms type_interp_rel_wf_vbpl_basic}) ctxt) THEN'
     
     (* well-def RHS *)
@@ -117,22 +117,22 @@ ML \<open>
     (Rmsg' "Assign5" (progress_tac ctxt) ctxt) THEN'
     (* end *)
     
-    (Rmsg' "Assign6" (assm_full_simp_solved_with_thms_tac [lookup_bpl_target_thm] ctxt) ctxt) THEN'
-    (Rmsg' "Assign7" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN' 
+    (Rmsg' "Assign Ty LHS" (assm_full_simp_solved_with_thms_tac [lookup_bpl_target_thm] ctxt) ctxt) THEN'
+    (Rmsg' "Assign TyRel" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN' 
     
     (* prove updated Viper and Boogie states are still in relation *)
     (* begin *)
-    (Rmsg' "Assign8" (resolve_tac ctxt [@{thm state_rel_store_update_2}]) ctxt) THEN'
-    (Rmsg' "Assign9" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-    (Rmsg' "Assign10" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-    (Rmsg' "Assign11" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-    (Rmsg' "Assign12" ( (#var_rel_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
-    (Rmsg' "Assign13" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-    (Rmsg' "Assign14" (assm_full_simp_solved_with_thms_tac [lookup_bpl_target_thm] ctxt) ctxt) THEN'
-    (Rmsg' "Assign15" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign RAssign (state rel store update)" (resolve_tac ctxt [@{thm state_rel_store_update_2}]) ctxt) THEN'
+    (Rmsg' "Assign StateRel (state rel store update)" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign WellDefSame  (state rel store update)" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign VarCtxt  (state rel store update)" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign VarTr  (state rel store update)" ( (#var_rel_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
+    (Rmsg' "Assign ValRelVprBpl  (state rel store update)" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+    (Rmsg' "Assign TyBpl (state rel store update)" (assm_full_simp_solved_with_thms_tac [lookup_bpl_target_thm] ctxt) ctxt) THEN'
+    (Rmsg' "Assign TypeOfVal (state rel store update)" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
     (* end *)
         
-    (Rmsg' "Assign16" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+    (Rmsg' "Assign Rhs Rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
 
 
   fun field_rel_single_inst_tac field_rel_tac field_lookup_tac ctxt =
