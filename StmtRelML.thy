@@ -165,23 +165,23 @@ ML \<open>
   fun field_assign_rel_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) atomic_hint =
     (case atomic_hint of 
        FieldAssignHint (rcv_wf_rel_info, rhs_wf_rel_info, rcv_exp_rel_info, rhs_exp_rel_info) =>
-       (Rmsg' "FieldAssign1" (resolve_tac ctxt [@{thm field_assign_rel_inst[OF wf_ty_repr_basic]}]) ctxt) THEN'
-       (Rmsg' "FieldAssign2" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign3" (simp_tac_with_thms [#tr_def_thm basic_stmt_rel_info] ctxt THEN'
-                              resolve_tac ctxt [@{thm heap_update_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]])
-                               ctxt) THEN'
-       (Rmsg' "FieldAssign4" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign5" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign6" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign 1" (resolve_tac ctxt [@{thm field_assign_rel_inst[OF wf_ty_repr_basic]}]) ctxt) THEN'
+       (Rmsg' "FieldAssign RStateRel" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapVarDefSame" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapUpdWf" (resolve_tac ctxt [@{thm heap_update_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]])
+                                         ctxt) THEN'
+       (Rmsg' "FieldAssign DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign TypeInterp" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign Rext" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
        (* TODO: need to use wf_rel_extend *)
        (Rmsg' "FieldAssign7 (Wf Rcv)" (exp_wf_rel_non_trivial_tac rcv_wf_rel_info rcv_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign8 (Wf Rhs)" (exp_wf_rel_non_trivial_tac rhs_wf_rel_info rhs_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign9 (Wf Writeable Field)" (wf_writeable_field_rel_tac rcv_exp_rel_info basic_stmt_rel_info ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign10" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign11" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info, @{thm update_heap_concrete_def}, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign12 (Exp Rel Rcv)" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign13 (single field rel)" ((#field_rel_single_tac basic_stmt_rel_info) ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign14 (Exp Rel Rhs)" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt)
+       (Rmsg' "FieldAssign HeapVar" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapUpdateBpl" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info, @{thm update_heap_concrete_def}, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign Exp Rel Rcv" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign FieldRel" ((#field_rel_single_tac basic_stmt_rel_info) ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign Exp Rel Rhs" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt)
 
     | _ => error "field assign rel tac only handles field assignment"
     )

@@ -272,7 +272,7 @@ subsection \<open>Field assignment relation\<close>
 
 lemma field_assign_rel:
   assumes 
-    HeapUpdWf: "heap_update_wf TyRep ctxt (heap_update Tr)" and
+    HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
     Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"  and
@@ -282,7 +282,7 @@ lemma field_assign_rel:
                  \<gamma>2 
                  ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
                    "h_bpl = heap_var Tr" and
-    HeapUpdateBpl: "h_upd_bpl = heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
+    HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
     RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
     FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     RhsRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rhs_vpr rhs_bpl" and
@@ -369,7 +369,7 @@ proof (rule stmt_rel_intro)
 
    from HeapUpdWf have 
       RedHeapUpdBpl:
-     "red_expr_bpl ctxt (heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])
+     "red_expr_bpl ctxt (heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])
                              ns3 (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))"
      apply (rule heap_update_wf_apply)
      using  \<open>h_bpl = _\<close> Semantics.RedVar[OF LookupHeapVarBpl]
@@ -448,7 +448,7 @@ lemma field_assign_rel_inst:
     WfTyRep: "wf_ty_repr_bpl TyRep" and
     RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns" and
     HeapVarDefSame: "heap_var_def Tr = heap_var Tr" and
-    HeapUpdWf: "heap_update_wf TyRep ctxt (heap_update Tr)" and
+    HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
     Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"  and
@@ -459,7 +459,7 @@ lemma field_assign_rel_inst:
                  ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
                    "h_bpl = heap_var Tr" and
 (*    HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))" and *)
-    HeapUpdateBpl: "h_upd_bpl = heap_update Tr (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
+    HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
     RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
     FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     RhsRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rhs_vpr rhs_bpl"
