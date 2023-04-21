@@ -73,12 +73,13 @@ ML \<open>
        exp_rel_info *
        thm (* auxiliary variable lookup var ty theorem *)
 
+  (*TODO: generalize such that it captures a more general version *)
   fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm =
     (Rmsg' "store perm 1" (eresolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
     (Rmsg' "store perm eval perm" (blast_tac ctxt) ctxt) THEN'
     (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
     (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
-    (Rmsg' "InhField lookup" (assm_full_simp_solved_with_thms_tac [lookup_aux_var_ty_thm] ctxt) ctxt) THEN'
+    (Rmsg' "store perm lookup" (assm_full_simp_solved_with_thms_tac [lookup_aux_var_ty_thm] ctxt) ctxt) THEN'
     (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt)
 
   fun non_null_rcv_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
@@ -93,6 +94,7 @@ ML \<open>
     (Rmsg' "inh field acc upd 1" (assume_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd aux var disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd wf ty repr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
+    (Rmsg' "inh field acc upd def mask and eval mask same" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd ty interp eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc mask update wf concrete" (resolve_tac ctxt [ @{thm mask_update_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
     (Rmsg' "inh field acc mask read wf concrete" (resolve_tac ctxt [ @{thm mask_read_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
