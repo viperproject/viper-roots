@@ -12,12 +12,18 @@ session TotalViper = Viper +
     TotalUtil
     ViperBoogieAbsValueInst
     ViperBoogieBasicRel
+	ViperBoogieFunctionInst
+	ViperBoogieTranslationInterface
+	ViperBoogieRelUtil
+	TotalViperHelperML
 	CPGHelperML
     ExpRel
     ExpRelML
     ExprWfRel
     ExprWfRelML
-    ExpProofGenTest
+    StmtRel
+	InhaleRelML
+	ExhaleRelML
 	StmtRelML
 	
 	
