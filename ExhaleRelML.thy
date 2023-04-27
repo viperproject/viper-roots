@@ -15,8 +15,7 @@ ML \<open>
   | NoExhHint (* used for debugging purposes *)
 
   type 'a exhale_rel_complete_hint = {
-     lookup_ty_mask_def_thm: thm,
-     lookup_ty_heap_def_thm: thm,
+     setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
      lookup_decl_exhale_heap: thm,
      exhale_rel_hint: 'a exhale_rel_hint 
   }

@@ -215,7 +215,7 @@ ML \<open>
     end
 
   fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
-    setup_well_def_state_tac (#basic_info info) (#lookup_ty_mask_def_thm hint) (#lookup_ty_heap_def_thm hint) ctxt THEN'
+    (#setup_well_def_state_tac hint) (#basic_info info) ctxt THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
     exhale_finish_tac ctxt info hint
