@@ -32,6 +32,92 @@ definition values_respect_fdecl
            list_all closed ts \<and> 
            map (type_of_val A) vs = map (instantiate ts) (fst (snd fdecl))"
 
+text \<open>The following function transforms a Boogie function f into a function that only reduces to f 
+if the input types are correct w.r.t. the function declaration. This function enables defining f to 
+just guarantee a correct return type if the argument types are correct and then lifts f to a function
+that satisfies all the required typing constraints.\<close>
+
+definition lift_fun_bpl :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> fdecl_ty_bpl \<Rightarrow> 'a sem_fun_bpl \<Rightarrow> 'a sem_fun_bpl"
+  where
+    "lift_fun_bpl A fdecl f ts vs = 
+       (if (length ts = fst fdecl \<and> 
+           list_all closed ts \<and> 
+           map (type_of_val A) vs = map (instantiate ts) (fst (snd fdecl)))
+       then 
+           f ts vs
+       else
+           None)"
+
+lemma lift_fun_decl_well_typed:
+  assumes "fdecl = (n_ty_params, args_ty, ret_ty)" and
+          "length ts = n_ty_params" and
+          "list_all closed ts" and
+          "map (type_of_val A) vs = map (instantiate ts) args_ty" and
+          "f ts vs = res"
+        shows "lift_fun_bpl A fdecl f ts vs = res"
+  using assms
+  by (simp add: lift_fun_bpl_def)
+
+lemma lift_fun_decl_fun_interp_single_wf_1:
+  assumes "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f"
+  shows "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty)  (lift_fun_bpl A (n_ty_params, args_ty, ret_ty) f)"
+  using assms
+  by (simp add: lift_fun_decl_well_typed)
+
+lemma lift_fun_decl_fun_interp_single_wf_2:
+  assumes "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f"
+  shows "fun_interp_single_wf_2 A (n_ty_params, args_ty, ret_ty) (lift_fun_bpl A (n_ty_params, args_ty, ret_ty) f)"
+  using assms
+  apply (unfold lift_fun_bpl_def)
+  apply simp
+  using map_eq_imp_length_eq 
+  by fastforce
+
+lemma fun_interp_single_wf_intro:
+  assumes "\<And> ts vs. length ts = n_ty_params \<Longrightarrow> 
+                     list_all closed ts \<Longrightarrow>
+                     length vs = length args_ty \<Longrightarrow>
+                     map (type_of_val A) vs = (map (instantiate ts) args_ty) \<Longrightarrow>
+                     \<exists>v. f ts vs = Some v \<and> type_of_val A v = instantiate ts ret_ty"
+shows "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f "
+  using assms
+  by simp
+
+
+subsection \<open>Inversion lemmas\<close>
+
+term wf_ty_repr
+
+lemma test:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (THeapId TyRep, [])" and
+          Inj: "inj (tcon_id_repr TyRep)" and
+          DomainTConIdDisj: "(fst ` (ran (domain_translation TyRep))) \<inter> range (tcon_id_repr TyRep) = {}"
+  shows "\<exists>h. v = AHeap h"
+  using assms(1)
+  apply (rule vbpl_absval_ty_opt.elims)
+         apply auto
+        apply (metis Inj injD tcon_enum.distinct)+
+  using field_ty_fun_opt_tcon Inj
+       apply (metis field_ty_fun_two_params list.distinct(1))
+  using DomainTConIdDisj
+      apply (metis (no_types, lifting) disjoint_iff_not_equal fst_conv image_eqI ranI range_eqI)
+     apply (metis Inj injD tcon_enum.distinct)
+    apply (metis Inj injD tcon_enum.distinct)
+   apply (metis Inj injD tcon_enum.distinct)
+
+  sledgehammer
+
+
+
+
+
+
+lemma heap_value:
+  assumes  "(type_of_val (vbpl_absval_ty TyRep)) v = TConSingle (THeapId T)"
+  shows "\<exists>h. v = AbsV (AHeap h)"
+  using assms
+  oops
+
 subsection \<open>Good state assumption\<close>
 
 abbreviation good_state_decl :: "'a ty_repr_bpl \<Rightarrow> fdecl_ty_bpl"
@@ -58,6 +144,22 @@ lemma good_state_Some_true:
   apply simp
   apply (rule exI[where ?x="\<omega>"])
   by simp
+
+lemma good_state_fun_interp_single_wf:
+  shows "fun_interp_single_wf (vbpl_absval_ty TyRep) (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool)) (good_state Pr F)"
+proof (rule fun_interp_single_wf_intro)
+  fix ts vs
+  assume "length ts = 0" and 
+         "list_all closed ts" and
+         "length vs = length [TConSingle (THeapId T), TConSingle (TMaskId T)]" and
+         "map (type_of_val (vbpl_absval_ty TyRep)) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TMaskId T)]"
+
+  hence "ts = []"
+    by blast
+
+
+
+
 
 subsection \<open>Functions for polymorphic map instantiations\<close>
 
@@ -202,32 +304,6 @@ fun identical_on_known_locs ::  "'a sem_fun_bpl"
 
 subsection \<open>Global function map\<close>
 
-text \<open>Transforms a Boogie function f into a function that only reduces to f if the input types are 
-correct w.r.t. the function declaration. This function enables defining f to just guarantee
-a correct return type if the argument types are correct and then lifts f to a function that satisfies
-all the required typing constraints.\<close>
-
-definition lift_fun_bpl :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> fdecl_ty_bpl \<Rightarrow> 'a sem_fun_bpl \<Rightarrow> 'a sem_fun_bpl"
-  where
-    "lift_fun_bpl A fdecl f ts vs = 
-       (if (length ts = fst fdecl \<and> 
-           list_all closed ts \<and> 
-           map (type_of_val A) vs = map (instantiate ts) (fst (snd fdecl)))
-       then 
-           f ts vs
-       else
-           None)"
-
-lemma lift_fun_decl_well_typed:
-  assumes "fdecl = (n_ty_params, args_ty, ret_ty)" and
-          "length ts = n_ty_params" and
-          "list_all closed ts" and
-          "map (type_of_val A) vs = map (instantiate ts) args_ty" and
-          "f ts vs = res"
-        shows "lift_fun_bpl A fdecl f ts vs = res"
-  using assms
-  by (simp add: lift_fun_bpl_def)
-
 text \<open>TODO: this is currently not modular. Ideally, different modules would define these interpretations
 independently. Could achieve this by separating different functions.\<close>
 
@@ -255,11 +331,36 @@ fun fun_interp_vpr_bpl :: " ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Rig
     "fun_interp_vpr_bpl Pr T F fid = 
           (let (f,fdecl) = fun_interp_vpr_bpl_aux Pr T F fid in lift_fun_bpl (vbpl_absval_ty T) fdecl f)"
 
+fun fun_interp_vpr_bpl_concrete :: "ViperLang.program \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (fun_enum_bpl \<Rightarrow> fname) \<Rightarrow> ('a vbpl_absval) fun_interp"
+  where "fun_interp_vpr_bpl_concrete Pr T FieldMap FunMap fun_name = 
+         (if (\<exists>fid. FunMap fid = fun_name) then
+           Some (fun_interp_vpr_bpl Pr T FieldMap (SOME fid. FunMap fid = fun_name))
+         else
+           None)"
+
 definition fun_interp_vpr_bpl_wf :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (fun_enum_bpl \<Rightarrow> fname) \<Rightarrow>
                                       ('a vbpl_absval) fun_interp \<Rightarrow> bool"
   where 
    "fun_interp_vpr_bpl_wf Pr T FieldMap FunMap \<Gamma> = 
          (\<forall>fid. \<Gamma> (FunMap fid) = Some (fun_interp_vpr_bpl Pr T FieldMap fid))"
+
+lemma fun_interp_vpr_bpl_concrete_wf:
+  assumes "inj FunMap"
+  shows "fun_interp_vpr_bpl_wf Pr T FieldMap FunMap (fun_interp_vpr_bpl_concrete Pr T FieldMap FunMap)"
+  unfolding fun_interp_vpr_bpl_wf_def
+proof (rule allI)
+  fix fid
+
+  have "\<exists>fid'. FunMap fid' = FunMap fid"
+    by blast
+
+  moreover have "fid = (SOME fid'. FunMap fid' = FunMap fid)"
+    using \<open>inj FunMap\<close>
+    by (metis inv_def inv_f_f)
+
+  thus "fun_interp_vpr_bpl_concrete Pr T FieldMap FunMap (FunMap fid) = Some (fun_interp_vpr_bpl Pr T FieldMap fid)"
+    by auto
+qed
 
 definition ctxt_wf :: "ViperLang.program \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (fun_enum_bpl \<Rightarrow> fname) \<Rightarrow> 'a econtext_bpl \<Rightarrow>  bool"
   where "ctxt_wf Pr T FieldMap FunMap ctxt \<equiv> fun_interp_vpr_bpl_wf Pr T FieldMap FunMap (fun_interp ctxt)"

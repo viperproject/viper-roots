@@ -88,15 +88,17 @@ record 'a ty_repr_bpl =
   tcon_id_repr :: "tcon_enum \<Rightarrow> tcon_id"
   pred_snap_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
   pred_knownfolded_field_type :: "predicate_ident \<rightharpoonup> bpl_ty"
-  domain_translation :: "abs_type \<rightharpoonup> tcon_id \<times> ty list" \<comment>\<open>we assume domains without type parameters\<close>
+  domain_translation :: "abs_type \<rightharpoonup> tcon_id" \<comment>\<open>we assume domains without type parameters\<close>
   domain_type :: "'a \<Rightarrow> abs_type"
 
 definition wf_ty_repr_bpl :: "'a ty_repr_bpl \<Rightarrow> bool"
   where "wf_ty_repr_bpl T \<equiv>
-               (\<forall> vt bt. domain_translation T vt = Some bt \<longrightarrow> list_all closed (snd bt)) \<and>
+           \<comment>\<open>    (\<forall> vt bt. domain_translation T vt = Some bt \<longrightarrow> list_all closed (snd bt)) \<and>\<close>
                (\<forall> pid bt. pred_snap_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
                (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
-               finite (dom (domain_translation T))" 
+               finite (dom (domain_translation T)) \<and>
+               inj (tcon_id_repr T) \<and>
+               ((ran (domain_translation T))) \<inter> range (tcon_id_repr T) = {}" 
 
 text\<open>\<^const>\<open>wf_ty_repr_bpl\<close> requires there to be only finitely many domains. One reason for this 
 restriction is that not all type constructors are selected (we need to be able to pick a fresh
@@ -115,23 +117,23 @@ abbreviation "TNormalFieldId T \<equiv> (tcon_id_repr T) TCNormalField"
 text \<open>For the dummy type, we just pick some identifier that is different from all the ones used by 
       the translation\<close>
 definition TDummyId :: "'a ty_repr_bpl \<Rightarrow> tcon_id"
-  where "TDummyId T \<equiv> SOME v. v \<notin> (range (tcon_id_repr T) \<union> (range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))))"
+  where "TDummyId T \<equiv> SOME v. v \<notin> (range (tcon_id_repr T) \<union> (range (tcon_id_repr T) \<union> ((ran (domain_translation T)))))"
 
 lemma tdummyid_fresh:
   assumes "wf_ty_repr_bpl T"
-  shows "TDummyId T \<notin> range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))"
+  shows "TDummyId T \<notin> range (tcon_id_repr T) \<union> ((ran (domain_translation T)))"
 proof -
 
   have "finite (range (tcon_id_repr T))"
     using tcon_enum_univ_finite
     by blast
 
-  moreover have "finite (fst ` (ran (domain_translation T)))"
+  moreover have "finite ((ran (domain_translation T)))"
     using assms Map.finite_ran Finite_Set.finite_imageI
     unfolding wf_ty_repr_bpl_def
-    by blast
+    by fast
     
-  ultimately have "\<exists>v. v \<notin> range (tcon_id_repr T) \<union> (fst ` (ran (domain_translation T)))"
+  ultimately have "\<exists>v. v \<notin> range (tcon_id_repr T) \<union> ((ran (domain_translation T)))"
     by (meson ex_new_if_finite finite_UnI infinite_UNIV_listI)    
   thus ?thesis
     unfolding TDummyId_def
@@ -157,7 +159,7 @@ fun vpr_to_bpl_ty :: "'a ty_repr_bpl \<Rightarrow> vpr_ty \<rightharpoonup> bpl_
   | "vpr_to_bpl_ty T ViperLang.TBool = Some (Lang.TPrim Lang.TBool)"  
   | "vpr_to_bpl_ty T ViperLang.TPerm = Some (Lang.TPrim Lang.TReal)"
   | "vpr_to_bpl_ty T ViperLang.TRef = Some (TConSingle (TRefId T))"
-  | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon (fst tc) (snd tc)) (domain_translation T t)"
+  | "vpr_to_bpl_ty T (ViperLang.TAbs t) = map_option (\<lambda>tc. TCon tc []) (domain_translation T t)"
 
 lemma vpr_to_bpl_ty_closed:
           "wf_ty_repr_bpl T \<Longrightarrow>
@@ -186,9 +188,9 @@ proof (cases ty)
 next
   fix t_args t
   assume "ty = TAbs t"
-  from this obtain tid_dom t_args_dom where 
-    "domain_translation T t = Some (tid_dom, t_args_dom)" and
-    "ty_bpl = TCon tid_dom t_args_dom"
+  from this obtain tid_dom where 
+    "domain_translation T t = Some tid_dom" and
+    "ty_bpl = TCon tid_dom []"
     using assms
     by auto
   thus "ty_bpl \<noteq> TCon (TDummyId T) t_args"
@@ -242,15 +244,27 @@ an inhabitant that is not a dummy value.\<close>
 
 definition is_inhabited :: "'a ty_repr_bpl \<Rightarrow> tcon_id \<Rightarrow> nat \<Rightarrow> bool"
   where 
-    "is_inhabited T tid n = 
+    "is_inhabited T tid n \<equiv>
       (\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
-         (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res)"
+         (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res) \<or>
+      (\<exists> a. (domain_translation T \<circ> domain_type T) a = Some tid \<and> n = 0)"
 
+
+lemma is_inhabited_elim:
+  assumes "is_inhabited T tid n" and
+          "(\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
+         (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res) \<Longrightarrow> P" and
+         "(\<exists> (a :: 'a). (domain_translation T \<circ> domain_type T) a = Some tid \<and> n = 0) \<Longrightarrow> P"
+       shows P
+  using assms
+  unfolding is_inhabited_def
+  by argo
+  
 function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
   where 
    "vbpl_absval_ty_opt T (ARef r) = Some (TRefId T, [])"
  | "vbpl_absval_ty_opt T (AField vb_field) = (field_ty_fun_opt T vb_field)"
- | "vbpl_absval_ty_opt T (ADomainVal v) = domain_translation T (domain_type T v)"
+ | "vbpl_absval_ty_opt T (ADomainVal v) = map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T v))"
  | "vbpl_absval_ty_opt T (AHeap h) = 
       Some_if 
           (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
@@ -332,12 +346,37 @@ proof (cases tc_enum)
     by (metis (mono_tags, lifting) field_ty_fun_opt.simps(4) list.pred_inject(2) vbpl_absval_ty_opt.simps(2))
 qed (insert assms, auto)
 
+(*
+declare [[show_types]]
+declare [[show_sorts]]
+declare [[show_consts]]
+*)
+
 theorem is_inhabited_correct:
   assumes Inh:"is_inhabited T tid n" and "n = length ts" and "list_all closed ts"
   shows "\<exists>v. vbpl_absval_ty_opt T v = Some (tid, ts)"
-  using assms ty_inhabitant_well_typed
-  unfolding is_inhabited_def
-  by (metis prod.exhaust_sel)
+proof (rule is_inhabited_elim[OF Inh])
+
+  assume "\<exists>tc_enum res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). tcon_id_repr T tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res"
+  thus "\<exists>v. vbpl_absval_ty_opt T v = Some (tid, ts)"
+    using ty_inhabitant_well_typed assms
+    by fastforce
+next      
+  assume "\<exists>(a::'a). (domain_translation T \<circ> domain_type T) a = Some tid \<and> n = 0"
+  from this obtain a where 
+     *: "(domain_translation T \<circ> domain_type T) a = Some tid" and 
+     "n = 0"
+    by blast
+
+  hence "ts = []" using \<open>n = length ts\<close>
+    by simp
+
+  show "\<exists>v. vbpl_absval_ty_opt T v = Some (tid, ts)"
+    apply (rule exI[where ?x="ADomainVal a"])
+    apply simp
+    using \<open>ts = _\<close> *
+    by simp
+qed
 
 abbreviation type_of_vbpl_val :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
   where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
@@ -371,13 +410,46 @@ next
   next
     case False
     show ?thesis
-      apply  (rule exI[where ?x="AbsV (ADummy tid ts)"])
+      apply (rule exI[where ?x="AbsV (ADummy tid ts)"])
       using False \<open>closed t\<close> TCon
       by auto
   qed
 qed
 
 subsection \<open>Helper definitions and lemmas\<close>
+
+lemma field_ty_fun_two_params:
+  assumes "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
+  obtains t1 t2
+  where "ty_args = [t1, t2]"
+  apply (insert assms)
+  apply (cases f)
+     apply fastforce+
+  apply simp
+  by (metis Pair_inject option.distinct(1) option.inject)
+
+lemma field_ty_fun_opt_num_args:
+     "field_ty_fun_opt T f = Some res \<Longrightarrow> length (snd res) = 2"
+  apply (erule field_ty_fun_opt.elims)
+     apply (simp_all add: map_option_case split: option.split_asm split: if_split_asm)
+  done
+
+lemma field_ty_fun_opt_closed_args: 
+  assumes "wf_ty_repr_bpl TyRep" and
+          "field_ty_fun_opt TyRep f = Some res"
+  shows  "list_all closed (snd res)"
+  apply (rule field_ty_fun_opt.elims[OF assms(2)])
+  using assms(1) wf_ty_repr_bpl_def
+       apply (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)
+   apply blast+
+  done
+
+lemma field_ty_fun_opt_tcon:
+  assumes "field_ty_fun_opt TyRep f = Some res"
+  shows "fst res = TFieldId TyRep"
+  using assms
+  by (rule field_ty_fun_opt.elims)
+     (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)     
 
 definition heap_bpl_upd_normal_field :: "'a heap_repr \<Rightarrow> ref \<Rightarrow> vname \<Rightarrow> vtyp \<Rightarrow> 'a vbpl_val \<Rightarrow> 'a heap_repr"
   where "heap_bpl_upd_normal_field h r f vpr_ty v \<equiv> h((r, NormalField f vpr_ty) \<mapsto> v)"
@@ -437,5 +509,6 @@ next
     using \<open>t = _\<close> \<open>v = _\<close>
     by auto
 qed
+
 
 end

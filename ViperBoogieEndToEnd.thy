@@ -2,9 +2,11 @@ theory ViperBoogieEndToEnd
 imports StmtRel
 begin
 
-definition stmt_correct_total_2 where
+definition stmt_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> (nat \<Rightarrow> vtyp option) \<Rightarrow> stmt \<Rightarrow> bool" where
   "stmt_correct_total_2 ctxt R \<Lambda> s \<equiv>
-        \<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
+        \<forall>(\<omega> :: 'a full_total_state) r. 
+                  is_empty_total \<omega> \<longrightarrow> 
+                  total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
                   red_stmt_total ctxt R \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure"
 
 lemma proc_is_correct_elim:
@@ -36,8 +38,8 @@ lemma valid_configuration_not_failure:
 type_synonym ('a,'m) proc_body_satisfies_spec_ty = 
    "'a absval_ty_fun \<Rightarrow> 'm proc_context \<Rightarrow> var_context \<Rightarrow> 'a fun_interp \<Rightarrow> rtype_env \<Rightarrow> expr list \<Rightarrow> expr list \<Rightarrow> ast \<Rightarrow> 'a nstate \<Rightarrow> bool"
 
-abbreviation state_rel_initial where 
-  "state_rel_initial ctxt Pr TyRep Tr AuxPred w ns \<equiv> 
+abbreviation state_rel_well_def_same where 
+  "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred w ns \<equiv> 
        state_rel Pr TyRep Tr AuxPred ctxt w w ns"
 
 abbreviation red_bigblock_multi where
@@ -207,20 +209,22 @@ lemma proc_body_satisfies_spec_valid_config:
   by blast
 
 lemma end_to_end_stmt_rel:
-  assumes ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
-
-          \<comment>\<open>Viper encoding does not use Boogie procedure preconditions\<close>
-          ProcPresEmpty: "proc_pres proc_bpl = []" and
+  assumes 
           \<comment>\<open>The Boogie procedure is correct.\<close>             
              \<comment>\<open>Note that we need to explicitly provide the type for term\<open>A\<close> to 
                 be able to instantiate A with \<^term>\<open>vbpl_absval_ty TyRep\<close>\<close>
-          Boogie_correct: "\<And>A :: ('a vbpl_absval) absval_ty_fun. proc_is_correct A fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
+          Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and
+
+          ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
+
+          \<comment>\<open>Viper encoding does not use Boogie procedure preconditions\<close>
+          ProcPresEmpty: "proc_pres proc_bpl = []" and
 
           \<comment>\<open>Viper and Boogie statement are related\<close>
           StmtRel: "stmt_rel 
              \<comment>\<open>input relation\<close>
-             (state_rel_empty (state_rel_initial ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
+             (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
              \<comment>\<open>output relation is irrelevant\<close>
              R' 
              ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
@@ -229,16 +233,17 @@ lemma end_to_end_stmt_rel:
              (convert_ast_to_program_point proc_body_bpl)
              \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
              \<gamma>'"  and 
-    TypeInterpEq: "type_interp ctxt = (vbpl_absval_ty TyRep)" and
+    TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
 \<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
      WfTyRep: "wf_ty_repr_bpl TyRep" and
      FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)" and
      InitialStateRel: "\<And> \<omega>. is_empty_total \<omega> \<Longrightarrow> 
+                       total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
-                           (state_rel_empty (state_rel_initial ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
+                           (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars) \<and>
                            state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl)) \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
@@ -247,25 +252,26 @@ lemma end_to_end_stmt_rel:
   unfolding stmt_correct_total_2_def
 proof (rule allI | rule impI)+
   fix \<omega> r 
-  assume "is_empty_total \<omega>" and RedStmtVpr:"red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> r"
+  assume "is_empty_total \<omega>" and 
+         HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
+         RedStmtVpr:"red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> r"
   
   let ?abs="vbpl_absval_ty TyRep"
 
-  note Boogie_correct_inst=Boogie_correct[where ?A="?abs"]
+  note Boogie_correct_inst=Boogie_correct
 
   obtain ns ls gs where 
     "ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>" and
   StmtRelInitialInst: 
-    "state_rel_empty (state_rel_initial ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
+    "state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
   GlobalsWf:
     "state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars)" and
   LocalsWf:
     "state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl))" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-    using InitialStateRel[OF \<open>is_empty_total \<omega>\<close>]
+    using InitialStateRel[OF \<open>is_empty_total \<omega>\<close> HeapWellTy]
     by blast
-    
   
   have ProcBodyBplCorrect:
       "(Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty)) ?abs [] (constants@global_vars, (proc_args proc_bpl)@(locals_bpl@(proc_rets proc_bpl))) (fun_interp ctxt) [] 

@@ -18,22 +18,6 @@ definition read_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Right
 definition update_mask_concrete :: "fun_repr_bpl \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr"
   where "update_mask_concrete F m rcv f p ts \<equiv> FunExp (F FUpdateMask) ts [m, rcv, f, p]"
 
-lemma field_ty_fun_two_params:
-  assumes "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
-  obtains t1 t2
-  where "ty_args = [t1, t2]"
-  apply (insert assms)
-  apply (cases f)
-     apply fastforce+
-  apply simp
-  by (metis Pair_inject option.distinct(1) option.inject)
-
-lemma field_ty_fun_opt_num_args:
-     "field_ty_fun_opt T f = Some res \<Longrightarrow> length (snd res) = 2"
-  apply (erule field_ty_fun_opt.elims)
-     apply (simp_all add: map_option_case split: option.split_asm split: if_split_asm)
-  done
-
 lemma vpr_to_bpl_ty_closed:
   assumes   "wf_ty_repr_bpl TyRep" and
             "vpr_to_bpl_ty TyRep vty = Some t" 
@@ -41,24 +25,7 @@ lemma vpr_to_bpl_ty_closed:
   apply (rule vpr_to_bpl_ty.elims[OF assms(2)])
   using assms(1)
   unfolding wf_ty_repr_bpl_def
-  by (auto simp: map_option_case split:option.split_asm)  
-
-lemma field_ty_fun_opt_closed_args: 
-  assumes "wf_ty_repr_bpl TyRep" and
-          "field_ty_fun_opt TyRep f = Some res"
-  shows  "list_all closed (snd res)"
-  apply (rule field_ty_fun_opt.elims[OF assms(2)])
-  using assms(1) wf_ty_repr_bpl_def
-       apply (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)
-   apply blast+
-  done
-
-lemma field_ty_fun_opt_tcon:
-  assumes "field_ty_fun_opt TyRep f = Some res"
-  shows "fst res = TFieldId TyRep"
-  using assms
-  by (rule field_ty_fun_opt.elims)
-     (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)     
+  by (auto simp: map_option_case split:option.split_asm) 
 
 lemma instantiate_nil_id: "instantiate [] = id"
   by auto
@@ -237,7 +204,12 @@ fun fun_repr_concrete :: fun_repr_bpl
   | "fun_repr_concrete FUpdateMask = ''updMask''"
   | "fun_repr_concrete FGoodState = ''state''"
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
-  | "fun_repr_concrete FIdenticalOnKnownLocs = ''IdenticalOnKnownLocations''"
+  | "fun_repr_concrete FIdenticalOnKnownLocs = ''IdenticalOnKnownLocations''"  
+
+(* potentially useful to prove injectivity:
+lemma "card {''readHeap'', ''updHeap'', ''readMask'', ''updMask'', ''state'', ''HasDirectPerm'', ''IdenticalOnKnownLocations''} = 7"
+  by simp
+*)
 
 method ctxt_wf_fun_tac for f :: fun_enum_bpl = (unfold ctxt_wf_def, erule allE[where ?x=f], simp)
 
