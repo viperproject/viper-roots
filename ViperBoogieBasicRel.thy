@@ -2377,9 +2377,9 @@ proof (rule allI | rule impI)+
   proof (cases v)
     case (VAbs a)
     from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d" and "ty_bpl = TCon (fst d) (snd d)"
+    with ** obtain tid where "domain_translation Trep (A_vpr a) = Some tid" and "ty_bpl = TCon tid []"
       by fastforce
-    hence "vbpl_absval_ty Trep (ADomainVal a) = d" using \<open>A_vpr = domain_type Trep\<close>
+    hence "vbpl_absval_ty Trep (ADomainVal a) = (tid, [])" using \<open>A_vpr = domain_type Trep\<close>
       by simp
     hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
       by simp

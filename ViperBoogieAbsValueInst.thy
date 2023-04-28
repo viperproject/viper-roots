@@ -98,7 +98,25 @@ definition wf_ty_repr_bpl :: "'a ty_repr_bpl \<Rightarrow> bool"
                (\<forall> pid bt. pred_knownfolded_field_type T pid = Some bt \<longrightarrow> closed bt) \<and>
                finite (dom (domain_translation T)) \<and>
                inj (tcon_id_repr T) \<and>
-               ((ran (domain_translation T))) \<inter> range (tcon_id_repr T) = {}" 
+               ran (domain_translation T) \<inter> range (tcon_id_repr T) = {}"
+
+lemma wf_ty_repr_bpl_finite_dom_tr:
+  assumes "wf_ty_repr_bpl T"
+  shows "finite (dom (domain_translation T))"
+  using assms
+  by (simp add: wf_ty_repr_bpl_def)
+
+lemma wf_ty_repr_bpl_inj_tcon_id_repr:
+  assumes "wf_ty_repr_bpl T"
+  shows "inj (tcon_id_repr T)"
+  using assms
+  by (simp add: wf_ty_repr_bpl_def)
+
+lemma wf_ty_repr_bpl_domain_tr_disj:
+  assumes "wf_ty_repr_bpl T"
+  shows "ran (domain_translation T) \<inter> range (tcon_id_repr T) = {}"
+  using assms
+  by (simp add: wf_ty_repr_bpl_def)
 
 text\<open>\<^const>\<open>wf_ty_repr_bpl\<close> requires there to be only finitely many domains. One reason for this 
 restriction is that not all type constructors are selected (we need to be able to pick a fresh
@@ -195,7 +213,7 @@ next
     by auto
   thus "ty_bpl \<noteq> TCon (TDummyId T) t_args"
     using tdummyid_fresh[OF assms(1)]
-    by (metis UnI2 fst_eqD imageI ranI ty.inject(3))
+    by (metis UnI2 imageI ranI ty.inject(3))
 qed (auto)
 
 fun field_ty_fun_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"
@@ -249,7 +267,6 @@ definition is_inhabited :: "'a ty_repr_bpl \<Rightarrow> tcon_id \<Rightarrow> n
          (tcon_id_repr T) tc_enum = tid \<and> ty_inhabitant tc_enum = Some res \<and> n = fst res) \<or>
       (\<exists> a. (domain_translation T \<circ> domain_type T) a = Some tid \<and> n = 0)"
 
-
 lemma is_inhabited_elim:
   assumes "is_inhabited T tid n" and
           "(\<exists> tc_enum :: tcon_enum. \<exists> res :: (nat \<times> (Lang.ty list \<Rightarrow> 'a vbpl_absval)). 
@@ -259,7 +276,16 @@ lemma is_inhabited_elim:
   using assms
   unfolding is_inhabited_def
   by argo
-  
+
+lemma is_inhabited_tcon_enum:
+  assumes "tcon_id_repr (T :: 'a ty_repr_bpl) tc_enum = tid" and
+          "ty_inhabitant tc_enum = Some (res :: nat \<times> (ty list \<Rightarrow> 'a vbpl_absval))" and
+          "n = fst res"
+        shows "is_inhabited T tid n"
+  using assms
+  unfolding is_inhabited_def
+  by blast
+                                                                        
 function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
   where 
    "vbpl_absval_ty_opt T (ARef r) = Some (TRefId T, [])"
@@ -345,12 +371,6 @@ proof (cases tc_enum)
     using Closed TCField
     by (metis (mono_tags, lifting) field_ty_fun_opt.simps(4) list.pred_inject(2) vbpl_absval_ty_opt.simps(2))
 qed (insert assms, auto)
-
-(*
-declare [[show_types]]
-declare [[show_sorts]]
-declare [[show_consts]]
-*)
 
 theorem is_inhabited_correct:
   assumes Inh:"is_inhabited T tid n" and "n = length ts" and "list_all closed ts"
@@ -510,5 +530,206 @@ next
     by auto
 qed
 
+subsection \<open>Inversion lemmas\<close>
 
+lemma general_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          TyOfVal: "type_of_vbpl_val TyRep v = TCon tid ts" and
+          AbsValTyOpt:  "vbpl_absval_ty_opt TyRep (the_absv v) = Some (tid, ts) \<Longrightarrow>
+                      \<exists>a. the_absv v = f a" and
+          "tid \<in> range (tcon_id_repr TyRep)"
+        shows "\<exists>a. v = AbsV (f a)"
+proof -
+  have *: "TCon tid ts \<noteq> TConSingle (TDummyId TyRep)"
+    using tdummyid_fresh[OF WfTyRepr] \<open>tid \<in> _\<close>
+    by (metis UnI1 ty.inject(3))
+  
+  from type_of_val_not_dummy[OF TyOfVal *] obtain a
+    where 
+      "v = AbsV a" and
+      "vbpl_absval_ty_opt TyRep a = Some (tid, ts)"
+    by (simp split: val.split_asm)
+
+  thus ?thesis
+    using AbsValTyOpt WfTyRepr
+    unfolding wf_ty_repr_bpl_def    
+    by auto
+qed
+
+lemma tcon_id_repr_domain_tr_disj:
+  assumes WfTyRepr: "wf_ty_repr_bpl T" and
+          "tid \<in> range (tcon_id_repr T)"
+  shows "Some (tid, ts :: bpl_ty list) \<noteq> map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T v))"
+        (is "_ \<noteq> ?rhs")
+proof (cases ?rhs)
+  case None
+  then show ?thesis by simp
+next
+  case (Some a)
+  then show ?thesis 
+    using wf_ty_repr_bpl_domain_tr_disj[OF WfTyRepr] ranI \<open>tid \<in> _\<close>
+    by fastforce          
+qed
+
+lemma tcon_id_repr_dummy_disj:
+  assumes  "tcon_id_repr (T :: 'a ty_repr_bpl) tc_enum = tid" and
+           "ty_inhabitant tc_enum = Some (res :: nat \<times> (ty list \<Rightarrow> 'a vbpl_absval))" and
+           "length ts = fst res"
+  shows "Some (tid, ts :: bpl_ty list) \<noteq>  Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+        (is "_ \<noteq> ?rhs")
+proof (cases ?rhs)
+  case None
+  then show ?thesis by simp
+next
+  case (Some a)
+    hence "\<not> is_inhabited T tid (length ts) \<and> list_all closed ts"
+      by (metis option.discI)  
+    moreover have  "is_inhabited T tid (length ts)"
+      using assms
+    by (auto intro!: is_inhabited_tcon_enum)
+    ultimately show ?thesis       
+    by simp
+qed
+
+subsubsection \<open>Heap\<close>
+
+lemma heap_inversion_vbpl_absval_ty_opt:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (THeapId TyRep, [])" and
+         WfTyRepr: "wf_ty_repr_bpl TyRep"
+  shows "\<exists>h. v = AHeap h"
+  using assms(1)
+proof (rule vbpl_absval_ty_opt.elims)
+  fix T a
+  assume "TyRep = T" and "v = ADomainVal a"
+
+  let ?domainType = "map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T a))"
+  assume *: "Some (THeapId TyRep, []) = ?domainType"
+
+  thus "\<exists>h. v = AHeap h"
+    using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
+next
+  fix T f
+  assume "TyRep = T" and 
+         "v = AField f" and 
+         "Some (THeapId TyRep, []) = field_ty_fun_opt T f"
+
+  thus "\<exists>h. v = AHeap h"
+    using field_ty_fun_two_params
+    by (metis list.discI)
+next
+  fix T tid ts
+  assume "TyRep = T" and
+         *: "Some (THeapId TyRep, []) = Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+         (is "_ = ?rhs")
+
+  have Inhabited: "is_inhabited TyRep (THeapId TyRep) 0"
+    by (auto intro!: is_inhabited_tcon_enum)
+
+  thus "\<exists>h. v = AHeap h"
+    by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
+qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
+                                                          
+lemma heap_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          HeapTy: "type_of_vbpl_val TyRep v = TCon (THeapId TyRep) []"
+        shows "\<exists>h. v = AbsV (AHeap h)"
+  apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr HeapTy])
+  using heap_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
+  by blast+
+
+subsubsection \<open>Mask\<close>
+
+lemma mask_inversion_vbpl_absval_ty_opt:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (TMaskId TyRep, [])" and
+         WfTyRepr: "wf_ty_repr_bpl TyRep"
+       shows "\<exists>m. v = AMask m"
+  using assms(1)
+proof (rule vbpl_absval_ty_opt.elims)
+  fix T a
+  assume "TyRep = T" and "v = ADomainVal a"
+
+  let ?domainType = "map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T a))"
+  assume *: "Some (TMaskId TyRep, []) = ?domainType"
+
+  thus "\<exists>m. v = AMask m"
+    using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
+next
+  fix T f
+  assume "TyRep = T" and 
+         "v = AField f" and 
+         "Some (TMaskId TyRep, []) = field_ty_fun_opt T f"
+
+  thus "\<exists>m. v = AMask m"
+    using field_ty_fun_two_params
+    by (metis list.discI)
+next
+  fix T tid ts
+  assume "TyRep = T" and
+         *: "Some (TMaskId TyRep, []) = Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+         (is "_ = ?rhs")
+
+  have Inhabited: "is_inhabited TyRep (TMaskId TyRep) 0"
+    by (auto intro!: is_inhabited_tcon_enum)
+
+  thus "\<exists>h. v = AMask h"
+    by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
+qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
+
+lemma mask_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          MaskTy: "type_of_vbpl_val TyRep v = TCon (TMaskId TyRep) []"
+        shows "\<exists>m. v = AbsV (AMask m)"
+  apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr MaskTy])
+  using mask_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
+  by blast+
+
+subsubsection \<open>Ref\<close>
+
+lemma ref_inversion_vbpl_absval_ty_opt:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (TRefId TyRep, [])" and
+         WfTyRepr: "wf_ty_repr_bpl TyRep"
+       shows "\<exists>r. v = ARef r"
+  using assms(1)
+proof (rule vbpl_absval_ty_opt.elims)
+  fix T a
+  assume "TyRep = T" and "v = ADomainVal a"
+
+  let ?domainType = "map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T a))"
+  assume *: "Some (TRefId TyRep, []) = ?domainType"
+
+  thus "\<exists>r. v = ARef r"
+    using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
+next
+  fix T f
+  assume "TyRep = T" and 
+         "v = AField f" and 
+         "Some (TRefId TyRep, []) = field_ty_fun_opt T f"
+
+  thus "\<exists>r. v = ARef r"
+    using field_ty_fun_two_params
+    by (metis list.discI)
+next
+  fix T tid ts
+  assume "TyRep = T" and
+         *: "Some (TRefId TyRep, []) = Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+         (is "_ = ?rhs")
+
+  have Inhabited: "is_inhabited TyRep (TRefId TyRep) 0"
+    by (auto intro!: is_inhabited_tcon_enum)
+
+  thus "\<exists>r. v = ARef r"
+    by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
+qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
+
+lemma ref_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          RefTy: "type_of_vbpl_val TyRep v = TCon (TRefId TyRep) []"
+        shows "\<exists>r. v = AbsV (ARef r)"
+  apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr RefTy])
+  using ref_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
+  by blast+
+    
 end

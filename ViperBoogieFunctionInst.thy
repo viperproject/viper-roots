@@ -83,41 +83,6 @@ shows "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f "
   using assms
   by simp
 
-
-subsection \<open>Inversion lemmas\<close>
-
-term wf_ty_repr
-
-lemma test:
-  assumes "vbpl_absval_ty_opt TyRep v = Some (THeapId TyRep, [])" and
-          Inj: "inj (tcon_id_repr TyRep)" and
-          DomainTConIdDisj: "(fst ` (ran (domain_translation TyRep))) \<inter> range (tcon_id_repr TyRep) = {}"
-  shows "\<exists>h. v = AHeap h"
-  using assms(1)
-  apply (rule vbpl_absval_ty_opt.elims)
-         apply auto
-        apply (metis Inj injD tcon_enum.distinct)+
-  using field_ty_fun_opt_tcon Inj
-       apply (metis field_ty_fun_two_params list.distinct(1))
-  using DomainTConIdDisj
-      apply (metis (no_types, lifting) disjoint_iff_not_equal fst_conv image_eqI ranI range_eqI)
-     apply (metis Inj injD tcon_enum.distinct)
-    apply (metis Inj injD tcon_enum.distinct)
-   apply (metis Inj injD tcon_enum.distinct)
-
-  sledgehammer
-
-
-
-
-
-
-lemma heap_value:
-  assumes  "(type_of_val (vbpl_absval_ty TyRep)) v = TConSingle (THeapId T)"
-  shows "\<exists>h. v = AbsV (AHeap h)"
-  using assms
-  oops
-
 subsection \<open>Good state assumption\<close>
 
 abbreviation good_state_decl :: "'a ty_repr_bpl \<Rightarrow> fdecl_ty_bpl"
@@ -154,8 +119,7 @@ proof (rule fun_interp_single_wf_intro)
          "length vs = length [TConSingle (THeapId T), TConSingle (TMaskId T)]" and
          "map (type_of_val (vbpl_absval_ty TyRep)) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TMaskId T)]"
 
-  hence "ts = []"
-    by blast
+  hence "ts = []" by blast
 
 
 
