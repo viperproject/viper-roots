@@ -451,7 +451,7 @@ lemma field_ty_fun_two_params:
 lemma field_ty_fun_opt_num_args:
      "field_ty_fun_opt T f = Some res \<Longrightarrow> length (snd res) = 2"
   apply (erule field_ty_fun_opt.elims)
-     apply (simp_all add: map_option_case split: option.split_asm split: if_split_asm)
+     apply (simp_all add: map_option_case split: option.split_asm if_split_asm)
   done
 
 lemma field_ty_fun_opt_closed_args: 
@@ -460,7 +460,7 @@ lemma field_ty_fun_opt_closed_args:
   shows  "list_all closed (snd res)"
   apply (rule field_ty_fun_opt.elims[OF assms(2)])
   using assms(1) wf_ty_repr_bpl_def
-       apply (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)
+       apply (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm if_split_asm)
    apply blast+
   done
 
@@ -731,5 +731,63 @@ lemma ref_inversion_type_of_vbpl_val:
   apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr RefTy])
   using ref_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
   by blast+
+
+subsubsection \<open>Field\<close>
+
+lemma field_inversion_vbpl_absval_ty_opt:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (TFieldId TyRep, ts)" and
+          "length ts = 2" and
+         WfTyRepr: "wf_ty_repr_bpl TyRep"
+       shows "\<exists>f. v = AField f"
+  using assms(1)
+proof (rule vbpl_absval_ty_opt.elims)
+  fix T a
+  assume "TyRep = T" and "v = ADomainVal a"
+
+  let ?domainType = "map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T a))"
+  assume *: "Some (TFieldId TyRep, ts) = ?domainType"
+
+  thus "\<exists>r. v = AField r"
+    using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
+next
+  fix T f
+  assume "TyRep = T" and 
+         "v = AField f" and 
+         "Some (TFieldId TyRep, ts) = field_ty_fun_opt T f"
+
+  thus "\<exists>r. v = AField r"
+    by blast   
+next
+  fix T tid ts'
+  assume "TyRep = T" and
+         *: "Some (TFieldId TyRep, ts) = Some_if (\<not> is_inhabited T tid (length ts') \<and> list_all closed ts') (tid, ts')"
+         (is "_ = ?rhs")
+
+  have Inhabited: "is_inhabited TyRep (TFieldId TyRep) 2"
+    by (auto intro!: is_inhabited_tcon_enum)
+
+  thus "\<exists>r. v = AField r"
+    using \<open>length ts = 2\<close>
+    by (metis "*" \<open>TyRep = T\<close> fst_conv option.distinct(1) option.inject snd_eqD)
+qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
+
+lemma field_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          FieldTy: "type_of_vbpl_val TyRep v = TCon (TFieldId TyRep) ts" and
+                   "length ts = 2"
+        shows "\<exists>f. v = AbsV (AField f)"
+  apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr FieldTy])
+  apply (insert \<open>length ts = 2\<close>)
+  using field_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
+  by blast+
+
+subsubsection \<open>Collection of inversion lemmas\<close>
+
+lemmas all_inversion_type_of_vbpl_val =
+  heap_inversion_type_of_vbpl_val
+  mask_inversion_type_of_vbpl_val
+  ref_inversion_type_of_vbpl_val
+  field_inversion_type_of_vbpl_val
     
 end
