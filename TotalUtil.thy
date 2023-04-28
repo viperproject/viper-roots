@@ -60,6 +60,24 @@ proof (rule ballI)
     by (metis list.pred_set snd_conv)
 qed
 
+lemma list_all_map_of: 
+  assumes "list_all (\<lambda> y. P (fst y) (snd y)) xs"
+  shows "\<forall>a b. map_of xs a = Some b \<longrightarrow> P a b"
+proof (rule allI | rule impI)+
+  fix a b
+  assume "map_of xs a = Some b"
+
+  hence "(a, b) \<in> set xs"
+    by (simp add: map_of_SomeD)
+
+  moreover from assms have "\<forall> (a',b') \<in> set xs. P a' b'"
+    using list_all_iff assms
+    by (metis case_prod_beta')
+
+  ultimately show "P a b"
+    by blast
+qed    
+
 lemma not_satisfies_prop_in_set:
   assumes "\<forall>x \<in> xs. P x" and
           "\<not> P y"

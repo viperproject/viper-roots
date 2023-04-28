@@ -64,6 +64,14 @@ lemma lift_fun_decl_fun_interp_single_wf_1:
   using assms
   by (simp add: lift_fun_decl_well_typed)
 
+lemma lift_fun_decl_fun_interp_single_wf_1_eq:
+  assumes "fd = fd'"
+          "fun_interp_single_wf A fd f"
+        shows "fun_interp_single_wf A fd (lift_fun_bpl A fd' f)"
+  apply (cases fd)
+  using assms lift_fun_decl_fun_interp_single_wf_1
+  by blast
+
 lemma lift_fun_decl_fun_interp_single_wf_2:
   assumes "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f"
   shows "fun_interp_single_wf_2 A (n_ty_params, args_ty, ret_ty) (lift_fun_bpl A (n_ty_params, args_ty, ret_ty) f)"
@@ -72,6 +80,14 @@ lemma lift_fun_decl_fun_interp_single_wf_2:
   apply simp
   using map_eq_imp_length_eq 
   by fastforce
+
+lemma lift_fun_decl_fun_interp_single_wf_2_eq:
+  assumes "fd = fd'"
+          "fun_interp_single_wf A fd f"
+        shows "fun_interp_single_wf_2 A fd (lift_fun_bpl A fd' f)"
+  apply (cases fd)
+  using assms lift_fun_decl_fun_interp_single_wf_2
+  by blast  
 
 lemma fun_interp_single_wf_intro:
   assumes "\<And> ts vs. length ts = n_ty_params \<Longrightarrow> 
@@ -84,9 +100,6 @@ shows "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f "
   by simp
 
 subsection \<open>Good state assumption\<close>
-
-abbreviation good_state_decl :: "'a ty_repr_bpl \<Rightarrow> fdecl_ty_bpl"
-  where "good_state_decl T \<equiv> (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool))"
 
 fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 'a sem_fun_bpl"
   where
@@ -111,19 +124,24 @@ lemma good_state_Some_true:
   by simp
 
 lemma good_state_fun_interp_single_wf:
-  shows "fun_interp_single_wf (vbpl_absval_ty TyRep) (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool)) (good_state Pr F)"
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool)) (good_state Pr F)"
 proof (rule fun_interp_single_wf_intro)
   fix ts vs
   assume "length ts = 0" and 
-         "list_all closed ts" and
-         "length vs = length [TConSingle (THeapId T), TConSingle (TMaskId T)]" and
-         "map (type_of_val (vbpl_absval_ty TyRep)) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TMaskId T)]"
+ ArgsTy: "map (type_of_val (vbpl_absval_ty T)) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TMaskId T)]"
 
   hence "ts = []" by blast
 
+  from ArgsTy obtain h m where
+    "vs = [AbsV (AHeap h), AbsV (AMask m)]" 
+    using all_inversion_type_of_vbpl_val[OF WfTyRepr]
+    by force
 
 
-
+  show "\<exists>v. good_state Pr F ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TPrim prim_ty.TBool)"
+    by (simp add: \<open>ts = _\<close> \<open>vs = _\<close>)
+qed
 
 subsection \<open>Functions for polymorphic map instantiations\<close>
 
@@ -163,7 +181,8 @@ fun store_heap :: "'a sem_fun_bpl"
 
 subsubsection \<open>Mask\<close>
 
-text \<open>select function for the heap: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
+text \<open>select function for the mask: readMask<A, B>(m: MaskType, r: Ref, f: (Field A B)): Perm\<close>
+
 fun select_mask :: "'a sem_fun_bpl"
   where 
     "select_mask ts vs = 
@@ -171,6 +190,30 @@ fun select_mask :: "'a sem_fun_bpl"
            ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
              Some (RealV (m (r, f)))
         | _ \<Rightarrow> None)"
+
+lemma select_mask_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)) 
+              select_mask"
+proof (rule fun_interp_single_wf_intro)
+  fix ts vs
+  assume "length ts = 2" and 
+  ArgsTy: "map (type_of_val (vbpl_absval_ty T)) vs = 
+           map (instantiate ts) [TConSingle (TMaskId T), TConSingle (TRefId T), TCon (TFieldId T) [(TVar 0),(TVar 1)]]"
+
+  from this obtain t1 t2 where "ts = [t1, t2]"
+    using deconstruct_list_length_2 by blast
+
+  from ArgsTy obtain m r f where
+    "vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
+    using all_inversion_type_of_vbpl_val[OF WfTyRepr]
+    by force
+    
+  show  "\<exists>v. select_mask ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TPrim TReal) "
+    by (simp add: \<open>ts = _\<close> \<open>vs = _\<close>)
+qed
 
 lemma select_mask_some: 
   assumes "select_mask ts vs = Some t"
@@ -184,7 +227,7 @@ lemma select_mask_none:
   using assms select_mask_some option.exhaust_sel 
   by blast
 
-text \<open>store function for the heap: updMask<A, B>(h: MaskType, r: Ref, f: (Field A B), y: Perm): Perm\<close>
+text \<open>store function for the mask: updMask<A, B>(h: MaskType, r: Ref, f: (Field A B), y: Perm): Perm\<close>
 
 fun store_mask :: "'a sem_fun_bpl"
   where
@@ -193,6 +236,30 @@ fun store_mask :: "'a sem_fun_bpl"
           ([t1, t2], [AbsV (AMask m), AbsV (ARef r), AbsV (AField f), RealV p]) \<Rightarrow>
             Some (AbsV (  AMask (m((r,f) := p))  ))
         | _ \<Rightarrow> None)"
+
+lemma store_mask_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], (TConSingle (TMaskId T)))
+              store_mask"
+proof (rule fun_interp_single_wf_intro)
+  fix ts vs
+  assume "length ts = 2" and 
+  ArgsTy: "map (type_of_val (vbpl_absval_ty T)) vs = 
+           map (instantiate ts) [TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal]"
+
+  from this obtain t1 t2 where "ts = [t1, t2]"
+    using deconstruct_list_length_2 by blast
+
+  from ArgsTy obtain m r f y where
+    "vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f), RealV y]"
+    using all_inversion_type_of_vbpl_val[OF WfTyRepr] VCExprHelper.treal_realv
+    by fastforce
+    
+  show "\<exists>v. store_mask ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TConSingle (TMaskId T))"    
+    by (simp add: \<open>ts = _\<close> \<open>vs = _\<close>)
+qed
 
 text \<open>function for checking whether there is nonzero permission in mask\<close>
 
@@ -283,7 +350,7 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
   | "fun_interp_vpr_bpl_aux Pr T F FReadMask =
        (select_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FUpdateMask =
-       (store_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], (TPrim TReal)))"
+       (store_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], TConSingle (TMaskId T)))"
   | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =
        (has_perm_in_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FIdenticalOnKnownLocs =
@@ -325,6 +392,15 @@ proof (rule allI)
   thus "fun_interp_vpr_bpl_concrete Pr T FieldMap FunMap (FunMap fid) = Some (fun_interp_vpr_bpl Pr T FieldMap fid)"
     by auto
 qed
+
+lemma fun_interp_vpr_bpl_concrete_lookup:
+  assumes "inj FunMap" and
+          "FunMap fid = fname"
+        shows "fun_interp_vpr_bpl_concrete Pr T FieldMap FunMap fname = Some (fun_interp_vpr_bpl Pr T FieldMap fid)"
+  using fun_interp_vpr_bpl_concrete_wf[OF assms(1)] assms(2)
+  unfolding fun_interp_vpr_bpl_wf_def
+  by blast
+
 
 definition ctxt_wf :: "ViperLang.program \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> (fun_enum_bpl \<Rightarrow> fname) \<Rightarrow> 'a econtext_bpl \<Rightarrow>  bool"
   where "ctxt_wf Pr T FieldMap FunMap ctxt \<equiv> fun_interp_vpr_bpl_wf Pr T FieldMap FunMap (fun_interp ctxt)"
