@@ -89,6 +89,13 @@ lemma lift_fun_decl_fun_interp_single_wf_2_eq:
   using assms lift_fun_decl_fun_interp_single_wf_2
   by blast  
 
+lemma lift_fun_decl_fun_interp_single_wf_eq:
+  assumes "fd = fd'"
+          "fun_interp_single_wf A fd' f"
+        shows "fun_interp_single_wf A fd (lift_fun_bpl A fd' f) \<and> fun_interp_single_wf_2 A fd (lift_fun_bpl A fd' f)"
+  using assms lift_fun_decl_fun_interp_single_wf_1_eq lift_fun_decl_fun_interp_single_wf_2_eq
+  by meson
+
 lemma fun_interp_single_wf_intro:
   assumes "\<And> ts vs. length ts = n_ty_params \<Longrightarrow> 
                      list_all closed ts \<Longrightarrow>
@@ -169,8 +176,69 @@ fun select_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
                 Some (select_heap_aux T t2 h r f)
          | _ \<Rightarrow> None)"
 
-text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
 
+lemma select_heap_aux_well_typed:
+  assumes WfTyRepr: "wf_ty_repr_bpl T" and
+          "closed ret_ty"  and
+          HeapTy: "type_of_vbpl_val T (AbsV (AHeap h)) = TConSingle (THeapId T)" and
+          FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, ret_ty])"
+  shows "type_of_vbpl_val T (select_heap_aux T ret_ty h r f) = ret_ty"
+proof (cases "h (r,f)")
+  case None
+  with closed_types_inhabited[OF \<open>closed _\<close>] show ?thesis
+    unfolding select_heap_aux_def
+    apply simp
+    by (meson \<open>closed _\<close> closed_types_inhabited someI_ex)
+next
+  case (Some v)
+  from HeapTy have "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])"
+    using tdummyid_fresh[OF WfTyRepr]                                                                                    
+    by (metis (no_types, lifting) Pair_inject UnI1 prod.collapse range_eqI ty.inject(3) type_of_val.simps(2) vbpl_absval_ty_not_dummy)
+
+  with Some FieldTy have "type_of_vbpl_val T v = ret_ty"
+    using heap_bpl_well_typed_elim
+    by meson
+
+  thus ?thesis
+    unfolding select_heap_aux_def Some
+    by simp
+qed
+
+lemma select_heap_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TVar 1))
+                                                 (select_heap T)"
+proof (rule fun_interp_single_wf_intro)
+  fix ts vs
+  assume "length ts = 2" and closed: "list_all closed ts" and
+ ArgsTy: "map (type_of_vbpl_val T) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TRefId T), TCon (TFieldId T) [TVar 0, TVar 1]]"
+
+  from this obtain t1 t2 where "ts = [t1, t2]"
+    using deconstruct_list_length_2
+    by fast
+
+  from ArgsTy obtain h r f where
+    "vs = [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]" 
+    by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr])
+
+  with ArgsTy have HeapTy: "type_of_vbpl_val T (AbsV (AHeap h)) = TConSingle (THeapId T)" 
+    by simp
+
+  from \<open>vs = _\<close> ArgsTy have "type_of_vbpl_val T (AbsV (AField f)) = TCon (TFieldId T) [t1, t2]"
+    using \<open>ts = _\<close>
+    by simp
+
+  hence FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [t1, t2])"
+  using tdummyid_fresh[OF WfTyRepr]                                                                                    
+  by (metis list.distinct(1) prod.exhaust_sel snd_conv ty.inject(3) type_of_val.simps(2) vbpl_absval_ty_not_dummy vbpl_absval_ty_opt.simps(2))
+
+  thus "\<exists>v. select_heap T ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TVar 1)"
+    using \<open>vs = _\<close> \<open>ts = _\<close> select_heap_aux_well_typed[OF WfTyRepr _ HeapTy FieldTy] closed
+    by auto
+qed
+
+text \<open>store function for the heap: updHeap<A, B>(h: HeapType, r: Ref, f: (Field A B), y: B): HeapType\<close>
+      
 fun store_heap :: "'a sem_fun_bpl"
   where
     "store_heap ts vs = 
@@ -178,6 +246,43 @@ fun store_heap :: "'a sem_fun_bpl"
           ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]) \<Rightarrow>
             Some (AbsV (  AHeap (h((r,f) \<mapsto> v))  ))
         | _ \<Rightarrow> None)"
+
+lemma store_heap_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TVar 1], TConSingle (THeapId T))
+                                                 store_heap"
+proof (rule fun_interp_single_wf_intro)
+  fix ts vs
+  assume "length ts = 2" and closed: "list_all closed ts" and
+ ArgsTy: "map (type_of_vbpl_val T) vs = map (instantiate ts) [TConSingle (THeapId T), TConSingle (TRefId T), TCon (TFieldId T) [TVar 0, TVar 1], TVar 1]"
+
+  from this obtain t1 t2 where "ts = [t1, t2]"
+    using deconstruct_list_length_2
+    by fast
+
+  from ArgsTy obtain h r f v where
+    "vs = [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f), v]" 
+    by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr])
+
+  with ArgsTy have 
+   HeapTy: "type_of_vbpl_val T (AbsV (AHeap h)) = TConSingle (THeapId T)" 
+       and "type_of_vbpl_val T (AbsV (AField f)) = TCon (TFieldId T) [t1, t2]"
+       and NewValTy: "type_of_vbpl_val T v = t2"
+    using \<open>ts = _\<close>
+    by auto
+
+  hence FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [t1, t2])"
+  using tdummyid_fresh[OF WfTyRepr]                                                                                    
+  by (metis list.distinct(1) prod.exhaust_sel snd_conv ty.inject(3) type_of_val.simps(2) vbpl_absval_ty_not_dummy vbpl_absval_ty_opt.simps(2))
+
+  from HeapTy have HeapTyOpt: "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])"
+    using tdummyid_fresh[OF WfTyRepr] 
+    by (metis (no_types, lifting) Pair_inject UnI1 prod.exhaust_sel range_eqI ty.inject(3) type_of_val.simps(2) vbpl_absval_ty_not_dummy)
+
+  thus " \<exists>v. store_heap ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TConSingle (THeapId T))"
+    using \<open>vs = _\<close> \<open>ts = _\<close> closed heap_upd_ty_preserved[OF HeapTyOpt FieldTy NewValTy]
+    by simp
+qed
 
 subsubsection \<open>Mask\<close>
 
@@ -243,23 +348,8 @@ lemma store_mask_fun_interp_single_wf:
               (vbpl_absval_ty T) 
               (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], (TConSingle (TMaskId T)))
               store_mask"
-proof (rule fun_interp_single_wf_intro)
-  fix ts vs
-  assume "length ts = 2" and 
-  ArgsTy: "map (type_of_val (vbpl_absval_ty T)) vs = 
-           map (instantiate ts) [TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal]"
-
-  from this obtain t1 t2 where "ts = [t1, t2]"
-    using deconstruct_list_length_2 by blast
-
-  from ArgsTy obtain m r f y where
-    "vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f), RealV y]"
-    using all_inversion_type_of_vbpl_val[OF WfTyRepr] VCExprHelper.treal_realv
-    by fastforce
-    
-  show "\<exists>v. store_mask ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TConSingle (TMaskId T))"    
-    by (simp add: \<open>ts = _\<close> \<open>vs = _\<close>)
-qed
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 VCExprHelper.treal_realv split: val.split vbpl_absval.split)
 
 text \<open>function for checking whether there is nonzero permission in mask\<close>
 
@@ -332,6 +422,15 @@ fun identical_on_known_locs ::  "'a sem_fun_bpl"
          ([], [AbsV (AHeap h), AbsV (AHeap h_exhale), AbsV (AMask m)]) \<Rightarrow>
            Some (BoolV (\<forall>r f t. m (r, NormalField f t) > 0 \<longrightarrow> h (r, NormalField f t) = h_exhale (r, NormalField f t)))
        | _ \<Rightarrow> None)"
+
+lemma identical_on_known_locs_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (0,[TConSingle (THeapId T), TConSingle (THeapId T), TConSingle (TMaskId T)], (TPrim TBool))
+              identical_on_known_locs"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] split: val.split vbpl_absval.split)
 
 subsection \<open>Global function map\<close>
 
@@ -461,7 +560,7 @@ proof  -
         apply simp
       apply simp
     using Hty Mty
-     apply (simp del: vbpl_absval_ty_opt.simps)    
+     apply simp
     using Hrel Mrel good_state_Some_true FieldTr state_rel0_wf_mask_simple[OF state_rel_state_rel0[OF StateRel]]
     by blast
 qed
