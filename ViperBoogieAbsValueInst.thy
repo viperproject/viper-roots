@@ -285,7 +285,12 @@ lemma is_inhabited_tcon_enum:
   using assms
   unfolding is_inhabited_def
   by blast
-                                                                        
+
+text \<open>Below it would be nice to write the heap equation directly in terms of \<^term>\<open>type_of_val\<close>, but
+      the termination obligations are not in the form that I expect. Instead, we prove the heap equation
+      in terms of \<^term>\<open>type_of_val\<close> later and exchange the equations in the simpset. 
+      IMPORTANT: If you add any equations here here or change the order, then the simpset change below
+                 must be adjusted. \<close>
 function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<rightharpoonup> (tcon_id \<times> bpl_ty list)"
   where 
    "vbpl_absval_ty_opt T (ARef r) = Some (TRefId T, [])"
@@ -293,11 +298,12 @@ function (sequential) vbpl_absval_ty_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vbp
  | "vbpl_absval_ty_opt T (ADomainVal v) = map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T v))"
  | "vbpl_absval_ty_opt T (AHeap h) = 
       Some_if 
-          (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
+         (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
              h (r, f) = Some v \<and> field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<longrightarrow> 
-             (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
-                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)
-          ) 
+               (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) | 
+                        AbsV absv \<Rightarrow> (tcon_to_bplty \<circ> option_fold id (TDummyId T, [])) (vbpl_absval_ty_opt T absv))
+                = t
+          )
           (THeapId T, [])"
  | "vbpl_absval_ty_opt T (AMask m) = Some (TMaskId T, [])"
  | "vbpl_absval_ty_opt T (AKnownFoldedMask pm) = Some (TKnownFoldedMaskId T, [])"
@@ -315,6 +321,30 @@ termination
 fun vbpl_absval_ty :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<Rightarrow> (tcon_id \<times> bpl_ty list)"
   where
     "vbpl_absval_ty T a = option_fold id (TDummyId T, []) (vbpl_absval_ty_opt T a)"
+
+abbreviation type_of_vbpl_val :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
+  where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
+
+lemma type_of_vbpl_val_case_of:
+  shows "(case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) | 
+                        AbsV absv \<Rightarrow> (tcon_to_bplty \<circ> option_fold id (TDummyId T, [])) (vbpl_absval_ty_opt T absv)) =
+          type_of_vbpl_val T v"
+  apply (simp split: val.split)
+  done
+
+lemma vbpl_absval_ty_opt_heap_simp_alt [simp]:
+ "vbpl_absval_ty_opt T (AHeap h) = 
+      Some_if 
+         (\<forall>r::ref. \<forall> f :: 'a vb_field. \<forall>fieldKind t :: bpl_ty. \<forall> v :: 'a vbpl_val. 
+             h (r, f) = Some v \<and> field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<longrightarrow> 
+               type_of_vbpl_val T v = t
+          )
+          (THeapId T, [])"
+  by (simp add: type_of_vbpl_val_case_of)
+
+text \<open>Remove original heap equation from simpset\<close>
+
+declare vbpl_absval_ty_opt.simps(4)[simp del] 
 
 text\<open> \<^const>\<open>vbpl_absval_ty\<close> is the type interpretation for the Boogie abstract value instantiation 
       used for Viper. It uses \<^const>\<open>vbpl_absval_ty_opt\<close>, which maps each value to a type if there
@@ -398,9 +428,6 @@ next
     by simp
 qed
 
-abbreviation type_of_vbpl_val :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
-  where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
-
 theorem closed_types_inhabited:
   assumes "closed t"
   shows "\<exists>v. type_of_vbpl_val T v = t"
@@ -437,6 +464,16 @@ next
 qed
 
 subsection \<open>Helper definitions and lemmas\<close>
+
+lemma field_ty_fun_two_tids:
+  assumes "field_ty_fun_opt T f = Some ft"
+  shows "fst ft = TFieldId T"
+  using assms
+  apply (rule field_ty_fun_opt.elims)
+     apply (metis (mono_tags, lifting) map_option_eq_Some prod.collapse prod.inject)
+    apply (metis (mono_tags, lifting) map_option_eq_Some prod.collapse prod.inject)
+   apply (metis (mono_tags, lifting) map_option_eq_Some prod.collapse prod.inject)
+  by (metis fst_conv option.distinct(1) option.inject)
 
 lemma field_ty_fun_two_params:
   assumes "field_ty_fun_opt T f = Some (field_tcon, ty_args)"
@@ -479,9 +516,8 @@ definition mask_bpl_upd_normal_field :: "'a mask_repr \<Rightarrow> ref \<Righta
 
 lemma heap_bpl_well_typed:
   assumes "\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
-                   field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>                   
-                   (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
-                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)"
+                   field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>  
+                   type_of_vbpl_val T v = t"              
   shows "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])"
   using assms
   by simp
@@ -490,12 +526,40 @@ lemma heap_bpl_well_typed_elim:
   assumes "vbpl_absval_ty_opt T (AHeap h) = Some (THeapId T, [])" and
           "(\<And>r (f :: 'a vb_field) v fieldKind t. h (r, f) = Some v \<Longrightarrow> 
                    field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t]) \<Longrightarrow>                   
-                   (case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) = t | 
-                        AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt T absv) = Some t)) \<Longrightarrow> P"
+                   type_of_vbpl_val T v = t) \<Longrightarrow> P"
   shows P
-  using assms
-  apply (simp)
-  by (metis option.distinct(1))
+  apply (rule assms(2))
+  apply (insert assms(1))
+  apply simp
+  by (meson option.distinct(1))
+
+lemma heap_upd_ty_preserved:
+  assumes OldHeap: "vbpl_absval_ty_opt T (AHeap hb) = Some (THeapId T, [])"  and
+         FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t])" and
+         NewVal: "type_of_vbpl_val T v = t"
+        shows "vbpl_absval_ty_opt T (AHeap (hb ((r,f) \<mapsto> v))) = Some (THeapId T, [])"
+proof (rule heap_bpl_well_typed)
+  fix ra fa va fieldKind t
+  assume *: "(hb((r, f) \<mapsto> v)) (ra, fa) = Some va" 
+         "field_ty_fun_opt T fa = Some (TFieldId T, [fieldKind, t])"
+
+  show "type_of_vbpl_val T va = t"
+  proof (cases "(ra,fa) = (r,f)")
+    case True
+    thus ?thesis 
+      using * FieldTy NewVal
+      by auto      
+  next
+    case False
+    hence "Some va = hb (ra, fa)"
+      using *
+      by auto
+
+    thus ?thesis
+      using OldHeap *
+      by (metis heap_bpl_well_typed_elim)
+  qed
+qed
 
 lemma vbpl_absval_ty_not_dummy:
   assumes "vbpl_absval_ty TyRep absv = (tcon_id, t_args)" and
@@ -623,11 +687,9 @@ next
          *: "Some (THeapId TyRep, []) = Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
          (is "_ = ?rhs")
 
-  have Inhabited: "is_inhabited TyRep (THeapId TyRep) 0"
-    by (auto intro!: is_inhabited_tcon_enum)
-
   thus "\<exists>h. v = AHeap h"
-    by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
+    using Some_Some_ifD[OF *] \<open>TyRep = T\<close> is_inhabited_tcon_enum
+    by force
 qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
                                                           
 lemma heap_inversion_type_of_vbpl_val:
@@ -675,7 +737,9 @@ next
 
   thus "\<exists>h. v = AMask h"
     by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
-qed (insert wf_ty_repr_bpl_inj_tcon_id_repr[OF WfTyRepr] injD, fastforce split: if_split_asm)+
+qed (insert injD[OF wf_ty_repr_bpl_inj_tcon_id_repr, OF WfTyRepr], fastforce split: if_split_asm)+
+
+thm injD[OF wf_ty_repr_bpl_inj_tcon_id_repr]
 
 lemma mask_inversion_type_of_vbpl_val:
   assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
@@ -749,15 +813,7 @@ proof (rule vbpl_absval_ty_opt.elims)
 
   thus "\<exists>r. v = AField r"
     using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
-    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
-next
-  fix T f
-  assume "TyRep = T" and 
-         "v = AField f" and 
-         "Some (TFieldId TyRep, ts) = field_ty_fun_opt T f"
-
-  thus "\<exists>r. v = AField r"
-    by blast   
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))   
 next
   fix T tid ts'
   assume "TyRep = T" and
@@ -782,12 +838,29 @@ lemma field_inversion_type_of_vbpl_val:
   using field_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
   by blast+
 
+lemma field_inversion_type_of_vbpl_val_2:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          FieldTy: "type_of_vbpl_val TyRep v = TCon (TFieldId TyRep) [t1,t2]" 
+        shows "\<exists>f. v = AbsV (AField f)"
+  using assms
+  by (rule field_inversion_type_of_vbpl_val) simp
+  
+
 subsubsection \<open>Collection of inversion lemmas\<close>
 
+\<comment>\<open>Only include lemmas here, which have \<^term>\<open>wf_ty_repr_bpl TyRep\<close> as the first premise. This way one 
+   can use \<open>...[OF WfTyRepFact]\<close> \<close>
 lemmas all_inversion_type_of_vbpl_val =
   heap_inversion_type_of_vbpl_val
   mask_inversion_type_of_vbpl_val
   ref_inversion_type_of_vbpl_val
   field_inversion_type_of_vbpl_val
+  field_inversion_type_of_vbpl_val_2
+
+lemmas lit_inversion_type_of_val = 
+  VCExprHelper.tbool_boolv
+  VCExprHelper.tint_intv
+  VCExprHelper.treal_realv
+
     
 end

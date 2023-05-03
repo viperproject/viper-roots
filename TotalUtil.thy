@@ -31,6 +31,12 @@ abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option"
 abbreviation Some_if :: "bool \<Rightarrow> 'a \<Rightarrow> 'a option" where
   "Some_if b x \<equiv> option_if b (Some x)"
 
+lemma Some_Some_ifD:
+  assumes "Some x = Some_if P y"
+  shows "P"
+  using assms
+  by (metis option.distinct(1))
+
 definition pred_eq
   where "pred_eq x v = (x = v)"
 

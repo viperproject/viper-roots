@@ -477,9 +477,7 @@ proof -
       by blast
       
 
-    thus "case v of 
-             LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = \<tau>_bpl
-           | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some \<tau>_bpl"
+    thus "type_of_vbpl_val TyRep v = \<tau>_bpl"
       apply (subst \<open>v = _\<close>)
       using type_of_val_not_dummy
             vpr_to_bpl_ty_not_dummy[OF WfTyRep \<open>vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl\<close>] 

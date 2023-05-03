@@ -178,9 +178,7 @@ proof -
     assume FieldTy: "field_ty_fun_opt TyRep f = Some (TFieldId TyRep, [fieldKind, t])" and
            "hb' (r, f) = Some v"
 
-    thus "case v of 
-            LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t
-          | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
+    thus "type_of_vbpl_val TyRep v = t"
     proof (cases "(r,f) \<in> vpr_heap_locations_bpl Pr tr_field")
       case True
       hence "hb0 (r,f) = Some v"
@@ -1665,30 +1663,9 @@ proof -
   next
     let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
     show "vbpl_absval_ty_opt TyRep (AHeap ?hb') = Some (THeapId TyRep, [])"
-    proof (rule heap_bpl_well_typed)
-      fix r f v fieldKind t
-      assume LookupF: "?hb' (r, f) = Some v"
-      assume FieldTyF: "field_ty_fun_opt TyRep f = Some (TFieldId TyRep, [fieldKind, t])"
-      show "case v of LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
-      proof (cases "r = (Address addr) \<and> f = NormalField f_bpl ty_vpr")
-        case True
-        hence "?hb' (r, f) = Some (val_rel_vpr_bpl v_vpr)" by force
-        moreover from True have "t = ty_bpl" using FieldTyF \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>
-          by simp
-        ultimately show ?thesis 
-          using VBplTy LookupF  
-               type_of_val_not_dummy[OF VBplTy] 
-               vpr_to_bpl_ty_not_dummy[OF WfTyRep \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>] 
-          by auto
-      next
-        case False
-        hence "?hb' (r, f) = hb (r, f)" by force
-        then show ?thesis 
-          using HeapRelFacts LookupF FieldTyF 
-          apply (simp split: val.split val.split_asm)
-          by (metis option.distinct(1))        
-      qed
-    qed
+      apply (rule heap_upd_ty_preserved[OF HeapRelFacts(2)])
+       apply (fastforce intro: \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>)
+      by (rule VBplTy)      
   next
     have HeapRel:"heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb"
        using HeapVarRel LookupHeapVar

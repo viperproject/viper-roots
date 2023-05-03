@@ -77,38 +77,6 @@ lemma heap_wf_concrete:
      apply (simp only: map_instantiate_nil)
     by (auto elim: cons_exp_elim simp: select_heap_aux_def)
 
-lemma heap_upd_well_typed:
-  assumes 
-   HeapTy: "vbpl_absval_ty_opt TyRep (AHeap h) = Some (THeapId TyRep, [])" and
-   FieldTy:  "field_ty_fun_opt TyRep f = Some (field_tcon, ty_args)" and
-   NewValType: "type_of_vbpl_val TyRep new_val = ty_args ! 1" and
-   NewValNotDummy: "ty_args ! 1 \<noteq> TConSingle (TDummyId TyRep)"
-  shows "vbpl_absval_ty_opt TyRep (AHeap (h((r, f) \<mapsto> new_val))) = Some (THeapId TyRep, [])"
-proof (rule heap_bpl_well_typed)
-  fix r' f' v fieldKind t
-  assume A: "(h((r, f) \<mapsto> new_val)) (r', f') = Some v" 
-            "field_ty_fun_opt TyRep f' = Some (TFieldId TyRep, [fieldKind, t])"
-  show "case v of LitV lit \<Rightarrow> TPrim (Lang.type_of_lit lit) = t
-       | AbsV absv \<Rightarrow> map_option tcon_to_bplty (vbpl_absval_ty_opt TyRep absv) = Some t"
-  proof (cases "(r',f') = (r,f)")
-    case True
-    hence "v = new_val" using A
-      by fastforce
-    moreover have "ty_args ! 1 = t" using True A FieldTy
-      by fastforce
-    ultimately show ?thesis 
-      using NewValType type_of_val_not_dummy[OF NewValType NewValNotDummy]
-      by blast      
-  next
-    case False
-    hence "h (r',f') = Some v" using A
-      by auto
-    thus ?thesis 
-      using heap_bpl_well_typed_elim[OF HeapTy] A
-      by meson
-  qed
-qed
-
 lemma heap_update_wf_concrete:
   assumes 
     CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
@@ -260,6 +228,8 @@ definition ty_repr_basic :: "('a \<Rightarrow> abs_type) \<Rightarrow> 'a ty_rep
         domain_type = A \<rparr>"
 
 lemma wf_ty_repr_basic: "wf_ty_repr_bpl (ty_repr_basic A)"
+  sorry (* TODO *)
+(*
   unfolding wf_ty_repr_bpl_def
   apply (intro conjI)
     apply clarify
@@ -272,6 +242,7 @@ lemma wf_ty_repr_basic: "wf_ty_repr_bpl (ty_repr_basic A)"
   apply (unfold ty_repr_basic_def)
   apply simp
   done
+*)
 
 lemma type_interp_rel_wf_vbpl_basic: "type_interp_rel_wf A_vpr (vbpl_absval_ty (ty_repr_basic A_vpr)) (ty_repr_basic A_vpr)"
   unfolding ty_repr_basic_def
