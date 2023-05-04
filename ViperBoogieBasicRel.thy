@@ -412,6 +412,9 @@ fun boogie_const_ty :: "'a ty_repr_bpl \<Rightarrow> boogie_const => bpl_ty"
   | "boogie_const_ty T CNull = TConSingle (TRefId T)"
   | "boogie_const_ty T CZeroMask = TConSingle (TMaskId T)"
 
+lemma boogie_const_val_well_ty: "type_of_vbpl_val T (boogie_const_val c) = boogie_const_ty T c"  
+  by (cases c) auto
+
 definition boogie_const_rel :: "(boogie_const \<Rightarrow> vname) \<Rightarrow> var_context \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "boogie_const_rel C \<Lambda> ns \<equiv> 
            \<forall>const. lookup_var \<Lambda> ns (C const) = Some (boogie_const_val const)"

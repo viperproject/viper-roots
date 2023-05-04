@@ -351,16 +351,6 @@ proof (rule allI | rule impI)+
   qed
 qed
 
-lemma temp:
-  assumes "is_empty_total \<omega>" and
-          "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)"
-  shows "\<exists>ns ls gs.  ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
-                           (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
-                           state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars) \<and>
-                           state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl)) \<and>
-                           axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-  oops
-
   subsection \<open>General setup for constructing well-typed states\<close>
 
 fun named_state_var_context :: "'a absval_ty_fun \<Rightarrow> vdecls \<Rightarrow> 'a named_state"
@@ -424,12 +414,12 @@ proof (rule allI | rule impI)+
   qed
 qed
 
-subsection \<open>Constructing concrete well-typed state\<close>
+subsection \<open>Constructing initial state\<close>
 
 subsubsection \<open>Global state\<close>
 
-fun initial_global_state :: "program \<Rightarrow> tr_vpr_bpl \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) named_state"
-  where "initial_global_state Pr Tr \<omega> x = 
+fun initial_global_state_aux :: "program \<Rightarrow> tr_vpr_bpl \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) named_state"
+  where "initial_global_state_aux Pr Tr \<omega> x = 
            (if x = heap_var Tr then
               Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap Pr (field_translation Tr) (get_hh_total_full \<omega>))))
            else 
@@ -442,27 +432,33 @@ fun initial_global_state :: "program \<Rightarrow> tr_vpr_bpl \<Rightarrow> 'a f
                   None             
            )"
 
-lemma dom_initial_global_state: "dom (initial_global_state Pr Tr \<omega>) = {heap_var Tr, mask_var Tr} \<union> range (const_repr Tr)"
+lemma dom_initial_global_state_aux: "dom (initial_global_state_aux Pr Tr \<omega>) = {heap_var Tr, mask_var Tr} \<union> range (const_repr Tr)"
   unfolding dom_def
   by auto
 
-lemma initial_global_state_typ_wf:
+
+abbreviation initial_global_state 
+  where "initial_global_state T vs Pr Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_global_state_aux Pr Tr \<omega>)"
+
+
+lemma initial_global_state_aux_typ_wf:
   assumes 
           WfTyRepr: "wf_ty_repr_bpl T" and
           InjTrField:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
+          Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, range (const_repr Tr)]" and
           Closed: "list_all (closed \<circ> (fst \<circ> snd)) vs" and
           VprHeapTy:  "total_heap_well_typed Pr (domain_type T) (get_hh_total_full \<omega>)" and
           HeapTy: "lookup_vdecls_ty vs (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty vs (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<forall>c. lookup_vdecls_ty vs (const_repr Tr c) = Some (boogie_const_ty T c)"
-        shows "state_typ_wf (vbpl_absval_ty T) [] (extend_named_state_var_context (vbpl_absval_ty T) vs (initial_global_state Pr Tr \<omega>)) vs"
+        shows "state_typ_wf (vbpl_absval_ty T) [] (initial_global_state T vs Pr Tr \<omega>) vs"
 proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_inhabited])
   fix x t v
   assume LookupTy: "lookup_vdecls_ty vs x = Some t" and
-         "initial_global_state Pr Tr \<omega> x = Some v" (is "?ns x = _")
+         "initial_global_state_aux Pr Tr \<omega> x = Some v" (is "?ns x = _")
 
   hence *:"x \<in> {heap_var Tr} \<union> {mask_var Tr} \<union> range (const_repr Tr)"
-    using dom_initial_global_state
+    using dom_initial_global_state_aux
     by blast
 
   show "type_of_vbpl_val T v = t"
@@ -485,19 +481,137 @@ proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_i
     next
       case 2 \<comment>\<open>mask_var case\<close>
       hence "x = mask_var Tr" by simp
-      hence "v = AbsV (AMask (\<lambda>_. 0))"
-        using \<open>?ns x = Some v\<close>
-        
+      moreover have "x \<noteq> heap_var Tr"
+        using Disj
+        unfolding disjoint_list_def
+        apply (rule allE[where ?x = 0])
+        apply (erule allE[where ?x = 1])
+        by (simp add: \<open>x = _\<close>)
 
+      ultimately have "v = AbsV (AMask (\<lambda>_. 0))"
+        using \<open>?ns x = Some v\<close> 
+        by simp
 
       then show ?thesis 
-        
+        using MaskTy LookupTy \<open>x = _\<close>
+        by simp    
     qed
   next
     case 2 \<comment>\<open>const case\<close>
-    then show ?thesis sorry
-  qed
+    have "x \<noteq> heap_var Tr"
+      apply (insert Disj)
+      apply (unfold disjoint_list_def)
+      apply (erule allE[where ?x = 0])
+      apply (erule allE[where ?x = 2])
+      apply simp
+      using 2
+      by blast
 
+    moreover have "x \<noteq> mask_var Tr"
+      apply (insert Disj)
+      apply (unfold disjoint_list_def)
+      apply (erule allE[where ?x = 1])
+      apply (erule allE[where ?x = 2])
+      apply simp
+      using 2
+      by blast
+
+    ultimately have "v = boogie_const_val (SOME c. const_repr Tr c = x)"
+      using \<open>?ns x = Some v\<close> 2
+      by simp
+
+    then show ?thesis 
+      using boogie_const_val_well_ty ConstTy LookupTy
+      by (metis (mono_tags, lifting) "2" image_iff option.inject verit_sko_ex')
+  qed
+qed
+
+subsubsection \<open>Local state\<close>
+
+fun initial_local_state_aux :: "tr_vpr_bpl \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) named_state"
+  where "initial_local_state_aux Tr \<omega> x = 
+           (if x \<in> ran (var_translation Tr) then 
+             Some (SOME v. \<exists>x_vpr v_vpr. var_translation Tr x_vpr = Some x \<and> 
+                                     get_store_total \<omega> x_vpr = Some v_vpr \<and> 
+                                     v = val_rel_vpr_bpl v_vpr)
+           else 
+             None)"
+
+abbreviation initial_local_state
+  where "initial_local_state T vs Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_local_state_aux Tr \<omega>)"
+
+lemma initial_local_state_aux_typ_wf:
+  assumes 
+          WfTyRepr: "wf_ty_repr_bpl T" and
+          Closed: "list_all (closed \<circ> (fst \<circ> snd)) vs" and
+          VarTranslationTy: "\<And> x_vpr x_bpl. var_translation Tr x_vpr = Some x_bpl \<Longrightarrow>
+                                   (\<exists>v_vpr. get_store_total \<omega> x_vpr = Some v_vpr \<and> 
+                                            (\<exists>t. lookup_vdecls_ty vs x_bpl = Some t \<and>
+                                                 type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))" and
+          Inj:  "inj_on (var_translation Tr) (dom (var_translation Tr))"
+        shows "state_typ_wf (vbpl_absval_ty T) [] (initial_local_state T vs Tr \<omega>) vs"
+proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_inhabited])
+  fix x t v
+  assume LookupTy: "lookup_vdecls_ty vs x = Some t" and
+         *: "initial_local_state_aux Tr \<omega> x = Some v"
+
+  hence "x \<in> ran (var_translation Tr)"
+    by (metis initial_local_state_aux.simps option.distinct(1))
+
+  hence "v = (SOME v. \<exists>x_vpr v_vpr. var_translation Tr x_vpr = Some x \<and> 
+                                     get_store_total \<omega> x_vpr = Some v_vpr \<and> 
+                                     v = val_rel_vpr_bpl v_vpr)"
+    using *
+    by auto
+
+  from \<open>x \<in> _\<close> obtain x_vpr where VarTr: "var_translation Tr x_vpr = Some x"
+    unfolding ran_def
+    by blast
+
+  moreover from this obtain v_vpr where 
+        Store: "get_store_total \<omega> x_vpr = Some v_vpr" and 
+        TyBpl: "type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t"
+    using VarTranslationTy LookupTy
+    by fastforce
+
+  have "\<exists>v x_vpr v_vpr. var_translation Tr x_vpr = Some x \<and> get_store_total \<omega> x_vpr = Some v_vpr \<and> 
+                               v = val_rel_vpr_bpl v_vpr"
+    apply (rule exI)+
+    apply (intro conjI)
+      apply (rule VarTr)
+     apply (rule Store)
+    apply simp
+    done
+
+  from this obtain x_vpr' v_vpr' where 
+    "var_translation Tr x_vpr' = Some x" and 
+    "get_store_total \<omega> x_vpr' = Some v_vpr'" and
+    "v = val_rel_vpr_bpl v_vpr'"
+    using \<open>v = _\<close>    
+    by (smt (verit, ccfv_threshold) Nitpick.Eps_psimp) (* SMT proof *)
+
+  hence "v = val_rel_vpr_bpl v_vpr"
+    using VarTr Inj
+    by (metis Store domI inj_on_eq_iff option.sel)
+
+  thus "type_of_vbpl_val T v = t"
+    using TyBpl
+    by simp
+qed
+
+subsubsection \<open>Properties\<close>
+
+lemma temp:
+  assumes "is_empty_total \<omega>" and
+          "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
+          WfMask: "wf_mask_simple (get_mh_total_full \<omega>)" and
+          "local_state ns = initial_local_state T vs Tr \<omega>" and
+          "global_state ns = initial_global_state T vs Pr Tr \<omega>"
+  shows "state_rel_empty (state_rel_well_def_same ctxt Pr T Tr AuxPred) \<omega> ns"
+  unfolding state_rel_empty_def state_rel_def state_rel0_def
+proof (rule conjI[OF \<open>is_empty_total \<omega>\<close>], intro conjI)
+ (* TODO *)
+  oops
 
 
 
