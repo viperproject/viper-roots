@@ -13,10 +13,13 @@ subsection \<open>General\<close>
 
 datatype fun_enum_bpl = 
      FGoodState
+     | FGoodMask
      | FReadHeap
      | FUpdateHeap
      | FReadMask
      | FUpdateMask
+     | FReadKnownFoldedMask
+     | FUpdateKnownFoldedMask
      | FHasPerm
      | FIdenticalOnKnownLocs
 
@@ -106,7 +109,7 @@ shows "fun_interp_single_wf A (n_ty_params, args_ty, ret_ty) f "
   using assms
   by simp
 
-subsection \<open>Good state assumption\<close>
+subsection \<open>Good state and good mask\<close>
 
 fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 'a sem_fun_bpl"
   where
@@ -145,10 +148,23 @@ proof (rule fun_interp_single_wf_intro)
     using all_inversion_type_of_vbpl_val[OF WfTyRepr]
     by force
 
-
   show "\<exists>v. good_state Pr F ts vs = Some v \<and> type_of_vbpl_val T v = instantiate ts (TPrim prim_ty.TBool)"
     by (simp add: \<open>ts = _\<close> \<open>vs = _\<close>)
 qed
+
+fun good_mask :: "'a sem_fun_bpl"
+  where 
+    "good_mask ts vs =
+      (case (ts, vs) of 
+           ([], [AbsV (AMask m)]) \<Rightarrow> 
+             Some (BoolV ((\<forall> loc. m loc \<ge> 0) \<and> (\<forall> r f t. m (r, (NormalField f t)) \<le> 1)))
+        | _ \<Rightarrow> None)"
+
+lemma good_mask_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (0,[TConSingle (TMaskId T)],(TPrim TBool)) good_mask"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 VCExprHelper.treal_realv split: val.split vbpl_absval.split)
 
 subsection \<open>Functions for polymorphic map instantiations\<close>
 
@@ -361,6 +377,15 @@ fun has_perm_in_mask :: "'a sem_fun_bpl"
              Some (BoolV (m (r, f) > 0))
         | _ \<Rightarrow> None)"
 
+lemma has_direct_perm_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (2,[TConSingle (TMaskId T), TConSingle (TRefId T), (TCon (TFieldId T) [(TVar 0),(TVar 1)])], (TPrim TBool))
+              has_perm_in_mask"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 VCExprHelper.treal_realv split: val.split vbpl_absval.split)
+
 lemma has_perm_in_mask_some: 
   assumes "has_perm_in_mask ts vs = Some t"
   shows "\<exists>t1 t2 m r f. ts = [t1, t2] \<and> vs = [AbsV (AMask m), AbsV (ARef r), AbsV (AField f)]"
@@ -403,15 +428,33 @@ fun select_knownfolded_mask :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
              Some (BoolV (m (r, f)))
         | _ \<Rightarrow> None)"
 
+lemma select_knownfolded_mask_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (2,[TConSingle (TKnownFoldedMaskId T), TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TBool))
+              (select_knownfolded_mask T)"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 lit_inversion_type_of_val split: val.split vbpl_absval.split)
+
 text \<open>store function for the knownfolded mask: updPMask<A, B>(PMaskType: PMaskType, obj: Ref, f_1: (Field A B), y: bool): PMaskType\<close>
 
-fun store_knownfolded_mask :: "'a ty_repr_bpl \<Rightarrow> bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
+fun store_knownfolded_mask :: "bpl_ty list \<Rightarrow> 'a vbpl_val list \<rightharpoonup> 'a vbpl_val"
   where 
-    "store_knownfolded_mask T ts vs = 
+    "store_knownfolded_mask ts vs = 
         (case (ts, vs) of 
            ([t1, t2], [AbsV (AKnownFoldedMask m), AbsV (ARef r), AbsV (AField f), BoolV b]) \<Rightarrow> 
              Some (AbsV (AKnownFoldedMask (m((r,f) := b))))
         | _ \<Rightarrow> None)"
+
+lemma store_knownfolded_mask_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf 
+              (vbpl_absval_ty T) 
+              (2,[TConSingle (TKnownFoldedMaskId T), TConSingle (TRefId T), (TCon (TFieldId T) [(TVar 0),(TVar 1)]),(TPrim TBool)], TConSingle (TKnownFoldedMaskId T))
+              store_knownfolded_mask"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 lit_inversion_type_of_val split: val.split vbpl_absval.split)
 
 subsubsection \<open>Identical on known locations\<close>
 
@@ -442,6 +485,8 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
   where
     "fun_interp_vpr_bpl_aux Pr T F FGoodState = 
        (good_state Pr F, (0,[TConSingle (THeapId T), TConSingle (TMaskId T)],(TPrim TBool)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FGoodMask = 
+       (good_mask, (0,[TConSingle (TMaskId T)],(TPrim TBool)))"
   | "fun_interp_vpr_bpl_aux Pr T F FReadHeap = 
        (select_heap T, (2,[TConSingle (THeapId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TVar 1)))"
   | "fun_interp_vpr_bpl_aux Pr T F FUpdateHeap = 
@@ -450,8 +495,12 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
        (select_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
   | "fun_interp_vpr_bpl_aux Pr T F FUpdateMask =
        (store_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)]), TPrim TReal], TConSingle (TMaskId T)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FReadKnownFoldedMask  =
+       (select_knownfolded_mask T, (2,[TConSingle (TKnownFoldedMaskId T), TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TBool)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FUpdateKnownFoldedMask =
+       (store_knownfolded_mask, (2,[TConSingle (TKnownFoldedMaskId T), TConSingle (TRefId T), (TCon (TFieldId T) [(TVar 0),(TVar 1)]),(TPrim TBool)], TConSingle (TKnownFoldedMaskId T)))"
   | "fun_interp_vpr_bpl_aux Pr T F FHasPerm =
-       (has_perm_in_mask, (2,[TConSingle (TMaskId T),TConSingle (TRefId T),(TCon (TFieldId T) [(TVar 0),(TVar 1)])],(TPrim TReal)))"
+       (has_perm_in_mask, (2,[TConSingle (TMaskId T), TConSingle (TRefId T), (TCon (TFieldId T) [(TVar 0),(TVar 1)])], (TPrim TBool)))"
   | "fun_interp_vpr_bpl_aux Pr T F FIdenticalOnKnownLocs =
        (identical_on_known_locs, (0,[TConSingle (THeapId T), TConSingle (THeapId T), TConSingle (TMaskId T)], (TPrim TBool)))"
 

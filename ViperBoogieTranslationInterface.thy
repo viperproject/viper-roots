@@ -170,7 +170,10 @@ fun fun_repr_concrete :: fun_repr_bpl
   | "fun_repr_concrete FUpdateHeap = ''updHeap''"
   | "fun_repr_concrete FReadMask = ''readMask''"
   | "fun_repr_concrete FUpdateMask = ''updMask''"
+  | "fun_repr_concrete FReadKnownFoldedMask = ''readPMask''"
+  | "fun_repr_concrete FUpdateKnownFoldedMask = ''updPMask''"
   | "fun_repr_concrete FGoodState = ''state''"
+  | "fun_repr_concrete FGoodMask = ''GoodMask''"
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
   | "fun_repr_concrete FIdenticalOnKnownLocs = ''IdenticalOnKnownLocations''"  
 

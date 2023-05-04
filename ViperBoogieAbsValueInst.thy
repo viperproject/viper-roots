@@ -739,14 +739,59 @@ next
     by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
 qed (insert injD[OF wf_ty_repr_bpl_inj_tcon_id_repr, OF WfTyRepr], fastforce split: if_split_asm)+
 
-thm injD[OF wf_ty_repr_bpl_inj_tcon_id_repr]
-
 lemma mask_inversion_type_of_vbpl_val:
   assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
           MaskTy: "type_of_vbpl_val TyRep v = TCon (TMaskId TyRep) []"
         shows "\<exists>m. v = AbsV (AMask m)"
   apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr MaskTy])
   using mask_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
+  by blast+
+
+subsubsection \<open>Knownfolded mask\<close>
+
+lemma knownfolded_mask_inversion_vbpl_absval_ty_opt:
+  assumes "vbpl_absval_ty_opt TyRep v = Some (TKnownFoldedMaskId TyRep, [])" and
+         WfTyRepr: "wf_ty_repr_bpl TyRep"
+       shows "\<exists>m. v = AKnownFoldedMask m"
+  using assms(1)
+proof (rule vbpl_absval_ty_opt.elims)
+  fix T a
+  assume "TyRep = T" and "v = ADomainVal a"
+
+  let ?domainType = "map_option (\<lambda>tid. (tid, [])) (domain_translation T (domain_type T a))"
+  assume *: "Some (TKnownFoldedMaskId TyRep, []) = ?domainType"
+
+  thus "\<exists>m. v = AKnownFoldedMask m"
+    using tcon_id_repr_domain_tr_disj[OF WfTyRepr] \<open>TyRep = _\<close> \<open>v = _\<close>    
+    by (metis assms(1) range_eqI vbpl_absval_ty_opt.simps(3))
+next
+  fix T f
+  assume "TyRep = T" and 
+         "v = AField f" and 
+         "Some (TKnownFoldedMaskId TyRep, []) = field_ty_fun_opt T f"
+
+  thus "\<exists>m. v = AKnownFoldedMask m"
+    using field_ty_fun_two_params
+    by (metis list.discI)
+next
+  fix T tid ts
+  assume "TyRep = T" and
+         *: "Some (TKnownFoldedMaskId TyRep, []) = Some_if (\<not> is_inhabited T tid (length ts) \<and> list_all closed ts) (tid, ts)"
+         (is "_ = ?rhs")
+
+  have Inhabited: "is_inhabited TyRep (TKnownFoldedMaskId TyRep) 0"
+    by (auto intro!: is_inhabited_tcon_enum)
+
+  thus "\<exists>m. v = AKnownFoldedMask m"
+    by (metis "*" Pair_inject \<open>TyRep = T\<close> list.size(3) option.distinct(1) option.inject)
+qed (insert injD[OF wf_ty_repr_bpl_inj_tcon_id_repr, OF WfTyRepr], fastforce split: if_split_asm)+
+
+lemma knownfolded_mask_inversion_type_of_vbpl_val:
+  assumes WfTyRepr: "wf_ty_repr_bpl TyRep" and
+          MaskTy: "type_of_vbpl_val TyRep v = TCon (TKnownFoldedMaskId TyRep) []"
+        shows "\<exists>m. v = AbsV (AKnownFoldedMask m)"
+  apply (rule general_inversion_type_of_vbpl_val[OF WfTyRepr MaskTy])
+  using knownfolded_mask_inversion_vbpl_absval_ty_opt WfTyRepr wf_ty_repr_bpl_def
   by blast+
 
 subsubsection \<open>Ref\<close>
@@ -850,9 +895,11 @@ subsubsection \<open>Collection of inversion lemmas\<close>
 
 \<comment>\<open>Only include lemmas here, which have \<^term>\<open>wf_ty_repr_bpl TyRep\<close> as the first premise. This way one 
    can use \<open>...[OF WfTyRepFact]\<close> \<close>
+
 lemmas all_inversion_type_of_vbpl_val =
   heap_inversion_type_of_vbpl_val
   mask_inversion_type_of_vbpl_val
+  knownfolded_mask_inversion_type_of_vbpl_val
   ref_inversion_type_of_vbpl_val
   field_inversion_type_of_vbpl_val
   field_inversion_type_of_vbpl_val_2
