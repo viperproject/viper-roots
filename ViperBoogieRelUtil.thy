@@ -426,12 +426,13 @@ proof -
     by force
 qed
 
-lemma construct_bpl_heap_from_vpr_heap_correct:
+lemma construct_bpl_heap_from_vpr_heap_correct_aux:
   assumes WfTyRep: "wf_ty_repr_bpl TyRep" and
           HeapWellTyVpr: "total_heap_well_typed Pr \<Delta> h" and
           DomainType: "domain_type TyRep = \<Delta>" and
           Inj: "inj_on tr_field (dom tr_field)"
-  shows "\<exists>hb. heap_rel Pr tr_field h hb \<and>
+        shows "let hb = construct_bpl_heap_from_vpr_heap Pr tr_field h in
+              heap_rel Pr tr_field h hb \<and>
               vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
 proof -
   let ?hb = "construct_bpl_heap_from_vpr_heap Pr tr_field h"
@@ -485,8 +486,18 @@ proof -
   qed
 
   ultimately show ?thesis
-    by blast
+    by presburger
 qed
+
+lemma construct_bpl_heap_from_vpr_heap_correct:
+  assumes WfTyRep: "wf_ty_repr_bpl TyRep" and
+          HeapWellTyVpr: "total_heap_well_typed Pr \<Delta> h" and
+          DomainType: "domain_type TyRep = \<Delta>" and
+          Inj: "inj_on tr_field (dom tr_field)"
+  shows "\<exists>hb. heap_rel Pr tr_field h hb \<and>
+              vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
+  using assms construct_bpl_heap_from_vpr_heap_correct_aux
+  by meson
 
 subsection \<open>Introducing new Boogie variables for the well-definedness state\<close>
 
