@@ -236,16 +236,15 @@ lemma end_to_end_stmt_rel:
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
+    WfTyRep: "wf_ty_repr_bpl TyRep" and
 \<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
-     WfTyRep: "wf_ty_repr_bpl TyRep" and
      FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)" and
      InitialStateRel: "\<And> \<omega>. is_empty_total \<omega> \<Longrightarrow> 
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
+                           \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
-                           state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars) \<and>
-                           state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl)) \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
 
   shows "stmt_correct_total_2 ctxt_vpr StateCons \<Lambda> stmt_vpr"
@@ -262,16 +261,22 @@ proof (rule allI | rule impI)+
 
   obtain ns ls gs where 
     "ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>" and
-  StmtRelInitialInst: 
+  StateRelInitialInst: 
     "state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
-  GlobalsWf:
-    "state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars)" and
-  LocalsWf:
-    "state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl))" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
     using InitialStateRel[OF \<open>is_empty_total \<omega>\<close> HeapWellTy]
     by blast
+
+  from StateRelInitialInst have StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+    by (simp add: state_rel_empty_def)
+    
+  have
+    GlobalsWf: "state_typ_wf (vbpl_absval_ty TyRep) [] gs (constants @ global_vars)" and
+    LocalsWf: "state_typ_wf (vbpl_absval_ty TyRep) [] ls ((proc_args proc_bpl)@ (locals_bpl @ proc_rets proc_bpl))"
+    using state_rel_state_well_typed[OF StateRel] \<open>ns = _\<close> VarCtxtEq TypeInterpEq
+    unfolding state_rel_empty_def state_well_typed_def 
+    by auto          
   
   have ProcBodyBplCorrect:
       "(Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty)) ?abs [] (constants@global_vars, (proc_args proc_bpl)@(locals_bpl@(proc_rets proc_bpl))) (fun_interp ctxt) [] 
@@ -317,7 +322,7 @@ proof (rule allI | rule impI)+
     assume "\<not> r \<noteq> RFailure"
     hence "r = RFailure" by simp
 
-    from stmt_rel_failure_elim[OF StmtRel StmtRelInitialInst] RedStmtVpr \<open>r = _\<close> obtain c' where
+    from stmt_rel_failure_elim[OF StmtRel StateRelInitialInst] RedStmtVpr \<open>r = _\<close> obtain c' where
      FailureConfig: "snd c' = Failure" and 
       RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
       by blast
@@ -447,11 +452,15 @@ fun initial_global_state_aux :: "program \<Rightarrow> tr_vpr_bpl \<Rightarrow> 
                 if x \<in> range (const_repr Tr) then
                   Some (boogie_const_val (SOME c. const_repr Tr c = x))
                 else
-                  None             
+                  (if (\<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some x)  then
+                    Some (AbsV (AField (NormalField x (SOME t. \<exists>f_vpr. field_translation Tr f_vpr = Some x \<and> 
+                                                                       declared_fields Pr f_vpr = Some t))))
+                   else None)             
            )"
 
-lemma dom_initial_global_state_aux: "dom (initial_global_state_aux Pr Tr \<omega>) = {heap_var Tr, mask_var Tr} \<union> range (const_repr Tr)"
-  unfolding dom_def
+lemma dom_initial_global_state_aux: "dom (initial_global_state_aux Pr Tr \<omega>) \<subseteq>
+  {heap_var Tr, mask_var Tr} \<union> {f_bpl. \<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some f_bpl}  \<union> range (const_repr Tr)"
+  unfolding dom_def ran_def
   by auto
 
 lemma initial_global_state_aux_heap: 
@@ -459,7 +468,7 @@ lemma initial_global_state_aux_heap:
   by simp
 
 lemma initial_global_state_aux_mask: 
-  assumes "disjoint_list [{heap_var Tr}, {mask_var Tr}, range (const_repr Tr)]"
+  assumes "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
   shows  "initial_global_state_aux Pr Tr \<omega> (mask_var Tr) = Some (AbsV (AMask (\<lambda>_. 0)))"
 proof -
   have "mask_var Tr \<noteq> heap_var Tr"
@@ -474,7 +483,7 @@ proof -
 qed
 
 lemma initial_global_state_aux_const: 
-  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, range (const_repr Tr)]" and
+  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
           Const: "x \<in> range (const_repr Tr)"
         shows  "initial_global_state_aux Pr Tr \<omega> x = Some (boogie_const_val (SOME c. const_repr Tr c = x))"
 proof -
@@ -482,7 +491,7 @@ proof -
     apply (insert Disj)
     apply (unfold disjoint_list_def)
     apply (erule allE[where ?x = 0])
-    apply (erule allE[where ?x = 2])
+    apply (erule allE[where ?x = 3])
     apply simp
     using Const
     by blast
@@ -491,7 +500,7 @@ proof -
     apply (insert Disj)
     apply (unfold disjoint_list_def)
     apply (erule allE[where ?x = 1])
-    apply (erule allE[where ?x = 2])
+    apply (erule allE[where ?x = 3])
     apply simp
     using Const
     by blast
@@ -501,27 +510,97 @@ proof -
     by simp
 qed
 
+lemma initial_global_state_aux_field: 
+  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
+          Field: "\<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some x"
+  shows  "initial_global_state_aux Pr Tr \<omega> x = Some (AbsV (AField (NormalField x (SOME t. \<exists>f_vpr. field_translation Tr f_vpr = Some x \<and> 
+                                                                       declared_fields Pr f_vpr = Some t))))"
+proof -
+  have "x \<in> ran (field_translation Tr)"
+    using Field ranI
+    by fast
+
+  have "x \<noteq> heap_var Tr"
+    apply (insert Disj)
+    apply (unfold disjoint_list_def)
+    apply (erule allE[where ?x = 0])
+    apply (erule allE[where ?x = 2])
+    apply simp
+    using \<open>x \<in> _\<close>
+    by blast
+
+  moreover have "x \<noteq> mask_var Tr"
+    apply (insert Disj)
+    apply (unfold disjoint_list_def)
+    apply (erule allE[where ?x = 1])
+    apply (erule allE[where ?x = 2])
+    apply simp
+    using \<open>x \<in> _\<close>
+    by blast
+
+  moreover have "x \<notin> range (const_repr Tr)"
+    apply (insert Disj)
+    apply (unfold disjoint_list_def)
+    apply (erule allE[where ?x = 3])
+    apply (erule allE[where ?x = 2])
+    apply simp
+    using \<open>x \<in> _\<close>
+    by (meson disjnt_iff)
+
+  ultimately show ?thesis
+    using Field
+    by simp
+qed
+
+lemma initial_global_state_aux_field_2: 
+  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
+          Inj: "inj_on (field_translation Tr) (dom (field_translation Tr))" and
+          FieldTr: "field_translation Tr f_vpr = Some x" and
+          FieldVpr: "declared_fields Pr f_vpr = Some t"
+        shows  "initial_global_state_aux Pr Tr \<omega> x = Some (AbsV (AField (NormalField x t)))" (is "?g x = _")
+proof -
+  have *: "\<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some x"
+    using FieldTr FieldVpr
+    by blast
+
+  note Aux = initial_global_state_aux_field[OF Disj *]
+  with FieldTr FieldVpr obtain f'_vpr t' where 
+    "?g x = Some (AbsV (AField (NormalField x t')))" and
+    "field_translation Tr f'_vpr = Some x \<and> declared_fields Pr f'_vpr = Some t'"     
+    by (smt (verit, best) exE_some) (* SMT proof *)
+
+  thus ?thesis
+    using Inj FieldTr FieldVpr   
+    by (metis domI inj_on_contraD option.inject)
+qed
+
 abbreviation initial_global_state 
   where "initial_global_state T vs Pr Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_global_state_aux Pr Tr \<omega>)"
-
 
 lemma initial_global_state_aux_typ_wf:
   assumes 
           WfTyRepr: "wf_ty_repr_bpl T" and
           InjTrField:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
-          Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, range (const_repr Tr)]" and
+          Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
           Closed: "list_all (closed \<circ> (fst \<circ> snd)) vs" and
-          VprHeapTy:  "total_heap_well_typed Pr (domain_type T) (get_hh_total_full \<omega>)" and
+          VprHeapTy: "total_heap_well_typed Pr (domain_type T) (get_hh_total_full \<omega>)" and
+          FieldTrTy: "\<And>f_vpr t_vpr. declared_fields Pr f_vpr = Some t_vpr \<Longrightarrow>
+                        \<exists>f_bpl t_bpl.  
+                             field_translation Tr f_vpr = Some f_bpl \<and>
+                             vpr_to_bpl_ty T t_vpr = Some t_bpl \<and>
+                             lookup_vdecls_ty vs f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])" and
           HeapTy: "lookup_vdecls_ty vs (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty vs (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<And>c. lookup_vdecls_ty vs (const_repr Tr c) = Some (boogie_const_ty T c)"
         shows "state_typ_wf (vbpl_absval_ty T) [] (initial_global_state T vs Pr Tr \<omega>) vs"
 proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_inhabited])
+  let ?field_tr_dom = "{f_bpl. \<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some f_bpl}"
+
   fix x t v
   assume LookupTy: "lookup_vdecls_ty vs x = Some t" and
          "initial_global_state_aux Pr Tr \<omega> x = Some v" (is "?ns x = _")
 
-  hence *:"x \<in> {heap_var Tr} \<union> {mask_var Tr} \<union> range (const_repr Tr)"
+  hence *:"x \<in> {heap_var Tr} \<union> {mask_var Tr} \<union> ?field_tr_dom \<union> range (const_repr Tr)"
     using dom_initial_global_state_aux
     by blast
 
@@ -530,28 +609,51 @@ proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_i
     case 1
     then show ?thesis 
     proof (cases rule: Set.UnE[OF 1])
+      case 1
+      then show ?thesis
+      proof (cases rule: Set.UnE[OF 1])
       case 1 \<comment>\<open>heap_var case\<close>
-      hence "x = heap_var Tr" by simp
-      hence "v = (AbsV (AHeap (construct_bpl_heap_from_vpr_heap Pr (field_translation Tr) (get_hh_total_full \<omega>))))" (is "v = ?h")
+        hence "x = heap_var Tr" by simp
+        hence "v = (AbsV (AHeap (construct_bpl_heap_from_vpr_heap Pr (field_translation Tr) (get_hh_total_full \<omega>))))" (is "v = ?h")
+          using \<open>?ns x = Some v\<close>
+          by simp
+        have "type_of_vbpl_val T ?h = (TConSingle (THeapId T))"
+          using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr VprHeapTy _ InjTrField]
+          by simp      
+        
+        then show ?thesis        
+          using HeapTy LookupTy \<open>v = _\<close> \<open>x = heap_var Tr\<close> 
+          by auto
+      next
+        case 2 \<comment>\<open>mask_var case\<close>
+        hence "x = mask_var Tr" by simp
+        hence "v = AbsV (AMask (\<lambda>_. 0))"
+          using \<open>?ns x = Some v\<close>  initial_global_state_aux_mask[OF Disj, where ?Pr=Pr and ?\<omega>=\<omega>]
+          by simp        
+  
+        then show ?thesis 
+          using MaskTy LookupTy \<open>x = _\<close>
+          by simp    
+      qed
+    next
+      case 2 \<comment>\<open>field translation\<close>
+      from this obtain f_vpr t_vpr where FieldLookup: "declared_fields Pr f_vpr = Some t_vpr" and 
+                                     FieldTr: "field_translation Tr f_vpr = Some x"
+        by blast
+      from this obtain t_bpl where 
+         TyBpl: "vpr_to_bpl_ty T t_vpr = Some t_bpl" and
+         LookupFieldTyBpl: "lookup_vdecls_ty vs x = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])"         
+        using FieldTrTy[OF FieldLookup]
+        by auto
+        
+      from initial_global_state_aux_field_2[OF Disj InjTrField FieldTr FieldLookup, where ?\<omega>=\<omega>] have
+         "v = AbsV (AField (NormalField x t_vpr))"
         using \<open>?ns x = Some v\<close>
         by simp
-      have "type_of_vbpl_val T ?h = (TConSingle (THeapId T))"
-        using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr VprHeapTy _ InjTrField]
-        by simp      
-      
-      then show ?thesis        
-        using HeapTy LookupTy \<open>v = _\<close> \<open>x = heap_var Tr\<close> 
-        by auto
-    next
-      case 2 \<comment>\<open>mask_var case\<close>
-      hence "x = mask_var Tr" by simp
-      hence "v = AbsV (AMask (\<lambda>_. 0))"
-        using \<open>?ns x = Some v\<close>  initial_global_state_aux_mask[OF Disj, where ?Pr=Pr and ?\<omega>=\<omega>]
+        
+      thus ?thesis
+        using LookupFieldTyBpl LookupTy TyBpl 
         by simp        
-
-      then show ?thesis 
-        using MaskTy LookupTy \<open>x = _\<close>
-        by simp    
     qed
   next
     case 2 \<comment>\<open>const case\<close>
@@ -680,31 +782,39 @@ qed
 
 subsubsection \<open>Properties\<close>
 
-lemma temp:
+lemma init_state_in_state_relation:
   assumes "is_empty_total \<omega>" and
           WfTyRepr: "wf_ty_repr_bpl T" and
           ViperHeapWellTy: "total_heap_well_typed ((program_total ctxt_vpr)) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>)" and
          TyInterp: "type_interp ctxt = vbpl_absval_ty T" and
           DomainTy:  "domain_type T = absval_interp_total ctxt_vpr" and
-          "local_state ns = initial_local_state T vs Tr \<omega>" and
-          "global_state ns = initial_global_state T vs (program_total ctxt_vpr) Tr \<omega>" and
+          "ns = \<lparr> old_global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
+                  global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
+                  local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
+                  binder_state = Map.empty \<rparr>" and
          Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
                                ran (field_translation Tr), range (const_repr Tr), dom Map.empty]" and
-         InjVarRel: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
+         InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
 
-          ClosedLocals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
-          ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (snd (var_context ctxt))" and
+          ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
+          ClosedLocals: "list_all (closed \<circ> (fst \<circ> snd)) (snd (var_context ctxt))" and
           GlobalsLocalsDisj: "set (map fst (fst (var_context ctxt))) \<inter> set (map fst (snd (var_context ctxt))) = {}" and
 
           "heap_var Tr = heap_var_def Tr" and
           "mask_var Tr = mask_var_def Tr" and
 
 \<comment>\<open>Global state assumptions\<close>
-          InjTrField:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
+          InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
+          InjConstRepr: "inj (const_repr Tr)" and
+          FieldTrTy: "\<And>f_vpr t_vpr. declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr \<Longrightarrow>
+                        \<exists>f_bpl t_bpl.  
+                             field_translation Tr f_vpr = Some f_bpl \<and>
+                             vpr_to_bpl_ty T t_vpr = Some t_bpl \<and>
+                             lookup_vdecls_ty (fst (var_context ctxt)) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])" and
           HeapTy: "lookup_vdecls_ty (fst (var_context ctxt)) (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty (fst (var_context ctxt)) (mask_var Tr) = Some (TConSingle (TMaskId T))" and
-          ConstTy: "\<And>c. lookup_vdecls_ty vs (const_repr Tr c) = Some (boogie_const_ty T c)" and
+          ConstTy: "\<And>c. lookup_vdecls_ty (fst (var_context ctxt)) (const_repr Tr c) = Some (boogie_const_ty T c)" and
 
 \<comment>\<open>Local state assumptions\<close>
           VarTranslationTy: "\<And> x_vpr x_bpl. var_translation Tr x_vpr = Some x_bpl \<Longrightarrow>
@@ -714,103 +824,187 @@ lemma temp:
 
 
   shows "state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) T Tr Map.empty) \<omega> ns"
+proof -
+  from \<open>ns = _\<close> have
+    "local_state ns = initial_local_state T (snd (var_context ctxt)) Tr \<omega>" and
+    "global_state ns = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>" and
+    "old_global_state ns = global_state ns" and
+    "binder_state ns = Map.empty"
+    by simp_all
+
+  have "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (field_translation Tr), range (const_repr Tr)]"
+    by (rule disjoint_list_sublist[OF Disj]) auto
+  hence DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
+    by (rule disjoint_list_subset_list_all2) blast
+
+  show ?thesis
   unfolding state_rel_empty_def state_rel_def state_rel0_def
-proof (rule conjI[OF \<open>is_empty_total \<omega>\<close>], intro conjI)
+  proof (rule conjI[OF \<open>is_empty_total \<omega>\<close>], intro conjI)
 
-  have Aux: "\<And>var_vpr var_bpl val_vpr.
-       var_translation Tr var_vpr = Some var_bpl \<Longrightarrow> get_store_total \<omega> var_vpr = Some val_vpr \<Longrightarrow> 
-       lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
-  proof -    
-    fix var_vpr var_bpl val_vpr
-    assume VarTrSome: "var_translation Tr var_vpr = Some var_bpl" and
-           "get_store_total \<omega> var_vpr = Some val_vpr" 
-
-    moreover from this obtain t where LookupTy: "lookup_vdecls_ty (snd (var_context ctxt)) var_bpl = Some t"
-      using VarTranslationTy
-      by blast
-
-    ultimately have "local_state ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
-      apply (subst \<open>local_state ns = _\<close>)
-      using initial_local_state_aux_Some[OF InjVarRel]
-      by fastforce
-
-    thus "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
-      using LookupTy
-      by (metis lookup_var_local lookup_vdecls_ty_map_of prod.exhaust_sel)
-  qed
-           
-  show "store_rel (type_interp ctxt) (var_context ctxt) Tr \<omega> ns"
-    unfolding store_rel_def
-    apply (rule conjI[OF InjVarRel], (rule allI | rule impI)+)
-    using VarTranslationTy TyInterp Aux
-    by (metis lookup_vdecls_ty_local_3)
-
-next
-
-  show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var Tr) \<omega> ns"
-    unfolding heap_var_rel_def
-  proof (rule exI, intro conjI)
-    have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
-                    (is "_ = Some (AbsV (AHeap ?hb))")
-      by (simp add: \<open>global_state ns = _\<close>) 
+    have Aux: "\<And>var_vpr var_bpl val_vpr.
+         var_translation Tr var_vpr = Some var_bpl \<Longrightarrow> get_store_total \<omega> var_vpr = Some val_vpr \<Longrightarrow> 
+         lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
+    proof -    
+      fix var_vpr var_bpl val_vpr
+      assume VarTrSome: "var_translation Tr var_vpr = Some var_bpl" and
+             "get_store_total \<omega> var_vpr = Some val_vpr" 
   
-    with GlobalsLocalsDisj and HeapTy
-    show "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap ?hb))"
-      by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.collapse)
+      moreover from this obtain t where LookupTy: "lookup_vdecls_ty (snd (var_context ctxt)) var_bpl = Some t"
+        using VarTranslationTy
+        by blast
+  
+      ultimately have "local_state ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
+        apply (subst \<open>local_state ns = _\<close>)
+        using initial_local_state_aux_Some[OF InjVarTr]
+        by fastforce
+  
+      thus "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
+        using LookupTy
+        by (metis lookup_var_local lookup_vdecls_ty_map_of prod.exhaust_sel)
+    qed
+             
+    show "store_rel (type_interp ctxt) (var_context ctxt) Tr \<omega> ns"
+      unfolding store_rel_def
+      apply (rule conjI[OF InjVarTr], (rule allI | rule impI)+)
+      using VarTranslationTy TyInterp Aux
+      by (metis lookup_vdecls_ty_local_3)
+  
   next
-    from GlobalsLocalsDisj and HeapTy
-    show "lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId T))"
-      by (metis lookup_var_decl_global_2 lookup_var_ty_def lookup_vdecls_ty_def lookup_vdecls_ty_map_of)
-  next
-    show "vbpl_absval_ty_opt T (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))) = Some (THeapId T, [])"
-      using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr ViperHeapWellTy DomainTy InjTrField] 
-      by meson
-  next
-    show "heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>)
-     (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))"
-      using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr ViperHeapWellTy DomainTy InjTrField] 
-      by meson
-  qed
+  
+    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var Tr) \<omega> ns"
+      unfolding heap_var_rel_def
+    proof (rule exI, intro conjI)
+      have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
+                      (is "_ = Some (AbsV (AHeap ?hb))")
+        by (simp add: \<open>global_state ns = _\<close>) 
+    
+      with GlobalsLocalsDisj and HeapTy
+      show "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap ?hb))"
+        by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.collapse)
+    next
+      from GlobalsLocalsDisj and HeapTy
+      show "lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId T))"
+        by (metis lookup_var_decl_global_2 lookup_var_ty_def lookup_vdecls_ty_def lookup_vdecls_ty_map_of)
+    next
+      show "vbpl_absval_ty_opt T (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))) = Some (THeapId T, [])"
+        using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr ViperHeapWellTy DomainTy InjFieldTr] 
+        by meson
+    next
+      show "heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>)
+       (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))"
+        using construct_bpl_heap_from_vpr_heap_correct_aux[OF WfTyRepr ViperHeapWellTy DomainTy InjFieldTr] 
+        by meson
+    qed
+  
+    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var_def Tr) \<omega> ns"
+      using \<open>heap_var Tr = _\<close>
+      by simp
+  next  
+    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var Tr) \<omega> ns"
+      unfolding mask_var_rel_def
+    proof (rule exI, intro conjI)
+                    
+      have "global_state ns (mask_var Tr) = Some (AbsV (AMask zero_mask_bpl))"
+                      (is "_ = Some (AbsV (AMask ?mb))")
+        apply (subst \<open>global_state ns = _\<close>)
+        using initial_global_state_aux_mask[OF DisjAux, where ?Pr="program_total ctxt_vpr" and ?\<omega>=\<omega>]
+        by simp
+  
+      with GlobalsLocalsDisj and MaskTy      
+      show "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask ?mb))"
+        by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.collapse)
+    next
+      show "lookup_var_ty (var_context ctxt) (mask_var Tr) = Some (TConSingle (TMaskId T))"
+        using GlobalsLocalsDisj and MaskTy
+        by (metis (no_types, opaque_lifting) lookup_var_decl_global_2 lookup_var_ty_def lookup_vdecls_ty_def lookup_vdecls_ty_map_of option.inject)
+    next    
+      show "mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) zero_mask_bpl"
+        using \<open>is_empty_total \<omega>\<close>
+        unfolding mask_rel_def is_empty_total_def zero_mask_def      
+        by (simp add: pnone.rep_eq)
+    qed
+  
+    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var_def Tr) \<omega> ns"
+      using \<open>mask_var Tr = _\<close>
+      by simp
+  
+    show "field_rel (program_total ctxt_vpr) (var_context ctxt) Tr ns"
+      unfolding field_rel_def
+    proof (rule conjI[OF InjFieldTr], (rule allI | rule impI)+)
+      fix f_vpr t_vpr
+      assume FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr"
+      with FieldTrTy obtain f_bpl t_bpl
+        where FieldTr: "field_translation Tr f_vpr = Some f_bpl" and
+                       "vpr_to_bpl_ty T t_vpr = Some t_bpl" and
+              FieldGlobal:  "lookup_vdecls_ty (fst (var_context ctxt)) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])"
+        by blast
 
-  thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var_def Tr) \<omega> ns"
-    using \<open>heap_var Tr = _\<close>
-    by simp
-next
-  show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var Tr) \<omega> ns"
-    unfolding mask_var_rel_def
-  proof (rule exI, intro conjI)
-    thm initial_global_state_aux_mask
-    have "global_state ns (mask_var Tr) = Some (AbsV (AMask zero_mask_bpl))"
-                    (is "_ = Some (AbsV (AMask ?mb))")
-      using initial_global_state_aux_mask Disj (* Try using disjoint_list append to prove premise *)
+
+      from FieldGlobal GlobalsLocalsDisj have 
+        "lookup_var (var_context ctxt) ns f_bpl = global_state ns f_bpl"
+        by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.exhaust_sel)
       
-    show "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask ?mb))"
+      moreover from initial_global_state_aux_field_2[OF DisjAux InjFieldTr FieldTr FieldLookup, where ?\<omega>=\<omega>]
+      have "global_state ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))"
+        using \<open>global_state ns = _\<close>
+        by simp
+      
+      ultimately show "has_Some (\<lambda>f_bpl. lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))) (field_translation Tr f_vpr)"
+        using FieldTr
+        by simp
+    qed
+  next
+  
+    show "boogie_const_rel (const_repr Tr) (var_context ctxt) ns"
+      unfolding boogie_const_rel_def
+    proof (rule allI)
+      fix c
+      let ?cr = "const_repr Tr c"
 
-  thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var_def Tr) \<omega> ns"
-    using \<open>mask_var Tr = _\<close>
-    by simp
-next
+      from ConstTy GlobalsLocalsDisj
+      have LookupVar: "lookup_var (var_context ctxt) ns ?cr = global_state ns ?cr"
+        by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.exhaust_sel)
 
-  show "field_rel (program_total ctxt_vpr) (var_context ctxt) Tr ns"
-    sorry
+      from initial_global_state_aux_const[OF DisjAux, where ?Pr="program_total ctxt_vpr" and ?\<omega>=\<omega> and ?x="?cr"] InjConstRepr
+      have "initial_global_state_aux (program_total ctxt_vpr) Tr \<omega> (const_repr Tr c) = Some (boogie_const_val c)"
+      using inj_eq by fastforce
 
-next
+      hence "global_state ns ?cr = Some (boogie_const_val c)"
+        by (simp add: \<open>global_state ns = _\<close>)
 
-  show "boogie_const_rel (const_repr Tr) (var_context ctxt) ns"
-    sorry
+      with LookupVar show "lookup_var (var_context ctxt) ns (const_repr Tr c) = Some (boogie_const_val c)"
+        by argo
+    qed
 
-next
-
-  show "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns"
-    unfolding state_well_typed_def
-    sorry
-
-next
-
-  show "aux_vars_pred_sat (var_context ctxt) Map.empty ns"
-    by (simp add: aux_vars_pred_sat_def)
-
-qed (insert assms, auto)
+  next
+  
+    show "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns"
+      unfolding state_well_typed_def
+    proof (intro conjI)
+      show "state_typ_wf (type_interp ctxt) [] (local_state ns) (snd (var_context ctxt))"
+        apply (subst \<open>local_state ns = _\<close>)
+        apply (subst TyInterp)
+        by (rule initial_local_state_aux_typ_wf[OF WfTyRepr ClosedLocals VarTranslationTy InjVarTr])
+    next
+      show "state_typ_wf (type_interp ctxt) [] (global_state ns) (fst (var_context ctxt))"
+        apply (subst \<open>global_state ns = _\<close>)
+        apply (subst TyInterp)
+        apply (rule initial_global_state_aux_typ_wf[OF WfTyRepr InjFieldTr DisjAux ClosedGlobals _ FieldTrTy HeapTy MaskTy ConstTy])
+        using ViperHeapWellTy DomainTy
+        by simp_all
+    
+      thus "state_typ_wf (type_interp ctxt) [] (old_global_state ns) (fst (var_context ctxt))"
+        using \<open>old_global_state ns = _\<close>
+        by simp
+    next
+      show "binder_state ns = Map.empty"
+        by (rule \<open>binder_state ns = _\<close>)
+    qed
+  next  
+    show "aux_vars_pred_sat (var_context ctxt) Map.empty ns"
+      by (simp add: aux_vars_pred_sat_def)  
+  qed (insert assms, auto)
+qed
 
 
 end

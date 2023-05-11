@@ -451,4 +451,79 @@ lemma disjoint_list_subset:
   unfolding disjoint_list_def
   by (metis disjnt_subset1 disjnt_subset2)
 
+lemma disjoint_list_subset_list_all2: 
+  assumes "disjoint_list xs" and
+          "list_all2 (\<lambda>x y. x \<subseteq> y) xs' xs"
+        shows "disjoint_list xs'"
+  apply (rule disjoint_list_subset[OF assms(1)])
+   apply (simp add: list_all2_lengthD[OF assms(2)])
+  by (simp add: list_all2_nthD2[OF assms(2)])
+
+lemma disjoint_list_sublist:
+  assumes "disjoint_list xs" and
+          "set xs' \<subseteq> set xs"
+        shows "disjoint_list xs'"
+  using assms
+  unfolding disjoint_list_def
+  sorry
+
+subsection \<open>Strictly Ordered Lists\<close>
+
+\<comment>\<open>TODO: the passification metatheory contains a more specific version of this --> move this to 
+  a theory in Boogie proof gen and then reuse the definitions in the passification metatheory\<close>
+
+lemma distinct_helper: \<comment>\<open>copied from passification metatheory --> TODO: merge\<close>
+  assumes A1:"(x, fx) \<in> set xs" and 
+          A2:"(y, fy) \<in> set xs" and
+          "x \<noteq> y"
+          "distinct (map snd xs)"
+        shows "fx \<noteq> fy"  
+proof -
+  thm distinct_conv_nth
+  from A1 obtain i where "i < length xs" and  "xs ! i = (x, fx)"
+    by (meson in_set_conv_nth)
+  moreover from A2 obtain j where "j < length xs" and "xs ! j = (y, fy)"
+    by (meson in_set_conv_nth)
+  ultimately show ?thesis using \<open>x \<noteq> y\<close> \<open>distinct (map snd xs)\<close> distinct_conv_nth
+    by (metis eq_snd_iff length_map nth_map prod.inject)
+qed
+
+fun strictly_ordered_list :: "('a :: linorder) list \<Rightarrow> bool"
+  where 
+    "strictly_ordered_list [] = True"
+  | "strictly_ordered_list [x] = True"
+  | "strictly_ordered_list (x#y#zs) = (x < y \<and> strictly_ordered_list (y#zs))"
+
+lemma strictly_ordered_list_smaller: "strictly_ordered_list (a#xs) \<Longrightarrow> (\<forall> b \<in> (set xs).a < b)"
+  by (induction arbitrary:a rule: strictly_ordered_list.induct) auto
+
+lemma strictly_ordered_list_distinct: "strictly_ordered_list xs \<Longrightarrow> distinct xs"
+proof (induction rule: strictly_ordered_list.induct)
+case 1
+then show ?case by simp
+next
+  case (2 x)
+  then show ?case by simp
+next
+  case (3 x y zs)
+  then show ?case 
+    by (meson distinct.simps(2) less_imp_neq strictly_ordered_list.simps(3) strictly_ordered_list_smaller)
+qed
+
+lemma strictly_ordered_list_inj:
+  assumes "strictly_ordered_list (map snd xs)"
+  shows "inj_on (map_of xs) (dom (map_of xs))"
+  unfolding inj_on_def
+proof clarify
+  fix x0 y0 x1 y1
+  assume "map_of xs x0 = Some y0" and
+         "map_of xs x1 = Some y1" and
+         "map_of xs x0 = map_of xs x1"
+
+  thus "x0 = x1"
+    using assms
+    by (metis distinct_helper map_of_SomeD strictly_ordered_list_distinct)
+qed
+
+
 end

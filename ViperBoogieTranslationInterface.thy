@@ -263,10 +263,17 @@ fun const_repr_basic :: "boogie_const \<Rightarrow> vname"
   | "const_repr_basic CNull = 0"
   | "const_repr_basic CZeroMask = 1"
 
+lemma inj_const_repr_basic: "inj const_repr_basic"
+  unfolding inj_def
+  apply (rule allI)+
+  apply (rule impI)
+  apply (rename_tac c1 c2)
+  by (case_tac c1; case_tac c2; simp)
+
 lemma const_repr_basic_bound: "const_repr_basic c = x \<Longrightarrow> x \<le> 4"
   by (cases c) auto
 
-lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<le> 4"
+lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<ge> 0 \<and> x \<le> 4"
   using const_repr_basic_bound
   by fastforce  
 

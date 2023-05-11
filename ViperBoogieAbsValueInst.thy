@@ -213,7 +213,7 @@ next
     by auto
   thus "ty_bpl \<noteq> TCon (TDummyId T) t_args"
     using tdummyid_fresh[OF assms(1)]
-    by (metis UnI2 imageI ranI ty.inject(3))
+    by (metis UnI2 ranI ty.inject(3))
 qed (auto)
 
 fun field_ty_fun_opt :: "'a ty_repr_bpl \<Rightarrow> 'a vb_field \<rightharpoonup> (tcon_id \<times> ty list)"

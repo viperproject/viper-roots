@@ -180,4 +180,35 @@ shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont
   using assms(4) RedAssumeOk
   by blast
 
+subsection \<open>Misc\<close>
+
+lemma closed_wf_ty_eq: "closed \<tau> = wf_ty 0 \<tau>"
+proof (induction \<tau>)
+  case (TCon tid args)
+  show ?case 
+  proof 
+    assume "wf_ty 0 (TCon tid args)"
+    hence "list_all (wf_ty 0) args"
+      by simp
+    hence "list_all closed args"
+      using TCon.IH list_all_cong
+      by blast
+    thus "closed (TCon tid args)"
+      by simp
+  next
+    assume "closed (TCon tid args)"
+    hence "list_all closed args"
+      by simp
+    hence "list_all (wf_ty 0) args"
+      using TCon.IH list_all_cong
+      by blast
+    thus "wf_ty 0 (TCon tid args)"
+      by simp
+  qed
+qed auto
+
+lemma closed_wf_ty_fun_eq: "closed = wf_ty 0"
+  using closed_wf_ty_eq
+  by presburger
+
 end

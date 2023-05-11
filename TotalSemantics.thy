@@ -337,6 +337,10 @@ lemmas red_stmt_total_inversion_thms =
 definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
   where "is_empty_total \<omega> \<equiv> get_mh_total_full \<omega> = zero_mask \<and> get_mp_total_full \<omega> = zero_mask"
 
+lemma is_empty_total_wf_mask: "is_empty_total \<omega> \<Longrightarrow> wf_mask_simple (get_mh_total_full \<omega>)"
+  unfolding is_empty_total_def
+  by (simp add: wf_zero_mask)
+
 subsection \<open>Correctness\<close>
 
 definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
