@@ -177,6 +177,14 @@ fun fun_repr_concrete :: fun_repr_bpl
   | "fun_repr_concrete FHasPerm = ''HasDirectPerm''"
   | "fun_repr_concrete FIdenticalOnKnownLocs = ''IdenticalOnKnownLocations''"  
 
+lemma fun_repr_concrete_inj: "inj fun_repr_concrete"
+  unfolding inj_def
+proof clarify
+  fix x y
+  show "fun_repr_concrete x = fun_repr_concrete y \<Longrightarrow> x = y"
+    by (cases x; cases y; simp)
+qed
+
 (* potentially useful to prove injectivity:
 lemma "card {''readHeap'', ''updHeap'', ''readMask'', ''updMask'', ''state'', ''HasDirectPerm'', ''IdenticalOnKnownLocations''} = 7"
   by simp

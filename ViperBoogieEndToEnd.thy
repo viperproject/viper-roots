@@ -2,31 +2,27 @@ theory ViperBoogieEndToEnd
 imports StmtRel
 begin
 
+definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp list \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_store_well_typed A vs \<sigma> \<equiv> \<forall>i. 0 \<le> i \<and> i < length vs \<longrightarrow> 
+                         map_option (\<lambda>v. get_type A v) (\<sigma> i) = Some (vs ! i)"
+
+definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total ctxt R mdecl \<equiv>
+        \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
+         (\<forall>(\<omega> :: 'a full_total_state) r. 
+                  vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+                  total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
+                  is_empty_total \<omega> \<longrightarrow>
+                  red_stmt_total ctxt R (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) mbody \<omega> r \<longrightarrow> r \<noteq> RFailure)"
+
+(*
 definition stmt_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> (nat \<Rightarrow> vtyp option) \<Rightarrow> stmt \<Rightarrow> bool" where
   "stmt_correct_total_2 ctxt R \<Lambda> s \<equiv>
         \<forall>(\<omega> :: 'a full_total_state) r. 
                   is_empty_total \<omega> \<longrightarrow> 
                   total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
                   red_stmt_total ctxt R \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure"
-
-lemma proc_is_correct_elim:
-  assumes 
-     "proc_is_correct A fun_decls constants global_vars axioms proc proc_body_satisfies_spec_general" and
-     "proc_body proc = Some (locals, p_body)" and
-     "\<forall>t. closed t \<longrightarrow> (\<exists>v. type_of_val A (v :: 'a val) = t)" and
-     "\<forall>v. closed ((type_of_val A) v)" and
-     "fun_interp_wf A fun_decls \<Gamma>" and
-     "(list_all closed \<Omega> \<and> length \<Omega> = proc_ty_args proc)" and
-     "state_typ_wf A \<Omega> gs (constants @ global_vars)" and
-     "state_typ_wf A \<Omega> ls ((proc_args proc)@ (locals @ proc_rets proc))" and
-     "axioms_sat A (constants, []) \<Gamma> (global_to_nstate (state_restriction gs constants)) axioms"
-shows 
-  "(proc_body_satisfies_spec_general 
-                                        A [] (constants@global_vars, (proc_args proc)@(locals@(proc_rets proc))) \<Gamma> \<Omega> 
-                                       (proc_all_pres proc) (proc_checked_posts proc) p_body
-                                       \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> )"
-  using assms
-  by fastforce
+*)
 
 lemma valid_configuration_not_failure:
   assumes "valid_configuration A \<Lambda> \<Gamma> \<Omega> posts bb cont state"
@@ -214,13 +210,15 @@ lemma end_to_end_stmt_rel:
              \<comment>\<open>Note that we need to explicitly provide the type for term\<open>A\<close> to 
                 be able to instantiate A with \<^term>\<open>vbpl_absval_ty TyRep\<close>\<close>
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
-                  (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and
+                  (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and 
+
+          VprMethodBodySome: "method_decl.body mdecl = Some body_vpr" and
 
           ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
 
           \<comment>\<open>Viper encoding does not use Boogie procedure preconditions\<close>
           ProcPresEmpty: "proc_pres proc_bpl = []" and
-
+                         "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))" and
           \<comment>\<open>Viper and Boogie statement are related\<close>
           StmtRel: "stmt_rel 
              \<comment>\<open>input relation\<close>
@@ -228,7 +226,7 @@ lemma end_to_end_stmt_rel:
              \<comment>\<open>output relation is irrelevant\<close>
              R' 
              ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
-             stmt_vpr 
+             body_vpr 
              \<comment>\<open>initial program point in Boogie procedure body\<close>
              (convert_ast_to_program_point proc_body_bpl)
              \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
@@ -239,21 +237,31 @@ lemma end_to_end_stmt_rel:
     WfTyRep: "wf_ty_repr_bpl TyRep" and
 \<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
      FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)" and
-     InitialStateRel: "\<And> \<omega>. is_empty_total \<omega> \<Longrightarrow> 
+     InitialStateRel: "\<And> \<omega>.  
+                       vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
+                       is_empty_total \<omega> \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
 
-  shows "stmt_correct_total_2 ctxt_vpr StateCons \<Lambda> stmt_vpr"
-  unfolding stmt_correct_total_2_def
+ (*shows "stmt_correct_total_2 ctxt_vpr StateCons \<Lambda> stmt_vpr"*)
+shows "vpr_method_correct_total ctxt_vpr StateCons mdecl"
+  unfolding vpr_method_correct_total_def
 proof (rule allI | rule impI)+
-  fix \<omega> r 
-  assume "is_empty_total \<omega>" and 
+  let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
+  fix \<omega> r  body_vpr_prf
+  assume "method_decl.body mdecl = Some body_vpr_prf" and
+         StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
-         RedStmtVpr:"red_stmt_total ctxt_vpr StateCons \<Lambda> stmt_vpr \<omega> r"
+         "is_empty_total \<omega>" and
+         RedStmtVpr:"red_stmt_total ctxt_vpr StateCons ?\<Lambda> body_vpr_prf \<omega> r"
+
+  hence "body_vpr_prf = body_vpr"
+    using VprMethodBodySome
+    by simp
   
   let ?abs="vbpl_absval_ty TyRep"
 
@@ -265,7 +273,7 @@ proof (rule allI | rule impI)+
     "state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-    using InitialStateRel[OF \<open>is_empty_total \<omega>\<close> HeapWellTy]
+    using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total \<omega>\<close>]
     by blast
 
   from StateRelInitialInst have StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
@@ -325,6 +333,7 @@ proof (rule allI | rule impI)+
     from stmt_rel_failure_elim[OF StmtRel StateRelInitialInst] RedStmtVpr \<open>r = _\<close> obtain c' where
      FailureConfig: "snd c' = Failure" and 
       RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
+      using \<open>body_vpr_prf = _\<close> \<open>\<Lambda> = _\<close>
       by blast
 
     let ?c'_program_point = "fst c'"
@@ -782,6 +791,76 @@ qed
 
 subsubsection \<open>Properties\<close>
 
+lemma list_all2_map_of:
+  assumes "list_all2 P xs ys" and
+          "\<forall> x y. P x y \<longrightarrow> fst x = fst y" and
+          "map_of xs a = Some b"
+        shows "\<exists>c. map_of ys a = Some c \<and> P (a,b) (a,c)"
+  sorry
+
+lemma list_all2_map_of_2:
+  assumes "list_all2 P xs ys" and
+          "\<forall> x y. P x y \<longrightarrow> fst x = fst y" 
+        shows "\<forall> a b. map_of xs a = Some b \<longrightarrow> (\<exists>c. map_of ys a = Some c \<and> P (a,b) (a,c))"
+  apply clarify
+  apply (rule list_all2_map_of)
+  using assms
+  by auto
+
+definition field_tr_prop
+  where "field_tr_prop T global_decls f_vpr_ty_vpr f_vpr_f_bpl \<equiv>  
+      \<exists>ty_bpl.
+           (fst f_vpr_ty_vpr = fst f_vpr_f_bpl)   \<and>
+            vpr_to_bpl_ty T (snd f_vpr_ty_vpr) = Some ty_bpl \<and>
+            lookup_vdecls_ty global_decls (snd f_vpr_f_bpl) =
+            Some
+             (TCon (TFieldId T) [TConSingle (TNormalFieldId T), ty_bpl])"
+
+lemma field_tr_prop_fst: "\<forall>f_vpr_ty_vpr f_vpr_f_bpl. field_tr_prop T global_decls f_vpr_ty_vpr f_vpr_f_bpl \<longrightarrow> fst f_vpr_ty_vpr = fst f_vpr_f_bpl"
+  by (simp add: field_tr_prop_def)
+
+definition var_rel_prop
+  where "var_rel_prop T local_decls ty_vpr var_vpr_var_bpl \<equiv> 
+          \<exists>ty_bpl. vpr_to_bpl_ty T ty_vpr = Some ty_bpl \<and>
+                   lookup_vdecls_ty local_decls (snd var_vpr_var_bpl) = Some ty_bpl"
+
+lemma var_rel_prop_aux:
+  assumes WellTy: "vpr_store_well_typed A vs \<sigma>" and 
+          "domain_type T = A" and
+          ListAll2: "list_all2 (var_rel_prop T local_decls) vs var_rel_list" and
+          VarRelFst: "map fst var_rel_list = upt 0 (length vs)" and
+          LookupVarRel: "map_of var_rel_list x_vpr = Some x_bpl"
+  shows "\<exists>v_vpr. \<sigma> x_vpr = Some v_vpr \<and> 
+                                      (\<exists>t. lookup_vdecls_ty local_decls x_bpl = Some t \<and>
+                                           type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t)"
+proof -
+  from LookupVarRel obtain i
+    where  "i < length var_rel_list" and
+           "var_rel_list ! i = (x_vpr, x_bpl)"
+    by (meson in_set_conv_nth map_of_SomeD)
+
+  with ListAll2 have Prop: "var_rel_prop T local_decls (vs ! i) (x_vpr, x_bpl)"
+    by (metis list_all2_nthD2)
+
+  from ListAll2 have "length vs = length var_rel_list"
+    using list_all2_lengthD
+    by blast
+
+  with VarRelFst \<open>var_rel_list ! i = _\<close> \<open>i < _\<close> have "i = x_vpr"
+    by (metis add_0 fst_conv nth_map nth_upt)
+
+  from WellTy obtain v_vpr where "\<sigma> i = Some v_vpr" and "get_type A v_vpr = vs ! i"
+    using \<open>i < _\<close> \<open>length vs = _\<close>
+    unfolding vpr_store_well_typed_def
+    by auto
+
+  thus ?thesis
+    using vpr_to_bpl_val_type \<open>domain_type _  = _\<close> \<open>i = _\<close>
+     Prop 
+    unfolding var_rel_prop_def
+    by fastforce
+qed
+
 lemma init_state_in_state_relation:
   assumes "is_empty_total \<omega>" and
           WfTyRepr: "wf_ty_repr_bpl T" and
@@ -807,11 +886,11 @@ lemma init_state_in_state_relation:
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
           InjConstRepr: "inj (const_repr Tr)" and
-          FieldTrTy: "\<And>f_vpr t_vpr. declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr \<Longrightarrow>
-                        \<exists>f_bpl t_bpl.  
-                             field_translation Tr f_vpr = Some f_bpl \<and>
-                             vpr_to_bpl_ty T t_vpr = Some t_bpl \<and>
-                             lookup_vdecls_ty (fst (var_context ctxt)) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])" and
+          FieldTrTy: "\<And>f_vpr t_vpr. 
+                          declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr \<Longrightarrow>
+                        \<exists> f_bpl.  
+                           field_translation Tr f_vpr = Some f_bpl \<and>
+                           field_tr_prop T (fst (var_context ctxt)) (f_vpr, t_vpr) (f_vpr, f_bpl)" and
           HeapTy: "lookup_vdecls_ty (fst (var_context ctxt)) (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty (fst (var_context ctxt)) (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<And>c. lookup_vdecls_ty (fst (var_context ctxt)) (const_repr Tr c) = Some (boogie_const_ty T c)" and
@@ -937,8 +1016,8 @@ proof -
         where FieldTr: "field_translation Tr f_vpr = Some f_bpl" and
                        "vpr_to_bpl_ty T t_vpr = Some t_bpl" and
               FieldGlobal:  "lookup_vdecls_ty (fst (var_context ctxt)) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])"
-        by blast
-
+        unfolding field_tr_prop_def
+        by fastforce
 
       from FieldGlobal GlobalsLocalsDisj have 
         "lookup_var (var_context ctxt) ns f_bpl = global_state ns f_bpl"
@@ -989,9 +1068,12 @@ proof -
       show "state_typ_wf (type_interp ctxt) [] (global_state ns) (fst (var_context ctxt))"
         apply (subst \<open>global_state ns = _\<close>)
         apply (subst TyInterp)
-        apply (rule initial_global_state_aux_typ_wf[OF WfTyRepr InjFieldTr DisjAux ClosedGlobals _ FieldTrTy HeapTy MaskTy ConstTy])
+        apply (rule initial_global_state_aux_typ_wf[OF WfTyRepr InjFieldTr DisjAux ClosedGlobals _ _ HeapTy MaskTy ConstTy])
         using ViperHeapWellTy DomainTy
-        by simp_all
+         apply simp
+        using FieldTrTy
+        unfolding field_tr_prop_def
+        by simp
     
       thus "state_typ_wf (type_interp ctxt) [] (old_global_state ns) (fst (var_context ctxt))"
         using \<open>old_global_state ns = _\<close>
@@ -1006,5 +1088,93 @@ proof -
   qed (insert assms, auto)
 qed
 
+subsection \<open>Misc\<close>
+
+lemma inter_aux:
+  assumes "\<forall>x \<in> A :: ('a :: linorder) set . x \<ge> a_min \<and> x \<le> a_max" and
+          "\<forall>x \<in> B. x \<ge> b_min \<and> x \<le> b_max" and
+          "a_min \<le> a_max \<and> b_min \<le> b_max \<and> (a_max < b_min \<or> b_max < a_min)"
+        shows "A \<inter> B = {}"
+  using assms  
+  by fastforce     
+
+method rename_case_simp_tac = 
+     (rename_tac j1, 
+      case_tac j1,
+      solves \<open>simp add: Set.Int_commute\<close>)
+
+lemma disj_helper:
+  assumes "heap_var Tr \<noteq> mask_var Tr" and
+          "{heap_var Tr, mask_var Tr} \<inter> ran (var_translation Tr) = {}" and
+          "{heap_var Tr, mask_var Tr} \<inter> ran (field_translation Tr) = {}" and
+          "{heap_var Tr, mask_var Tr} \<inter> range (const_repr Tr) = {}" and
+          "ran (var_translation Tr) \<inter> ran (field_translation Tr) = {}" and
+          "ran (var_translation Tr) \<inter> range (const_repr Tr) = {}" and
+          "ran (field_translation Tr) \<inter> range (const_repr Tr) = {}"
+
+  shows "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr), 
+                               ran (field_translation Tr), range (const_repr Tr)]" (is "disjoint_list ?M")
+  unfolding disjoint_list_def
+proof clarify
+  fix i j
+  assume "0 \<le> i" and
+         "i < length ?M" and
+         "0 \<le> j" and
+         "j < length ?M" and
+         "i \<noteq> j" 
+  thus  "disjnt (?M ! i) (?M ! j)"
+    unfolding disjnt_def
+    apply (cases i)
+    apply (insert assms)
+     \<comment>\<open> i = 0 \<close>
+
+     apply (cases j)
+      apply simp 
+      apply (solves \<open>simp\<close> | rename_case_simp_tac)+
+    apply (rename_tac i1)
+    apply (case_tac i1)
+     \<comment>\<open> i = 1 \<close>
+
+     apply (cases j)
+      apply simp
+      apply (solves \<open>simp\<close> | rename_case_simp_tac)+
+    apply (rename_tac i2)
+    apply (case_tac i2)
+
+     \<comment>\<open> i = 2 \<close>
+
+     apply (cases j)
+      apply simp
+      apply (solves \<open>simp\<close> | rename_case_simp_tac)+
+    apply (rename_tac i3)
+    apply (case_tac i3)
+
+     \<comment>\<open> i = 3 \<close>
+
+     apply (cases j)
+      apply simp
+      apply (solves \<open>simp\<close> | rename_case_simp_tac)+
+    apply (rename_tac i4)
+    apply (case_tac i4)
+
+     \<comment>\<open> i = 4 \<close>
+     apply (cases j)
+      apply simp
+      apply (solves \<open>simp\<close> | rename_case_simp_tac)+
+    done
+qed
+
+lemma disj_helper_2:
+  assumes "heap_var Tr = heap_var_def Tr \<and> mask_var_def Tr = mask_var Tr \<and> heap_var Tr \<noteq> mask_var Tr"
+          "{heap_var Tr, mask_var Tr} \<inter> ran (var_translation Tr) = {}" and
+          "{heap_var Tr, mask_var Tr} \<inter> ran (field_translation Tr) = {}" and
+          "{heap_var Tr, mask_var Tr} \<inter> range (const_repr Tr) = {}" and
+          "ran (var_translation Tr) \<inter> ran (field_translation Tr) = {}" and
+          "ran (var_translation Tr) \<inter> range (const_repr Tr) = {}" and
+          "ran (field_translation Tr) \<inter> range (const_repr Tr) = {}"
+
+  shows "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
+                               ran (field_translation Tr), range (const_repr Tr), dom Map.empty]"
+  sorry
 
 end

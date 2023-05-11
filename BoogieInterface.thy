@@ -182,6 +182,25 @@ shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont
 
 subsection \<open>Misc\<close>
 
+lemma proc_is_correct_elim:
+  assumes 
+     "proc_is_correct A fun_decls constants global_vars axioms proc proc_body_satisfies_spec_general" and
+     "proc_body proc = Some (locals, p_body)" and
+     "\<forall>t. closed t \<longrightarrow> (\<exists>v. type_of_val A (v :: 'a val) = t)" and
+     "\<forall>v. closed ((type_of_val A) v)" and
+     "fun_interp_wf A fun_decls \<Gamma>" and
+     "(list_all closed \<Omega> \<and> length \<Omega> = proc_ty_args proc)" and
+     "state_typ_wf A \<Omega> gs (constants @ global_vars)" and
+     "state_typ_wf A \<Omega> ls ((proc_args proc)@ (locals @ proc_rets proc))" and
+     "axioms_sat A (constants, []) \<Gamma> (global_to_nstate (state_restriction gs constants)) axioms"
+shows 
+  "(proc_body_satisfies_spec_general 
+                                        A [] (constants@global_vars, (proc_args proc)@(locals@(proc_rets proc))) \<Gamma> \<Omega> 
+                                       (proc_all_pres proc) (proc_checked_posts proc) p_body
+                                       \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> )"
+  using assms
+  by fastforce
+
 lemma closed_wf_ty_eq: "closed \<tau> = wf_ty 0 \<tau>"
 proof (induction \<tau>)
   case (TCon tid args)

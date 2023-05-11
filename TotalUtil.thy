@@ -222,6 +222,11 @@ subsection \<open>Disjoint lists\<close>
 definition disjoint_list :: " ('a set) list \<Rightarrow> bool"
   where "disjoint_list xs = (\<forall>i j. 0 \<le> i \<and> i < length xs \<and> 0 \<le> j \<and> j < length xs \<and> i \<noteq> j \<longrightarrow> disjnt (xs ! i) (xs ! j))"
 
+lemma disjoint_listI:
+  assumes "\<And> i j. 0 \<le> i \<Longrightarrow> i < j \<Longrightarrow> j < length xs \<Longrightarrow> disjnt (xs ! i) (xs ! j)"
+  shows "disjoint_list xs"  
+  sorry
+
 lemma disjoint_list_app_disj:
   assumes "disjoint_list (xs@ys)" and
           "x \<in> set xs" and
