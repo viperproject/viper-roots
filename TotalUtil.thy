@@ -1,5 +1,5 @@
 theory TotalUtil
-imports TotalStateUtil HOL.Real
+imports TotalStateUtil HOL.Real "HOL-Library.Multiset"
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
@@ -221,11 +221,6 @@ subsection \<open>Disjoint lists\<close>
 
 definition disjoint_list :: " ('a set) list \<Rightarrow> bool"
   where "disjoint_list xs = (\<forall>i j. 0 \<le> i \<and> i < length xs \<and> 0 \<le> j \<and> j < length xs \<and> i \<noteq> j \<longrightarrow> disjnt (xs ! i) (xs ! j))"
-
-lemma disjoint_listI:
-  assumes "\<And> i j. 0 \<le> i \<Longrightarrow> i < j \<Longrightarrow> j < length xs \<Longrightarrow> disjnt (xs ! i) (xs ! j)"
-  shows "disjoint_list xs"  
-  sorry
 
 lemma disjoint_list_app_disj:
   assumes "disjoint_list (xs@ys)" and
@@ -464,13 +459,119 @@ lemma disjoint_list_subset_list_all2:
    apply (simp add: list_all2_lengthD[OF assms(2)])
   by (simp add: list_all2_nthD2[OF assms(2)])
 
+lemma count_multiset_at_least_two:
+  assumes "xs ! i = xs ! j" and 
+          "i \<noteq> j" and
+          "i < length xs" and "j < length xs"
+        shows "count (mset xs) (xs ! i) \<ge> 2"
+  using assms
+proof (induction xs arbitrary: i j)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  then show ?case 
+  proof (cases i)
+    case 0
+    thus ?thesis 
+      using 0 Cons
+      by auto
+  next
+    case (Suc i')
+    hence "(a # xs) ! i = xs ! i'"
+      by simp
+    show ?thesis
+    proof (cases j)
+      case 0
+      then show ?thesis 
+        using Cons
+        by auto
+    next
+      case (Suc j')
+      hence "(a # xs) ! j = xs ! j'"
+        by simp
+
+      have "i' \<noteq> j'"
+        using \<open>i \<noteq> j\<close> \<open>i = Suc i'\<close> \<open>j = Suc j'\<close>
+        by fast
+
+      moreover have "xs ! i' = xs ! j'"
+        using Cons \<open>(a # xs) ! i = xs ! i'\<close> \<open>(a # xs) ! j = xs ! j'\<close> by fastforce
+
+      moreover have "i' < length xs"
+        using \<open>i < _\<close> \<open>i = Suc i'\<close> \<open>j < _\<close> \<open>j = Suc j'\<close>
+        by simp
+      moreover have "j' < length xs"
+        using \<open>j < _\<close> \<open>j = Suc j'\<close>
+        by simp
+
+      ultimately have *:"2 \<le> count (mset xs) (xs ! i')"
+        using Cons.IH
+        by blast
+        
+      have "count (mset (a # xs)) ((a # xs) ! i) \<ge> count (mset xs) ((a #xs) ! i) "
+        by simp
+      then show ?thesis 
+        using \<open>(a # xs) ! i = xs ! i'\<close> *
+        by simp        
+    qed
+  qed
+qed
+
 lemma disjoint_list_sublist:
   assumes "disjoint_list xs" and
-          "set xs' \<subseteq> set xs"
+         Sub: "mset xs' \<subseteq># mset xs" 
         shows "disjoint_list xs'"
-  using assms
   unfolding disjoint_list_def
-  sorry
+proof clarify
+  fix i j
+  assume *: "0 \<le> i" "i < length xs'" "0 \<le> j" "j < length xs'" "i \<noteq> j"
+
+  let ?a = "xs' ! i" and ?b = "xs' ! j"
+
+  from * have "?a \<in># mset xs'"
+    by simp
+
+  hence "?a \<in># mset xs"
+    using Sub
+    by (meson mset_subset_eqD)
+
+  from this obtain i' where "?a = xs ! i'" and "i' < length xs"
+    by (metis in_set_conv_nth set_mset_mset)
+
+  from * have "?b \<in># mset xs'"
+    by simp
+
+  hence "?b \<in># mset xs"
+    using Sub
+    by (meson mset_subset_eqD)
+
+  show "disjnt (xs' ! i) (xs' ! j)"
+  proof (cases "?a = ?b")
+    case True
+    hence "count (mset xs') ?a \<ge> 2"
+      using \<open>i \<noteq> j\<close> and \<open>?a \<in># mset xs'\<close> \<open>?b \<in># mset xs'\<close> \<open>i < _\<close> \<open>j < _\<close> count_multiset_at_least_two
+      by blast
+    hence "count (mset xs) ?a \<ge> 2"
+      using Sub
+      by (meson le_trans mset_subset_eq_count)
+    from this obtain j' where "?a = xs ! j'" and "j' < length xs" and "j' \<noteq> i'"
+      sorry
+    then show ?thesis sorry
+  next
+    case False
+    from \<open>?b \<in># mset xs\<close> obtain j' where "?b = xs ! j'" and "j' < length xs"
+      by (metis in_set_conv_nth set_mset_mset)
+
+    with False \<open>?a = xs ! i'\<close> have "i' \<noteq> j'" 
+      by auto
+
+    then show ?thesis 
+      using assms \<open>i' < length xs\<close> \<open>j' < length xs\<close> \<open>?a = xs ! i'\<close> \<open>?b = xs ! j'\<close>
+      unfolding disjoint_list_def
+      by simp
+  qed
+qed
 
 subsection \<open>Strictly Ordered Lists\<close>
 

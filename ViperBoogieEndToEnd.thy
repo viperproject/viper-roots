@@ -15,15 +15,6 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
                   is_empty_total \<omega> \<longrightarrow>
                   red_stmt_total ctxt R (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) mbody \<omega> r \<longrightarrow> r \<noteq> RFailure)"
 
-(*
-definition stmt_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> (nat \<Rightarrow> vtyp option) \<Rightarrow> stmt \<Rightarrow> bool" where
-  "stmt_correct_total_2 ctxt R \<Lambda> s \<equiv>
-        \<forall>(\<omega> :: 'a full_total_state) r. 
-                  is_empty_total \<omega> \<longrightarrow> 
-                  total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
-                  red_stmt_total ctxt R \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure"
-*)
-
 lemma valid_configuration_not_failure:
   assumes "valid_configuration A \<Lambda> \<Gamma> \<Omega> posts bb cont state"
   shows "state \<noteq> Failure"
@@ -792,20 +783,34 @@ qed
 subsubsection \<open>Properties\<close>
 
 lemma list_all2_map_of:
-  assumes "list_all2 P xs ys" and
-          "\<forall> x y. P x y \<longrightarrow> fst x = fst y" and
-          "map_of xs a = Some b"
+  assumes ListAll2: "list_all2 P xs ys" and
+          Fst: "\<forall> x y. P x y \<longrightarrow> fst x = fst y" and
+          MapOf: "map_of xs a = Some b"
         shows "\<exists>c. map_of ys a = Some c \<and> P (a,b) (a,c)"
-  sorry
-
-lemma list_all2_map_of_2:
-  assumes "list_all2 P xs ys" and
-          "\<forall> x y. P x y \<longrightarrow> fst x = fst y" 
-        shows "\<forall> a b. map_of xs a = Some b \<longrightarrow> (\<exists>c. map_of ys a = Some c \<and> P (a,b) (a,c))"
-  apply clarify
-  apply (rule list_all2_map_of)
-  using assms
-  by auto
+  using ListAll2 MapOf
+proof (induction rule: list_all2_induct)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons x xs y ys)
+  then show ?case 
+  proof (cases "a = fst x")
+    case True
+    hence "map_of (y # ys) a = Some (snd y)"
+      using Cons.hyps Fst by auto
+    moreover from \<open>a = fst x\<close> have "snd x = b"
+      using Cons
+      by simp
+    ultimately show ?thesis 
+      using \<open>P x y\<close> \<open>a = fst x\<close>
+      by (metis Fst prod.collapse)
+  next
+    case False
+    then show ?thesis 
+      using Cons Fst old.prod.exhaust 
+      by auto
+  qed   
+qed
 
 definition field_tr_prop
   where "field_tr_prop T global_decls f_vpr_ty_vpr f_vpr_f_bpl \<equiv>  
@@ -912,7 +917,7 @@ proof -
     by simp_all
 
   have "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (field_translation Tr), range (const_repr Tr)]"
-    by (rule disjoint_list_sublist[OF Disj]) auto
+    by (rule disjoint_list_sublist[OF Disj]) fastforce    
   hence DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
     by (rule disjoint_list_subset_list_all2) blast
 
@@ -1164,17 +1169,41 @@ proof clarify
     done
 qed
 
+lemma disjoint_list_append_empty:
+  assumes "disjoint_list xs"
+  shows "disjoint_list (xs@[{}])"
+  unfolding disjoint_list_def
+proof clarify
+  fix i j
+  assume *: "0 \<le> i" "i < length (xs @ [{}])" "0 \<le> j" "j < length (xs @ [{}])" "i \<noteq> j"
+  show "disjnt ((xs @ [{}]) ! i) ((xs @ [{}]) ! j)"
+  proof (cases "i = length xs \<or> j = length xs")
+    case True
+    then show ?thesis 
+      using *
+      unfolding disjnt_def
+      by fastforce
+  next
+    case False
+    with * have "i < length xs \<and> j < length xs"
+      by simp
+    then show ?thesis 
+      using assms *
+      unfolding disjoint_list_def
+      by (metis list_update_append1 list_update_id nth_list_update_eq)            
+  qed
+qed
+
 lemma disj_helper_2:
-  assumes "heap_var Tr = heap_var_def Tr \<and> mask_var_def Tr = mask_var Tr \<and> heap_var Tr \<noteq> mask_var Tr"
-          "{heap_var Tr, mask_var Tr} \<inter> ran (var_translation Tr) = {}" and
-          "{heap_var Tr, mask_var Tr} \<inter> ran (field_translation Tr) = {}" and
-          "{heap_var Tr, mask_var Tr} \<inter> range (const_repr Tr) = {}" and
-          "ran (var_translation Tr) \<inter> ran (field_translation Tr) = {}" and
-          "ran (var_translation Tr) \<inter> range (const_repr Tr) = {}" and
-          "ran (field_translation Tr) \<inter> range (const_repr Tr) = {}"
+  assumes 
+          "heap_var Tr = heap_var_def Tr" and
+          "mask_var Tr = mask_var_def Tr" and
+      "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
+                               ran (field_translation Tr), range (const_repr Tr)]"
 
   shows "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
                                ran (field_translation Tr), range (const_repr Tr), dom Map.empty]"
-  sorry
+  using assms disjoint_list_append_empty
+  by fastforce
 
 end
