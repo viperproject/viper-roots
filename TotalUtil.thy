@@ -518,6 +518,50 @@ next
   qed
 qed
 
+lemma count_at_least_two_different_elem: 
+  assumes "count (mset xs) a \<ge> 2" and 
+            "xs ! i = a" and "i < length xs"
+          shows "\<exists>j. j < length xs \<and> j \<noteq> i \<and> xs ! j = a"
+proof -
+  have "xs = take i xs @ xs ! i # drop (Suc i) xs" (is "xs = ?ts @ xs ! i # ?ds")
+    using \<open>i < _\<close> List.id_take_nth_drop
+    by blast
+
+  hence "count (mset xs) a = count (mset ?ts) a + count (mset (xs ! i # ?ds)) a"
+    by (metis count_union mset_append)
+
+  also have "... = count (mset ?ts) a + 1 + count (mset ?ds) a"
+    using \<open>xs ! i = a\<close>
+    by simp
+  finally have *:"count (mset ?ts) a \<ge> 1 \<or> count (mset ?ds) a \<ge> 1"
+    using \<open>count (mset xs) a \<ge> 2\<close>
+    by linarith
+
+  show ?thesis
+  proof (cases rule: disjE[OF *])
+    case 1
+    hence "a \<in># mset ?ts"
+      by simp
+    from this obtain j where "?ts ! j = a" and "j < length ?ts"
+      using in_set_conv_nth set_mset_mset
+      by metis
+    thus ?thesis
+      by auto      
+  next
+    case 2
+    hence "a \<in># mset ?ds"
+      by simp
+    from this obtain j where "?ds ! j = a" and "j < length ?ds"
+      using in_set_conv_nth set_mset_mset
+      by metis
+    hence "xs ! (j+(Suc i)) = a"
+      using nth_drop
+      by (simp add: add.commute)
+    thus ?thesis      
+      by (metis Suc_n_not_le_n \<open>j < length (drop (Suc i) xs)\<close> drop_drop drop_eq_Nil2 leD le_add2 linorder_le_less_linear)
+  qed
+qed
+ 
 lemma disjoint_list_sublist:
   assumes "disjoint_list xs" and
          Sub: "mset xs' \<subseteq># mset xs" 
@@ -555,9 +599,14 @@ proof clarify
     hence "count (mset xs) ?a \<ge> 2"
       using Sub
       by (meson le_trans mset_subset_eq_count)
-    from this obtain j' where "?a = xs ! j'" and "j' < length xs" and "j' \<noteq> i'"
-      sorry
-    then show ?thesis sorry
+    
+    from this obtain j' where "xs ! i' = xs ! j'" and "j' < length xs" and "j' \<noteq> i'"
+      using count_at_least_two_different_elem
+      by (metis \<open>i' < length xs\<close> \<open>xs' ! i = xs ! i'\<close>)
+    then show ?thesis 
+      using \<open>i' < _\<close> assms
+      unfolding disjoint_list_def
+      by (metis True \<open>xs' ! i = xs ! i'\<close> bot_nat_0.extremum)      
   next
     case False
     from \<open>?b \<in># mset xs\<close> obtain j' where "?b = xs ! j'" and "j' < length xs"

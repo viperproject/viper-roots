@@ -574,7 +574,7 @@ proof -
     by (metis domI inj_on_contraD option.inject)
 qed
 
-abbreviation initial_global_state 
+definition initial_global_state 
   where "initial_global_state T vs Pr Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_global_state_aux Pr Tr \<omega>)"
 
 lemma initial_global_state_aux_typ_wf:
@@ -593,6 +593,7 @@ lemma initial_global_state_aux_typ_wf:
           MaskTy: "lookup_vdecls_ty vs (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<And>c. lookup_vdecls_ty vs (const_repr Tr c) = Some (boogie_const_ty T c)"
         shows "state_typ_wf (vbpl_absval_ty T) [] (initial_global_state T vs Pr Tr \<omega>) vs"
+  unfolding initial_global_state_def
 proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_inhabited])
   let ?field_tr_dom = "{f_bpl. \<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some f_bpl}"
 
@@ -718,7 +719,7 @@ proof -
 qed
 
 
-abbreviation initial_local_state
+definition initial_local_state
   where "initial_local_state T vs Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_local_state_aux Tr \<omega>)"
 
 lemma initial_local_state_aux_typ_wf:
@@ -731,6 +732,7 @@ lemma initial_local_state_aux_typ_wf:
                                                  type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))" and
           Inj:  "inj_on (var_translation Tr) (dom (var_translation Tr))"
         shows "state_typ_wf (vbpl_absval_ty T) [] (initial_local_state T vs Tr \<omega>) vs"
+  unfolding initial_local_state_def
 proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_inhabited])
   fix x t v
   assume LookupTy: "lookup_vdecls_ty vs x = Some t" and
@@ -865,6 +867,33 @@ proof -
     unfolding var_rel_prop_def
     by fastforce
 qed
+ 
+lemma boogie_const_rel_aux:
+  assumes ConstTy: "\<And>c. lookup_vdecls_ty (fst \<Lambda>) (const_repr Tr c) = Some (boogie_const_ty T c)" and
+          GlobalsLocalsDisj: "set (map fst (fst \<Lambda>)) \<inter> set (map fst (snd \<Lambda>)) = {}" and
+          DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
+          InitGlobalState: "\<And>x. x \<in> range (const_repr Tr) \<Longrightarrow> global_state ns x = initial_global_state T (fst \<Lambda>) Pr Tr \<omega> x" and
+          InjConstRepr: "inj (const_repr Tr)"
+  shows   "boogie_const_rel (const_repr Tr) \<Lambda> ns"
+  unfolding boogie_const_rel_def
+  proof (rule allI)
+    fix c
+    let ?cr = "const_repr Tr c"
+
+    from ConstTy GlobalsLocalsDisj
+    have LookupVar: "lookup_var \<Lambda> ns ?cr = global_state ns ?cr"
+      by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.exhaust_sel)
+
+    from initial_global_state_aux_const[OF DisjAux, where ?Pr="Pr" and ?\<omega>=\<omega> and ?x="?cr"] InjConstRepr
+    have "initial_global_state_aux Pr Tr \<omega> (const_repr Tr c) = Some (boogie_const_val c)"
+    using inj_eq by fastforce
+
+    hence "global_state ns ?cr = Some (boogie_const_val c)"
+      by (simp add: InitGlobalState initial_global_state_def)
+
+    with LookupVar show "lookup_var \<Lambda> ns (const_repr Tr c) = Some (boogie_const_val c)"
+      by argo
+  qed
 
 lemma init_state_in_state_relation:
   assumes "is_empty_total \<omega>" and
@@ -940,7 +969,7 @@ proof -
       ultimately have "local_state ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
         apply (subst \<open>local_state ns = _\<close>)
         using initial_local_state_aux_Some[OF InjVarTr]
-        by fastforce
+        by (fastforce simp: initial_local_state_def)
   
       thus "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
         using LookupTy
@@ -960,7 +989,7 @@ proof -
     proof (rule exI, intro conjI)
       have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
                       (is "_ = Some (AbsV (AHeap ?hb))")
-        by (simp add: \<open>global_state ns = _\<close>) 
+        by (simp add: \<open>global_state ns = _\<close> initial_global_state_def) 
     
       with GlobalsLocalsDisj and HeapTy
       show "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap ?hb))"
@@ -992,7 +1021,7 @@ proof -
                       (is "_ = Some (AbsV (AMask ?mb))")
         apply (subst \<open>global_state ns = _\<close>)
         using initial_global_state_aux_mask[OF DisjAux, where ?Pr="program_total ctxt_vpr" and ?\<omega>=\<omega>]
-        by simp
+        by (simp add: initial_global_state_def)
   
       with GlobalsLocalsDisj and MaskTy      
       show "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask ?mb))"
@@ -1031,35 +1060,16 @@ proof -
       moreover from initial_global_state_aux_field_2[OF DisjAux InjFieldTr FieldTr FieldLookup, where ?\<omega>=\<omega>]
       have "global_state ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))"
         using \<open>global_state ns = _\<close>
-        by simp
+        by (simp add: initial_global_state_def)
       
       ultimately show "has_Some (\<lambda>f_bpl. lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))) (field_translation Tr f_vpr)"
         using FieldTr
         by simp
     qed
-  next
-  
+  next  
     show "boogie_const_rel (const_repr Tr) (var_context ctxt) ns"
-      unfolding boogie_const_rel_def
-    proof (rule allI)
-      fix c
-      let ?cr = "const_repr Tr c"
-
-      from ConstTy GlobalsLocalsDisj
-      have LookupVar: "lookup_var (var_context ctxt) ns ?cr = global_state ns ?cr"
-        by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.exhaust_sel)
-
-      from initial_global_state_aux_const[OF DisjAux, where ?Pr="program_total ctxt_vpr" and ?\<omega>=\<omega> and ?x="?cr"] InjConstRepr
-      have "initial_global_state_aux (program_total ctxt_vpr) Tr \<omega> (const_repr Tr c) = Some (boogie_const_val c)"
-      using inj_eq by fastforce
-
-      hence "global_state ns ?cr = Some (boogie_const_val c)"
-        by (simp add: \<open>global_state ns = _\<close>)
-
-      with LookupVar show "lookup_var (var_context ctxt) ns (const_repr Tr c) = Some (boogie_const_val c)"
-        by argo
-    qed
-
+      using ConstTy GlobalsLocalsDisj DisjAux \<open>global_state ns = _\<close> InjConstRepr boogie_const_rel_aux
+      by metis
   next
   
     show "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns"
@@ -1205,5 +1215,126 @@ lemma disj_helper_2:
                                ran (field_translation Tr), range (const_repr Tr), dom Map.empty]"
   using assms disjoint_list_append_empty
   by fastforce
+
+lemma initial_global_state_state_restriction:
+  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
+          ConstantsRange:"set (map fst constants) = range (const_repr Tr) \<union> ran (field_translation Tr)" and 
+          Elem: "x \<in> range (const_repr Tr) \<union> ran (field_translation Tr)" 
+  shows "state_restriction (initial_global_state T (constants@globals) Pr Tr \<omega>) constants x = initial_global_state T constants Pr Tr \<omega> x"
+  unfolding state_restriction_def
+proof -
+  let ?ns0 = "initial_global_state T (constants@globals) Pr Tr \<omega>"
+  let ?ns1 = "initial_global_state T constants Pr Tr \<omega>"
+
+  have Aux:"\<And>a a' b y z. b y = Some z \<Longrightarrow>  (a ++ b) y = (a' ++ b) y"
+    by simp
+
+  have "?ns0 x = ?ns1 x"
+  proof (cases rule:  Set.UnE[OF \<open>x \<in> _\<close>])
+    case 1
+    show ?thesis 
+      apply (simp add: initial_global_state_def, rule Aux)
+      using initial_global_state_aux_const[OF Disj 1]
+      by blast
+  next
+    case 2
+    show ?thesis
+    proof (cases "\<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some x")
+      case True
+      show ?thesis         
+        apply (simp add: initial_global_state_def, rule Aux)
+        using initial_global_state_aux_field[OF Disj True]
+        by blast
+    next
+      case False
+      have "x \<noteq> heap_var Tr"
+        apply (insert Disj 2)
+        apply (unfold disjoint_list_def)
+        apply (erule allE[where ?x=0])
+        apply (erule allE[where ?x=2])
+        by auto
+
+      moreover have "x \<noteq> mask_var Tr"
+        apply (insert Disj 2)
+        apply (unfold disjoint_list_def)
+        apply (erule allE[where ?x=1])
+        apply (erule allE[where ?x=2])
+        by auto
+      moreover have "x \<notin> range (const_repr Tr)"
+        apply (insert Disj 2)
+        apply (unfold disjoint_list_def)
+        apply (erule allE[where ?x=3])
+        apply (erule allE[where ?x=2])
+        apply simp
+        by (meson disjnt_iff)
+      ultimately have LookupAux: "initial_global_state_aux Pr Tr \<omega> x = None"
+        using False
+        by simp
+
+      from Elem ConstantsRange have "x \<in> set (map fst constants)"
+        by simp
+
+      hence DomConstants: "x \<in> dom (lookup_vdecls_ty constants)"
+        unfolding lookup_vdecls_ty_def
+        by (simp add: dom_map_of_2 dom_map_option)
+
+      from \<open>x \<in> set (map fst constants)\<close> have
+          DomConstantsGlobals: "x \<in> dom (lookup_vdecls_ty (constants@globals))"
+        unfolding lookup_vdecls_ty_def
+        using DomConstants lookup_vdecls_ty_def by force       
+        
+      have "named_state_var_context (vbpl_absval_ty T) constants x = 
+           Some (SOME v. \<exists>t. lookup_vdecls_ty constants x = Some t \<and> type_of_val (vbpl_absval_ty T) v = t)"
+        using ConstantsRange Elem
+        by (simp add: DomConstants)
+
+      have "lookup_vdecls_ty constants x = lookup_vdecls_ty (constants@globals) x"
+        using lookup_vdecls_ty_def DomConstants
+        by auto         
+      hence "named_state_var_context (vbpl_absval_ty T) constants x = named_state_var_context (vbpl_absval_ty T) (constants@globals) x"
+        using DomConstants DomConstantsGlobals
+        by simp
+      with LookupAux show ?thesis 
+        unfolding initial_global_state_def
+        by (simp add: domIff map_add_dom_app_simps(3))
+    qed     
+  qed
+
+  moreover have "map_of constants x \<noteq> None"
+    using ConstantsRange \<open>x \<in> _\<close>
+    by (simp add: map_of_eq_None_iff)
+
+  ultimately show "option_if (map_of constants x \<noteq> None) (?ns0 x) = ?ns1 x"
+    by presburger  
+qed
+
+lemma boogie_axioms_state_restriction_aux:
+  assumes "gs = initial_global_state T (constants@globals) Pr Tr \<omega>" and
+          "C = const_repr Tr" and
+         ConstTy: "\<And>c. lookup_vdecls_ty constants (const_repr Tr c) = Some (boogie_const_ty T c)" and          
+          Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and          
+          InjConstRepr: "inj (const_repr Tr)" and
+          ConstantsRange:"set (map fst constants) = range (const_repr Tr) \<union> ran (field_translation Tr)" and 
+         AxiomsSatGeneral: "\<And> ns. boogie_const_rel C (constants, []) ns \<Longrightarrow>  \<comment>\<open>TODO: need to add field_rel\<close>
+                                  axioms_sat A (constants, []) \<Gamma> ns axioms"
+  shows "axioms_sat A (constants, []) \<Gamma> (global_to_nstate (state_restriction gs constants)) axioms"
+proof -
+  let ?ns = "(global_to_nstate (state_restriction gs constants))"
+  have "boogie_const_rel (const_repr Tr) (constants, []) ?ns"    
+    apply (rule boogie_const_rel_aux)
+        apply (simp add: ConstTy)
+       apply simp
+      apply (rule Disj)
+     apply (subst \<open>gs = _\<close>)
+     apply (simp del: extend_named_state_var_context.simps)
+     apply (rule initial_global_state_state_restriction[OF Disj ConstantsRange])
+     apply simp
+    apply (rule InjConstRepr)
+    done
+
+  thus ?thesis
+    using AxiomsSatGeneral \<open>C = _\<close>
+    by simp
+qed
 
 end

@@ -21,8 +21,10 @@ type_synonym 'a bpl_mask_ty = "ref \<times> 'a vb_field \<Rightarrow> real"
 datatype boogie_const =      
        CNoPerm
      | CWritePerm
-     | CNull 
+     | CNull     
      | CZeroMask
+     | CKnownFoldedZeroMask
+     | CEmptyFrame     
 
 definition total_context_trivial :: "program \<Rightarrow> 'a total_context"
   where "total_context_trivial Pr \<equiv> \<lparr> program_total = Pr, fun_interp_total=f_None, absval_interp_total=(\<lambda>_.''dummy'')  \<rparr>"
@@ -404,6 +406,8 @@ fun boogie_const_val :: "boogie_const => ('a vbpl_val)"
   | "boogie_const_val CWritePerm = RealV 1"
   | "boogie_const_val CNull = AbsV (ARef Null)"
   | "boogie_const_val CZeroMask = AbsV (AMask zero_mask_bpl)"
+  | "boogie_const_val CKnownFoldedZeroMask = AbsV (AKnownFoldedMask (\<lambda> _. False))"
+  | "boogie_const_val CEmptyFrame = AbsV (AFrame EmptyFrame)"
 
 fun boogie_const_ty :: "'a ty_repr_bpl \<Rightarrow> boogie_const => bpl_ty"
   where
@@ -411,6 +415,9 @@ fun boogie_const_ty :: "'a ty_repr_bpl \<Rightarrow> boogie_const => bpl_ty"
   | "boogie_const_ty T CWritePerm = TPrim TReal"
   | "boogie_const_ty T CNull = TConSingle (TRefId T)"
   | "boogie_const_ty T CZeroMask = TConSingle (TMaskId T)"
+  | "boogie_const_ty T CKnownFoldedZeroMask = TConSingle (TKnownFoldedMaskId T)"
+  | "boogie_const_ty T CEmptyFrame = TConSingle (TFrameFragmentId T)"
+
 
 lemma boogie_const_val_well_ty: "type_of_vbpl_val T (boogie_const_val c) = boogie_const_ty T c"  
   by (cases c) auto
