@@ -1122,6 +1122,7 @@ lemma syn_field_access_valid_wf_rel:
          ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
          FunMap:   "FunMap FHasPerm = has_perm_name" and
          MaskExp:  "e_m_bpl = Lang.Var (mask_var_def Tr)" and
+         EmptyRunTypeContext: "rtype_interp ctxt = []" and
          FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
        TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
    shows "wf_rel_fieldacc get_valid_locs R R ctxt_vpr StateCons P ctxt e f 
@@ -1160,9 +1161,8 @@ proof (rule wf_rel_intro)
           apply (rule ctxt_wf_fun_interp[OF CtxtWf])
          apply (fastforce intro: RedExpListNil RedExpListCons RedMaskBpl RedFieldBpl)
         apply simp
-      apply (rule lift_fun_decl_well_typed)
-    by (auto simp: vpr_to_bpl_ty_closed[OF TyRepWf FieldTyBpl] FieldTyBpl)
-
+    apply (rule lift_fun_decl_well_typed)
+    by (auto simp: vpr_to_bpl_ty_closed[OF TyRepWf FieldTyBpl] FieldTyBpl EmptyRunTypeContext)
   
   from MaskRel have MaskRelLoc:"\<And>a. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a))) \<Longrightarrow> 
                                real_of_rat (Rep_prat ((get_mh_total_full \<omega>def) (a, f))) = (m_bpl (Address a, NormalField f_bpl \<tau>))"

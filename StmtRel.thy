@@ -185,6 +185,7 @@ lemma assign_rel_simple:
   assumes R_def:  "R3 = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R2 \<omega> ns)" and
           VprTy: "\<Lambda>_vpr x_vpr = Some ty" and
           TyRelWf: "type_interp_rel_wf (absval_interp_total ctxt_vpr) (type_interp ctxt) Trep" and
+          EmptyRtype: "rtype_interp ctxt = []" and
           ExpWfRel: "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma> ((BigBlock name ((Lang.Assign x_bpl e_bpl)#cs) str tr), cont)" 
                     (is "expr_wf_rel R3 ctxt_vpr StateCons P ctxt e_vpr \<gamma> (?b, cont)") and
           BplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl" and
@@ -236,8 +237,8 @@ proof (cases rule: stmt_rel_intro)
     have RedBpl: "red_ast_bpl P ctxt ((?b, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ?ns'')"
       apply (rule red_ast_bpl_one_simple_cmd)
        apply (rule Semantics.RedAssign)
-         apply (rule BplTy)
-        apply (rule ValBplTy)
+        apply (rule BplTy)
+      apply (simp add: EmptyRtype ValBplTy)      
       using RedEBpl
       by auto
 

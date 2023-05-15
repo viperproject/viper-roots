@@ -8,12 +8,13 @@ record 'a econtext_bpl_general =
   type_interp :: "'a  absval_ty_fun"
   var_context :: var_context
   fun_interp :: "'a fun_interp"
+  rtype_interp :: "rtype_env"
 
 abbreviation create_ctxt_bpl :: "'a absval_ty_fun \<Rightarrow> var_context \<Rightarrow> 'a fun_interp \<Rightarrow> 'a econtext_bpl_general"
-  where "create_ctxt_bpl A \<Lambda> \<Gamma> \<equiv> \<lparr>type_interp=A, var_context=\<Lambda>,fun_interp=\<Gamma>\<rparr>"
+  where "create_ctxt_bpl A \<Lambda> \<Gamma> \<equiv> \<lparr>type_interp=A, var_context=\<Lambda>,fun_interp=\<Gamma>,rtype_interp=[]\<rparr>"
 
 abbreviation red_expr_bpl :: "'a econtext_bpl_general \<Rightarrow> expr \<Rightarrow> 'a nstate \<Rightarrow> 'a val \<Rightarrow> bool"
-  where "red_expr_bpl ctxt e ns v \<equiv> type_interp ctxt, var_context ctxt, fun_interp ctxt, [] \<turnstile> \<langle>e, ns\<rangle> \<Down> v"   
+  where "red_expr_bpl ctxt e ns v \<equiv> type_interp ctxt, var_context ctxt, fun_interp ctxt, rtype_interp ctxt \<turnstile> \<langle>e, ns\<rangle> \<Down> v"   
 
 subsection \<open>Ast\<close>
 
@@ -45,10 +46,10 @@ inductive red_bigblock_small :: "ast \<Rightarrow> 'a econtext_bpl_general \<Rig
   for P ctxt
   where 
     RedBigBlockSmallSimpleCmd [intro]: 
-      "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
+      "\<lbrakk> (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), (rtype_interp ctxt) \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s' \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt (((BigBlock name (c#cs) str tr), cont), s) (((BigBlock name cs str tr), cont), s')"
    | RedBigBlockSmallNoSimpleCmdOneStep [intro]: 
-    "\<lbrakk> red_bigblock (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) [] P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
+    "\<lbrakk> red_bigblock (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) P (BigBlock name [] str tr, cont, s) (b', cont', s') \<rbrakk> \<Longrightarrow>
        red_bigblock_small P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
 
 abbreviation red_bigblock_small_multi :: "ast \<Rightarrow> 'a econtext_bpl_general \<Rightarrow> 'a vast_config_general \<Rightarrow> 'a vast_config_general \<Rightarrow> bool"
@@ -72,14 +73,14 @@ lemma red_ast_bpl_transitive:
   by fastforce
 
 lemma red_ast_bpl_one_simple_cmd:
-  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [] \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s'"
+  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), rtype_interp ctxt \<turnstile> \<langle>c, s\<rangle> \<rightarrow> s'"
   shows "red_ast_bpl P ctxt ((BigBlock name (c#cs) str tr, cont), s) ((BigBlock name cs str tr, cont), s')"
   using assms
   unfolding red_ast_bpl_def
   by blast
 
 lemma red_ast_bpl_one_step_empty_simple_cmd:
-  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), [], P \<turnstile> 
+  assumes "(type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), rtype_interp ctxt, P \<turnstile> 
              \<langle>(BigBlock name [] str tr, cont, s)\<rangle> \<longrightarrow> (b', cont', s')"
   shows "red_ast_bpl P ctxt ((BigBlock name [] str tr, cont), s) ((b', cont'), s')"
   using assms
@@ -159,7 +160,7 @@ lemma red_ast_bpl_one_assume:
 lemma red_ast_bpl_one_assign:
   assumes "lookup_var_ty (var_context ctxt) x = Some ty" and
           "red_expr_bpl ctxt e ns v" and
-          "type_of_val (type_interp ctxt) v = instantiate [] ty"
+          "type_of_val (type_interp ctxt) v = instantiate (rtype_interp ctxt) ty"
   shows "red_ast_bpl P ctxt ((BigBlock name (Assign x e#cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal (update_var (var_context ctxt) ns x v))"
   apply (rule red_ast_bpl_one_simple_cmd)
   using assms
@@ -167,7 +168,7 @@ lemma red_ast_bpl_one_assign:
 
 lemma red_ast_bpl_havoc_assume:
 assumes "lookup_var_decl (var_context ctxt) x = Some (ty,w)" and
-        "type_of_val (type_interp ctxt) v = instantiate [] ty" and
+        "type_of_val (type_interp ctxt) v = instantiate (rtype_interp ctxt) ty" and
         "\<And>cond. w = Some cond \<Longrightarrow> red_expr_bpl ctxt cond (update_var (var_context ctxt) ns x v) (BoolV True)" and
         "red_expr_bpl ctxt e (update_var (var_context ctxt) ns x v) (BoolV True)"
 shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont), Normal ns) 
@@ -229,5 +230,41 @@ qed auto
 lemma closed_wf_ty_fun_eq: "closed = wf_ty 0"
   using closed_wf_ty_eq
   by presburger
+
+lemma closed_instantiate: "closed \<tau> \<Longrightarrow> instantiate ts \<tau> = \<tau>"
+proof (induction \<tau>)
+  case (TVar x)
+  then show ?case by simp
+next
+  case (TPrim x)
+  then show ?case by simp
+next
+  case (TCon x1a x2a)
+  then show ?case 
+    by (metis closed.simps(3) in_set_conv_nth instantiate.simps(3) list_all_length map_idI)
+qed
+
+lemma closed_map_instantiate: "list_all closed ts \<Longrightarrow> map (instantiate ts') ts = ts"
+  apply (induction ts)
+   apply simp
+  apply (simp add: closed_instantiate)
+  done
+
+lemma instantiate_idem: 
+  assumes "list_all closed ts"
+  shows "instantiate ts (instantiate ts t) = (instantiate ts t)"
+proof (induction t)
+  case (TVar x)  
+  then show ?case 
+  proof clarsimp
+    assume "x < length ts"
+    hence "closed (ts ! x)"
+      using assms
+      by (simp add: list_all_length)
+    thus "instantiate ts (ts ! x) = ts ! x"
+      using closed_instantiate
+      by auto
+  qed
+qed auto
 
 end

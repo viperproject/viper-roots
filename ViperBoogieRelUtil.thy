@@ -8,6 +8,7 @@ lemma store_temporary_var:
   assumes
   StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
          TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
+         EmptyRtype: "rtype_interp ctxt = []" and
          DisjAux: "temp_var \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
          LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_var = Some \<tau>_bpl" and
@@ -27,7 +28,7 @@ proof (rule exI, rule conjI)
 
   show "?red ?ns'"
     apply (rule red_ast_bpl_one_simple_cmd)
-    by (fastforce intro!: RedAssign LookupTyTemp RedRhs simp:TyValBpl )
+    by (fastforce intro!: RedAssign LookupTyTemp RedRhs simp:TyValBpl EmptyRtype)
 
   show "?R' \<omega> ?ns'"
     using StateRel2
@@ -38,6 +39,7 @@ lemma store_vpr_exp_to_temporary_var:
   assumes  
   StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega>def \<omega> ns") and
          TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
+         EmptyRtype: "rtype_interp ctxt = []" and
          DisjAux: "temp_var \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
          LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_var = Some \<tau>_bpl" and
@@ -47,7 +49,7 @@ lemma store_vpr_exp_to_temporary_var:
    shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign temp_var e_bpl # cs) s tr), cont), Normal ns)
                                    ((BigBlock name cs s tr, cont), Normal ns') \<and>
                 (state_rel Pr TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (val_rel_vpr_bpl v))) ctxt \<omega>def \<omega> ns')"
-proof (rule store_temporary_var[OF StateRel TyInterp DisjAux LookupTyTemp _ TyValBpl])
+proof (rule store_temporary_var[OF StateRel TyInterp EmptyRtype DisjAux LookupTyTemp _ TyValBpl])
   show "red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v)"
     using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRhsVpr StateRel
     by metis
@@ -61,12 +63,13 @@ lemma store_temporary_perm_rel:
          DisjAux: "temp_var \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
          LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_var = Some (TPrim TReal)" and
-         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep"
+         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
+         EmptyRtype: "rtype_interp ctxt = []"
   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign temp_var e_bpl # cs) s tr), cont), Normal ns)
                                    ((BigBlock name cs s tr, cont), Normal ns') \<and>
                 (state_rel Pr TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>def \<omega> ns')"
            (is "\<exists>ns'. ?red ns' \<and> ?R' \<omega> ns'")
-   using store_vpr_exp_to_temporary_var[OF StateRel TyInterp DisjAux LookupTyTemp RedPerm ExpRel]
+   using store_vpr_exp_to_temporary_var[OF StateRel TyInterp EmptyRtype DisjAux LookupTyTemp RedPerm ExpRel]
    by simp
 
 subsection \<open>Store well-definedness state in fresh variables\<close>

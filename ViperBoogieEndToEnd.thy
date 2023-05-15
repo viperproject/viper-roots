@@ -147,7 +147,8 @@ lemma red_ast_block_red_bigblock_failure_preserve:
           "type_interp ctxt = A" and 
           "var_context ctxt = \<Lambda>" and 
           "fun_interp ctxt = \<Gamma>"
-        shows "\<exists>d'. red_bigblock_multi A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (fst (fst c), snd (fst c), snd c) d' 
+          "rtype_interp ctxt = \<Omega>"
+        shows "\<exists>d'. red_bigblock_multi A ([] :: ast proc_context) \<Lambda> \<Gamma> \<Omega> P (fst (fst c), snd (fst c), snd c) d' 
                     \<and> (snd (snd d') = Failure)"
   using assms
   unfolding red_ast_bpl_def
@@ -157,7 +158,7 @@ proof (induction rule: converse_rtranclp_induct)
 next
   case (step y z)
   from this obtain d' where    
-     Red2: "red_bigblock_multi A ([] :: ast proc_context) \<Lambda> \<Gamma> [] P (fst (fst z), snd (fst z), snd z) d'" and
+     Red2: "red_bigblock_multi A ([] :: ast proc_context) \<Lambda> \<Gamma> \<Omega> P (fst (fst z), snd (fst z), snd z) d'" and
      Red2StateFailure: "snd (snd d') = Failure"
     by blast
 
@@ -166,10 +167,10 @@ next
   proof cases
     case (RedBigBlockSmallSimpleCmd c s s' name cs str tr cont)
     from this obtain \<gamma>' where
-    "red_bigblock_multi (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) [] P (BigBlock name (c # cs) str tr, cont, s) \<gamma>' \<and>
+    "red_bigblock_multi (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) P (BigBlock name (c # cs) str tr, cont, s) \<gamma>' \<and>
      (snd (snd \<gamma>')) = Failure"
       using red_bigblock_multi_simple_cmds_cons_failure RedBigBlockSmallSimpleCmd Red2
-      by (metis Red2StateFailure assms(3) assms(5) prod.collapse prod.inject step.prems(3))
+      by (metis Red2StateFailure assms(3) assms(5) fstI snd_conv step.prems(3) step.prems(5))
     thus ?thesis
       using Red2StateFailure \<open>y = _\<close> assms
       by fastforce
@@ -222,8 +223,8 @@ lemma end_to_end_stmt_rel:
              (convert_ast_to_program_point proc_body_bpl)
              \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
              \<gamma>'"  and 
-    TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and
-    ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" and
+    TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
+    ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
     WfTyRep: "wf_ty_repr_bpl TyRep" and
 \<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
@@ -337,7 +338,7 @@ proof (rule allI | rule impI)+
       "snd (snd d') = Failure"
 
       using red_ast_block_red_bigblock_failure_preserve[OF RedBpl FailureConfig TypeInterpEq VarCtxtEq HOL.refl]
-            \<open>ns = _\<close>      
+            \<open>ns = _\<close> ProcTyArgsEmpty
       by (auto simp: init_ast_convert_ast_to_program_point_eq)
     
     let ?d'_bigblock = "fst d'"

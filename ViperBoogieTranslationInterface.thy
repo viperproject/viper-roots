@@ -46,6 +46,14 @@ method red_fun_op_bpl_tac1 uses CtxtWf =
      insert field_ty_fun_two_params,
      fastforce)
 
+lemma list_all_comp:
+  assumes "list_all P xs" and
+          "\<And>x. x \<in> set xs \<Longrightarrow> P x \<Longrightarrow> (Q \<circ> P) x"
+        shows "list_all (Q \<circ> P) xs"
+  using assms
+  using list.pred_mono_strong by blast
+
+
 lemma heap_wf_concrete:
   assumes 
     CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
@@ -66,16 +74,18 @@ lemma heap_wf_concrete:
          apply simp       
     using field_ty_fun_two_params
         apply fastforce    
-    using field_ty_fun_opt_closed_args[OF TyRepWf] 
-       apply (fastforce simp: map_instantiate_nil)
-      apply (simp only: map_instantiate_nil)    
+    using list_all_comp[OF field_ty_fun_opt_closed_args[OF TyRepWf]] closed_instantiate 
+       apply (metis TyRepWf closed.simps(3) field_ty_fun_opt_closed instantiate.simps(3) snd_conv)
+          apply (rule field_ty_fun_two_params)
+       apply blast
+      apply (insert field_ty_fun_opt_closed_args[OF TyRepWf])
       apply simp
-    using field_ty_fun_two_params field_ty_fun_opt_tcon
-    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
-     apply (rule field_ty_fun_two_params)
-    apply blast
-     apply (simp only: map_instantiate_nil)
-    by (auto elim: cons_exp_elim simp: select_heap_aux_def)
+    using closed_instantiate
+      apply (metis field_ty_fun_opt_tcon fst_conv list_all_simps(1) snd_eqD)
+
+      apply (rule field_ty_fun_two_params)
+       apply blast    
+    by (fastforce elim: cons_exp_elim simp: select_heap_aux_def)+
 
 lemma heap_update_wf_concrete:
   assumes 
@@ -88,16 +98,20 @@ lemma heap_update_wf_concrete:
    apply (rule impI)
    apply (unfold update_heap_concrete_def)
   apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
-    using field_ty_fun_opt_closed_args[OF TyRepWf] 
-       apply (fastforce simp: map_instantiate_nil)
-      apply (simp only: map_instantiate_nil)    
+  using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] 
+     apply (metis TyRepWf case_prod_conv field_ty_fun_opt_closed_args snd_def)
+          apply (rule field_ty_fun_two_params)
+       apply blast
+      apply (insert field_ty_fun_opt_closed_args[OF TyRepWf])
       apply simp
-    using field_ty_fun_two_params field_ty_fun_opt_tcon
-        apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+    using closed_instantiate
+      apply (metis field_ty_fun_opt_tcon fst_conv list_all_simps(1) snd_eqD)
+    
      apply (rule field_ty_fun_two_params)
     apply blast
-      apply (simp only: map_instantiate_nil)
-      apply simp
+     apply simp
+  apply simp
+    using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] field_ty_fun_two_params field_ty_fun_opt_tcon
     by (blast elim: cons_exp_elim)
     
 lemma mask_read_wf_concrete:
@@ -105,22 +119,26 @@ lemma mask_read_wf_concrete:
     CtxtWf: "ctxt_wf Pr TyRep F fun_repr ctxt" and
     TyRepWf: "wf_ty_repr_bpl TyRep"
   shows "mask_read_wf TyRep ctxt (read_mask_concrete fun_repr)"   
+
   unfolding mask_read_wf_def
   apply (rule allI)+
   apply (rule conjI)
    apply (rule impI)
    apply (unfold read_mask_concrete_def)
   apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
-    using field_ty_fun_opt_closed_args[OF TyRepWf] 
-       apply (fastforce simp: map_instantiate_nil)
-      apply (simp only: map_instantiate_nil)    
+   using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] 
+     apply (metis TyRepWf case_prod_conv field_ty_fun_opt_closed_args snd_def)
+          apply (rule field_ty_fun_two_params)
+       apply blast
+      apply (insert field_ty_fun_opt_closed_args[OF TyRepWf])
       apply simp
-    using field_ty_fun_two_params field_ty_fun_opt_tcon
-    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+    using closed_instantiate
+      apply (metis field_ty_fun_opt_tcon fst_conv list_all_simps(1) snd_eqD)   
      apply (rule field_ty_fun_two_params)
     apply blast
-     apply (simp only: map_instantiate_nil)
-    apply simp
+     apply simp
+  apply simp
+    using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] field_ty_fun_two_params field_ty_fun_opt_tcon
     by (blast elim: cons_exp_elim)
 
 lemma mask_update_wf_concrete:
@@ -129,21 +147,25 @@ lemma mask_update_wf_concrete:
     TyRepWf: "wf_ty_repr_bpl TyRep"
   shows "mask_update_wf TyRep ctxt (update_mask_concrete fun_repr)"  
   unfolding mask_update_wf_def
+
   apply (rule allI)+
   apply (rule conjI)
    apply (rule impI)
    apply (unfold update_mask_concrete_def)
    apply (red_fun_op_bpl_tac1 CtxtWf: CtxtWf)
-    using field_ty_fun_opt_closed_args[OF TyRepWf] 
-       apply (fastforce simp: map_instantiate_nil)
-      apply (simp only: map_instantiate_nil)    
+   using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] 
+     apply (metis TyRepWf case_prod_conv field_ty_fun_opt_closed_args snd_def)
+          apply (rule field_ty_fun_two_params)
+       apply blast
+      apply (insert field_ty_fun_opt_closed_args[OF TyRepWf])
       apply simp
-    using field_ty_fun_two_params field_ty_fun_opt_tcon
-    apply (metis fst_eqD length_0_conv length_Suc_conv lessI list.distinct(1) nth_Cons_0 nth_Cons_Suc)
+    using closed_instantiate
+      apply (metis field_ty_fun_opt_tcon fst_conv list_all_simps(1) snd_eqD)   
      apply (rule field_ty_fun_two_params)
     apply blast
-     apply (simp only: map_instantiate_nil)
-    apply simp
+     apply simp
+  apply simp
+    using closed_map_instantiate[OF field_ty_fun_opt_closed_args[OF TyRepWf]] field_ty_fun_two_params field_ty_fun_opt_tcon
     by (blast elim: cons_exp_elim)
 
 subsection \<open>Translation interface\<close>
