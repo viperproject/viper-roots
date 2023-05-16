@@ -274,6 +274,45 @@ lemma type_interp_rel_wf_vbpl_basic: "type_interp_rel_wf A_vpr (vbpl_absval_ty (
   unfolding ty_repr_basic_def
   by (simp add: type_interp_rel_wf_vbpl_no_domains)
 
+lemma mask_inversion_type_of_vbpl_val_concrete_2: 
+   "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''MaskType'' = (\<exists>m. v = AbsV (AMask m) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''MaskType'')"
+  sorry
+
+lemma heap_inversion_type_of_vbpl_val_concrete:
+ "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''HeapType'' = (\<exists>h. v = AbsV (AHeap h) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''HeapType'')"
+  sorry
+  
+lemma ref_inversion_type_of_vbpl_val_concrete:
+  assumes RefTy: "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Ref'' []"
+  shows "\<exists>r. v = AbsV (ARef r)"
+  sorry
+
+lemma ref_inversion_type_of_vbpl_val_concrete_2:
+  "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Ref'' [] = (\<exists>r. v = AbsV (ARef r) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TCon ''Ref'' [])"
+  sorry
+
+lemma field_inversion_type_of_vbpl_val_2_concrete:
+  assumes "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Field'' [t1, t2]"
+  shows "\<exists>f. v = AbsV (AField f)"
+  sorry
+
+lemma field_inversion_type_of_vbpl_val_2_concrete_2:
+  "(type_of_vbpl_val (ty_repr_basic A) v = TCon ''Field'' [t1, t2]) = (\<exists>f. v = AbsV (AField f) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TCon ''Field'' [t1, t2])"
+  sorry
+
+lemma realv_inversion_type_of_vbpl_val:
+  "type_of_val A v = TPrim TReal = (\<exists>i. v = RealV i \<and> (id type_of_val) A v = TPrim TReal)"
+  sorry
+
+lemmas inversion_type_of_vbpl_val_equalities =
+ heap_inversion_type_of_vbpl_val_concrete
+ mask_inversion_type_of_vbpl_val_concrete_2
+ ref_inversion_type_of_vbpl_val_concrete
+ ref_inversion_type_of_vbpl_val_concrete_2
+ field_inversion_type_of_vbpl_val_2_concrete_2
+
+term id
+
 subsection \<open>Helper definitions\<close>
 
 text \<open>Since currently Carbon always generates the same constants and global variables in the same order,
@@ -342,5 +381,23 @@ lemma lookup_zero_mask_const:
   assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
   shows "lookup_var \<Lambda> ns 1 = Some (boogie_const_val CZeroMask)"
   by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemma lookup_known_folded_zero_mask_const: 
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 2 = Some (boogie_const_val CKnownFoldedZeroMask)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemma lookup_empty_frame_const: 
+  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
+  shows "lookup_var \<Lambda> ns 5 = Some (boogie_const_val CEmptyFrame)"
+  by (rule boogie_const_rel_lookup_2[OF assms]) auto
+
+lemmas lookup_boogie_const_concrete_lemmas =
+  lookup_no_perm_const
+  lookup_write_perm_const
+  lookup_null_const
+  lookup_zero_mask_const
+  lookup_known_folded_zero_mask_const
+  lookup_empty_frame_const
 
 end
