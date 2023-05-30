@@ -578,9 +578,41 @@ abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<R
 text \<open>\<^const>\<open>red_inhale_th_cons\<close> only takes transitions to total heap consistent states whenever some 
 permission is inhaled\<close>
 
-definition assertion_self_framing_store :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a store \<Rightarrow> bool"
+definition assertion_framing_state :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where
-    "assertion_self_framing_store ctxt A \<sigma> \<equiv> 
-      \<forall> \<omega> res. red_inhale_th_cons ctxt A (update_store_total \<omega> \<sigma>) res \<longrightarrow> res \<noteq> RFailure"
+    "assertion_framing_state ctxt StateCons A \<omega> \<equiv> 
+      \<forall> res. red_inhale ctxt StateCons A \<omega> res \<longrightarrow> res \<noteq> RFailure"
+
+definition assertion_self_framing_store :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a store \<Rightarrow> bool"
+  where
+    "assertion_self_framing_store ctxt StateCons A \<sigma> \<equiv> 
+      \<forall> \<omega>. assertion_framing_state ctxt StateCons A (update_store_total \<omega> \<sigma>)"
+
+lemma assertion_framing_star: 
+  assumes "assertion_framing_state ctxt StateCons (A1 && A2) \<omega>" 
+  shows "assertion_framing_state ctxt StateCons A1 \<omega> \<and> 
+        (\<forall> \<omega>'. red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>') \<longrightarrow> assertion_framing_state ctxt StateCons A2 \<omega>')" (is "?Goal1 \<and> ?Goal2")
+proof 
+  show "assertion_framing_state ctxt StateCons A1 \<omega>"
+    unfolding assertion_framing_state_def
+  proof (rule allI | rule impI)+
+    fix res
+    assume "red_inhale ctxt StateCons A1 \<omega> res"
+
+    thus "res \<noteq> RFailure"
+      using assms InhStarFailureMagic assertion_framing_state_def
+      by blast
+  qed
+next
+  show ?Goal2
+  proof (rule allI | rule impI)+
+    fix \<omega>' 
+    assume InhA1: "red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>')"
+    show "assertion_framing_state ctxt StateCons A2 \<omega>'"
+      unfolding assertion_framing_state_def
+      using InhA1 InhStarNormal assertion_framing_state_def assms by blast
+  qed
+qed
+
 
 end
