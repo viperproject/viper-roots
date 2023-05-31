@@ -21,27 +21,34 @@ abbreviation old_label :: label
 definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
         \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
-         (\<forall>(\<omega> :: 'a full_total_state) rPre r. 
-                  vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
-                  total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
-                  is_empty_total \<omega> \<longrightarrow>
-                  red_inhale ctxt R (method_decl.pre mdecl) \<omega> rPre \<longrightarrow>
-                  (
-                    rPre \<noteq> RFailure \<and>
-                    (\<forall>\<omega>Pre. rPre = RNormal \<omega>Pre \<longrightarrow> 
-                      \<comment>\<open>the postcondition takes the prestate as the old state\<close>
-                      \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>Pre\<close> since inhale does not change the store.\<close>
-                      (\<forall>mh. assertion_framing_state ctxt R (method_decl.post mdecl) 
-                                       \<lparr> get_store_total = get_store_total \<omega>,
-                                        get_trace_total = Map.empty(old_label \<mapsto> get_total_full \<omega>Pre), 
-                                        get_total_full = mh \<rparr>) \<and> 
-                      (red_stmt_total ctxt R 
-                                      (nth_option (method_decl.args mdecl @ method_decl.rets mdecl))
-                                      mbody
-                                      (update_trace_total \<omega>Pre (Map.empty(old_label \<mapsto> get_total_full \<omega>Pre))) 
-                                      r \<longrightarrow> r \<noteq> RFailure)
-                    )
-                  )
+         (\<forall>(\<omega> :: 'a full_total_state) rpre. 
+            vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+            total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
+            is_empty_total \<omega> \<longrightarrow>
+            red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>
+            (
+              rpre \<noteq> RFailure \<and>
+              (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
+                \<comment>\<open>the postcondition takes the prestate as the old state\<close>
+                \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>pre\<close> since inhale does not change the store.\<close>
+                (\<forall>mh. assertion_framing_state ctxt R (method_decl.post mdecl) 
+                                 \<lparr> get_store_total = get_store_total \<omega>,
+                                  get_trace_total = Map.empty(old_label \<mapsto> get_total_full \<omega>pre), 
+                                  get_total_full = mh \<rparr>
+                ) \<and> 
+                (\<forall>rbody. red_stmt_total ctxt R 
+                                (nth_option (method_decl.args mdecl @ method_decl.rets mdecl))
+                                mbody
+                                (update_trace_total \<omega>pre (Map.empty(old_label \<mapsto> get_total_full \<omega>pre))) 
+                                rbody \<longrightarrow> 
+                          (rbody \<noteq> RFailure \<and> 
+                            (\<forall>\<omega>body. rbody = RNormal \<omega>body \<longrightarrow> 
+                                (\<forall> rpost. red_exhale ctxt R \<omega>body (method_decl.post mdecl) \<omega>body rpost \<longrightarrow> rpost \<noteq> RFailure)
+                            )
+                          )
+                )
+              )
+            )
          )"
 
 lemma valid_configuration_not_failure:
