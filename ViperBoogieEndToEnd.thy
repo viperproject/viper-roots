@@ -18,6 +18,29 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
 abbreviation old_label :: label
   where "old_label \<equiv> ''old''"
 
+definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
+                   (\<forall>mh. assertion_framing_state ctxt R postcondition
+                                 \<lparr> get_store_total = \<sigma>,
+                                 \<comment>\<open>old state given by state that satisfies precondition\<close>
+                                  get_trace_total = Map.empty(old_label \<mapsto> get_total_full \<omega>pre), 
+                                  get_total_full = mh \<rparr>
+                )"
+
+definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "vpr_method_body_correct ctxt R mdecl \<omega>pre \<equiv>
+            (\<forall>rbody. red_stmt_total ctxt R 
+                                (nth_option (method_decl.args mdecl @ method_decl.rets mdecl))
+                                (the (method_decl.body mdecl))
+                                (update_trace_total \<omega>pre (Map.empty(old_label \<mapsto> get_total_full \<omega>pre))) 
+                                rbody \<longrightarrow> 
+                          (rbody \<noteq> RFailure \<and> 
+                            (\<forall>\<omega>body. rbody = RNormal \<omega>body \<longrightarrow> 
+                                (\<forall> rpost. red_exhale ctxt R \<omega>body (method_decl.post mdecl) \<omega>body rpost \<longrightarrow> rpost \<noteq> RFailure)
+                            )
+                          )
+                )"
+
 definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
         \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
@@ -29,24 +52,9 @@ definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a ful
             (
               rpre \<noteq> RFailure \<and>
               (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
-                \<comment>\<open>the postcondition takes the prestate as the old state\<close>
                 \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>pre\<close> since inhale does not change the store.\<close>
-                (\<forall>mh. assertion_framing_state ctxt R (method_decl.post mdecl) 
-                                 \<lparr> get_store_total = get_store_total \<omega>,
-                                  get_trace_total = Map.empty(old_label \<mapsto> get_total_full \<omega>pre), 
-                                  get_total_full = mh \<rparr>
-                ) \<and> 
-                (\<forall>rbody. red_stmt_total ctxt R 
-                                (nth_option (method_decl.args mdecl @ method_decl.rets mdecl))
-                                mbody
-                                (update_trace_total \<omega>pre (Map.empty(old_label \<mapsto> get_total_full \<omega>pre))) 
-                                rbody \<longrightarrow> 
-                          (rbody \<noteq> RFailure \<and> 
-                            (\<forall>\<omega>body. rbody = RNormal \<omega>body \<longrightarrow> 
-                                (\<forall> rpost. red_exhale ctxt R \<omega>body (method_decl.post mdecl) \<omega>body rpost \<longrightarrow> rpost \<noteq> RFailure)
-                            )
-                          )
-                )
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
+                vpr_method_body_correct ctxt R mdecl \<omega>pre
               )
             )
          )"
@@ -393,6 +401,42 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+text\<open>\<^const>\<open>Ast.proc_body_satisfies_spec\<close> is expressed via \<^const>\<open>red_bigblock\<close>, while \<^const>\<open>red_ast_bpl\<close> 
+     is expressed via \<^const>\<open>red_bigblock_small\<close>. The following lemma bridges the gap.\<close>
+lemma red_ast_bpl_proc_body_sat_spec:
+  assumes RedBpl: "red_ast_bpl proc_body_ast ctxt (convert_ast_to_program_point proc_body_ast, Normal ns) c'" and
+          PreconditionsSat: "expr_all_sat (type_interp ctxt) (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) ns pres" and
+          ProcBodySatSpec: "(Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty)) (type_interp ctxt) [] (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) 
+                                       pres posts proc_body_ast ns"
+        shows "snd c' \<noteq> Failure"
+proof (rule ccontr)
+  assume "\<not> snd c' \<noteq> Failure"
+  hence "snd c' = Failure"
+    by simp
+    
+  obtain d' where 
+    RedBigBlockMulti: "(red_bigblock_multi (type_interp ctxt) ([] :: ast proc_context) (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) proc_body_ast)\<^sup>*\<^sup>*
+       (init_ast proc_body_ast ns) d'" and
+    "snd (snd d') = Failure"  
+        using red_ast_block_red_bigblock_failure_preserve[OF RedBpl \<open>snd c' = _\<close>] init_ast_convert_ast_to_program_point_eq
+        by (metis fstI r_into_rtranclp sndI)
+      
+  let ?d'_bigblock = "fst d'"
+  let ?d'_cont = "fst (snd d')"
+  let ?d'_state = "snd (snd d')"
+
+  have "Ast.valid_configuration (type_interp ctxt) (var_context ctxt)
+       (fun_interp ctxt) (rtype_interp ctxt) posts ?d'_bigblock ?d'_cont ?d'_state"
+    apply (rule proc_body_satisfies_spec_valid_config[OF ProcBodySatSpec] )
+    using PreconditionsSat RedBigBlockMulti
+    unfolding expr_all_sat_def
+    by auto
+  thus False
+    using \<open>snd (snd d') = Failure\<close> valid_configuration_not_failure
+    by blast 
+qed
+
+
 lemma end_to_end_stmt_rel_2:
   assumes 
           \<comment>\<open>The Boogie procedure is correct.\<close>             
@@ -410,22 +454,29 @@ lemma end_to_end_stmt_rel_2:
                          "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))" and
           \<comment>\<open>Precondition inhale is simulated at the beginning (expressed via \<^const>\<open>stmt_rel\<close> because
             \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations)\<close>
-          InhRel: "stmt_rel  (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
-                             (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-                             ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) (convert_ast_to_program_point proc_body_bpl) \<gamma>Pre" and
-        
-          \<comment>\<open>Viper and Boogie statement are related\<close>
+          PreInhRel: "stmt_rel (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
+                            (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+                            ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) (convert_ast_to_program_point proc_body_bpl) \<gamma>Pre" and        
+          \<comment>\<open>Viper method body relation\<close>
           StmtRel: "stmt_rel 
              \<comment>\<open>input relation\<close>
-             (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
+           \<comment>\<open>(state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))\<close>
+             (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
              \<comment>\<open>output relation is irrelevant\<close>
              R' 
-             ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
-             body_vpr 
-             \<comment>\<open>initial program point in Boogie procedure body\<close>
+             ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt
+             body_vpr
              \<gamma>Pre
-             \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
-             \<gamma>'"  and 
+             \<gamma>Body"  and 
+
+          PostExhRel: "stmt_rel (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+                                (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+                                 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
+                                 (Exhale (method_decl.post mdecl)) 
+                                 \<gamma>Body
+                               \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
+                                 \<gamma>'" and
+   
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
@@ -441,8 +492,6 @@ lemma end_to_end_stmt_rel_2:
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-
- (*shows "stmt_correct_total_2 ctxt_vpr StateCons \<Lambda> stmt_vpr"*)
 shows "vpr_method_correct_total_2 ctxt_vpr StateCons mdecl"
   unfolding vpr_method_correct_total_2_def
 proof (rule allI | rule impI)+
@@ -452,9 +501,7 @@ proof (rule allI | rule impI)+
          StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
          "is_empty_total \<omega>" and
-         "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> rpre" and
-        
-         RedStmtVpr:"red_stmt_total ctxt_vpr StateCons ?\<Lambda> body_vpr_prf \<omega> r"
+         RedInhPre: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> rpre"
 
   hence "body_vpr_prf = body_vpr"
     using VprMethodBodySome
@@ -521,6 +568,86 @@ proof (rule allI | rule impI)+
     show "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
       by (rule AxiomsSat)
   qed
+
+  show "rpre \<noteq> RFailure \<and>
+       (\<forall>\<omega>pre.
+           rpre = RNormal \<omega>pre \<longrightarrow>
+           vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)"
+        (is "?Goal1 \<and> ?Goal2")
+  proof (rule conjI)
+
+    show "rpre \<noteq> RFailure"
+    proof (rule ccontr)
+      assume "\<not> rpre \<noteq> RFailure"
+      hence "rpre = RFailure" by simp
+      with stmt_rel_failure_elim[OF PreInhRel StateRelInitialInst] RedInhPre
+       obtain c' where
+        FailureConfig: "snd c' = Failure" and 
+        RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
+        using RedInhale
+        by blast  
+
+      have "snd c' \<noteq> Failure"
+        using red_ast_bpl_proc_body_sat_spec[OF RedBpl, where ?pres="(Ast.proc_all_pres proc_bpl)"]
+              ProcPresEmpty ProcBodyBplCorrect
+        unfolding expr_all_sat_def
+        by (simp add: \<open>var_context _ = _\<close> \<open>type_interp _ = _\<close> \<open>rtype_interp _ =_\<close> \<open>ns = _\<close>)
+
+      thus False
+        using \<open>snd c' = Failure\<close>
+        by simp 
+    qed
+  next
+    show ?Goal2
+    proof (rule allI | rule impI | rule conjI)+
+      fix \<omega>pre
+      assume "rpre = RNormal \<omega>pre"
+
+      show "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)"
+        sorry
+
+      show "vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
+        unfolding vpr_method_body_correct_def
+      proof (rule allI | rule impI | rule conjI)+
+        let ?\<omega>pre' = "(update_trace_total \<omega>pre [old_label \<mapsto> get_total_full \<omega>pre])"
+        fix rbody
+        assume RedBodyVpr: "red_stmt_total ctxt_vpr StateCons (nth_option (method_decl.args mdecl @ rets mdecl)) 
+                               (the (method_decl.body mdecl))
+                               \<omega>pre rbody" \<comment>\<open>TODO: need to change \<omega>pre to ?\<omega>pre'\<close>
+        
+        from stmt_rel_normal_elim[OF PreInhRel StateRelInitialInst] RedInhPre
+        obtain nspre where
+          RedPreBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) (\<gamma>Pre, Normal nspre)" and
+          Rpre: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>pre nspre"
+          using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
+          by blast
+ 
+        have "rbody \<noteq> RFailure"
+        proof (rule ccontr)
+          assume "\<not> rbody \<noteq> RFailure"
+          hence "rbody = RFailure" by simp
+          with stmt_rel_failure_elim[OF StmtRel Rpre] RedBodyVpr obtain c' 
+            where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) c'"
+            using \<open>\<Lambda> = _\<close> VprMethodBodySome
+            by auto
+
+          hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
+            using RedPreBpl red_ast_bpl_transitive
+            by blast
+
+          have "snd c' \<noteq> Failure"
+            using red_ast_bpl_proc_body_sat_spec[OF RedBpl, where ?pres="(Ast.proc_all_pres proc_bpl)"]
+              ProcPresEmpty ProcBodyBplCorrect
+            unfolding expr_all_sat_def
+            by (simp add: \<open>var_context _ = _\<close> \<open>type_interp _ = _\<close> \<open>rtype_interp _ =_\<close> \<open>ns = _\<close>)
+          thus False 
+            by (simp add: \<open>snd c' = Failure\<close>)
+        qed
+        
+        
+    qed
+  qed
+qed
 
   show "r \<noteq> RFailure"
   proof (rule ccontr)
