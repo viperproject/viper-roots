@@ -73,6 +73,12 @@ abbreviation state_rel_well_def_same where
   "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred w ns \<equiv> 
        state_rel Pr TyRep Tr AuxPred ctxt w w ns"
 
+text \<open>The following lemma will not hold once we track old states.\<close>
+lemma state_rel_well_def_same_old_state:
+  assumes "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred w ns"
+  shows "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred (update_trace_total w t) ns"
+  sorry
+
 abbreviation red_bigblock_multi where
   "red_bigblock_multi A M \<Lambda> \<Gamma> \<Omega> ast \<equiv> rtranclp (red_bigblock A M \<Lambda> \<Gamma> \<Omega> ast)"
 
@@ -461,20 +467,20 @@ lemma end_to_end_stmt_rel_2:
           StmtRel: "stmt_rel 
              \<comment>\<open>input relation\<close>
            \<comment>\<open>(state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))\<close>
-             (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-             \<comment>\<open>output relation is irrelevant\<close>
-             R' 
+             (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)             
+             (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) 
              ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt
              body_vpr
              \<gamma>Pre
              \<gamma>Body"  and 
 
           PostExhRel: "stmt_rel (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-                                (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+                                 \<comment>\<open>output relation is irrelevant\<close>
+                                 R'
                                  ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
                                  (Exhale (method_decl.post mdecl)) 
                                  \<gamma>Body
-                               \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
+                                 \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
                                  \<gamma>'" and
    
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
@@ -604,7 +610,17 @@ proof (rule allI | rule impI)+
       assume "rpre = RNormal \<omega>pre"
 
       show "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)"
-        sorry
+        unfolding vpr_postcondition_framed_def assertion_framing_state_def
+      proof (rule allI | rule impI)+
+        fix mh res
+        assume "red_inhale ctxt_vpr StateCons 
+                        (method_decl.post mdecl) 
+                        \<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr> 
+                        res"
+
+        show "res \<noteq> RFailure"
+          sorry
+      qed
 
       show "vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
         unfolding vpr_method_body_correct_def
@@ -613,7 +629,7 @@ proof (rule allI | rule impI)+
         fix rbody
         assume RedBodyVpr: "red_stmt_total ctxt_vpr StateCons (nth_option (method_decl.args mdecl @ rets mdecl)) 
                                (the (method_decl.body mdecl))
-                               \<omega>pre rbody" \<comment>\<open>TODO: need to change \<omega>pre to ?\<omega>pre'\<close>
+                               ?\<omega>pre' rbody" \<comment>\<open>TODO: need to change \<omega>pre to ?\<omega>pre'\<close>
         
         from stmt_rel_normal_elim[OF PreInhRel StateRelInitialInst] RedInhPre
         obtain nspre where
@@ -621,15 +637,18 @@ proof (rule allI | rule impI)+
           Rpre: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>pre nspre"
           using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
           by blast
+
+        \<comment>\<open>the following will have to be adjusted once we track old states\<close>
+        note Rpre_old_upd=state_rel_well_def_same_old_state[OF Rpre]
  
-        have "rbody \<noteq> RFailure"
+        show "rbody \<noteq> RFailure"
         proof (rule ccontr)
           assume "\<not> rbody \<noteq> RFailure"
           hence "rbody = RFailure" by simp
-          with stmt_rel_failure_elim[OF StmtRel Rpre] RedBodyVpr obtain c' 
+          with stmt_rel_failure_elim[OF StmtRel Rpre_old_upd] RedBodyVpr obtain c' 
             where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) c'"
             using \<open>\<Lambda> = _\<close> VprMethodBodySome
-            by auto
+            by fastforce
 
           hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
             using RedPreBpl red_ast_bpl_transitive
@@ -643,49 +662,47 @@ proof (rule allI | rule impI)+
           thus False 
             by (simp add: \<open>snd c' = Failure\<close>)
         qed
-        
-        
+
+        show "\<forall>\<omega>body. rbody = RNormal \<omega>body \<longrightarrow> (\<forall>rpost. red_exhale ctxt_vpr StateCons \<omega>body (method_decl.post mdecl) \<omega>body rpost \<longrightarrow> rpost \<noteq> RFailure)"
+        proof (rule allI | rule impI)+
+          fix \<omega>body rpost
+          assume "rbody = RNormal \<omega>body" and 
+                 RedExhPost: "red_exhale ctxt_vpr StateCons \<omega>body (method_decl.post mdecl) \<omega>body rpost"
+
+          from stmt_rel_normal_elim[OF StmtRel Rpre_old_upd] RedBodyVpr obtain nsbody
+            where 
+             RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Body, Normal nsbody)" and
+             Rbody: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>body nsbody"
+            using \<open>\<Lambda> = _\<close> VprMethodBodySome \<open>rbody = _\<close>
+            by auto
+
+          show "rpost \<noteq> RFailure"
+          proof (rule ccontr)
+            assume "\<not> rpost \<noteq> RFailure"
+            hence "rpost = RFailure"
+              by simp
+
+            with stmt_rel_failure_elim[OF PostExhRel Rbody]
+            obtain c' where "snd c' = Failure" and 
+                            "red_ast_bpl proc_body_bpl ctxt (\<gamma>Body, Normal nsbody) c'"
+              using RedExhPost RedExhaleFailure
+              by blast
+
+            hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
+              using RedPreBpl RedBodyBpl red_ast_bpl_transitive
+              by blast
+
+            have "snd c' \<noteq> Failure"
+            using red_ast_bpl_proc_body_sat_spec[OF RedBpl, where ?pres="(Ast.proc_all_pres proc_bpl)"]
+              ProcPresEmpty ProcBodyBplCorrect
+            unfolding expr_all_sat_def
+            by (simp add: \<open>var_context _ = _\<close> \<open>type_interp _ = _\<close> \<open>rtype_interp _ =_\<close> \<open>ns = _\<close>)
+            thus False 
+              by (simp add: \<open>snd c' = Failure\<close>)
+          qed
+        qed
+      qed
     qed
-  qed
-qed
-
-  show "r \<noteq> RFailure"
-  proof (rule ccontr)
-    assume "\<not> r \<noteq> RFailure"
-    hence "r = RFailure" by simp
-
-    from stmt_rel_failure_elim[OF StmtRel StateRelInitialInst] RedStmtVpr \<open>r = _\<close> obtain c' where
-     FailureConfig: "snd c' = Failure" and 
-      RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
-      using \<open>body_vpr_prf = _\<close> \<open>\<Lambda> = _\<close>
-      by blast
-
-    let ?c'_program_point = "fst c'"
-    let ?c'_bigblock = "fst ?c'_program_point"
-    let ?c'_cont = "snd ?c'_program_point"
-
-    obtain d' where 
-      RedBigBlockMulti: "(red_bigblock_multi (vbpl_absval_ty TyRep) ([] :: ast proc_context) (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl) (fun_interp ctxt) [] proc_body_bpl)\<^sup>*\<^sup>*
-         (init_ast proc_body_bpl \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>) d'" and
-      "snd (snd d') = Failure"
-
-      using red_ast_block_red_bigblock_failure_preserve[OF RedBpl FailureConfig TypeInterpEq VarCtxtEq HOL.refl]
-            \<open>ns = _\<close> ProcTyArgsEmpty
-      by (auto simp: init_ast_convert_ast_to_program_point_eq)
-    
-    let ?d'_bigblock = "fst d'"
-    let ?d'_cont = "fst (snd d')"
-    let ?d'_state = "snd (snd d')"
-
-    have "Ast.valid_configuration (vbpl_absval_ty TyRep) (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)
-         (fun_interp ctxt) [] (Ast.proc_checked_posts proc_bpl) ?d'_bigblock ?d'_cont ?d'_state"
-      apply (rule proc_body_satisfies_spec_valid_config[OF ProcBodyBplCorrect] )
-      using ProcPresEmpty RedBigBlockMulti
-      unfolding expr_all_sat_def
-      by auto
-    thus False
-      using \<open>snd (snd d') = Failure\<close> valid_configuration_not_failure
-      by blast    
   qed
 qed
 
