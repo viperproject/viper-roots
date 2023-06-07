@@ -46,6 +46,7 @@ conditions. \<^term>\<open>th_result_rel bSuccess bFeasible W res\<close> is use
 \<close>
 
 inductive_cases THResultNormal_case: "th_result_rel True True W (RNormal \<omega>)"
+thm THResultNormal_case
 
 lemma THResultNormal_alt: "\<lbrakk> \<omega> \<in> W; A; B\<rbrakk> \<Longrightarrow> th_result_rel A B W (RNormal \<omega>)"
   by (cases A; cases B) (auto intro: THResultNormal)
@@ -146,7 +147,7 @@ definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) 
   where "inhale_perm_single_pred R \<omega> lp p_opt = 
       {\<omega>'| \<omega>' q. R \<omega>' \<and>  
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
-               \<omega>' = update_mp_total_full \<omega> ((get_mp_total_full \<omega>)(lp := (padd (get_mp_total_full \<omega> lp) q)))
+               \<omega>' = update_mp_loc_total_full \<omega> lp (padd (get_mp_total_full \<omega> lp) q)
        }"
 
 
@@ -298,19 +299,6 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | RedExpListNil:
   "red_pure_exps_total ctxt R \<omega>_def Nil \<omega> (Some Nil)"
 
-\<comment>\<open>unfold_rel\<close>
-
-| UnfoldRelStep: 
-    "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
-     ViperLang.predicate_decl.body pred_decl = Some pred_body;
-     m = get_mp_total_full \<omega>;
-     pgte (m (pred_id,vs)) q;
-     q \<noteq> pnone;
-     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q );
-     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
-     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
-     unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
-
 \<comment>\<open>Atomic inhale\<close>
 | InhAcc: 
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
@@ -362,7 +350,19 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
  "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
    red_inhale ctxt R (Imp e A) \<omega> RFailure"
 
-thm red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.induct             
+\<comment>\<open>unfold_rel\<close>
+| UnfoldRelStep: 
+    "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
+     ViperLang.predicate_decl.body pred_decl = Some pred_body;
+     m = get_mp_total_full \<omega>;
+     pgte (m (pred_id,vs)) q;
+     q \<noteq> pnone;
+     m' = m( (pred_id,vs) := psub (m (pred_id, vs)) q );
+     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
+     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
+
+lemmas red_exp_inhale_unfold_inducts = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.inducts
 
 subsection \<open>Elimination rules\<close>
 
