@@ -74,10 +74,18 @@ abbreviation state_rel_well_def_same where
        state_rel Pr TyRep Tr AuxPred ctxt w w ns"
 
 text \<open>The following lemma will not hold once we track old states.\<close>
+
 lemma state_rel_well_def_same_old_state:
   assumes "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred w ns"
   shows "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred (update_trace_total w t) ns"
-  sorry
+  unfolding state_rel_def state_rel0_def 
+  apply (intro conjI)
+                 apply (insert assms[simplified state_rel_def state_rel0_def])
+                 apply (solves \<open>simp\<close>)+
+              apply (fastforce simp: store_rel_def)
+             apply (solves \<open>simp\<close>)+
+         apply (fastforce simp: heap_var_rel_def mask_var_rel_def)+
+  done
 
 abbreviation red_bigblock_multi where
   "red_bigblock_multi A M \<Lambda> \<Gamma> \<Omega> ast \<equiv> rtranclp (red_bigblock A M \<Lambda> \<Gamma> \<Omega> ast)"
@@ -473,7 +481,7 @@ lemma end_to_end_stmt_rel_2:
              body_vpr
              \<gamma>Pre
              \<gamma>Body"  and 
-
+          \<comment>\<open>Postcondition satisfaction\<close>
           PostExhRel: "stmt_rel (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
                                  \<comment>\<open>output relation is irrelevant\<close>
                                  R'
@@ -482,7 +490,20 @@ lemma end_to_end_stmt_rel_2:
                                  \<gamma>Body
                                  \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
                                  \<gamma>'" and
-   
+
+          \<comment>\<open>Postcondition framing\<close>
+          PropagatePostFraming: "\<And> \<omega>0 \<omega>1 ns. state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred \<omega>0 ns \<Longrightarrow> 
+                                              get_store_total \<omega>1 = get_store_total \<omega>0 \<Longrightarrow>
+                                              \<exists>ns'. red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> R' \<omega>1 ns'" and
+             PostFramingExhRel: "stmt_rel R'
+                                 \<comment>\<open>output relation is irrelevant\<close>
+                                 R''
+                                 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt 
+                                 (Inhale (method_decl.post mdecl)) 
+                                 \<gamma>Framing0
+                                 \<comment>\<open>output program point in Boogie procedure body is irrelevant\<close>
+                                 \<gamma>'" and
+
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
@@ -609,17 +630,54 @@ proof (rule allI | rule impI)+
       fix \<omega>pre
       assume "rpre = RNormal \<omega>pre"
 
+      have StoreSame: "get_store_total \<omega>pre = get_store_total \<omega>"
+        using RedInhPre \<open>rpre = RNormal \<omega>pre\<close> inhale_only_changes_mask by blast
+
+      from stmt_rel_normal_elim[OF PreInhRel StateRelInitialInst] RedInhPre
+          obtain nspre where
+            RedPreBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) (\<gamma>Pre, Normal nspre)" and
+            Rpre: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>pre nspre"
+            using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
+            by blast
+
       show "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)"
         unfolding vpr_postcondition_framed_def assertion_framing_state_def
       proof (rule allI | rule impI)+
         fix mh res
-        assume "red_inhale ctxt_vpr StateCons 
-                        (method_decl.post mdecl) 
-                        \<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr> 
-                        res"
+        let ?\<omega>Post = "\<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr>"
+        assume RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
+        
+        from PropagatePostFraming[OF Rpre, where ?\<omega>1.0 = ?\<omega>Post] obtain ns' where
+          RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Framing0, Normal ns')" and
+          "R' ?\<omega>Post ns'"
+          using StoreSame
+          by auto          
 
         show "res \<noteq> RFailure"
-          sorry
+        proof (rule ccontr)
+          assume "\<not> res \<noteq> RFailure"
+          hence "res = RFailure"
+            by simp
+
+          with stmt_rel_failure_elim[OF PostFramingExhRel \<open>R' _ _\<close>] RedInhPost
+          obtain c' where "red_ast_bpl proc_body_bpl ctxt (\<gamma>Framing0, Normal ns') c'" and 
+                          "snd c' = Failure"
+            using RedInhale \<open>\<Lambda> = _\<close>
+            by blast
+            
+          with RedPreBpl RedPreToFramingBpl
+          have RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
+            using red_ast_bpl_transitive
+            by blast
+
+          have "snd c' \<noteq> Failure"
+            using red_ast_bpl_proc_body_sat_spec[OF RedBpl, where ?pres="(Ast.proc_all_pres proc_bpl)"]
+              ProcPresEmpty ProcBodyBplCorrect
+            unfolding expr_all_sat_def
+            by (simp add: \<open>var_context _ = _\<close> \<open>type_interp _ = _\<close> \<open>rtype_interp _ =_\<close> \<open>ns = _\<close>)
+          thus False 
+            by (simp add: \<open>snd c' = Failure\<close>)
+        qed
       qed
 
       show "vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
@@ -629,14 +687,7 @@ proof (rule allI | rule impI)+
         fix rbody
         assume RedBodyVpr: "red_stmt_total ctxt_vpr StateCons (nth_option (method_decl.args mdecl @ rets mdecl)) 
                                (the (method_decl.body mdecl))
-                               ?\<omega>pre' rbody" \<comment>\<open>TODO: need to change \<omega>pre to ?\<omega>pre'\<close>
-        
-        from stmt_rel_normal_elim[OF PreInhRel StateRelInitialInst] RedInhPre
-        obtain nspre where
-          RedPreBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) (\<gamma>Pre, Normal nspre)" and
-          Rpre: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>pre nspre"
-          using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
-          by blast
+                               ?\<omega>pre' rbody"
 
         \<comment>\<open>the following will have to be adjusted once we track old states\<close>
         note Rpre_old_upd=state_rel_well_def_same_old_state[OF Rpre]
