@@ -2,7 +2,113 @@ theory TotalSemProperties
 imports TotalSemantics
 begin
 
-section \<open>Inhale leaves heap unchanged\<close>
+subsection \<open>Induction schemes\<close>
+
+subsection \<open>Inhale\<close>
+
+text \<open>Inhale only changes mask\<close>
+
+lemma inhale_perm_single_store_same:
+  assumes  "\<omega>' \<in> inhale_perm_single R \<omega> lh popt"
+  shows "get_store_total \<omega>' = get_store_total \<omega>"
+  using assms
+  unfolding inhale_perm_single_def
+  by auto
+
+lemma inhale_perm_single_trace_same:
+  assumes  "\<omega>' \<in> inhale_perm_single R \<omega> lh popt"
+  shows "get_trace_total \<omega>' = get_trace_total \<omega>"
+  using assms
+  unfolding inhale_perm_single_def
+  by auto
+
+lemma inhale_perm_single_heap_same:
+  assumes  "\<omega>' \<in> inhale_perm_single R \<omega> lh popt"
+  shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
+  using assms
+  unfolding inhale_perm_single_def
+  by (smt (verit, ccfv_threshold) get_h_total_full_aux mem_Collect_eq old.prod.exhaust)
+
+lemma inhale_perm_single_pred_store_same:
+  assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lh popt"
+  shows "get_store_total \<omega>' = get_store_total \<omega>"
+  using assms
+  unfolding inhale_perm_single_pred_def
+  by auto
+
+lemma inhale_perm_single_pred_trace_same:
+  assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lh popt"
+  shows "get_trace_total \<omega>' = get_trace_total \<omega>"
+  using assms
+  unfolding inhale_perm_single_pred_def
+  by auto
+
+lemma inhale_perm_single_pred_heap_same:
+  assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lh popt"
+  shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
+  using assms get_h_total_full_aux_2
+  unfolding inhale_perm_single_pred_def
+  by (smt (verit) mem_Collect_eq)
+
+lemmas inhale_perm_single_only_mask_changed=
+  inhale_perm_single_store_same
+  inhale_perm_single_trace_same
+  inhale_perm_single_heap_same
+
+lemmas inhale_perm_pred_single_only_mask_changed=
+  inhale_perm_single_pred_store_same
+  inhale_perm_single_pred_trace_same
+  inhale_perm_single_pred_heap_same
+
+lemma inhale_only_changes_mask:
+  shows "ctxt, R, x1 \<turnstile> \<langle>x2;x3\<rangle> [\<Down>]\<^sub>t x4 \<Longrightarrow> True" and
+        "red_pure_exps_total ctxt R x5 x6 x7 x8 \<Longrightarrow> True" and
+        "red_inhale ctxt R A \<omega> res \<Longrightarrow> (\<And>\<omega>'. res = RNormal \<omega>' \<Longrightarrow> 
+             get_store_total \<omega>' = get_store_total \<omega> \<and>
+             get_trace_total \<omega>' = get_trace_total \<omega> \<and>
+             get_h_total_full \<omega>' = get_h_total_full \<omega>)" and
+        "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
+proof (induction rule: red_exp_inhale_unfold_inducts)
+  case (InhAcc \<omega> e_r r e_p p W' f res)
+  then show ?case 
+    by (metis inhale_perm_single_only_mask_changed singleton_iff th_result_rel_normal)
+next
+  case (InhAccPred \<omega> e_p p e_args v_args W' pred_id res)
+  then show ?case 
+  using inhale_perm_pred_single_only_mask_changed th_result_rel_normal by blast
+next
+  case (InhAccWildcard \<omega> e_r r W' f res)
+  then show ?case     
+    by (metis inhale_perm_single_only_mask_changed th_result_rel_normal)
+next
+  case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
+  then show ?case
+    using inhale_perm_pred_single_only_mask_changed th_result_rel_normal by blast
+next
+  case (InhPure \<omega> e b)
+  then show ?case
+    by (metis stmt_result_total.distinct(3) stmt_result_total.inject)
+next
+  case (InhSubAtomicFailure A \<omega>)
+  then show ?case by simp
+next
+  case (InhStarNormal A \<omega> \<omega>'' B res)
+  then show ?case by presburger
+next
+  case (InhStarFailureMagic A \<omega> resA B)
+  then show ?case by simp
+next
+  case (InhImpTrue \<omega> e A res)
+  then show ?case by simp
+next
+  case (InhImpFalse \<omega> e A)
+  then show ?case by simp
+next
+  case (InhImpFailure \<omega> e A)
+  then show ?case by simp
+qed (rule HOL.TrueI)+
+
+text \<open>Inhale leaves heap unchanged\<close>
 
 (*
 lemma inhale_perm_single_mupd:
@@ -72,7 +178,7 @@ case (InhPureNormalMagic \<omega> e b R)
 qed auto
 *)
 
-section \<open>Unfold leads to one normal successor state\<close>
+subsection \<open>Unfold leads to one normal successor state\<close>
 
 (*
 lemma unfold_at_least_one:

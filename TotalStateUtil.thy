@@ -47,6 +47,9 @@ definition update_hh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Right
 definition update_mh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
   where "update_mh_loc_total \<phi> l p = \<phi>\<lparr>get_mh_total := (get_mh_total \<phi>)(l := p)\<rparr>"
 
+definition update_mp_loc_total :: "'a total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
+  where "update_mp_loc_total \<phi> lp p = \<phi>\<lparr>get_mp_total := (get_mp_total \<phi>)(lp := p)\<rparr>"
+
 definition update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> 'a total_state"
   where "update_mh_total \<phi> mh = \<phi>\<lparr>get_mh_total := mh\<rparr>"
 
@@ -204,6 +207,10 @@ fun update_mh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Ri
   where "update_mh_loc_total_full \<omega> l p = 
         \<omega>\<lparr> get_total_full := update_mh_loc_total (get_total_full \<omega>) l p \<rparr>"
 
+fun update_mp_loc_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat \<Rightarrow> 'a full_total_state"
+  where "update_mp_loc_total_full \<omega> lp p = 
+        \<omega>\<lparr> get_total_full := update_mp_loc_total (get_total_full \<omega>) lp p \<rparr>"
+
 lemma update_hh_loc_total_full_mask_same: "get_mh_total_full (update_hh_loc_total_full \<omega> l v) = get_mh_total_full \<omega>"
   by (simp add: update_hh_loc_total_mh_eq)
 
@@ -285,6 +292,11 @@ lemma get_h_total_full_aux:
   "get_h_total_full \<omega> = get_h_total_full (update_mh_loc_total_full \<omega> (addr, f_vpr) v_vpr)"
   apply simp
   by (simp add: update_mh_loc_total_mh_eq update_mh_loc_total_mp_eq)
+
+lemma get_h_total_full_aux_2:
+  "get_h_total_full \<omega> = get_h_total_full (update_mp_loc_total_full \<omega> ploc v_vpr)"
+  apply simp
+  by (simp add: update_mp_loc_total_def)
 
 lemma update_hh_loc_total_full_m_eq: "get_m_total_full (update_hh_loc_total_full \<omega> l v) = get_m_total_full \<omega>"
   by (simp add: update_hh_loc_total_mh_eq update_hh_loc_total_mp_eq)
