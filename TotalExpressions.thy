@@ -445,6 +445,7 @@ lemma red_pure_exps_total_singleton:
   done
 
 lemmas red_pure_exp_total_elims = 
+  RedLit_case RedVar_case
   RedUnop_case RedBinop_case RedFunApp_case  
   red_exp_list_normal_elim red_exp_list_failure_elim
 
@@ -452,7 +453,13 @@ subsubsection \<open>Inhale\<close>
 
 inductive_cases InhStar_case: "red_inhale ctxt R (A && B) \<omega> res"
 inductive_cases InhImp_case: "red_inhale ctxt R (Imp e A) \<omega> res"
+inductive_cases InhPure_case: "red_inhale ctxt R (Atomic (Pure e)) \<omega> res"
+thm InhPure_case
 
+lemmas red_inhale_elims = 
+  InhStar_case
+  InhImp_case
+  InhPure_case
 
 subsection \<open>Helper lemmas\<close>
 

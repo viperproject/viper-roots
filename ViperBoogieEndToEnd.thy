@@ -460,10 +460,11 @@ definition post_framing_rel
                    )"  
 
 definition method_rel
-  where "method_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 R1 RPostFrame \<gamma>0 \<equiv> 
+  where "method_rel R0 R1 RPostFrame ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
                    post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 RPostFrame \<gamma>Pre \<and>
                    (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
+                       \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
                        stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>                       
                        stmt_rel R1 R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post)
           )"
@@ -484,12 +485,13 @@ lemma end_to_end_stmt_rel_2:
           ProcPresEmpty: "proc_pres proc_bpl = []" and
                          "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))" and
 
-          VprMethodRel: "method_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl 
+          VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-                RPostFrame 
+               RPostFrame 
+               ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl               
                (convert_ast_to_program_point proc_body_bpl)" 
-          (is "method_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R0 ?R1 _ ?\<gamma>0") and
+          (is "method_rel ?R0 ?R1 RPostFrame ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0") and
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
@@ -513,7 +515,7 @@ proof (rule allI | rule impI)+
   from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
     PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 RPostFrame \<gamma>Pre" and
-    StmtRel: "stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
+    BodyRel: "stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
     PostExhRel: "stmt_rel ?R1 Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
     using VprMethodBodySome
@@ -710,7 +712,7 @@ proof (rule allI | rule impI)+
           proof (rule disjE[OF RedCasesVpr])
             assume ?Case1
    
-            with stmt_rel_failure_elim[OF StmtRel Rpre_old_upd] RedBodyVpr obtain c' 
+            with stmt_rel_failure_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain c' 
               where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) c'"
               using \<open>\<Lambda> = _\<close> VprMethodBodySome
               by fastforce
@@ -733,7 +735,7 @@ proof (rule allI | rule impI)+
               RedExhPost: "red_exhale ctxt_vpr StateCons \<omega>body (method_decl.post mdecl) \<omega>body RFailure"
               by (auto elim: red_stmt_total_inversion_thms)
 
-            from stmt_rel_normal_elim[OF StmtRel Rpre_old_upd] RedBodyVpr obtain nsbody
+            from stmt_rel_normal_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain nsbody
               where 
                RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Body, Normal nsbody)" and
                Rbody: "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>body nsbody"

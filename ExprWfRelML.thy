@@ -63,7 +63,8 @@ ML \<open>
       
       ( (* prove divisor reduces to an integer if zero is an integer constant *)
         (assm_full_simp_solved_tac ctxt) ORELSE'        
-          (expr_red_tac (#type_safety_thm_map exp_rel_info TInt) 
+          (expr_red_tac (#type_safety_thm_map exp_rel_info TInt)
+                        (#simplify_rtype_interp_tac exp_rel_info)
                         (#lookup_var_thms exp_rel_info) 
                         (#lookup_fun_bpl_thms exp_rel_info) 
                         ctxt)          
@@ -71,7 +72,8 @@ ML \<open>
         
       ( (* prove divisor reduces to a real if zero is a real constant *) 
         (Rmsg' "div_rel_5" assm_full_simp_solved_tac ctxt) ORELSE'
-        expr_red_tac (#type_safety_thm_map exp_rel_info TReal) 
+        expr_red_tac (#type_safety_thm_map exp_rel_info TReal)
+                     (#simplify_rtype_interp_tac exp_rel_info) 
                      (#lookup_var_thms exp_rel_info) 
                      (#lookup_fun_bpl_thms exp_rel_info) 
                      ctxt

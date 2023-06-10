@@ -64,7 +64,7 @@ lemma store_temporary_perm_rel:
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
          LookupTyTemp: "lookup_var_ty (var_context ctxt) temp_var = Some (TPrim TReal)" and
          TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
-         EmptyRtype: "rtype_interp ctxt = []"
+         EmptyRtype: "rtype_interp ctxt = []" 
   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign temp_var e_bpl # cs) s tr), cont), Normal ns)
                                    ((BigBlock name cs s tr, cont), Normal ns') \<and>
                 (state_rel Pr TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>def \<omega> ns')"

@@ -39,9 +39,11 @@ type exp_rel_info = {
     vpr_lit_bpl_exp_rel_tac : Proof.context -> int -> tactic,
     lookup_var_thms : thm list,
     lookup_fun_bpl_thms: thm list,
+    (* tactic to simplify the context projection on the runtype interpretation *)
+    simplify_rtype_interp_tac: Proof.context -> int -> tactic,
     (* should be tactic that given goal to relate Viper field access reduces the goal to a single
        goal where the receiver expression must be related *)       
-    field_access_rel_pre_tac : Proof.context -> int -> tactic 
+    field_access_rel_pre_tac : Proof.context -> int -> tactic
 }
 
 fun var_rel_tac lookup_var_rel_tac ctxt =
@@ -56,7 +58,8 @@ fun lit_tac vpr_lit_bpl_exp_rel_tac ctxt =
   fastforce_tac ctxt [] THEN' (* blast may be faster here *)
   vpr_lit_bpl_exp_rel_tac ctxt
 
-fun expr_red_tac type_safety_thm lookup_var_thms lookup_fun_thms ctxt = 
+fun expr_red_tac type_safety_thm simplify_rtype_interp_tac lookup_var_thms lookup_fun_thms ctxt = 
+  simplify_rtype_interp_tac ctxt THEN'
   resolve_tac ctxt [type_safety_thm] THEN'
   assm_full_simp_solved_tac ctxt THEN'
   assm_full_simp_solved_tac ctxt THEN'
@@ -73,7 +76,7 @@ and
   assm_full_simp_solved_tac ctxt THEN' (* bop *) 
   (fn i => fn st => 
      (* e2 reduces to a Boolean *)
-     expr_red_tac (#type_safety_thm_map info TBool) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) THEN' 
+     expr_red_tac (#type_safety_thm_map info TBool) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) THEN' 
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *) 
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)
 and

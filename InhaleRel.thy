@@ -426,4 +426,27 @@ next
     by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
 qed
 
+subsection \<open>Misc\<close>
+
+lemma inhale_rel_refl:
+  assumes "\<And> \<omega> res. red_inhale ctxt_vpr StateCons A \<omega> res \<Longrightarrow> (res \<noteq> RFailure \<and> (\<forall> \<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>)) "
+  shows "inhale_rel R ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>"
+  using assms
+  by (auto intro!: inhale_rel_intro intro: red_ast_bpl_refl)
+
+lemma inhale_rel_true: "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Pure (ELit (ViperLang.LBool True)))) \<gamma> \<gamma>"
+proof (rule inhale_rel_refl)
+  fix \<omega> res
+  assume "red_inhale ctxt_vpr StateCons (Atomic (Pure (ELit (ViperLang.lit.LBool True)))) \<omega> res"
+
+  from this obtain b where 
+    "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>(ELit (ViperLang.lit.LBool True));\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b)" and
+    "res = (if b then RNormal \<omega> else RMagic)"
+    apply (rule InhPure_case)
+    by (auto elim: red_exp_list_failure_elim red_pure_exp_total_elims)
+
+  thus " res \<noteq> RFailure \<and> (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>) "
+    by simp
+qed
+
 end
