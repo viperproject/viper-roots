@@ -82,8 +82,13 @@ and
            )
       | _ => error "unsupported hint in stmt_rel_single_stmt_tac"
     ) THEN'
-    (* now reduce \<open>assume state(Heap, Mask)\<close> *)
-    (Rmsg' "Progress Good State" (progress_assume_good_state_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ctxt)
+    (* Now reduce \<open>assume state(Heap, Mask)\<close> or otherwise progress without executing a Boogie command
+       (one example where an extra good state assumption does not appear here is when running the tactic
+        in cases where inhale was invoked directly in the InhaleModule instead of via translateStmt
+        such as when inhaling the precondition).
+       It might be better to control this via hints, because this tactic may reduce a good state
+       assumption that should not be reduced at this point. *)
+    (Rmsg' "Progress Good State" ((progress_assume_good_state_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_tac ctxt)) ctxt)
 \<close>
 
 ML \<open>

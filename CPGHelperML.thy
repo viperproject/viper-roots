@@ -174,7 +174,8 @@ fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info looku
   (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm lookup" (assm_full_simp_solved_with_thms_tac [lookup_aux_var_ty_thm] ctxt) ctxt) THEN'
-  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt)
+  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+  (Rmsg' "store perm empty rtype_interp" (assm_full_simp_solved_tac ctxt) ctxt)
 
 \<close>
 
