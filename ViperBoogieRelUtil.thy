@@ -502,7 +502,72 @@ lemma construct_bpl_heap_from_vpr_heap_correct:
   using assms construct_bpl_heap_from_vpr_heap_correct_aux
   by meson
 
-subsection \<open>Introducing new Boogie variables for the well-definedness state\<close>
+subsection \<open>State components that do not affect state relation\<close>
+
+text \<open>The properties here will have to be adjusted once new features are added that require 
+taking more state components into account. \<close>
+
+
+text \<open>The following lemma will not hold once the state relation tracks old states.\<close>
+
+\<comment>\<open>Need to update both the well-definedness and the evaluation state, because the state relation demands
+that they only differ on the mask.\<close>
+lemma state_rel_trace_independent:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  shows "state_rel Pr TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
+  unfolding state_rel_def state_rel0_def 
+  apply (intro conjI)
+                 apply (insert assms[simplified state_rel_def state_rel0_def])
+                 apply (solves \<open>simp\<close>)+
+              apply (fastforce simp: store_rel_def)
+             apply (solves \<open>simp\<close>)+
+         apply (fastforce simp: heap_var_rel_def mask_var_rel_def)+
+  done
+
+text \<open>The following lemma will not hold once the state relation tracks predicates.\<close>
+
+lemma state_rel_pred_independent:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
+          "get_store_total \<omega> = get_store_total \<omega>'" and
+          "get_trace_total \<omega> = get_trace_total \<omega>'"      
+          "get_hh_total_full \<omega> = get_hh_total_full \<omega>'" and
+          "get_mh_total_full \<omega> = get_mh_total_full \<omega>'"
+  shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>' \<omega>' ns"
+  unfolding state_rel_def state_rel0_def 
+  apply (intro conjI)
+                   apply (insert assms[simplified state_rel_def state_rel0_def])
+                 apply (solves \<open>simp\<close>)+
+               apply (fastforce simp: store_rel_def)
+             apply (solves \<open>simp\<close>)+
+         apply (fastforce simp: heap_var_rel_def mask_var_rel_def)+
+  done
+
+lemma state_rel_mask_pred_independent:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+  shows "state_rel Pr TyRep Tr AuxPred ctxt (update_mp_total_full \<omega> mp) (update_mp_total_full \<omega> mp) ns"
+  using assms
+  apply (rule state_rel_pred_independent)
+     apply simp
+    apply simp
+   apply (simp add: update_mp_total_def)
+  apply (simp add: update_mp_total_def)
+  done
+
+lemma state_rel_heap_pred_independent:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+  shows "state_rel Pr TyRep Tr AuxPred ctxt (update_hp_total_full \<omega> mp) (update_hp_total_full \<omega> mp) ns"
+  using assms
+  apply (rule state_rel_pred_independent)
+     apply simp
+    apply simp
+   apply (simp add: update_hp_total_def)
+  apply (simp add: update_hp_total_def)
+  done 
+               
+subsection \<open>Introducing new Boogie variables for the evaluation and well-definedness state\<close>
+
+
+
 
 text \<open>The premises of the following lemma should be in-sync with the analogous lemma that updates the heap.
       If they are not in-sync, then need to change the corresponding tactics.\<close>
@@ -566,6 +631,114 @@ qed
 
 text \<open>The premises of the following lemma should be in-sync with the analogous lemma that updates the mask.
       If they are not in-sync, then need to change the corresponding tactics.\<close>
+
+lemma mask_var_upd_red_ast_bpl_propagate:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          LookupTyNewVar: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and          
+          VarFresh: "mvar' \<notin> ({heap_var Tr, heap_var_def Tr} \<union>
+                      \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>mask_var Tr\<close>.
+                         The proof was simpler when adding this constraint (because it allows one to do the proof
+                         by first treating the new variable as a new auxiliary variable) \<close>
+                      {mask_var Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)" and
+                    "red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
+                    "mask_rel Pr (field_translation T) mh' mbpl'"
+        shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
+                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
+                     state_rel Pr TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def (update_mh_total_full \<omega> mh') ns'"
+  sorry
+
+lemma heap_var_upd_red_ast_bpl_propagate:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          LookupTyNewVar: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          VarFresh: "hvar' \<notin> 
+                       \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>heap_var Tr\<close>.
+                         The proof was simpler when adding this constraint (because it allows one to do the proof
+                         by first treating the new variable as a new auxiliary variable) \<close>
+                      ({heap_var Tr, heap_var_def Tr} \<union>
+                      {mask_var Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)" 
+        shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#cs) str tr, cont), Normal ns) 
+                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
+                     state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>def (update_hh_total_full \<omega> hh') ns'"
+  sorry
+
+lemma post_framing_propagate_aux:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>0 \<omega>0 ns" and
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
+          LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
+          RedMaskBpl: "\<And> \<omega> ns hvar. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow>
+                                    red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
+          MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>1) mbpl'" and
+          Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
+                              {mask_var Tr, mask_var_def Tr} \<union>
+                              (ran (var_translation Tr)) \<union>
+                              (ran (field_translation Tr)) \<union>
+                              (range (const_repr Tr)) \<union>
+                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}") and
+                "hvar' \<noteq> mvar'"
+  shows  "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
+                            ((BigBlock name cs str tr, cont), Normal ns') \<and>
+                state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega>1 ns'"
+proof -
+  from Disj have "hvar' \<notin> ?B" and "mvar' \<notin> ?B"
+    by fast+
+                            
+  note mask_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyMask TypeInterp \<open>mvar' \<notin> ?B\<close> RedMaskBpl MaskRel]
+
+  let ?hh' = "get_hh_total_full \<omega>1"
+  let ?mh' = "get_mh_total_full \<omega>1"
+
+  from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyHeap TypeInterp \<open>hvar' \<notin> ?B\<close>] obtain ns'
+    where "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
+                            ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns')" and
+          StateRel': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>0 (update_hh_total_full \<omega>0 ?hh') ns'"
+    by blast
+
+  let ?\<omega>' = "(update_mh_total_full (update_hh_total_full \<omega>0 (get_hh_total_full \<omega>1)) ?mh')"
+
+  from mask_var_upd_red_ast_bpl_propagate[OF StateRel' LookupTyMask TypeInterp _ RedMaskBpl[OF StateRel'] MaskRel]
+  obtain ns'' where
+     "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl # cs) str tr, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ns'')" and
+     StateRel'': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>0 ?\<omega>' ns''"
+    using \<open>mvar' \<notin> _\<close> \<open>hvar' \<noteq> mvar'\<close>
+    by force
+
+  hence StateRel3: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>' ?\<omega>' ns''"
+    sorry
+
+  let ?\<omega>'' = "update_trace_total (update_hp_total_full (update_mp_total_full ?\<omega>' (get_mp_total_full \<omega>1)) (get_hp_total_full \<omega>1)) (get_trace_total \<omega>1)"
+
+  from state_rel_trace_independent[OF state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]] have
+   "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>'' ?\<omega>'' ns''"
+    by blast
+
+  moreover have "?\<omega>'' = \<omega>1"
+    apply (rule full_total_state.equality)
+       apply (simp add:  StoreSame)
+      apply simp
+     apply (rule total_state.equality)
+         apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
+    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
+
+    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
+    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
+    apply simp     
+    apply simp
+    done
+
+  
+    
 
 lemma heap_def_var_upd_red_ast_bpl_propagate:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and

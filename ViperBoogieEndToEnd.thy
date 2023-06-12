@@ -651,15 +651,16 @@ proof (rule allI | rule impI)+
       proof (rule allI | rule impI)+
         fix mh res
         let ?\<omega>Post = "\<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr>"
+        let ?\<omega>PostEmpty = "empty_full_total_state (get_store_total \<omega>) [old_label \<mapsto> get_total_full \<omega>pre] (get_hh_total mh) (get_hp_total mh)"
         assume RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
         
         from PostFramingRel obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameEnd where 
           RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Framing0, Normal ns')" and
-          "RPostFrame ?\<omega>Post ns'" and
+          "RPostFrame ?\<omega>PostEmpty ns'" and
           PostFramingInhRel: "stmt_rel RPostFrame RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
-          unfolding post_framing_rel_def
-          using Rpre StoreSame
-          by (metis full_total_state.select_convs(1))         
+          using Rpre StoreSame is_empty_empty_full_total_state
+          unfolding post_framing_rel_def 
+          by (metis get_store_empty_full_total_state)          
 
         show "res \<noteq> RFailure"
         proof (rule ccontr)
@@ -667,7 +668,16 @@ proof (rule allI | rule impI)+
           hence "res = RFailure"
             by simp
 
-          with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrame _ _\<close>] RedInhPost
+          have "?\<omega>PostEmpty \<le> ?\<omega>Post"
+            apply (rule is_empty_total_full_less_eq[OF is_empty_empty_full_total_state])
+            by (simp_all add: empty_full_total_state_def)
+
+          with inhale_no_perm_failure_preserve_mono RedInhPost 
+          have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
+            using is_empty_empty_full_total_state \<open>res = _\<close> 
+            by blast
+
+          with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrame _ _\<close>]
           obtain c' where "red_ast_bpl proc_body_bpl ctxt (\<gamma>Framing0, Normal ns') c'" and 
                           "snd c' = Failure"
             using RedInhale \<open>\<Lambda> = _\<close>
@@ -1367,7 +1377,7 @@ proof -
 
   show ?thesis
   unfolding state_rel_empty_def state_rel_def state_rel0_def
-  proof (rule conjI[OF \<open>is_empty_total \<omega>\<close>], intro conjI)
+  proof (rule conjI[OF \<open>is_empty_total_full \<omega>\<close>], intro conjI)
 
     have Aux: "\<And>var_vpr var_bpl val_vpr.
          var_translation Tr var_vpr = Some var_bpl \<Longrightarrow> get_store_total \<omega> var_vpr = Some val_vpr \<Longrightarrow> 
@@ -1447,8 +1457,8 @@ proof -
         by (metis (no_types, opaque_lifting) lookup_var_decl_global_2 lookup_var_ty_def lookup_vdecls_ty_def lookup_vdecls_ty_map_of option.inject)
     next    
       show "mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) zero_mask_bpl"
-        using \<open>is_empty_total \<omega>\<close>
-        unfolding mask_rel_def is_empty_total_def zero_mask_def      
+        using \<open>is_empty_total_full \<omega>\<close>
+        unfolding mask_rel_def is_empty_total_full_def is_empty_total_def zero_mask_def      
         by (simp add: pnone.rep_eq)
     qed
   

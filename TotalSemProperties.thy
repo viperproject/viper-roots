@@ -108,7 +108,50 @@ next
   then show ?case by simp
 qed (rule HOL.TrueI)+
 
-text \<open>Inhale leaves heap unchanged\<close>
+text \<open>inhale preserves failure for smaller states if there is no permission introspection\<close>
+thm red_exp_inhale_unfold_inducts
+lemma inhale_no_perm_failure_preserve_mono:
+  shows "ctxt, R, x1 \<turnstile> \<langle>x2;x3\<rangle> [\<Down>]\<^sub>t x4 \<Longrightarrow> True" and
+        "red_pure_exps_total ctxt R x5 x6 x7 x8 \<Longrightarrow> True" and
+        \<comment>\<open>TODO: add no permission introspection property\<close>
+        "red_inhale ctxt R A \<omega>1 res1 \<Longrightarrow> \<omega>2 \<le> \<omega>1 \<Longrightarrow> res1 \<noteq> RMagic \<Longrightarrow> 
+              (res1 = RFailure \<longrightarrow> red_inhale ctxt R A \<omega>2 RFailure) \<and>
+              (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> (\<exists>\<omega>2'. \<omega>2' \<le> \<omega>1' \<and> red_inhale ctxt R A \<omega>2 (RNormal \<omega>2')))" and
+        "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
+proof (induction arbitrary:  and and \<omega>2 rule: red_exp_inhale_unfold_inducts)
+  case (InhAcc \<omega> e_r r e_p p W' f res)
+  then show ?case sorry
+next
+  case (InhAccPred \<omega> e_p p e_args v_args W' pred_id res)
+  then show ?case sorry
+next
+  case (InhAccWildcard \<omega> e_r r W' f res)
+  then show ?case sorry
+next
+  case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
+  then show ?case sorry
+next
+  case (InhPure \<omega> e b)
+  then show ?case sorry
+next
+  case (InhSubAtomicFailure A \<omega>)
+  then show ?case sorry
+next
+  case (InhStarNormal A \<omega> \<omega>'' B res)
+  then show ?case sorry
+next
+  case (InhStarFailureMagic A \<omega> resA B)
+  then show ?case sorry
+next
+  case (InhImpTrue \<omega> e A res)
+  then show ?case sorry
+next
+  case (InhImpFalse \<omega> e A)
+  then show ?case sorry
+next
+  case (InhImpFailure \<omega> e A)
+  then show ?case sorry
+qed (rule HOL.TrueI)+
 
 (*
 lemma inhale_perm_single_mupd:
