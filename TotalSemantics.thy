@@ -337,13 +337,6 @@ lemmas red_stmt_total_inversion_thms =
    RedExhaleNormal_case
    RedExhaleFailure_case
 
-definition is_empty_total :: "'a full_total_state \<Rightarrow> bool"
-  where "is_empty_total \<omega> \<equiv> get_mh_total_full \<omega> = zero_mask \<and> get_mp_total_full \<omega> = zero_mask"
-
-lemma is_empty_total_wf_mask: "is_empty_total \<omega> \<Longrightarrow> wf_mask_simple (get_mh_total_full \<omega>)"
-  unfolding is_empty_total_def
-  by (simp add: wf_zero_mask)
-
 subsection \<open>Correctness\<close>
 
 definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
@@ -410,7 +403,7 @@ definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total
          heap_dep_interp_wf ctxt StateCons \<Lambda> \<longrightarrow>           
            heap_dep_fun_obligations ctxt StateCons \<Lambda> \<and>
            predicate_obligations ctxt StateCons \<and>
-           (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total \<omega> \<longrightarrow> 
+           (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total_full \<omega> \<longrightarrow> 
                 red_stmt_total ctxt StateCons \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure)"
 
 (* TODO loops

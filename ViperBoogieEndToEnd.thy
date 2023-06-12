@@ -12,18 +12,20 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
          (\<forall>(\<omega> :: 'a full_total_state) r. 
                   vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
                   total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
-                  is_empty_total \<omega> \<longrightarrow>
+                  is_empty_total_full \<omega> \<longrightarrow>
                   red_stmt_total ctxt R (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) mbody \<omega> r \<longrightarrow> r \<noteq> RFailure)"
 
 abbreviation old_label :: label
   where "old_label \<equiv> ''old''"
+
+text \<open>Accesses to old expressions are represented via labeled old expressions with label \<^const>\<open>old_label\<close>.\<close>
 
 definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
                    (\<forall>mh. assertion_framing_state ctxt R postcondition
                                  \<lparr> get_store_total = \<sigma>,
                                  \<comment>\<open>old state given by state that satisfies precondition\<close>
-                                  get_trace_total = Map.empty(old_label \<mapsto> get_total_full \<omega>pre), 
+                                  get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], 
                                   get_total_full = mh \<rparr>
                 )"
 
@@ -47,7 +49,7 @@ definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a ful
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
             vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
-            is_empty_total \<omega> \<longrightarrow>
+            is_empty_total_full \<omega> \<longrightarrow>
             red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>
             (
               rpre \<noteq> RFailure \<and>
@@ -290,7 +292,7 @@ lemma end_to_end_stmt_rel:
      InitialStateRel: "\<And> \<omega>.  
                        vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
-                       is_empty_total \<omega> \<Longrightarrow>
+                       is_empty_total_full \<omega> \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
@@ -306,7 +308,7 @@ proof (rule allI | rule impI)+
   assume "method_decl.body mdecl = Some body_vpr_prf" and
          StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
-         "is_empty_total \<omega>" and
+         "is_empty_total_full \<omega>" and
          RedStmtVpr:"red_stmt_total ctxt_vpr StateCons ?\<Lambda> body_vpr_prf \<omega> r"
 
   hence "body_vpr_prf = body_vpr"
@@ -323,7 +325,7 @@ proof (rule allI | rule impI)+
     "state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-    using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total \<omega>\<close>]
+    using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total_full \<omega>\<close>]
     by blast
 
   from StateRelInitialInst have StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
@@ -452,7 +454,10 @@ qed
 
 definition post_framing_rel
   where "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 RPostFrame \<gamma>Pre \<equiv>
-           (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow>
+           (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow> 
+                               is_empty_total_full \<omega>1 \<longrightarrow>
+                               \<comment>\<open>One could omit emptiness and instead use a separate monotonicity theorem
+                                  for inhale. We do this in a separate step.\<close>
                                (\<exists>ns' \<gamma>Framing0 \<gamma>Framing1 R'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
                                   red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> RPostFrame \<omega>1 ns' \<and>
                                   \<comment>\<open>expressed via \<^const>\<open>stmt_rel\<close> because \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations)\<close>
@@ -501,7 +506,7 @@ lemma end_to_end_stmt_rel_2:
      InitialStateRel: "\<And> \<omega>.  
                        vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
-                       is_empty_total \<omega> \<Longrightarrow>
+                       is_empty_total_full \<omega> \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
@@ -528,7 +533,7 @@ proof (rule allI | rule impI)+
   assume "method_decl.body mdecl = Some body_vpr_prf" and
          StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
-         "is_empty_total \<omega>" and
+         "is_empty_total_full \<omega>" and
          RedInhPre: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> rpre"
 
   hence "body_vpr_prf = body_vpr"
@@ -545,7 +550,7 @@ proof (rule allI | rule impI)+
     "state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-    using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total \<omega>\<close>]
+    using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total_full \<omega>\<close>]
     by blast
 
   from StateRelInitialInst have StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
@@ -1306,7 +1311,7 @@ lemma boogie_const_rel_aux:
   qed
 
 lemma init_state_in_state_relation:
-  assumes "is_empty_total \<omega>" and
+  assumes "is_empty_total_full \<omega>" and
           WfTyRepr: "wf_ty_repr_bpl T" and
           ViperHeapWellTy: "total_heap_well_typed ((program_total ctxt_vpr)) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>)" and

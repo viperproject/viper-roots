@@ -394,10 +394,10 @@ lemma zero_mask_rel:
   by (auto intro: if_SomeI simp: pnone.rep_eq zero_mask_def)
 
 lemma zero_mask_rel_2:
-  assumes "is_empty_total \<omega>"
+  assumes "is_empty_total_full \<omega>"
   shows "mask_rel Pr F (get_mh_total_full \<omega>) zero_mask_bpl"
   using assms
-  unfolding is_empty_total_def 
+  unfolding is_empty_total_full_def is_empty_total_def
   by (simp add: zero_mask_rel)
 
 fun boogie_const_val :: "boogie_const => ('a vbpl_val)"
@@ -659,7 +659,7 @@ abbreviation state_rel_def_same
   where "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns \<equiv> state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
 
 definition state_rel_empty
-  where "state_rel_empty R \<omega> ns \<equiv> is_empty_total \<omega> \<and> R \<omega> ns"
+  where "state_rel_empty R \<omega> ns \<equiv> is_empty_total_full \<omega> \<and> R \<omega> ns"
 
 subsection \<open>Tactics\<close>
 

@@ -41,27 +41,29 @@ record 'a total_state =
    get_mp_total :: "'a predicate_mask"
 
 type_synonym 'a total_trace = "label \<rightharpoonup> 'a total_state"
+
 type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
+
 record 'a full_total_state = (*= "'a store \<times> 'a total_trace \<times> 'a total_state"*)
   get_store_total :: "'a store"
   get_trace_total :: "'a total_trace"
   get_total_full :: "'a total_state"
 
-definition empty_full_total_state :: "'a store \<Rightarrow> 'a total_trace \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
-  where "empty_full_total_state \<sigma> t hh hp =
-   \<lparr> get_store_total =\<sigma>, 
-     get_trace_total = t, 
-     get_total_full = \<lparr> get_hh_total = hh, get_hp_total = hp, get_mh_total = zero_mask, get_mp_total = zero_mask \<rparr> 
-   \<rparr>"
-
 
 subsection \<open>Order\<close>
+
+\<comment>\<open> TODO: instantiate the order type class for \<^typ>\<open>prat\<close> to then get the ordering on masks for free\<close>
 
 definition less_eq_mask :: "'a abstract_mask \<Rightarrow> 'a abstract_mask \<Rightarrow> bool"
   where "less_eq_mask m1 m2 \<equiv> \<forall>l. lte (m1 l) (m2 l)"
 
 definition less_mask :: "'a abstract_mask \<Rightarrow> 'a abstract_mask \<Rightarrow> bool"
   where "less_mask m1 m2 \<equiv> (\<forall>l. lte (m1 l) (m2 l)) \<and> (\<exists>l. lt (m1 l) (m2 l))"
+
+lemma zero_mask_less_eq_mask: "less_eq_mask zero_mask m"
+  unfolding less_eq_mask_def zero_mask_def
+  apply transfer
+  by auto
 
 lemma less_mask_less_eq_mask: "less_mask m1 m2 = (less_eq_mask m1 m2 \<and> \<not> less_eq_mask m2 m1)"
   unfolding less_mask_def less_eq_mask_def
@@ -253,5 +255,64 @@ fun get_mh_total_full :: "'a full_total_state \<Rightarrow> mask"
 
 fun get_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask"
   where "get_mp_total_full \<omega> = get_mp_total (get_total_full \<omega>)"
+
+subsection \<open>Empty states\<close>
+
+definition is_empty_total :: "'a total_state \<Rightarrow> bool"
+  where "is_empty_total \<phi> \<equiv> get_mh_total \<phi> = zero_mask \<and> get_mp_total \<phi> = zero_mask"
+
+definition is_empty_total_full :: "'a full_total_state \<Rightarrow> bool"
+  where "is_empty_total_full \<omega> \<equiv> is_empty_total (get_total_full \<omega>)"
+
+lemma is_empty_total_wf_mask: "is_empty_total_full \<omega> \<Longrightarrow> wf_mask_simple (get_mh_total_full \<omega>)"
+  unfolding is_empty_total_full_def is_empty_total_def
+  by (simp add: wf_zero_mask)
+
+lemma is_empty_total_less_eq:
+  assumes "is_empty_total \<phi>" and
+          "get_hh_total \<phi> = get_hh_total \<phi>'" and
+          "get_hp_total \<phi> = get_hp_total \<phi>'" and
+          "total_state.more \<phi> = total_state.more \<phi>'"
+        shows "\<phi> \<le> \<phi>'"
+  using assms zero_mask_less_eq_mask
+  unfolding less_eq_total_state_ext_def is_empty_total_def 
+  by metis
+
+lemma is_empty_total_full_less_eq:
+  assumes "is_empty_total_full \<omega>" and
+          "get_store_total \<omega> = get_store_total \<omega>'" and
+          "get_trace_total \<omega> = get_trace_total \<omega>'" and
+          "get_hh_total_full \<omega> = get_hh_total_full \<omega>'" and
+          "get_hp_total_full \<omega> = get_hp_total_full \<omega>'" and
+          "full_total_state.more \<omega> = full_total_state.more \<omega>'"
+        shows "\<omega> \<le> \<omega>'"
+proof -
+  have "get_total_full \<omega> \<le> get_total_full \<omega>'"
+    using is_empty_total_less_eq assms 
+    unfolding is_empty_total_full_def
+    by auto
+
+  thus ?thesis
+    using assms
+    unfolding less_eq_full_total_state_ext_def
+    by simp
+qed
+
+definition empty_full_total_state :: "'a store \<Rightarrow> 'a total_trace \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
+  where "empty_full_total_state \<sigma> t hh hp =
+   \<lparr> get_store_total =\<sigma>, 
+     get_trace_total = t, 
+     get_total_full = \<lparr> get_hh_total = hh, get_hp_total = hp, get_mh_total = zero_mask, get_mp_total = zero_mask \<rparr> 
+   \<rparr>"
+
+lemma get_store_empty_full_total_state [simp]: "get_store_total (empty_full_total_state \<sigma> t hh hp) = \<sigma>"
+  by (simp add: empty_full_total_state_def)
+
+lemma get_trace_empty_full_total_state [simp]: "get_trace_total (empty_full_total_state \<sigma> t hh hp) = t"
+  by (simp add: empty_full_total_state_def)
+
+lemma is_empty_empty_full_total_state: "is_empty_total_full (empty_full_total_state \<sigma> t hh hp)"
+  unfolding is_empty_total_full_def is_empty_total_def empty_full_total_state_def
+  by simp
 
 end
