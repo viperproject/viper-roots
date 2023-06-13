@@ -689,7 +689,7 @@ lemma post_framing_propagate_aux:
                 "hvar' \<noteq> mvar'"
   shows  "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                             ((BigBlock name cs str tr, cont), Normal ns') \<and>
-                state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega>1 ns'"
+                state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt \<omega>1 \<omega>1 ns'"
 proof -
   from Disj have "hvar' \<notin> ?B" and "mvar' \<notin> ?B"
     by fast+
@@ -700,7 +700,7 @@ proof -
   let ?mh' = "get_mh_total_full \<omega>1"
 
   from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyHeap TypeInterp \<open>hvar' \<notin> ?B\<close>] obtain ns'
-    where "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
+    where RedBpl1: "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                             ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns')" and
           StateRel': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>0 (update_hh_total_full \<omega>0 ?hh') ns'"
     by blast
@@ -709,7 +709,7 @@ proof -
 
   from mask_var_upd_red_ast_bpl_propagate[OF StateRel' LookupTyMask TypeInterp _ RedMaskBpl[OF StateRel'] MaskRel]
   obtain ns'' where
-     "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl # cs) str tr, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ns'')" and
+     RedBpl2: "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl # cs) str tr, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ns'')" and
      StateRel'': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>0 ?\<omega>' ns''"
     using \<open>mvar' \<notin> _\<close> \<open>hvar' \<noteq> mvar'\<close>
     by force
@@ -737,8 +737,10 @@ proof -
     apply simp
     done
 
-  
-    
+  ultimately show ?thesis
+    using RedBpl1 RedBpl2 red_ast_bpl_transitive
+    by fastforce
+qed    
 
 lemma heap_def_var_upd_red_ast_bpl_propagate:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and

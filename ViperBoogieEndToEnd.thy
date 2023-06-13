@@ -419,6 +419,7 @@ qed
 
 text\<open>\<^const>\<open>Ast.proc_body_satisfies_spec\<close> is expressed via \<^const>\<open>red_bigblock\<close>, while \<^const>\<open>red_ast_bpl\<close> 
      is expressed via \<^const>\<open>red_bigblock_small\<close>. The following lemma bridges the gap.\<close>
+
 lemma red_ast_bpl_proc_body_sat_spec:
   assumes RedBpl: "red_ast_bpl proc_body_ast ctxt (convert_ast_to_program_point proc_body_ast, Normal ns) c'" and
           PreconditionsSat: "expr_all_sat (type_interp ctxt) (var_context ctxt) (fun_interp ctxt) (rtype_interp ctxt) ns pres" and
@@ -452,27 +453,103 @@ proof (rule ccontr)
     by blast 
 qed
 
+definition post_framing_rel_aux
+  where "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns \<equiv>
+    (\<exists>ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrame R'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
+                                  red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> RPostFrame \<omega>1 ns' \<and>
+                                  \<comment>\<open>expressed via \<^const>\<open>stmt_rel\<close> because \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations\<close>
+                                  stmt_rel RPostFrame R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1)"
+
 definition post_framing_rel
-  where "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 RPostFrame \<gamma>Pre \<equiv>
+  where "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<equiv>
            (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow> 
                                is_empty_total_full \<omega>1 \<longrightarrow>
                                \<comment>\<open>One could omit emptiness and instead use a separate monotonicity theorem
                                   for inhale. We do this in a separate step.\<close>
-                               (\<exists>ns' \<gamma>Framing0 \<gamma>Framing1 R'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
-                                  red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> RPostFrame \<omega>1 ns' \<and>
-                                  \<comment>\<open>expressed via \<^const>\<open>stmt_rel\<close> because \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations)\<close>
-                                  stmt_rel RPostFrame R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1)
-                   )"  
+                               post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
+                   )"
 
 definition method_rel
-  where "method_rel R0 R1 RPostFrame ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
+  where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
-                   post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 RPostFrame \<gamma>Pre \<and>
+                   post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 \<gamma>Pre \<and>
                    (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
                        \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
                        stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>                       
                        stmt_rel R1 R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post)
           )"
+
+lemma post_framing_rel_aux:
+  assumes
+          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
+          ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var" and
+          Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
+                              {mask_var Tr, mask_var_def Tr} \<union>
+                              (ran (var_translation Tr)) \<union>
+                              (ran (field_translation Tr)) \<union>
+                              (range (const_repr Tr)) \<union>
+                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}") and
+                "hvar' \<noteq> mvar'" and
+          PropagateBpl: "\<And> \<omega>0 ns. (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns \<Longrightarrow>
+                            \<exists>ns'. red_ast_bpl proc_body_bpl ctxt 
+                                    (\<gamma>Pre, Normal ns)
+                                    ((BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont), Normal ns') \<and>
+                               (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns'" and
+          PostInhRel: 
+             "stmt_rel (state_rel_well_def_same ctxt Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred)
+                       R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt
+                       (Inhale (method_decl.post mdecl))
+                       (BigBlock name cs str tr, cont)
+                       \<gamma>'" 
+shows "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl 
+                        (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+                        \<gamma>Pre"
+  unfolding post_framing_rel_def
+proof (rule allI | rule impI)+
+  fix \<omega>0 \<omega>1 ns
+  assume "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>0 ns" (is "?R Tr \<omega>0 ns") and
+         StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
+         IsEmpty: "is_empty_total_full \<omega>1"
+
+  with PropagateBpl obtain ns1 where 
+    RedBpl1: "red_ast_bpl proc_body_bpl ctxt 
+                              (\<gamma>Pre, Normal ns)
+                              ((BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont), Normal ns1)" and
+    R1: "?R Tr \<omega>0 ns1"
+    by blast
+
+  have *: "\<And>\<omega> ns hvar. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
+                    red_expr_bpl ctxt (Var zero_mask_var) ns (AbsV (AMask zero_mask_bpl))"
+    apply (rule RedVar)
+    using boogie_const_rel_lookup[OF state_rel_boogie_const_rel, where ?const = CZeroMask]
+          ZeroMaskConst
+    by fastforce
+
+  from post_framing_propagate_aux[OF R1 TypeInterp StoreSame LookupTyHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>] 
+       IsEmpty obtain ns2 where
+    "red_ast_bpl proc_body_bpl ctxt
+        ((BigBlock name (cmd.Havoc hvar' # Assign mvar' (expr.Var zero_mask_var) # cs) str tr, cont),
+         Normal ns1)
+        ((BigBlock name cs str tr, cont), Normal ns2)" and
+    R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"
+             
+    by fast
+
+  with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
+    using red_ast_bpl_transitive
+    by fast
+   
+  show "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl (?R Tr) \<gamma>Pre \<omega>1 ns"
+    unfolding post_framing_rel_aux_def
+    apply ((rule exI)+, intro conjI)
+      apply (rule RedBpl2)
+     apply (rule R2)
+    apply (rule PostInhRel)
+    done
+qed
+
 
 lemma end_to_end_stmt_rel_2:
   assumes 
@@ -493,10 +570,9 @@ lemma end_to_end_stmt_rel_2:
           VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-               RPostFrame 
                ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl               
                (convert_ast_to_program_point proc_body_bpl)" 
-          (is "method_rel ?R0 ?R1 RPostFrame ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0") and
+          (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0") and
     TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
     ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
     VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
@@ -519,7 +595,7 @@ proof (rule allI | rule impI)+
 
   from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
-    PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 RPostFrame \<gamma>Pre" and
+    PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 \<gamma>Pre" and
     BodyRel: "stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
     PostExhRel: "stmt_rel ?R1 Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
@@ -654,12 +730,12 @@ proof (rule allI | rule impI)+
         let ?\<omega>PostEmpty = "empty_full_total_state (get_store_total \<omega>) [old_label \<mapsto> get_total_full \<omega>pre] (get_hh_total mh) (get_hp_total mh)"
         assume RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
         
-        from PostFramingRel obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameEnd where 
+        from PostFramingRel obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameStart RPostFrameEnd where 
           RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Framing0, Normal ns')" and
-          "RPostFrame ?\<omega>PostEmpty ns'" and
-          PostFramingInhRel: "stmt_rel RPostFrame RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
+          "RPostFrameStart ?\<omega>PostEmpty ns'" and
+          PostFramingInhRel: "stmt_rel RPostFrameStart RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
           using Rpre StoreSame is_empty_empty_full_total_state
-          unfolding post_framing_rel_def 
+          unfolding post_framing_rel_def post_framing_rel_aux_def
           by (metis get_store_empty_full_total_state)          
 
         show "res \<noteq> RFailure"
@@ -677,7 +753,7 @@ proof (rule allI | rule impI)+
             using is_empty_empty_full_total_state \<open>res = _\<close> 
             by blast
 
-          with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrame _ _\<close>]
+          with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrameStart _ _\<close>]
           obtain c' where "red_ast_bpl proc_body_bpl ctxt (\<gamma>Framing0, Normal ns') c'" and 
                           "snd c' = Failure"
             using RedInhale \<open>\<Lambda> = _\<close>
@@ -992,7 +1068,7 @@ proof -
   with FieldTr FieldVpr obtain f'_vpr t' where 
     "?g x = Some (AbsV (AField (NormalField x t')))" and
     "field_translation Tr f'_vpr = Some x \<and> declared_fields Pr f'_vpr = Some t'"     
-    by (smt (verit, best) exE_some) (* SMT proof *)
+    by (smt (verit, best) exE_some)(* SMT proof *)
 
   thus ?thesis
     using Inj FieldTr FieldVpr   
