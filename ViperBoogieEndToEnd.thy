@@ -22,7 +22,8 @@ text \<open>Accesses to old expressions are represented via labeled old expressi
 
 definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
-                   (\<forall>mh. assertion_framing_state ctxt R postcondition
+                   (\<forall>mh. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
+                         assertion_framing_state ctxt R postcondition
                                  \<lparr> get_store_total = \<sigma>,
                                  \<comment>\<open>old state given by state that satisfies precondition\<close>
                                   get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], 
@@ -463,9 +464,10 @@ definition post_framing_rel_aux
 definition post_framing_rel
   where "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<equiv>
            (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow> 
-                               is_empty_total_full \<omega>1 \<longrightarrow>
                                \<comment>\<open>One could omit emptiness and instead use a separate monotonicity theorem
-                                  for inhale. We do this in a separate step.\<close>
+                                  for inhale. We do this in a separate step.\<close> 
+                               is_empty_total_full \<omega>1 \<longrightarrow>                                                             
+                               total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1) \<longrightarrow>
                                post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
                    )"
 
@@ -481,7 +483,10 @@ definition method_rel
 
 lemma post_framing_rel_aux:
   assumes
+          WfTyRep: "wf_ty_repr_bpl TyRep" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+                      "domain_type TyRep = absval_interp_total ctxt_vpr" and
+                      "Pr = program_total ctxt_vpr" and
           LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
           LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
           ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var" and
@@ -511,6 +516,7 @@ proof (rule allI | rule impI)+
   fix \<omega>0 \<omega>1 ns
   assume "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>0 ns" (is "?R Tr \<omega>0 ns") and
          StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
+         HeapWellTy:  "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
          IsEmpty: "is_empty_total_full \<omega>1"
 
   with PropagateBpl obtain ns1 where 
@@ -520,22 +526,22 @@ proof (rule allI | rule impI)+
     R1: "?R Tr \<omega>0 ns1"
     by blast
 
-  have *: "\<And>\<omega> ns hvar. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
+  have *: "\<And>\<omega>0 \<omega> ns hvar' hvar. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
                     red_expr_bpl ctxt (Var zero_mask_var) ns (AbsV (AMask zero_mask_bpl))"
     apply (rule RedVar)
     using boogie_const_rel_lookup[OF state_rel_boogie_const_rel, where ?const = CZeroMask]
           ZeroMaskConst
     by fastforce
-
-  from post_framing_propagate_aux[OF R1 TypeInterp StoreSame LookupTyHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>] 
+  
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ LookupTyHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+       HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
         ((BigBlock name (cmd.Havoc hvar' # Assign mvar' (expr.Var zero_mask_var) # cs) str tr, cont),
          Normal ns1)
         ((BigBlock name cs str tr, cont), Normal ns2)" and
-    R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"
-             
-    by fast
+    R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
+    by force
 
   with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
     using red_ast_bpl_transitive
@@ -728,15 +734,20 @@ proof (rule allI | rule impI)+
         fix mh res
         let ?\<omega>Post = "\<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr>"
         let ?\<omega>PostEmpty = "empty_full_total_state (get_store_total \<omega>) [old_label \<mapsto> get_total_full \<omega>pre] (get_hh_total mh) (get_hp_total mh)"
-        assume RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
+        assume 
+              "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total mh)" and
+              RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
+
+        hence HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>PostEmpty)"
+          by (simp add: empty_full_total_state_def)
         
         from PostFramingRel obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameStart RPostFrameEnd where 
           RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Framing0, Normal ns')" and
           "RPostFrameStart ?\<omega>PostEmpty ns'" and
           PostFramingInhRel: "stmt_rel RPostFrameStart RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
-          using Rpre StoreSame is_empty_empty_full_total_state
+          using Rpre StoreSame is_empty_empty_full_total_state  HeapWellTy
           unfolding post_framing_rel_def post_framing_rel_aux_def
-          by (metis get_store_empty_full_total_state)          
+          by (metis get_store_empty_full_total_state)
 
         show "res \<noteq> RFailure"
         proof (rule ccontr)

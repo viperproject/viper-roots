@@ -761,6 +761,10 @@ proof -
       using \<open>\<omega>' \<in> _\<close> exhale_state_same_mask
       by metis
   next
+    show "get_trace_total \<omega> = get_trace_total \<omega>'"
+      using \<open>\<omega>' \<in> _\<close> exhale_state_same_trace
+      by metis
+  next
     show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) \<omega>' ?ns2"
       using ProgramTotal
       unfolding heap_var_rel_def

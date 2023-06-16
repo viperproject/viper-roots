@@ -645,17 +645,56 @@ lemma mask_var_upd_red_ast_bpl_propagate:
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
                       dom AuxPred)" and
-                    "red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
+        RedRhsBpl:  "red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
                     "mask_rel Pr (field_translation T) mh' mbpl'"
         shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                                   ((BigBlock name cs str tr, cont), Normal ns') \<and>
                      state_rel Pr TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def (update_mh_total_full \<omega> mh') ns'"
   sorry
+(*
+proof -
+
+  let ?ns' = "update_var (var_context ctxt) ns mvar' (AbsV (AMask mbpl'))"
+
+  have Red: "red_ast_bpl P ctxt   ((BigBlock name ((Assign mvar' e_bpl)#cs) str tr, cont), Normal ns) 
+                                  ((BigBlock name cs str tr, cont), Normal ?ns')"
+    apply (rule red_ast_bpl_one_assign[OF LookupTyNewVar RedRhsBpl])
+    apply (simp add: TypeInterp)
+    done
+
+  thm state_rel_mask_var_def_update
+
+  have StateRel':"state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ?ns'"
+    apply (rule state_rel_independent_var[OF StateRel])
+    using VarFresh
+       apply blast
+      apply (simp add: TypeInterp)
+     apply (rule LookupTyNewVar)
+    by (simp add: TypeInterp)
+
+
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) mvar_def' \<omega>def ?ns'"
+    unfolding mask_var_rel_def 
+    using LookupTyNewVar MaskRel
+    by fastforce
+
+  have "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
+    apply (rule state_rel_mask_var_def_update[OF StateRel' MaskVarRel'])
+    using VarFresh
+    by blast
+
+        
+  with Red show ?thesis
+    by fast
+*)
 
 lemma heap_var_upd_red_ast_bpl_propagate:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes 
+          StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           LookupTyNewVar: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          WfTyRep: "wf_ty_repr_bpl TyRep" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) hh'" and
           VarFresh: "hvar' \<notin> 
                        \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>heap_var Tr\<close>.
                          The proof was simpler when adding this constraint (because it allows one to do the proof
@@ -668,16 +707,35 @@ lemma heap_var_upd_red_ast_bpl_propagate:
                       dom AuxPred)" 
         shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#cs) str tr, cont), Normal ns) 
                                   ((BigBlock name cs str tr, cont), Normal ns') \<and>
-                     state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>def (update_hh_total_full \<omega> hh') ns'"
+                     state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>def hh') (update_hh_total_full \<omega> hh') ns'"
   sorry
+(*
+proof -
+  from state_rel_field_rel[OF StateRel] 
+  have Inj: "inj_on (field_translation Tr) (dom (field_translation Tr))"
+    unfolding field_rel_def
+    by blast
+
+  from construct_bpl_heap_from_vpr_heap_correct[OF WfTyRep TotalHeapWellTy _ Inj ] obtain hb where
+        HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total mh) hb" and
+        "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])"
+    by blast
+
+  let ?ns' = "update_var (var_context ctxt) ns hvar' (AbsV (AHeap hb))"
+
+  have "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>def hh') (update_hh_total_full \<omega> hh') ?ns'" 
+    apply (rule state_rel_heap_update[OF StateRel TypeInterp])
+*)    
 
 lemma post_framing_propagate_aux:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>0 \<omega>0 ns" and
+          WfTyRep: "wf_ty_repr_bpl TyRep" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
+          HeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>1)" and
           LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
           LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
-          RedMaskBpl: "\<And> \<omega> ns hvar. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow>
+          RedMaskBpl: "\<And>\<omega>0  \<omega> ns hvar hvar'. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow>
                                     red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
           MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>1) mbpl'" and
           Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
@@ -699,23 +757,27 @@ proof -
   let ?hh' = "get_hh_total_full \<omega>1"
   let ?mh' = "get_mh_total_full \<omega>1"
 
-  from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyHeap TypeInterp \<open>hvar' \<notin> ?B\<close>] obtain ns'
+  from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyHeap WfTyRep TypeInterp HeapWellTy \<open>hvar' \<notin> ?B\<close>] obtain ns'
     where RedBpl1: "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                             ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns')" and
-          StateRel': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>0 (update_hh_total_full \<omega>0 ?hh') ns'"
+          StateRel1: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>0 ?hh') (update_hh_total_full \<omega>0 ?hh') ns'"
     by blast
 
   let ?\<omega>' = "(update_mh_total_full (update_hh_total_full \<omega>0 (get_hh_total_full \<omega>1)) ?mh')"
 
-  from mask_var_upd_red_ast_bpl_propagate[OF StateRel' LookupTyMask TypeInterp _ RedMaskBpl[OF StateRel'] MaskRel]
+  from mask_var_upd_red_ast_bpl_propagate[OF StateRel1 LookupTyMask TypeInterp _ RedMaskBpl[OF StateRel1] MaskRel]
   obtain ns'' where
      RedBpl2: "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' e_bpl # cs) str tr, cont), Normal ns') ((BigBlock name cs str tr, cont), Normal ns'')" and
-     StateRel'': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>0 ?\<omega>' ns''"
+     StateRel2: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar', mask_var := mvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>0 ?hh') ?\<omega>' ns''"
     using \<open>mvar' \<notin> _\<close> \<open>hvar' \<noteq> mvar'\<close>
     by force
 
-  hence StateRel3: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>' ?\<omega>' ns''"
-    sorry
+  have Aux:"Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr> = Tr\<lparr>heap_var := hvar', mask_var := mvar', mask_var_def := mvar', heap_var_def := hvar'\<rparr>"
+    by simp
+
+  have StateRel3: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>' ?\<omega>' ns''"
+    using state_rel_set_def_to_eval[OF StateRel2]
+    by (simp add: Aux)
 
   let ?\<omega>'' = "update_trace_total (update_hp_total_full (update_mp_total_full ?\<omega>' (get_mp_total_full \<omega>1)) (get_hp_total_full \<omega>1)) (get_trace_total \<omega>1)"
 
