@@ -62,45 +62,6 @@ definition update_hh_total :: "'a total_state \<Rightarrow> 'a total_heap \<Righ
 definition update_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a total_state"
   where "update_hp_total \<phi> hp = \<phi>\<lparr>get_hp_total := hp\<rparr>"
 
-(*
-definition update_m_total :: "'a total_state \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state"
-  where "update_m_total \<phi> m = Abs_total_state (get_h_total \<phi>, m)"
-*)
-
-(*
-lemma Abs_total_state_inverse_2:
-  assumes "wf_pre_total_state (m,h)"
-  shows "Rep_total_state (Abs_total_state (m,h)) = (m,h)"
-  using assms Abs_total_state_inverse
-  by blast
-*)
-
-(*
-lemma get_m_update_m_total:
-  assumes "wf_mask_simple (fst m)"
-  shows "get_m_total (update_m_total \<phi> m) = m"
-  unfolding update_m_total_def
-  using assms
-  by (simp add: Abs_total_state_inverse_2)
-
-
-lemma get_h_update_m_total:
-  assumes "wf_mask_simple (fst m)"
-  shows "get_h_total (update_m_total \<phi> m) = get_h_total \<phi>"
-  unfolding update_m_total_def
-  using assms
-  by (simp add: Abs_total_state_inverse_2)            
-
-lemma update_m_total_eq: 
-  assumes "wf_mask_simple (fst m)" and
-          "get_h_total \<phi>1 = get_h_total \<phi>2"
-  shows "update_m_total \<phi>1 m = update_m_total \<phi>2 m"
-  apply (rule total_state_eq)
-   apply (simp only: get_m_update_m_total[OF assms(1)])
-  apply (simp only: get_h_update_m_total[OF assms(1)] assms(2))
-  done
-*)
-
 lemma get_update_mh_total: 
   shows   "get_mh_total (update_mh_total mh m0) = m0"
   unfolding update_mh_total_def
@@ -115,34 +76,6 @@ lemma update_mh_total_multiple:
   shows   "update_mh_total (update_mh_total mh m0) m1 = update_mh_total mh m1"
   unfolding update_mh_total_def  
   by simp
-
-(*
-lemma wf_pre_total_state_1: 
-  assumes"get_mh_pre_total \<phi>' = get_mh_total \<phi>"
-  shows "wf_pre_total_state \<phi>'"
-  using assms
-  using get_mask_total_wf by fastforce
-*)
-(*
-lemma update_hh_loc_total_m_eq: "get_m_total (update_hh_loc_total \<phi> l v) = get_m_total \<phi>"
-  unfolding update_hh_loc_total_def
-proof -
-  let ?\<phi>' = "(((get_hh_total \<phi>)(l := v), get_hp_total \<phi>), get_m_total \<phi>)"
-  have "wf_pre_total_state ?\<phi>'"
-    apply (rule wf_pre_total_state_1[where ?\<phi>=\<phi>])
-    by simp
-  thus "get_m_total (Abs_total_state ?\<phi>') = (get_m_total \<phi>)"
-    by (simp add: Abs_total_state_inverse_2)
-qed
-*)
-
-(*
-lemma m_eq_mh_eq_total: "get_m_total \<phi> = get_m_total \<phi>' \<Longrightarrow> get_mh_total \<phi> = get_mh_total \<phi>'"
-  by simp
-
-lemma m_eq_mp_eq_total: "get_m_total \<phi> = get_m_total \<phi>' \<Longrightarrow> get_mp_total \<phi> = get_mp_total \<phi>'"
-  by simp
-*)
 
 lemma update_hh_loc_total_mh_eq: "get_mh_total (update_hh_loc_total \<phi> l v) = get_mh_total \<phi>"
   by (simp add: update_hh_loc_total_def)
@@ -183,6 +116,12 @@ lemma update_hh_total_full_lookup_1: "get_hh_total_full (update_hh_total_full \<
 
 fun update_hp_total_full ::  "'a full_total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
   where "update_hp_total_full \<omega> hp = \<omega>\<lparr> get_total_full := update_hp_total (get_total_full \<omega>) hp \<rparr>"
+
+lemma update_hh_h_total: "update_hh_total_full \<omega> hh' = update_h_total_full \<omega> hh' (get_hp_total_full \<omega>)"
+  by (simp add: update_hh_total_def update_hp_total_def)
+
+lemma update_hp_h_total: "update_hp_total_full \<omega> hp' = update_h_total_full \<omega> (get_hh_total_full \<omega>) hp'"
+  by (simp add: update_hh_total_def update_hp_total_def)
 
 fun update_hh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"
   where "update_hh_loc_total_full \<omega> l v = 
@@ -229,7 +168,6 @@ lemma update_mh_loc_total_mh_eq: "get_hh_total (update_mh_loc_total \<phi> l v) 
 lemma update_mh_loc_total_mp_eq: "get_hp_total (update_mh_loc_total \<phi> l v) = get_hp_total \<phi>"
   by (simp add: update_mh_loc_total_def)
 
-thm update_hh_loc_total_fupd
 lemma update_mh_loc_total_fupd: "get_mh_total (update_mh_loc_total \<phi> l1 v) = (get_mh_total \<phi>)(l1 := v)"
   by (simp add: update_mh_loc_total_def)
 
@@ -238,30 +176,6 @@ lemma update_mh_loc_total_full_lookup_1: "get_mh_total_full (update_mh_loc_total
 
 lemma update_mh_loc_total_full_lookup_2: "l1 \<noteq> l2 \<Longrightarrow> get_mh_total_full (update_mh_loc_total_full \<phi> l1 v) l2 = get_mh_total_full \<phi> l2"
   by (simp add: update_mh_loc_total_fupd)
-
-(*
-lemma update_mp_total_h_eq: 
-  shows "get_h_total (update_mp_total \<phi> m) = get_h_total \<phi>"
-  by (metis Abs_total_state_inverse_2 fst_conv get_h_pre_total.simps get_h_total.elims get_m_pre_total.simps get_mask_total_wf snd_conv update_mp_total_def wf_pre_total_state.simps)
-
-lemma update_mp_total_h_full_eq: 
-  shows "get_h_total_full (update_mp_total_full \<phi> m) = get_h_total_full \<phi>"
-  using update_mp_total_h_eq
-  by auto
-
-lemma update_mh_total_h_eq: 
-  assumes "wf_mask_simple m"
-  shows "get_h_total (update_mh_total \<phi> m) = get_h_total \<phi>"
-  unfolding update_mh_total_def
-  using assms
-  by (simp add: Abs_total_state_inverse)
-
-lemma update_mh_total_full_hh_eq: 
-  assumes "wf_mask_simple m"
-  shows "get_h_total_full (update_mh_total_full \<phi> m) = get_h_total_full \<phi>"
-  using assms update_mh_total_h_eq
-  by auto
-*)
 
 lemma update_mh_total_full_multiple: 
   shows   "update_mh_total_full (update_mh_total_full \<omega> m0) m1 = update_mh_total_full \<omega> m1"

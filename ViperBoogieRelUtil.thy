@@ -691,25 +691,19 @@ proof -
 lemma heap_var_upd_red_ast_bpl_propagate:
   assumes 
           StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          LookupTyNewVar: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          LookupDeclNewVar: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)" and
           WfTyRep: "wf_ty_repr_bpl TyRep" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) hh'" and
           VarFresh: "hvar' \<notin> 
-                       \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>heap_var Tr\<close>.
-                         The proof was simpler when adding this constraint (because it allows one to do the proof
-                         by first treating the new variable as a new auxiliary variable) \<close>
-                      ({heap_var Tr, heap_var_def Tr} \<union>
                       {mask_var Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)" 
+                      dom AuxPred" 
         shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#cs) str tr, cont), Normal ns) 
                                   ((BigBlock name cs str tr, cont), Normal ns') \<and>
                      state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>def hh') (update_hh_total_full \<omega> hh') ns'"
-  sorry
-(*
 proof -
   from state_rel_field_rel[OF StateRel] 
   have Inj: "inj_on (field_translation Tr) (dom (field_translation Tr))"
@@ -717,15 +711,58 @@ proof -
     by blast
 
   from construct_bpl_heap_from_vpr_heap_correct[OF WfTyRep TotalHeapWellTy _ Inj ] obtain hb where
-        HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total mh) hb" and
-        "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])"
+        HeapRel: "heap_rel Pr (field_translation Tr) hh' hb" and
+        HeapTyBpl: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])"
     by blast
 
   let ?ns' = "update_var (var_context ctxt) ns hvar' (AbsV (AHeap hb))"
 
-  have "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>def hh') (update_hh_total_full \<omega> hh') ?ns'" 
+  have HeapSameEvalDef: "get_h_total_full \<omega>def = get_h_total_full \<omega>"
+    using StateRel
+    by (simp add: state_rel_def state_rel0_def)
+
+  hence HeapPredSameEvalDef: "get_hp_total_full \<omega>def = get_hp_total_full \<omega>"
+    by simp
+
+  have HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega> hh') ?ns'"
+    unfolding heap_var_rel_def
+    using HeapTyBpl LookupDeclNewVar HeapRel
+    by (metis lookup_var_decl_ty_Some update_hh_total_full_lookup_1 update_var_same)
+
+  hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega>def hh') ?ns'"
+    apply (rule heap_var_rel_stable)
+      apply (metis update_hh_total_full_lookup_1)
+    by auto
+
+  have BinderEmpty: "binder_state ns = Map.empty"
+    using StateRel
+    by (simp add: state_rel_def state_rel0_def state_well_typed_def)
+
+  have StateRel': "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>def hh') (update_hh_total_full \<omega> hh') ?ns'" 
     apply (rule state_rel_heap_update[OF StateRel TypeInterp])
-*)    
+             apply blast
+    using VarFresh
+            apply blast
+           apply (rule update_hh_h_total)
+          apply (subst HeapPredSameEvalDef)
+          apply (rule update_hh_h_total)
+         apply simp
+        apply (rule HeapVarRel)
+       apply (rule HeapVarRelDef)    
+      apply (metis LookupDeclNewVar global_state_update_local global_state_update_other lookup_var_decl_local_2)
+     apply (simp add: update_var_old_global_same)
+    using BinderEmpty
+    by (simp add: update_var_binder_same)
+
+  show ?thesis
+    apply (rule exI)
+    apply (rule conjI[OF _ StateRel'])
+    apply (rule red_ast_bpl_one_havoc[OF LookupDeclNewVar])
+     apply (subst TypeInterp)
+    using HeapTyBpl
+     apply simp
+    by simp
+qed
 
 lemma post_framing_propagate_aux:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>0 \<omega>0 ns" and
@@ -733,12 +770,14 @@ lemma post_framing_propagate_aux:
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
           HeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>1)" and
-          LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)" and
           LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
           RedMaskBpl: "\<And>\<omega>0  \<omega> ns hvar hvar'. state_rel Pr TyRep (Tr\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow>
                                     red_expr_bpl ctxt e_bpl ns (AbsV (AMask mbpl'))" and
           MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>1) mbpl'" and
-          Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
+                \<comment>\<open> could weaken the disjointness condition such that the heap and mask variable can 
+                    stay the same\<close>
+          Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union> 
                               {mask_var Tr, mask_var_def Tr} \<union>
                               (ran (var_translation Tr)) \<union>
                               (ran (field_translation Tr)) \<union>
@@ -757,7 +796,7 @@ proof -
   let ?hh' = "get_hh_total_full \<omega>1"
   let ?mh' = "get_mh_total_full \<omega>1"
 
-  from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupTyHeap WfTyRep TypeInterp HeapWellTy \<open>hvar' \<notin> ?B\<close>] obtain ns'
+  from heap_var_upd_red_ast_bpl_propagate[OF StateRel LookupDeclHeap WfTyRep TypeInterp HeapWellTy ] \<open>hvar' \<notin> ?B\<close> obtain ns'
     where RedBpl1: "red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                             ((BigBlock name (Assign mvar' e_bpl#cs) str tr, cont), Normal ns')" and
           StateRel1: "state_rel Pr TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt (update_hh_total_full \<omega>0 ?hh') (update_hh_total_full \<omega>0 ?hh') ns'"
