@@ -27,7 +27,7 @@ lemma inhale_perm_single_heap_same:
   shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
   using assms
   unfolding inhale_perm_single_def
-  by (smt (verit, ccfv_threshold) get_h_total_full_aux mem_Collect_eq old.prod.exhaust)
+  by fastforce
 
 lemma inhale_perm_single_pred_store_same:
   assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lh popt"
@@ -46,9 +46,9 @@ lemma inhale_perm_single_pred_trace_same:
 lemma inhale_perm_single_pred_heap_same:
   assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lh popt"
   shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
-  using assms get_h_total_full_aux_2
+  using assms 
   unfolding inhale_perm_single_pred_def
-  by (smt (verit) mem_Collect_eq)
+  by fastforce
 
 lemmas inhale_perm_single_only_mask_changed=
   inhale_perm_single_store_same

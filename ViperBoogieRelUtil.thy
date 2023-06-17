@@ -546,23 +546,13 @@ lemma state_rel_mask_pred_independent:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
   shows "state_rel Pr TyRep Tr AuxPred ctxt (update_mp_total_full \<omega> mp) (update_mp_total_full \<omega> mp) ns"
   using assms
-  apply (rule state_rel_pred_independent)
-     apply simp
-    apply simp
-   apply (simp add: update_mp_total_def)
-  apply (simp add: update_mp_total_def)
-  done
+  by (rule state_rel_pred_independent) auto
 
 lemma state_rel_heap_pred_independent:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
   shows "state_rel Pr TyRep Tr AuxPred ctxt (update_hp_total_full \<omega> mp) (update_hp_total_full \<omega> mp) ns"
   using assms
-  apply (rule state_rel_pred_independent)
-     apply simp
-    apply simp
-   apply (simp add: update_hp_total_def)
-  apply (simp add: update_hp_total_def)
-  done 
+  by (rule state_rel_pred_independent) auto
                
 subsection \<open>Introducing new Boogie variables for the evaluation and well-definedness state\<close>
 
@@ -726,14 +716,11 @@ proof -
 
   have HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega> hh') ?ns'"
     unfolding heap_var_rel_def
-    using HeapTyBpl LookupDeclNewVar HeapRel
-    by (metis lookup_var_decl_ty_Some update_hh_total_full_lookup_1 update_var_same)
-
-  hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega>def hh') ?ns'"
-    apply (rule heap_var_rel_stable)
-      apply (metis update_hh_total_full_lookup_1)
+    using lookup_var_decl_ty_Some LookupDeclNewVar HeapTyBpl HeapRel
     by auto
 
+  hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega>def hh') ?ns'"
+    by (rule heap_var_rel_stable) auto
   have BinderEmpty: "binder_state ns = Map.empty"
     using StateRel
     by (simp add: state_rel_def state_rel0_def state_well_typed_def)
@@ -829,14 +816,7 @@ proof -
        apply (simp add:  StoreSame)
       apply simp
      apply (rule total_state.equality)
-         apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
-    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
-
-    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
-    apply (simp add: update_hp_total_def update_mp_total_def update_mh_total_def update_hh_total_def)
-    apply simp     
-    apply simp
-    done
+    by auto
 
   ultimately show ?thesis
     using RedBpl1 RedBpl2 red_ast_bpl_transitive

@@ -143,8 +143,7 @@ lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state ctxt \<omega> m \<L
 
 lemma exhale_state_same_mask: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
   unfolding exhale_state_def
-  using update_hh_total_full_m_eq  
-  by blast
+  by force
 
 lemma exhale_state_well_typed_heap: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> 
                                     total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>')"  
@@ -157,8 +156,7 @@ proof -
     by blast
 
   thus ?thesis
-    using update_hh_total_full_lookup_1
-    by metis
+    by simp
 qed
 
 inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"

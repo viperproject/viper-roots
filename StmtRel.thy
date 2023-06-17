@@ -685,9 +685,9 @@ proof -
         using PermPos pnone.rep_eq by fastforce
 
       hence "get_hh_total_full \<omega> heap_loc = get_hh_total_full \<omega>' heap_loc"
-        using \<open>\<omega>' \<in> _\<close> update_hh_total_full_lookup_1
+        using \<open>\<omega>' \<in> _\<close> 
         unfolding exhale_state_def havoc_undef_locs_def
-        by (smt (z3) mem_Collect_eq) (* SMT proof *)
+        by fastforce
 
       then show ?thesis 
         using HeapRel NewHeapRel HeapLocProperties ProgramTotal

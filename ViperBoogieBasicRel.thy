@@ -1523,12 +1523,9 @@ lemma state_rel0_heap_update:
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
                       dom AuxPred) = {}" and
-         (* WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and *)
           UpdStates: "\<omega>def' = update_h_total_full \<omega>def hh' hp'" 
                      "\<omega>' = update_h_total_full \<omega> hh' hp'" and
           OnlyHeapAffected: "(\<And>x. x \<notin> {hvar', hvar_def'} \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
-       (*   OnlyHeapAffectedVpr: "get_store_total \<omega> = get_store_total \<omega>'" 
-                               "get_m_total_full \<omega> = get_m_total_full \<omega>'" and *)
           HeapRel: "heap_var_rel Pr \<Lambda> TyRep Tr hvar' \<omega>' ns'" and
           HeapRelDef: "heap_var_rel Pr \<Lambda> TyRep Tr hvar_def' \<omega>def' ns'" and
           ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
@@ -1540,8 +1537,8 @@ lemma state_rel0_heap_update:
 (*
   proof (intro conjI)
     show "wf_mask_simple (get_mh_total_full \<omega>def')"
-      using state_rel0_wf_mask_def_simple[OF StateRel] OnlyHeapAffectedVpr WellDefSame
-      by simp
+      using state_rel0_wf_mask_def_simple[OF StateRel] \<open>\<omega>def' = _\<close>
+     
   next
     show "wf_mask_simple (get_mh_total_full \<omega>')"
       using state_rel0_wf_mask_simple[OF StateRel] OnlyHeapAffectedVpr
@@ -1693,13 +1690,12 @@ next
     apply (simp add: OnlyHeapAffectedVpr WellDefSame)
      apply (simp add: WellDefSame)
     using OnlyHeapAffectedVpr
-    by (auto simp: update_hp_total_def update_hh_total_def)
+    by auto
 next
   show "\<omega>' = update_h_total_full \<omega> (get_hh_total_full \<omega>def') (get_hp_total_full \<omega>def')"
     apply (rule full_total_state.equality)
        apply (simp add: OnlyHeapAffectedVpr WellDefSame)
       apply (simp add: OnlyHeapAffectedVpr WellDefSame)
-     apply (simp add: update_hp_total_def update_hh_total_def)
     using OnlyHeapAffectedVpr WellDefSame
     by auto
 qed (insert assms, auto)
@@ -1753,8 +1749,7 @@ proof -
        by auto
     have AuxUpdateHeap:"\<And>l. l \<noteq> (addr, f_vpr) \<Longrightarrow> get_hh_total_full (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr) l = 
                                                    get_hh_total_full \<omega> l"
-      by (metis update_hh_loc_total_full_lookup_2)
-     
+      by simp     
   
     let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
     show "ViperBoogieBasicRel.heap_rel Pr (field_translation Tr) (get_hh_total_full ?\<omega>') ?hb'"    
@@ -1769,7 +1764,7 @@ proof -
         case True
         then show ?thesis 
           using FieldLookup FieldTranslation FieldLookupL FieldTranslationL 
-          by (simp add: update_hh_loc_total_lookup_1)
+          by simp
       next
         case False
         hence "(hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)) (Address (fst l), NormalField field_bpl field_ty_vpr)
@@ -1806,7 +1801,7 @@ next
     by simp
 next
   show "get_m_total_full \<omega> = get_m_total_full ?\<omega>'"
-    by (meson get_m_total_full_aux)
+    by simp
 next
   show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) ?\<omega>' ?ns'"
     apply (rule heap_var_rel_update[OF WfTyRep])
@@ -2093,7 +2088,7 @@ next
     by simp
 next
   show "get_h_total_full \<omega> = get_h_total_full ?\<omega>'"
-    by (meson get_h_total_full_aux)
+    by simp
 next
   have WfMask: "wf_mask_simple (get_mh_total_full \<omega>)"
     using state_rel_state_rel0[OF StateRel]  state_rel0_wf_mask_simple
@@ -2107,16 +2102,14 @@ next
     proof (cases "hl = (addr, f_vpr)")
       case True
       hence "get_mh_total_full ?\<omega>' hl = p"
-        using update_mh_loc_total_full_lookup_1
-        by metis
+        by simp
       then show ?thesis 
         using \<open>pgte pwrite p\<close>
         by argo
     next
       case False       
       hence "get_mh_total_full ?\<omega>' hl = get_mh_total_full \<omega> hl"
-        using update_mh_loc_total_full_lookup_2
-        by metis
+        by simp
       thus ?thesis 
         using WfMask
         unfolding wf_mask_simple_def
@@ -2151,12 +2144,11 @@ next
       then show ?thesis 
         using FieldLookup FieldLookup2 FieldTranslation FieldTranslation2
         unfolding mask_bpl_upd_normal_field_def
-        by (metis fst_eqD fun_upd_same option.inject snd_conv update_mh_loc_total_full_lookup_1)
+        by simp
     next
       case False
       hence "get_mh_total_full ?\<omega>' l = get_mh_total_full \<omega> l"
-        using update_mh_loc_total_full_lookup_2
-        by metis
+        by simp
       have "(Address addr, NormalField f_bpl ty_vpr) \<noteq> (Address (fst l), NormalField field_bpl field_ty_vpr)"
         using \<open>l \<noteq> _\<close> FieldTranslation FieldTranslation2 FieldTrInj
         by (metis Pair_inject domIff inj_onD option.simps(3) prod.exhaust_sel ref.inject vb_field.inject(1))

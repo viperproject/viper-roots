@@ -487,7 +487,7 @@ lemma post_framing_rel_aux:
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
                       "domain_type TyRep = absval_interp_total ctxt_vpr" and
                       "Pr = program_total ctxt_vpr" and
-          LookupTyHeap: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))" and
+          LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)" and
           LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
           ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var" and
           Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
@@ -533,7 +533,7 @@ proof (rule allI | rule impI)+
           ZeroMaskConst
     by fastforce
   
-  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ LookupTyHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
        HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
