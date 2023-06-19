@@ -295,7 +295,7 @@ proof (rule rel_intro)
       apply (subst \<open>snd \<omega>' = _\<close>)+
       apply (subst \<open>?mb' = _\<close>)
       apply (subst \<open>m_bpl = _\<close>)
-      apply (rule state_rel_mask_update_3[OF StateRelInst])
+      apply (rule state_rel_mask_update_4[OF StateRelInst])
                apply simp
               
       using SuccessUpdState[OF \<open>R \<omega> ns\<close> Success] False \<open>r = _\<close>
@@ -713,10 +713,12 @@ proof -
     using mask_var_disjoint[OF state_rel_state_rel0[OF StateRel]] Disj
               apply simp
              apply (rule update_mh_m_total)
-            apply (rule update_mh_m_total)
+    using state_rel_eval_welldef_eq[OF StateRel]
+            apply simp
+
            apply simp
-          apply (rule WfMask)
-         apply (rule WfMask)
+          apply (simp add: WfMask)
+         apply (simp add: WfMask)
         apply (fastforce simp: mask_var_rel_def intro: LookupTyNewVar MaskRel)
        apply (fastforce simp: mask_var_rel_def intro: LookupTyNewVar MaskRel)
       apply (metis global_state_update_local global_state_update_other option.exhaust)
