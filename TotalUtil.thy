@@ -442,6 +442,31 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+lemma disjoint_list_add_set:
+  assumes Disj: "disjoint_list (xs@(M#ys))" and
+                "finite M'" and \<comment>\<open>I think the finite property is not required in general (here we use it
+                                   to reuse the lemma that adds a single element via induction)\<close>
+          Fresh: "\<forall>A \<in> set (xs@ys). disjnt M' A"
+        shows "disjoint_list (xs@((M \<union> M')#ys))"
+  using Fresh
+proof (induction rule: finite_induct[OF \<open>finite M'\<close>] )
+  case 1
+  then show ?case 
+    using Disj
+    by simp    
+next
+  case (2 a M')
+  hence *:"disjoint_list (xs @ (M \<union> M') # ys)"
+    by simp
+
+  have "disjoint_list (xs @ (M \<union> M' \<union> {a}) # ys)"
+    apply (rule disjoint_list_add[OF *])
+    using 2
+    by auto
+  then show ?case
+    by auto
+qed
+
 lemma disjoint_list_subset: 
   assumes "disjoint_list xs" and
           "length xs = length xs'" and

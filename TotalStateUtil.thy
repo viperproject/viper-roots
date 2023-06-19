@@ -100,6 +100,12 @@ lemma update_hh_h_total: "update_hh_total_full \<omega> hh' = update_h_total_ful
 lemma update_hp_h_total: "update_hp_total_full \<omega> hp' = update_h_total_full \<omega> (get_hh_total_full \<omega>) hp'"
   by simp
 
+lemma update_mh_m_total: "update_mh_total_full \<omega> mh' = update_m_total_full \<omega> mh' (get_mp_total_full \<omega>)"
+  by simp
+
+lemma update_mp_m_total: "update_mp_total_full \<omega> mp' = update_m_total_full \<omega> (get_mh_total_full \<omega>) mp'"
+  by simp
+
 section \<open>Shifting stores\<close>
 
 fun shift_and_add_state_total :: "'a full_total_state \<Rightarrow> 'a val \<Rightarrow> 'a full_total_state"

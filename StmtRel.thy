@@ -742,7 +742,7 @@ proof -
     by (auto intro: RedVar)
 
   moreover have "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ?ns2"
-  proof (rule state_rel_heap_update[OF StateRel1])
+  proof (rule state_rel_heap_update_2[OF StateRel1])
     show " \<omega> = \<omega> \<and> \<omega>' = \<omega>' \<and> heap_var Tr = heap_var_def Tr"
       using WellDefSame
       by simp

@@ -23,6 +23,7 @@ text \<open>Accesses to old expressions are represented via labeled old expressi
 definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
                    (\<forall>mh. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
+                         wf_mask_simple (get_mh_total mh) \<longrightarrow>
                          assertion_framing_state ctxt R postcondition
                                  \<lparr> get_store_total = \<sigma>,
                                  \<comment>\<open>old state given by state that satisfies precondition\<close>
@@ -532,8 +533,8 @@ proof (rule allI | rule impI)+
     using boogie_const_rel_lookup[OF state_rel_boogie_const_rel, where ?const = CZeroMask]
           ZeroMaskConst
     by fastforce
-  
-  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
        HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
@@ -541,7 +542,8 @@ proof (rule allI | rule impI)+
          Normal ns1)
         ((BigBlock name cs str tr, cont), Normal ns2)" and
     R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
-    by force
+    using is_empty_total_wf_mask[OF IsEmpty]
+    by force    
 
   with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
     using red_ast_bpl_transitive

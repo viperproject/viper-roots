@@ -116,7 +116,12 @@ lemma inhale_no_perm_failure_preserve_mono:
         \<comment>\<open>TODO: add no permission introspection property\<close>
         "red_inhale ctxt R A \<omega>1 res1 \<Longrightarrow> \<omega>2 \<le> \<omega>1 \<Longrightarrow> res1 \<noteq> RMagic \<Longrightarrow> 
               (res1 = RFailure \<longrightarrow> red_inhale ctxt R A \<omega>2 RFailure) \<and>
-              (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> (\<exists>\<omega>2'. \<omega>2' \<le> \<omega>1' \<and> red_inhale ctxt R A \<omega>2 (RNormal \<omega>2')))" and
+              (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
+                    (red_inhale ctxt R A \<omega>2 RFailure \<or> 
+                           (\<exists>\<omega>2'. \<omega>2' \<le> \<omega>1' \<and> 
+                           red_inhale ctxt R A \<omega>2 (RNormal \<omega>2'))
+                    )
+              )" and
         "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
 proof (induction arbitrary:  and and \<omega>2 rule: red_exp_inhale_unfold_inducts)
   case (InhAcc \<omega> e_r r e_p p W' f res)
