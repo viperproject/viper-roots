@@ -272,9 +272,14 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
       get_mh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
       ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat v))"
 
-\<comment>\<open>Unfolding\<close>
+\<comment>\<open>Unfolding\<close> 
 | RedUnfolding: "\<lbrakk> ctxt, R, None \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      ctxt, R, None \<turnstile> \<langle>Unfolding p es ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v"
+| RedUnfoldingDefNoPred:
+   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega> (Some vs);
+     ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
+     \<not> (pgte (get_mp_total_full \<omega> (pred_id,vs)) pwrite) \<rbrakk> \<Longrightarrow> \<comment>\<open>insufficient perrmision\<close>
+     ctxt, R, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 | RedUnfoldingDef: 
    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega> (Some vs);
      unfold_rel ctxt R p vs pwrite \<omega>_def \<omega>'_def; 
