@@ -138,7 +138,17 @@ lemma inhale_perm_single_nonempty:
   shows "inhale_perm_single R \<omega> lh (Some p) = {update_mh_loc_total_full \<omega> lh (padd (get_mh_total_full \<omega> lh) p)}"
   using assms
   unfolding inhale_perm_single_def
-  by fastforce
+  by fastforce  
+
+lemma inhale_perm_single_elem:
+  assumes "\<omega>' = update_mh_loc_total_full \<omega> lh (padd (get_mh_total_full \<omega> lh) q)" and
+          "R \<omega>'" and
+          "option_fold ((=) q) (q \<noteq> pnone) p_opt" and
+          "pgte pwrite (padd (get_mh_total_full \<omega> lh) q)"
+        shows "\<omega>' \<in> inhale_perm_single R \<omega> lh p_opt"
+  using assms
+  unfolding inhale_perm_single_def
+  by blast
 
 text \<open>Construct the set of states that can be reached after inhaling a predicate permission.
       \<^term>\<open>p_opt\<close> plays the same role as in \<^const>\<open>inhale_perm_single\<close>\<close>

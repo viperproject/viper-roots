@@ -566,7 +566,7 @@ lemma end_to_end_stmt_rel_2:
                 be able to instantiate A with \<^term>\<open>vbpl_absval_ty TyRep\<close>\<close>
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and 
-
+          StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
           VprMethodBodySome: "method_decl.body mdecl = Some body_vpr" and
 
           ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
@@ -761,11 +761,11 @@ proof (rule allI | rule impI)+
             apply (rule is_empty_total_full_less_eq[OF is_empty_empty_full_total_state])
             by (simp_all add: empty_full_total_state_def)
 
-          with inhale_no_perm_failure_preserve_mono RedInhPost 
+          with inhale_no_perm_failure_preserve_mono(3) StateConsAntiMono  RedInhPost 
           have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
             using is_empty_empty_full_total_state \<open>res = _\<close> 
-            by fast
-
+            by blast
+            
           with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrameStart _ _\<close>]
           obtain c' where "red_ast_bpl proc_body_bpl ctxt (\<gamma>Framing0, Normal ns') c'" and 
                           "snd c' = Failure"

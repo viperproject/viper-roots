@@ -122,4 +122,42 @@ definition total_heap_well_typed :: "program \<Rightarrow> ('a \<Rightarrow> abs
   where "total_heap_well_typed Pr \<Delta> h \<equiv>                      
            \<forall>loc \<tau>. declared_fields Pr (snd loc) = Some \<tau> \<longrightarrow> has_type \<Delta> \<tau> (h loc)"
 
+subsection \<open>Ordering lemmas\<close>
+
+lemma less_eq_full_total_stateD_2:
+  assumes "\<omega>1 \<le> \<omega>2"
+  shows "get_h_total_full \<omega>1 = get_h_total_full \<omega>2 \<and>
+         get_mh_total_full \<omega>1 \<le> get_mh_total_full \<omega>2 \<and>     
+         get_mp_total_full \<omega>1 \<le> get_mp_total_full \<omega>2"
+  using assms 
+  by (fastforce dest: less_eq_full_total_stateD less_eq_total_stateD)  
+
+lemma update_mh_loc_total_mono:
+  assumes "\<phi>1 \<le> \<phi>2" and "p1 \<le> p2"
+  shows "update_mh_loc_total \<phi>1 l p1 \<le> update_mh_loc_total \<phi>2 l p2"
+proof -
+  have *: "(get_mh_total \<phi>1)(l := p1) \<le> (get_mh_total \<phi>2)(l := p2)"
+    using assms 
+    by (simp add: le_funD le_funI less_eq_total_stateD)
+
+  show ?thesis
+    apply (insert assms)
+    by (fastforce intro: less_eq_total_stateI dest: less_eq_total_stateD simp: *)
+qed
+
+lemma update_mh_loc_total_full_mono:
+  assumes "\<omega>1 \<le> \<omega>2" and "p1 \<le> p2"
+  shows "update_mh_loc_total_full \<omega>1 l p1 \<le> update_mh_loc_total_full \<omega>2 l p2"
+proof -
+  have *: "update_mh_loc_total (get_total_full \<omega>1) l p1 \<le> update_mh_loc_total (get_total_full \<omega>2) l p2"
+    using assms update_mh_loc_total_mono less_eq_full_total_state_ext_def
+    by blast
+
+  show ?thesis
+    apply (insert assms *)
+    apply (rule less_eq_full_total_stateI)
+    by (fastforce dest: less_eq_full_total_stateD)+
+qed
+    
+
 end
