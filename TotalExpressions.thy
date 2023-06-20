@@ -369,7 +369,9 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 
 lemmas red_exp_inhale_unfold_inducts = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.inducts
 
-subsection \<open>Elimination rules\<close>
+subsection \<open>Elimination and introduction rules\<close>
+
+lemmas red_exp_inhale_unfold_intros = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.intros
 
 subsubsection \<open>Expression evaluation and well-definedness\<close>
 
@@ -455,6 +457,19 @@ lemmas red_pure_exp_total_elims =
   red_exp_list_normal_elim red_exp_list_failure_elim
 
 subsubsection \<open>Inhale\<close>
+
+lemmas red_inhale_intros = 
+  InhAcc 
+  InhAccPred 
+  InhAccWildcard 
+  InhAccPredWildcard 
+  InhPure 
+  InhSubAtomicFailure
+  InhStarNormal 
+  InhStarFailureMagic
+  InhImpTrue
+  InhImpFalse 
+  InhImpFailure
 
 inductive_cases InhStar_case: "red_inhale ctxt R (A && B) \<omega> res"
 inductive_cases InhImp_case: "red_inhale ctxt R (Imp e A) \<omega> res"
