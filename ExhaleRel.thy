@@ -191,7 +191,7 @@ definition exhale_acc_normal_premise
        exhale_field_acc_rel_perm_success ctxt StateCons \<omega> r p f \<and>
        (if r = Null then \<omega>' = \<omega> else
           let mh = get_mh_total_full \<omega> in 
-              \<omega>' = update_mh_loc_total_full \<omega> (the_address r,f) (psub (mh (the_address r,f)) (Abs_prat p))
+              \<omega>' = update_mh_loc_total_full \<omega> (the_address r,f) ((mh (the_address r,f)) - (Abs_prat p))
        )"
 
 lemma exhale_field_acc_rel:
@@ -299,8 +299,8 @@ qed
 
 lemma psub_smaller:
   assumes "pgte p q"
-  shows "pgte p (psub p q)"
-  unfolding psub_def
+  shows "pgte p (p - q)"
+  unfolding minus_prat_def
 proof -
   from assms have DiffNonNegative: "Rep_prat p - Rep_prat q \<ge> 0"
     by (transfer) simp
@@ -344,7 +344,7 @@ proof (rule rel_general_conseq_output,
   thus "fst \<omega>' = (if (mask_var_def Tr = mask_var Tr \<and> r \<noteq> Null) then (snd \<omega>') else (fst \<omega>0_\<omega>def)) \<and>
 
          snd \<omega>' = (if (r = Null) then (snd \<omega>0_\<omega>def) else (update_mh_loc_total_full (snd \<omega>0_\<omega>def) (the_address r, f)
-                                                   (psub (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) (Abs_prat p))))"
+                                                   ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) - (Abs_prat p))))"
     using MaskDefDifferent
     unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_perm_success_def
     by presburger
@@ -384,7 +384,7 @@ next
 
   have "red_expr_bpl ctxt new_perm ns
         (if (r = Null) then (RealV 0) else 
-                            (RealV (real_of_rat (Rep_prat (psub (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) (Abs_prat p))))))"
+                            (RealV (real_of_rat (Rep_prat ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p))))))"
         (is ?conjunct1)
     apply (subst \<open>new_perm = _\<close>)
     apply (rule RedBinOp)
@@ -402,14 +402,14 @@ next
     using \<open>p \<ge> 0\<close> psub_aux Abs_prat_inverse
     by (metis EnoughPerm get_mh_total_full.simps of_rat_less_eq) 
 
-  moreover have "(r \<noteq> Null \<longrightarrow> pgte pwrite (psub (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) (Abs_prat p)))" 
+  moreover have "(r \<noteq> Null \<longrightarrow> pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p)))" 
         (is ?conjunct2)
   proof (rule impI)
     assume "r \<noteq> Null"
     hence "pgte (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) (Abs_prat p)"
       using \<open>p \<ge> 0\<close> Abs_prat_inverse EnoughPerm
       by (simp add: pgte.rep_eq)
-    thus "pgte pwrite (psub (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) (Abs_prat p))"
+    thus "pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p))"
       using PermAtMostOne psub_smaller PermAtMostOne pgte_transitive
       by blast
   qed

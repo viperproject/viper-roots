@@ -31,7 +31,7 @@ definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat
       {m'| m' q. 
                (p_opt = None \<longrightarrow> pgt q pnone) \<and>
                option_fold ((=) q) (q \<noteq> pnone \<and> pgt (m lh) q) p_opt \<and>
-               m' = m(lh := psub (m lh) q)
+               m' = m(lh := (m lh) - q)
        }"
 
 inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
@@ -46,7 +46,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      a = the_address r \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
                           ( exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (mh (a,f)) (Abs_prat p)))
-                                         (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) (psub (mh (a,f)) (Abs_prat p)))
+                                         (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((mh (a,f)) - (Abs_prat p)))
                           )"
 
 \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
@@ -64,7 +64,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
             (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
-                          (update_mp_total_full \<omega> (mp( (pred_id, v_args) := psub (mp (pred_id, v_args)) (Abs_prat p)))))"
+                          (update_mp_total_full \<omega> (mp( (pred_id, v_args) := (mp (pred_id, v_args)) - (Abs_prat p)))))"
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
@@ -282,12 +282,12 @@ always has at least one failure transition. This is in-sync with the recent Carb
 \<comment>\<open>TODO: fold acc(P(x),0)\<close>
 
 \<comment>\<open>Composite statements\<close>
-| RedScope:
+| RedScope: \<comment>\<open>TODO: lift to sets of types\<close>
     "\<lbrakk>  v \<in> set_from_type (absval_interp_total ctxt) \<tau>;
        red_stmt_total ctxt R \<Lambda> scopeBody (shift_and_add_state_total \<omega> v) res;
        res_unshift = map_stmt_result_total (unshift_state_total 0) res \<rbrakk> \<Longrightarrow>
 
-      red_stmt_total ctxt R \<Lambda> (Scope \<tau> scopeBody) \<omega> res_unshift"
+      red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
  | RedIfTrue: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True);
       red_stmt_total ctxt R \<Lambda> s_thn \<omega> res \<rbrakk> \<Longrightarrow> 

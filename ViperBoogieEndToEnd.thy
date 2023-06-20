@@ -764,7 +764,7 @@ proof (rule allI | rule impI)+
           with inhale_no_perm_failure_preserve_mono RedInhPost 
           have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
             using is_empty_empty_full_total_state \<open>res = _\<close> 
-            by blast
+            by fast
 
           with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrameStart _ _\<close>]
           obtain c' where "red_ast_bpl proc_body_bpl ctxt (\<gamma>Framing0, Normal ns') c'" and 
@@ -1548,7 +1548,7 @@ proof -
       show "mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) zero_mask_bpl"
         using \<open>is_empty_total_full \<omega>\<close>
         unfolding mask_rel_def is_empty_total_full_def is_empty_total_def zero_mask_def      
-        by (simp add: pnone.rep_eq)
+        by (simp add: zero_prat.rep_eq)
     qed
   
     thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var_def Tr) \<omega> ns"

@@ -1235,7 +1235,7 @@ proof (rule wf_rel_intro)
       then show ?thesis 
         using MaskRel MaskRelLoc ExpRel
         unfolding mask_rel_def get_valid_locs_def        
-        by (metis  R RedRcv exp_rel_vpr_bpl_elim mem_Collect_eq of_rat_0 pnone.rep_eq prat_pnone_pgt val_rel_vpr_bpl.simps(3))
+        by (metis  R RedRcv exp_rel_vpr_bpl_elim mem_Collect_eq of_rat_0 zero_prat.rep_eq prat_pnone_pgt val_rel_vpr_bpl.simps(3))
     qed
 
     have "red_ast_bpl P ctxt
@@ -1337,7 +1337,7 @@ proof (rule wf_rel_intro)
       by (simp add: get_writeable_locs_def)
   
     with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) = 1"    
-      by (simp add: pwrite.rep_eq)      
+      by (simp add: one_prat.rep_eq)
   
     have "red_ast_bpl P ctxt
               ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup) # cs) str tr, cont), Normal ns)
@@ -1379,7 +1379,7 @@ proof (rule wf_rel_intro)
       then show ?thesis 
         using MaskRel MaskRelLoc ExpRel
         unfolding mask_rel_def get_writeable_locs_def  
-        using RedRcvBpl Rep_prat_inject pwrite.rep_eq by fastforce
+        using RedRcvBpl Rep_prat_inject one_prat.rep_eq by fastforce
     qed
 
     have "red_ast_bpl P ctxt

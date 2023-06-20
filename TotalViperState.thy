@@ -52,38 +52,10 @@ record 'a full_total_state = (*= "'a store \<times> 'a total_trace \<times> 'a t
 
 subsection \<open>Order\<close>
 
-\<comment>\<open> TODO: instantiate the order type class for \<^typ>\<open>prat\<close> to then get the ordering on masks for free\<close>
-
-definition less_eq_mask :: "'a abstract_mask \<Rightarrow> 'a abstract_mask \<Rightarrow> bool"
-  where "less_eq_mask m1 m2 \<equiv> \<forall>l. lte (m1 l) (m2 l)"
-
-definition less_mask :: "'a abstract_mask \<Rightarrow> 'a abstract_mask \<Rightarrow> bool"
-  where "less_mask m1 m2 \<equiv> (\<forall>l. lte (m1 l) (m2 l)) \<and> (\<exists>l. lt (m1 l) (m2 l))"
-
-lemma zero_mask_less_eq_mask: "less_eq_mask zero_mask m"
-  unfolding less_eq_mask_def zero_mask_def
+lemma zero_mask_less_eq_mask: "zero_mask \<le> m"
+  unfolding  zero_mask_def le_fun_def
   apply transfer
-  by auto
-
-lemma less_mask_less_eq_mask: "less_mask m1 m2 = (less_eq_mask m1 m2 \<and> \<not> less_eq_mask m2 m1)"
-  unfolding less_mask_def less_eq_mask_def
-  apply(transfer)
-  using linorder_not_less by blast
-
-lemma less_eq_mask_refl: "less_eq_mask m m"
-  unfolding less_eq_mask_def  
-  by (transfer) simp
-
-lemma less_eq_mask_transitive: "less_eq_mask m1 m2 \<Longrightarrow> less_eq_mask m2 m3 \<Longrightarrow> less_eq_mask m1 m3"
-  unfolding less_eq_mask_def
-  apply transfer
-  using dual_order.trans by blast
-
-lemma less_eq_mask_antisymmetric: "less_eq_mask m1 m2 \<Longrightarrow> less_eq_mask m2 m1 \<Longrightarrow> m1 = m2"
-  unfolding less_eq_mask_def
-  apply transfer
-  using order_antisym_conv by blast
-
+  by simp
 
 instantiation total_state_ext :: (type,type) order
 begin
@@ -92,16 +64,16 @@ definition less_eq_total_state_ext :: "('a,'b) total_state_ext \<Rightarrow> ('a
   where "\<phi>1 \<le> \<phi>2 \<equiv> 
          get_hh_total \<phi>1 = get_hh_total \<phi>2 \<and>
          get_hp_total \<phi>1 = get_hp_total \<phi>2 \<and>
-         less_eq_mask (get_mh_total \<phi>1) (get_mh_total \<phi>2) \<and>
-         less_eq_mask (get_mp_total \<phi>1) (get_mp_total \<phi>2) \<and>
+         (get_mh_total \<phi>1) \<le> (get_mh_total \<phi>2) \<and>
+         (get_mp_total \<phi>1) \<le> (get_mp_total \<phi>2) \<and>
          total_state.more \<phi>1 = total_state.more \<phi>2"
 
 definition less_total_state_ext :: "('a,'b) total_state_ext \<Rightarrow> ('a,'b) total_state_ext \<Rightarrow> bool"
   where "\<phi>1 < \<phi>2 \<equiv> 
          get_hh_total \<phi>1 = get_hh_total \<phi>2 \<and>
          get_hp_total \<phi>1 = get_hp_total \<phi>2 \<and>
-         ( (less_eq_mask (get_mh_total \<phi>1) (get_mh_total \<phi>2) \<and> less_mask (get_mp_total \<phi>1) (get_mp_total \<phi>2)) \<or>
-           (less_mask (get_mh_total \<phi>1) (get_mh_total \<phi>2) \<and> less_eq_mask (get_mp_total \<phi>1) (get_mp_total \<phi>2))) \<and>
+         ( ((get_mh_total \<phi>1) < (get_mh_total \<phi>2) \<and> (get_mp_total \<phi>1) \<le> (get_mp_total \<phi>2)) \<or>
+           ((get_mh_total \<phi>1) \<le> (get_mh_total \<phi>2) \<and> (get_mp_total \<phi>1) < (get_mp_total \<phi>2))) \<and>
          total_state.more \<phi>1 = total_state.more \<phi>2"
 instance
 proof
@@ -113,38 +85,33 @@ proof
     show "x \<le> y \<and> \<not> y \<le> x"
     proof (rule conjI)
       show "x \<le> y"
-        using \<open>x < y\<close> less_mask_less_eq_mask
+        using \<open>x < y\<close> 
         unfolding less_total_state_ext_def less_eq_total_state_ext_def
-        by meson
+        by auto
     next
       show "\<not> y \<le> x"
-      using \<open>x < y\<close> less_mask_less_eq_mask
+      using \<open>x < y\<close> 
       unfolding less_total_state_ext_def less_eq_total_state_ext_def
-      by metis
+      by auto
     qed
   next
-    assume "x \<le> y \<and> \<not> y \<le> x"
+    assume *: "x \<le> y \<and> \<not> y \<le> x"
     thus "x < y"
-      using less_mask_less_eq_mask
       unfolding less_total_state_ext_def less_eq_total_state_ext_def
-      by metis
+      by force        
   qed
 
   show "x \<le> x"
     unfolding less_eq_total_state_ext_def
-    using less_eq_mask_refl
-    by meson
+    by blast
 
   show "x \<le> y \<Longrightarrow> y \<le> z \<Longrightarrow> x \<le> z"
     unfolding less_eq_total_state_ext_def
-    using less_eq_mask_transitive
-    by metis
+    by auto
   
   show "x \<le> y \<Longrightarrow> y \<le> x \<Longrightarrow> x = y"
     unfolding less_eq_total_state_ext_def
-    apply (rule total_state.equality)
-    using less_eq_mask_antisymmetric
-    by blast+
+    by auto
 qed
 
 end
@@ -242,6 +209,58 @@ proof
 qed
 end
 
+subsubsection \<open>Order for Option type\<close>
+
+text \<open>We instantiate option to be of type class order such that one can compare optional states.
+     TODO: Put this somewhere else. \<close>
+
+instantiation option :: (order) order
+begin
+
+definition less_eq_option :: "'a option \<Rightarrow> 'a option \<Rightarrow> bool"
+  where "a \<le> b \<equiv> 
+         a = None \<or>
+         (\<exists>v1 v2. a = Some v1 \<and> b = Some v2 \<and> v1 \<le> v2)"
+
+definition less_option :: "'a option \<Rightarrow> 'a option \<Rightarrow> bool"
+  where "a < b \<equiv> 
+           (a = None \<and> b \<noteq> None) \<or>
+           (\<exists>v1 v2. a = Some v1 \<and> b = Some v2 \<and> v1 < v2)"
+
+instance
+proof
+  fix x y z :: "'a option"
+
+  show "(x < y) = (x \<le> y \<and> \<not> y \<le> x)"
+    unfolding less_eq_option_def less_option_def
+    by auto
+
+  show "x \<le> x"
+    unfolding less_eq_option_def less_option_def
+    by auto
+    
+  show "x \<le> y \<Longrightarrow> y \<le> z \<Longrightarrow> x \<le> z"
+    unfolding less_eq_option_def less_option_def
+    by force
+
+  show "x \<le> y \<Longrightarrow> y \<le> x \<Longrightarrow> x = y"
+    unfolding less_eq_option_def less_option_def
+    by auto
+qed
+end
+
+lemma less_eq_None [simp]: "None \<le> a"
+  by (simp add: less_eq_option_def)
+
+lemma less_eq_Some [simp]: "a \<le> b \<Longrightarrow> Some a \<le> Some b"
+  by (simp add: less_eq_option_def)
+
+lemma less_None [simp]: "None < Some a"
+  by (simp add: less_option_def)
+
+lemma less_Some [simp]: "a < b \<Longrightarrow> Some a < Some b"
+  by (simp add: less_option_def)
+
 subsection \<open>Destructors \<close>
 
 fun get_hh_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap"
@@ -300,7 +319,7 @@ qed
 
 definition empty_full_total_state :: "'a store \<Rightarrow> 'a total_trace \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
   where "empty_full_total_state \<sigma> t hh hp =
-   \<lparr> get_store_total =\<sigma>, 
+   \<lparr> get_store_total = \<sigma>, 
      get_trace_total = t, 
      get_total_full = \<lparr> get_hh_total = hh, get_hp_total = hp, get_mh_total = zero_mask, get_mp_total = zero_mask \<rparr> 
    \<rparr>"

@@ -391,7 +391,7 @@ abbreviation zero_mask_bpl :: "ref \<times> 'a vb_field \<Rightarrow> real"
 lemma zero_mask_rel:
   shows "mask_rel Pr F zero_mask zero_mask_bpl"
   unfolding  mask_rel_def
-  by (auto intro: if_SomeI simp: pnone.rep_eq zero_mask_def)
+  by (auto intro: if_SomeI simp: zero_prat.rep_eq zero_mask_def)
 
 lemma zero_mask_rel_2:
   assumes "is_empty_total_full \<omega>"

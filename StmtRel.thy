@@ -682,7 +682,7 @@ proof -
         unfolding mask_rel_def
         by blast
       hence "get_mh_total_full \<omega> heap_loc \<noteq> pnone"
-        using PermPos pnone.rep_eq by fastforce
+        using PermPos zero_prat.rep_eq by fastforce
 
       hence "get_hh_total_full \<omega> heap_loc = get_hh_total_full \<omega>' heap_loc"
         using \<open>\<omega>' \<in> _\<close> 

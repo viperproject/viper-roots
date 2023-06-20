@@ -185,19 +185,20 @@ lemma padd_aux:
   assumes "p_rat \<ge> 0" and
           "q_real = real_of_rat (Rep_prat q)"
         shows "q_real + real_of_rat p_rat = real_of_rat (Rep_prat (padd q (Abs_prat p_rat)))"
-  using assms
-  by (simp add: Abs_prat_inverse padd.rep_eq of_rat_add)
+  using assms 
+  by (simp add: Abs_prat_inverse of_rat_add plus_prat.rep_eq)
 
 lemma psub_aux:
   assumes "p_rat \<ge> 0" and
           "real_of_rat p_rat \<le> q_real" and
           "q_real = real_of_rat (Rep_prat q)"
-        shows "q_real - real_of_rat p_rat = real_of_rat (Rep_prat (psub q (Abs_prat p_rat)))"
+        shows "q_real - real_of_rat p_rat = real_of_rat (Rep_prat (q - (Abs_prat p_rat)))"
   using assms
   apply (subst \<open>q_real = _\<close>)
-  apply (unfold psub_def)
+  apply (unfold minus_prat_def)
   apply (simp add: Abs_prat_inverse of_rat_diff)
-  by (metis add.group_left_neutral add_le_imp_le_diff leD leI of_rat_add of_rat_diff of_rat_less padd.rep_eq padd_aux pnone.rep_eq)
+  using add.group_left_neutral add_le_imp_le_diff leD leI of_rat_add of_rat_diff of_rat_less  padd_aux 
+  by (metis add_0 zero_prat.rep_eq)  
   
 subsection \<open>uncurry\<close>
 
