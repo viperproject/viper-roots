@@ -123,6 +123,7 @@ definition less_eq_full_total_state_ext :: "('a,'b) full_total_state_ext \<Right
   where "\<omega>1 \<le> \<omega>2 \<equiv> 
          get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
          dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>
+          \<comment>\<open>TODO: maybe use option type ordering to express this directly via function ordering\<close>
          (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
                       \<phi>1 \<le> \<phi>2) \<and>
          get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
@@ -208,6 +209,72 @@ proof
     by blast
 qed
 end
+
+lemma less_eq_total_stateI:
+  " get_hh_total \<phi>1 = get_hh_total \<phi>2 \<Longrightarrow>
+    get_hp_total \<phi>1 = get_hp_total \<phi>2 \<Longrightarrow>
+     (get_mh_total \<phi>1) \<le> (get_mh_total \<phi>2) \<Longrightarrow>
+     (get_mp_total \<phi>1) \<le> (get_mp_total \<phi>2) \<Longrightarrow>
+    total_state.more \<phi>1 = total_state.more \<phi>2 \<Longrightarrow>
+    \<phi>1 \<le> \<phi>2"
+  unfolding less_eq_total_state_ext_def
+  by blast
+
+lemma less_eq_total_stateD: "\<phi>1 \<le> \<phi>2 \<Longrightarrow>
+         get_hh_total \<phi>1 = get_hh_total \<phi>2 \<and>
+         get_hp_total \<phi>1 = get_hp_total \<phi>2 \<and>
+         ((get_mh_total \<phi>1) \<le> (get_mh_total \<phi>2) \<and> (get_mp_total \<phi>1) \<le> (get_mp_total \<phi>2)) \<and>
+         total_state.more \<phi>1 = total_state.more \<phi>2"
+  unfolding less_eq_total_state_ext_def
+  by blast
+
+lemma less_eq_total_stateE:
+  assumes "\<phi>1 \<le> \<phi>2" and
+          "get_hh_total \<phi>1 = get_hh_total \<phi>2 \<Longrightarrow>
+           get_hp_total \<phi>1 = get_hp_total \<phi>2 \<Longrightarrow>
+           (get_mh_total \<phi>1) \<le> (get_mh_total \<phi>2) \<Longrightarrow>
+           (get_mp_total \<phi>1) \<le> (get_mp_total \<phi>2) \<Longrightarrow>
+           total_state.more \<phi>1 = total_state.more \<phi>2 \<Longrightarrow> P"
+        shows P
+  using assms 
+  by (auto dest: less_eq_total_stateD)
+
+
+lemma less_eq_full_total_stateI:
+    "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
+     dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>
+     (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
+                  \<phi>1 \<le> \<phi>2) \<Longrightarrow>
+     get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
+     full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow>
+     \<omega>1 \<le> \<omega>2"
+  unfolding less_eq_full_total_state_ext_def
+  by blast
+
+lemma less_eq_full_total_stateD:
+  assumes "\<omega>1 \<le> \<omega>2"
+  shows "get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
+         dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>
+         (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
+                      \<phi>1 \<le> \<phi>2) \<and>
+         get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
+         full_total_state.more \<omega>1 = full_total_state.more \<omega>2"
+  using assms
+  unfolding less_eq_full_total_state_ext_def
+  by blast
+
+lemma less_eq_full_total_stateE:
+  assumes "\<omega>1 \<le> \<omega>2" and
+          "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
+           dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>
+           (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
+                        \<phi>1 \<le> \<phi>2) \<Longrightarrow>
+           get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
+           full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow> P"
+  shows P
+  using assms
+  unfolding less_eq_full_total_state_ext_def
+  by blast
 
 subsubsection \<open>Order for Option type\<close>
 
