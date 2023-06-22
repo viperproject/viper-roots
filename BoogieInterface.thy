@@ -111,6 +111,20 @@ proof -
     by (fastforce intro!: red_ast_bpl_one_step_empty_simple_cmd RedSkip)
 qed 
 
+lemma red_ast_bpl_if_nondet_then:
+  shows "red_ast_bpl P ctxt ((if_bigblock name None (thn_hd # thn_tl) els, KSeq next cont), Normal ns) 
+                            ((thn_hd, convert_list_to_cont thn_tl (KSeq next cont)), Normal ns)"
+  apply (rule red_ast_bpl_one_step_empty_simple_cmd)
+  apply (rule RedParsedIfTrue)
+  by simp
+
+lemma red_ast_bpl_if_nondet_else:
+  shows "red_ast_bpl P ctxt ((if_bigblock name None thn (els_hd # els_tl), KSeq next cont), Normal ns) 
+                            ((els_hd, convert_list_to_cont els_tl (KSeq next cont)), Normal ns)"
+  apply (rule red_ast_bpl_one_step_empty_simple_cmd)
+  apply (rule RedParsedIfFalse)
+  by simp
+
 subsection \<open>Reducing Boogie programs while preserving a property\<close>
 
 lemma red_ast_bpl_propagate_rel:
