@@ -15,9 +15,6 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
                   is_empty_total_full \<omega> \<longrightarrow>
                   red_stmt_total ctxt R (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) mbody \<omega> r \<longrightarrow> r \<noteq> RFailure)"
 
-abbreviation old_label :: label
-  where "old_label \<equiv> ''old''"
-
 text \<open>Accesses to old expressions are represented via labeled old expressions with label \<^const>\<open>old_label\<close>.\<close>
 
 definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
