@@ -4,6 +4,9 @@ theory TotalSemantics
 imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
 begin
 
+definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
+  where "vals_well_typed A vs ts \<equiv> map (get_type A) vs = ts"
+
 fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total"  where
   "exh_if_total False _ = RFailure"
 | "exh_if_total True \<omega> = RNormal \<omega>"
@@ -181,6 +184,7 @@ fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
 | "sub_expressions (FieldAssign e1 _ e2) = [e1, e2]"
 | "sub_expressions (Unfold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
 | "sub_expressions (Fold _ exps pw) = exps @ sub_expressions_exp_or_wildcard pw"
+| "sub_expressions (MethodCall _ m exps ) = exps"
 | "sub_expressions _ = []"
 
 \<comment>\<open>TODO: duplicated from Viper session\<close>
@@ -190,33 +194,40 @@ fun modif :: "stmt \<Rightarrow> var set" where
 | "modif (LocalAssign x e) = {x}"
 | "modif (Havoc x) = {x}"
 | "modif (Scope l s) = shift_down_set (modif s)" (* We ignore variables from this scope, and we shift the other ones *)
-| "modif (MethodCall x name y) = set y"
+| "modif (MethodCall y name es) = set y"
 | "modif (While b I s) = modif s"
 | "modif _ = {}"
+
+
+definition reset_state_after_call :: "var list \<Rightarrow> 'a val list \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow>'a full_total_state" where
+  "reset_state_after_call targets vs \<omega>BeforeCall \<omega> = 
+       \<lparr> get_store_total = (map_upds (get_store_total \<omega>BeforeCall) targets vs),
+         get_trace_total = get_trace_total \<omega>BeforeCall,
+         get_total_full = get_total_full \<omega> \<rparr>"
 
 inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "('a full_total_state \<Rightarrow> bool)" and \<Lambda> :: "type_context"  where
 \<comment>\<open>Atomic statements\<close>
    RedSkip: "red_stmt_total ctxt R \<Lambda> Skip \<omega> (RNormal \<omega>)" 
- | RedInhale: 
-   "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
- | RedExhale:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
-      \<comment>\<open>Here, we havoc all locations that for which there is no direct permission. This is sound but 
-        incomplete, because locations that are folded under a predicate need not be havoced. This should
-        be revisited.\<close>
-      \<omega>' \<in> exhale_state ctxt \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
- | RedExhaleFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
- | RedAssert:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh) \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>)"
- | RedAssertFailure:
-   "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
+| RedInhale: 
+ "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
+    red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
+| RedExhale:
+ "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
+    \<comment>\<open>Here, we havoc all locations that for which there is no direct permission. This is sound but 
+      incomplete, because locations that are folded under a predicate need not be havoced. This should
+      be revisited.\<close>
+    \<omega>' \<in> exhale_state ctxt \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
+    red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
+| RedExhaleFailure:
+ "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
+    red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
+| RedAssert:
+ "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh) \<rbrakk> \<Longrightarrow>
+    red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>)"
+| RedAssertFailure:
+ "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
+    red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
 
 \<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
 always has at least one failure transition. This is in-sync with the recent Carbon upgrade.\<close>
@@ -224,28 +235,50 @@ always has at least one failure transition. This is in-sync with the recent Carb
 
 \<comment>\<open>TODO: Add semantics for \<^term>\<open>Assume A\<close>. \<close>
 
+| RedHavoc:
+  "\<lbrakk> \<Lambda> x = Some ty;
+     get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow>
+   red_stmt_total ctxt R \<Lambda> (Havoc x) \<omega> (RNormal (update_var_total \<omega> x v))"
 \<comment>\<open>only reduce assignment if RHS has the type expected by LHS \<close>
- | RedLocalAssign:
-   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v);
-      \<Lambda> x = Some ty; 
-      get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
-     red_stmt_total ctxt R \<Lambda> (LocalAssign x e) \<omega> (RNormal (update_var_total \<omega> x v))"
- | RedFieldAssign: 
-   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
-      (addr,f) \<in> get_writeable_locs \<omega>;
-      ctxt, R, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v;
-      declared_fields (program_total ctxt) f = Some ty;
-      get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
-      red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (RNormal (update_hh_loc_total_full \<omega> (addr,f) v))"
+| RedLocalAssign:
+ "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val v);
+    \<Lambda> x = Some ty; 
+    get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
+   red_stmt_total ctxt R \<Lambda> (LocalAssign x e) \<omega> (RNormal (update_var_total \<omega> x v))"
+| RedFieldAssign: 
+ "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr));
+    (addr,f) \<in> get_writeable_locs \<omega>;
+    ctxt, R, (Some \<omega>)  \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v;
+    declared_fields (program_total ctxt) f = Some ty;
+    get_type (absval_interp_total ctxt) v = ty \<rbrakk> \<Longrightarrow> 
+    red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> (RNormal (update_hh_loc_total_full \<omega> (addr,f) v))"
 \<comment>\<open>Is null case handled in NestedPermSem?\<close>
- | RedFieldAssignFailure: 
-   "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
-      \<comment>\<open>the reduction of the right-hand-side is technically not required for this rule 
-         (irrelevant if well-typed), but matches Viper's current reduction order\<close>
-      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
-      r = Null \<or> (the_address r,f) \<notin>  get_writeable_locs \<omega> \<rbrakk> \<Longrightarrow> 
-      red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
-
+| RedFieldAssignFailure: 
+ "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+    \<comment>\<open>the reduction of the right-hand-side is technically not required for this rule 
+       (irrelevant if well-typed), but matches Viper's current reduction order\<close>
+    ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v; 
+    r = Null \<or> (the_address r,f) \<notin>  get_writeable_locs \<omega> \<rbrakk> \<Longrightarrow> 
+    red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
+| RedMethodCall:
+  " \<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) es \<omega> (Some v_args);
+      program.methods (program_total ctxt) m = Some mdecl;
+      list_all2 (\<lambda> y t. y = Some t) (map \<Lambda> ys) ts;
+      \<comment>\<open>non-deterministically select values for return variables that conform to the declared type\<close>
+      vals_well_typed (absval_interp_total ctxt) v_rets ts; 
+      red_stmt_total ctxt R \<Lambda> (Exhale (method_decl.pre mdecl)) 
+                              \<lparr> get_store_total = (shift_and_add_list Map.empty v_args), 
+                                get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
+                                get_total_full = get_total_full \<omega> \<rparr>
+                              resPre;
+      resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre;
+      \<And> \<omega>Pre. resPre = RNormal \<omega>Pre \<Longrightarrow> 
+      \<comment>\<open>can't use havoc here directly in a natural way to get updated state\<close>
+            red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.post mdecl)) 
+                                    (update_store_total \<omega>Pre (shift_and_add_list (get_store_total \<omega>Pre) v_rets))
+                                    resPost \<and>
+            res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost \<rbrakk> \<Longrightarrow>        
+      red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
@@ -335,10 +368,22 @@ lemmas red_stmt_total_inversion_thms =
    RedExhaleNormal_case
    RedExhaleFailure_case
 
-subsection \<open>Correctness\<close>
+text \<open>lift red stmt total to extended initial state \<close>
+abbreviation red_stmt_total_lift 
+  where "red_stmt_total_lift ctxt R \<Lambda> stmt initState targetState \<equiv> True"
+                                                                  
+lemma test:
+  assumes "red_pure_exps_total ctxt R (Some \<omega>) es \<omega> (Some v_args)"
+         "program.methods (program_total ctxt) m = Some mdecl"
+         "red_stmt_total ctxt R \<Lambda> (Exhale (method_decl.pre mdecl)) (update_store_total \<omega> (store_for_spec v_args)) resPre" and
+         "resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre" and
+         "\<And> \<omega>Pre. resPre = RNormal \<omega>Pre \<Longrightarrow> 
+              red_stmt_total ctxt R \<Lambda> (Havoc y) \<omega>Pre (RNormal \<omega>PreHavoc) \<and>
+              red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.pre mdecl)) \<omega>PreHavoc res"   
+  shows "red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
+  oops
 
-definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
-  where "vals_well_typed A vs ts \<equiv> map (get_type A) vs = ts"
+subsection \<open>Correctness\<close>
 
 definition assertion_sat :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "assertion_sat \<Lambda> R ctxt A \<omega> = 
