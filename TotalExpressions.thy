@@ -434,6 +434,12 @@ next
   then show ?thesis using assms by auto
 qed
 
+lemma red_exp_list_failure_Nil:
+  assumes "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) [] \<omega> res"
+  shows "res = Some []"
+  using assms
+  by cases
+
 lemma red_exp_list_failure_elim:
   assumes
      "red_pure_exps_total ctxt R \<omega>_def es \<omega> None" and

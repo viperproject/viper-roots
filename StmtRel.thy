@@ -791,15 +791,191 @@ proof -
     using Red1 red_ast_bpl_transitive
     by blast
 qed
+
+subsection \<open>Method call relation\<close> 
+
+fun the_var :: "ViperLang.pure_exp \<Rightarrow> ViperLang.var" where 
+  "the_var (ViperLang.Var x) = x"
+| "the_var _ = undefined"
+
+term map_upds
+
+value "upt 0 4"
+
+lemma dom_map_upds_test:
+  assumes "xs \<noteq> []" and "length xs = length ys"
+  shows "dom (map_upds zs xs ys) = dom zs \<union> set xs"
+  using assms
+  by force
+
+lemma method_call_rel:
+  assumes 
+          MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
+          RdefEq:  "Rdef = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)" and
+          StateRelConcrete: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and                  
+                  "list_all (\<lambda>x. \<exists>a. x = ViperLang.Var a) es" \<comment>\<open>simplifying assumption: only variables as arguments\<close> and
+                  "xs = map the_var es" and
+                  "var_tr' = map_upds Map.empty (upt 0 (length es)) (rev xs)" and
+          ExpWfRel: "exprs_wf_rel Rdef ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>def" and
+                   \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
+          ExhalePreRel: "\<And> ls ps.
+                        set ls = ran (var_translation Tr) \<Longrightarrow>
+                        length ls = length ps \<Longrightarrow>
+                        stmt_rel 
+                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upds AuxPred ls ps) ctxt)
+                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upds AuxPred ls ps) ctxt) 
+                              ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
+                              (Exhale (method_decl.pre mdecl)) \<gamma>def \<gamma>pre" and
+          InhalePostRel:         "\<And> ls ps.
+                        set ls = ran (var_translation Tr) \<Longrightarrow>
+                        length ls = length ps \<Longrightarrow>
+                        stmt_rel (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upds AuxPred ls ps) ctxt)
+                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upds AuxPred ls ps) ctxt)
+                              ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
+                              (Inhale (method_decl.post mdecl)) \<gamma>pre \<gamma>'"
+
+        \<comment>\<open>Simplifying assumption: no target variables\<close>
+  shows "stmt_rel R (state_rel_def_same Pr TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall [] m es) \<gamma> \<gamma>'" 
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume "R \<omega> ns" 
+  hence StateRel: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns"
+    using StateRelConcrete
+    by blast
+
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (MethodCall [] m es) \<omega> res"
+
+  thus "rel_vpr_aux (state_rel_def_same Pr TyRep Tr AuxPred ctxt) P ctxt \<gamma> \<gamma>' ns res"
+  proof (cases)
+    case (RedMethodCall v_args mdecl' ts v_rets resPre resPost)
+    with \<open>R \<omega> ns\<close> RdefEq obtain nsdef where 
+      RedBplDef: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>def, Normal nsdef)" and
+      Rdef: "R \<omega> nsdef"
+      using ExpWfRel
+      by (blast dest: exprs_wf_rel_normal_elim)   
+
+    from MdeclSome RedMethodCall have "mdecl = mdecl'"
+      by force
+
+      \<comment>\<open>Show state rel with new var translation\<close>
+    let ?\<omega>0 = "\<lparr>get_store_total = shift_and_add_list Map.empty v_args, 
+                get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
+                get_total_full = get_total_full \<omega>\<rparr>"
+
+    obtain ls where "set ls = ran (var_translation Tr)" and "length ls = card (ran (var_translation Tr))"
+      sorry \<comment>\<open>need that var translation is finite, otherwise this does not hold\<close>
+
+    let ?ps = "map (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x))) ls"
+
+    have "length ls = length ?ps"
+      by simp
+
+    note ExhalePreRelInst = ExhalePreRel[OF \<open>set ls = _\<close> \<open>length ls = length ?ps\<close>]
+    note InhalePostRelInst = InhalePostRel[OF \<open>set ls = _\<close> \<open>length ls = length ?ps\<close>]
+
+    let ?RCall = "(state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upds AuxPred ls ?ps) ctxt)"
+    have StateRelDuringCall: "?RCall ?\<omega>0 nsdef"
+      sorry
+
+    then show ?thesis 
+    proof (cases "resPre")
+      case RMagic
+      then show ?thesis \<comment>\<open>trivial case\<close>
+        using RedMethodCall
+        by (auto intro: rel_vpr_aux_intro)
+    next
+      case RFailure
+      with RedMethodCall ExhalePreRelInst \<open>mdecl = _\<close> StateRelDuringCall
+      obtain c where 
+          "red_ast_bpl P ctxt (\<gamma>def, Normal nsdef) c" and
+          "snd c = Failure"
+        by (blast dest: stmt_rel_failure_elim)
+      moreover have "res = RFailure"
+        using RFailure RedMethodCall
+        by argo
+      ultimately show ?thesis         
+        using RedBplDef red_ast_bpl_transitive
+        by (blast intro: rel_vpr_aux_intro)                  
+    next
+      case (RNormal \<omega>pre)
+      with RedMethodCall ExhalePreRelInst \<open>mdecl = _\<close> StateRelDuringCall
+      obtain nspre where
+        RedBplPre: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>pre, Normal nspre)" and
+        "?RCall \<omega>pre nspre"
+        using RedBplDef red_ast_bpl_transitive
+        by (blast dest: stmt_rel_normal_elim)
+
+      let ?\<omega>post = "update_store_total \<omega>pre (shift_and_add_list (get_store_total \<omega>pre) v_rets)"
         
+      from RedMethodCall RNormal have 
+         RedInh: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Inhale (method_decl.post mdecl')) ?\<omega>post resPost" and
+         "res = map_stmt_result_total (reset_state_after_call [] v_rets \<omega>) resPost"
+        by blast+
+
+      have "?\<omega>post = \<omega>pre" \<comment>\<open>only holds because assuming that there are no target variables\<close>
+      proof -
+        from RedMethodCall have "v_rets = []"
+          unfolding vals_well_typed_def
+          by simp
+        thus ?thesis
+          by simp
+      qed
+
+      show ?thesis  
+      proof (cases resPost)
+        case RMagic
+        then show ?thesis \<comment>\<open>trivial case\<close>
+          using \<open>res = _\<close>
+          by (auto intro: rel_vpr_aux_intro)
+      next
+        case RFailure
+          with RedInh stmt_rel_failure_elim[OF InhalePostRelInst \<open>?RCall \<omega>pre nspre\<close>] \<open>mdecl = _\<close>
+          obtain c where 
+              "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) c" and
+              "snd c = Failure"
+            using \<open>?\<omega>post = \<omega>pre\<close> 
+            by metis
+          moreover from RFailure \<open>res = _\<close> have "res = RFailure"
+            by simp
+
+          ultimately show ?thesis 
+            using RedBplPre red_ast_bpl_transitive
+            by (blast intro: rel_vpr_aux_intro)
+      next
+        case (RNormal \<omega>post)
+          with RedInh stmt_rel_normal_elim[OF InhalePostRelInst \<open>?RCall \<omega>pre nspre\<close>] \<open>mdecl = _\<close>
+          obtain nspost where 
+              "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) (\<gamma>', Normal nspost)" and
+              "?RCall \<omega>post nspost"
+            using \<open>?\<omega>post = \<omega>pre\<close> 
+            by auto
+          hence "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal nspost)"
+            using RedBplPre red_ast_bpl_transitive
+            by blast
+
+          moreover from RNormal \<open>res = _\<close> have "res = RNormal (reset_state_after_call [] v_rets \<omega> \<omega>post)"
+            by simp
+            
+          moreover from \<open>?RCall \<omega>post nspost\<close> have 
+             "state_rel_def_same Pr TyRep Tr AuxPred ctxt (reset_state_after_call [] v_rets \<omega> \<omega>post) nspost"
+            sorry
+
+            
+          ultimately show ?thesis 
+            by (blast intro: rel_vpr_aux_intro)
+      qed
+
+    qed
+
+  next
+    case RedSubExpressionFailure
+    then show ?thesis 
+      using RdefEq \<open>R \<omega> ns\<close> ExpWfRel 
+      by (auto intro!: rel_vpr_aux_intro dest: exprs_wf_rel_failure_elim)
+  qed
+qed
 
 subsection \<open>Misc\<close>
-
-lemma init_state:
-  assumes "R0 \<omega> ns" and
-          "is_empty_total \<omega>" 
-  shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name cs str tr,cont), Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'"
-  oops
 
 lemma exp_rel_true_imp_1:
   assumes  "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
