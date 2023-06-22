@@ -122,7 +122,7 @@ lemma wf_rel_normal_elim:
   unfolding wf_rel_def
   by blast
 
-lemma exprs_wf_rel_elim:
+lemma exprs_wf_rel_normal_elim:
   assumes 
        "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
        "R \<omega>def \<omega> ns"
@@ -169,6 +169,48 @@ lemma wf_rel_failure_elim:
   using assms
   unfolding wf_rel_def
   by blast
+  
+lemma exprs_wf_rel_failure_elim:
+  assumes 
+       "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
+       "R \<omega>def \<omega> ns"
+       "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+  shows
+       "\<exists> c. red_ast_bpl P ctxt (\<gamma>, Normal ns) c \<and> snd c = Failure"
+  using assms
+proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns rule: exprs_wf_rel.induct)
+  case (1 R ctxt_vpr StateCons P ctxt \<gamma> \<gamma>')
+  then show ?case
+    \<comment>\<open>contradiction, since empty list never reduces to \<^const>\<open>None\<close>\<close>
+    using red_exp_list_failure_Nil
+    by blast
+next
+  case (2 R ctxt_vpr StateCons P ctxt e es \<gamma> \<gamma>')
+
+  from this obtain \<gamma>'' where
+    WfRelE:  "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>''" and 
+    WfRelEs: "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>'"
+    by auto
+
+  consider (FailHd) "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" 
+         | (FailTl) v where "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v" and
+                       "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+    using 2 
+    by (blast elim: red_exp_list_failure_elim)
+
+  thus ?case
+  proof cases
+    case FailHd
+    then show ?thesis 
+      using WfRelE \<open>R \<omega>def \<omega> ns\<close> 
+      by (blast dest: wf_rel_failure_elim)
+  next
+    case FailTl
+    then show ?thesis 
+      using 2 WfRelE WfRelEs red_ast_bpl_transitive
+      by (blast dest: wf_rel_normal_elim)      
+  qed
+qed
 
 lemma expr_wf_rel_intro:
   assumes
