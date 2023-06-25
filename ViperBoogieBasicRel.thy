@@ -798,23 +798,6 @@ lemma heap_var_disjoint:
   apply (erule allE[where ?x=5])
   apply force
   done
-(*
-lemma heap_var_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "heap_var Tr \<noteq> mask_var Tr \<and> heap_var Tr \<noteq> mask_var_def Tr \<and> heap_var Tr \<notin> ran (var_translation Tr) \<and>
-         heap_var Tr \<notin> ran (field_translation Tr) \<and> heap_var Tr \<notin> range (const_repr Tr) \<and>
-         heap_var Tr \<notin> dom AuxPred"
-  using heap_var_disjoint_aux[OF assms]
-  by presburger
-
-lemma heap_var_def_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "heap_var_def Tr \<noteq> mask_var Tr \<and> heap_var Tr \<noteq> mask_var_def Tr \<and> heap_var_def Tr \<notin> ran (var_translation Tr) \<and>
-         heap_var_def Tr \<notin> ran (field_translation Tr) \<and> heap_var_def Tr \<notin> range (const_repr Tr) \<and>
-         heap_var_def Tr \<notin> dom AuxPred"
-  using heap_var_disjoint_aux[OF assms]
-  by presburger
-*)
 
 lemma mask_var_disjoint:
   assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
@@ -851,23 +834,43 @@ lemma mask_var_disjoint:
   apply force
   done
 
-(*
-lemma mask_var_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "mask_var Tr \<noteq> heap_var Tr \<and> mask_var Tr \<noteq> heap_var_def Tr \<and> mask_var Tr \<notin> ran (var_translation Tr) \<and>
-         mask_var Tr \<notin> ran (field_translation Tr) \<and> mask_var Tr \<notin> range (const_repr Tr) \<and>
-         mask_var Tr \<notin> dom AuxPred"
-  using mask_var_disjoint_aux[OF assms]
-  by presburger
+lemma set_inter_union_conj: "A \<inter> B = {} \<and> A \<inter> C = {} \<Longrightarrow> A \<inter> (B \<union> C) = {}"
+  by auto
 
-lemma mask_var_def_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "mask_var_def Tr \<noteq> heap_var Tr \<and> mask_var_def Tr \<noteq> heap_var_def Tr \<and> mask_var_def Tr \<notin> ran (var_translation Tr) \<and>
-         mask_var_def Tr \<notin> ran (field_translation Tr) \<and> mask_var_def Tr \<notin> range (const_repr Tr) \<and>
-         mask_var_def Tr \<notin> dom AuxPred"
-  using mask_var_disjoint_aux[OF assms]
-  by presburger
-*)
+lemma var_translation_disjoint0:
+  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
+  shows "ran (var_translation Tr) \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
+                                      {mask_var Tr, mask_var_def Tr} \<union>
+                                       ran (field_translation Tr) \<union>
+                                       range (const_repr Tr) \<union>
+                                       dom AuxPred) = {}"
+
+  apply (rule set_inter_union_conj, rule conjI)+
+  using state_rel0_disjoint[OF assms(1)]
+    apply (unfold disjoint_list_def)
+
+       apply (erule allE[where ?x=0])
+     apply (erule allE[where ?x=2])
+     apply simp
+
+       apply (erule allE[where ?x=1])
+     apply (erule allE[where ?x=2])
+    apply simp
+
+       apply (erule allE[where ?x=3])
+     apply (erule allE[where ?x=2])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=4])
+   apply (erule allE[where ?x=2])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=5])
+   apply (erule allE[where ?x=2])
+    apply (simp add: disjnt_def inf_commute)
+  done    
+
+lemmas var_translation_disjoint = var_translation_disjoint0[OF state_rel_state_rel0]
 
 lemma state_rel0_eval_welldef_eq:
   assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
@@ -1521,6 +1524,23 @@ proof -
     using \<open>aux_var \<notin> dom AuxPred\<close>
     by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
 qed 
+
+lemma state_rel_new_aux_var_no_state_upd:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+     AuxVarFresh: "dom AuxPred' \<inter> 
+                      ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr))) = {}"  and   
+           "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
+         shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+  unfolding state_rel_def state_rel0_def
+proof (intro conjI)
+  show "disjoint_list
+     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
+      range (const_repr Tr), dom AuxPred']"
+    sorry
+qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto)
                    
 lemma state_rel0_heap_update:
   assumes  
