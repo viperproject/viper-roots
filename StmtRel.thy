@@ -955,6 +955,27 @@ next
   qed   
 qed
 
+\<comment>\<open>TODO: Move to TotalUtil.thy\<close>
+
+lemma map_upds_dom:
+  assumes "length xs = length ys"
+  shows "dom (m(xs [\<mapsto>] ys)) = dom m \<union> (set xs)"
+  using assms
+  by auto
+
+lemma map_upds_ran_distinct:
+  assumes "distinct xs" and "length xs = length ys"
+  shows "ran [xs [\<mapsto>] ys] = set ys"  
+  using assms 
+  unfolding map_upds_def
+  by (metis distinct_rev empty_map_add length_rev ran_map_of_zip set_rev zip_rev)
+    
+
+lemma shift_and_list_lookup: 
+  assumes "i < length xs"
+  shows "shift_and_add_list m vs i = Some (rev vs ! i)"
+  sorry
+
 lemma method_call_rel:
   assumes 
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
@@ -997,6 +1018,22 @@ proof (rule stmt_rel_intro_2)
     using StateRelConcrete
     by blast
 
+  have "set xs_bpl \<subseteq> ran (var_translation Tr)"
+  proof 
+    fix x_bpl
+    assume "x_bpl \<in> set xs_bpl"
+
+    from this obtain x_vpr where "x_vpr \<in> set xs" and "the ((var_translation Tr) x_vpr) = x_bpl"
+      using XsBplEq
+      by auto
+
+    moreover with \<open>set xs \<subseteq> dom (var_translation Tr)\<close> obtain x_bpl' where "var_translation Tr x_vpr = Some x_bpl'"
+      by fast
+
+    ultimately show "x_bpl \<in> ran (var_translation Tr)"
+      by (simp add: ranI)
+  qed
+
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (MethodCall ys m es) \<omega> res"
 
   thus "rel_vpr_aux (state_rel_def_same Pr TyRep Tr AuxPred ctxt) P ctxt \<gamma> \<gamma>' ns res"
@@ -1011,20 +1048,106 @@ proof (rule stmt_rel_intro_2)
     from MdeclSome RedMethodCall have "mdecl = mdecl'"
       by force
 
-    have "list_all2 (\<lambda>e v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v) es v_args"
+    have ListAllArgsEvalVpr: "list_all2 (\<lambda>e v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v) es v_args"
       using red_pure_exps_total_list_all2 RedMethodCall
       by blast
 
-    hence "list_all2 (\<lambda>x v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>ViperLang.Var x; \<omega>\<rangle> [\<Down>]\<^sub>t Val v) xs v_args"
-      using ArgsAreVars \<open>xs = _\<close>
-      sorry
+    hence "length es = length v_args"
+      by (simp add: list_all2_lengthD)
 
-    hence "list_all2 (\<lambda>x v. get_store_total \<omega> x = Some v) xs v_args"
+    have "length xs = length xs_bpl"
+      using XsBplEq
+      by auto
+
+    have "length xs_bpl = length v_args"
+      using RedMethodCall \<open>xs = _\<close> XsBplEq
+      by (metis ListAllArgsEvalVpr length_map list_all2_lengthD)    
+
+    note LengthEqs = \<open>length es = length v_args\<close> \<open>length xs = length xs_bpl\<close> \<open>length xs_bpl = length v_args\<close>
+
+    have "list_all2 (\<lambda>x v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>ViperLang.Var x; \<omega>\<rangle> [\<Down>]\<^sub>t Val v) xs v_args"
+    proof (rule list_all2_all_nthI)
+      show "length xs = length v_args"
+        using LengthEqs
+        by simp
+    next
+      fix i
+      assume "i < length xs"
+     
+      hence *: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>es ! i; \<omega>\<rangle> [\<Down>]\<^sub>t Val (v_args ! i)"
+        using ListAllArgsEvalVpr LengthEqs
+        by (simp add: list_all2_conv_all_nth)
+
+      have "(xs ! i) = the_var (es ! i)"
+        using \<open>xs = _\<close> \<open>i < length xs\<close> 
+        by simp
+
+      moreover from \<open>i < length xs\<close> 
+      have "\<exists>a. es ! i = pure_exp.Var a"
+        using  ArgsAreVars LengthEqs
+        by (simp add: list_all_length)
+
+      ultimately have "es ! i = pure_exp.Var (xs ! i)"
+        by auto
+  
+      thus "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>pure_exp.Var (xs ! i);\<omega>\<rangle> [\<Down>]\<^sub>t Val (v_args ! i)"
+        using *
+        by simp
+    qed        
+
+    hence StoreValArgsVpr: "list_all2 (\<lambda>x v. get_store_total \<omega> x = Some v) xs v_args"
       using TotalExpressions.RedVar_case
       by (metis (mono_tags, lifting) list_all2_mono)
 
-    have XsVarTr: "list_all2 (\<lambda> x_vpr x_bpl. var_translation Tr x_vpr = Some x_bpl) (rev xs) (rev xs_bpl)"
-      sorry
+    have StoreRelAuxArgs: 
+      "list_all2 (\<lambda> x_vpr x_bpl. store_var_rel_aux (type_interp ctxt) (var_context ctxt) Tr \<omega> nsdef x_vpr x_bpl) xs xs_bpl"
+    proof (rule list_all2_all_nthI)
+      fix i
+      assume "i < length xs"
+
+      let ?x_vpr = "xs ! i"
+      let ?x_bpl = "xs_bpl ! i"
+
+
+      have "var_translation Tr (xs ! i) = Some (xs_bpl ! i)"
+        using XsBplEq \<open>set xs \<subseteq> dom _\<close> \<open>i < _\<close> nth_mem
+        by fastforce
+
+      thus "store_var_rel_aux (type_interp ctxt) (var_context ctxt) Tr \<omega> nsdef ?x_vpr ?x_bpl"
+        using state_rel_store_rel[OF StateRelConcrete[OF \<open>R \<omega> nsdef\<close>]]
+        unfolding store_var_rel_aux_def store_rel_def
+        by blast 
+    next
+      show "length xs = length xs_bpl"
+        using XsBplEq by auto
+    qed
+
+    have ValRelArgs: "list_all2 
+          (\<lambda> v_vpr x_bpl. lookup_var (var_context ctxt) nsdef x_bpl = Some (val_rel_vpr_bpl v_vpr) \<and>
+                          (\<exists>ty_bpl. lookup_var_ty (var_context ctxt) x_bpl = Some ty_bpl \<and> 
+                          type_of_val (type_interp ctxt) (val_rel_vpr_bpl v_vpr) = ty_bpl)) 
+          v_args 
+          xs_bpl"
+    proof (rule list_all2_all_nthI)
+      show "length v_args = length xs_bpl"
+        by (simp add: \<open>length xs_bpl = length v_args\<close>)
+    next
+      fix i 
+      assume "i < length v_args"
+
+      with \<open>length xs_bpl = length v_args\<close> have
+        "store_var_rel_aux (type_interp ctxt) (var_context ctxt) Tr \<omega> nsdef (xs ! i) (xs_bpl ! i)"
+        using StoreRelAuxArgs
+        by (metis list_all2_nthD2)
+
+      thus "lookup_var (var_context ctxt) nsdef (xs_bpl ! i) = Some (val_rel_vpr_bpl (v_args ! i)) \<and>
+         (\<exists>ty_bpl. lookup_var_ty (var_context ctxt) (xs_bpl ! i) = Some ty_bpl \<and> 
+         type_of_val (type_interp ctxt) (val_rel_vpr_bpl (v_args ! i)) = ty_bpl)"        
+        using StoreValArgsVpr \<open>i < _\<close>
+        unfolding store_var_rel_aux_def
+        by (simp add: list_all2_conv_all_nth)
+    qed
+
 
       \<comment>\<open>Show state rel with new var translation\<close>
     let ?\<omega>0 = "\<lparr>get_store_total = shift_and_add_list Map.empty v_args, 
@@ -1059,7 +1182,7 @@ proof (rule stmt_rel_intro_2)
       proof (rule store_relI, simp_all)
         \<comment>\<open>Could adjust state rel with an additional parameter that switches off injectivity on the variable translation.
            Then, one could support multiple arguments being the same variable. Injectivity is useful only if there
-           are changes to local Viper variables.\<close>
+           are changes to the local Viper variables.\<close>
         show "inj_on var_tr' (dom var_tr')" 
           unfolding inj_on_def
         proof (rule ballI | rule impI)+
@@ -1072,9 +1195,6 @@ proof (rule stmt_rel_intro_2)
 
           hence "i < length es" and "j < length es"
             by simp_all
-
-          have "distinct [0..<length es]"
-            by simp
 
           have "var_tr' i = Some (rev xs_bpl ! i)"
             apply (subst \<open>var_tr' = _\<close>)
@@ -1095,24 +1215,74 @@ proof (rule stmt_rel_intro_2)
             by (metis (no_types, lifting) distinct_rev length_rev nth_eq_iff_index_eq option.inject)
         qed
       next
-        fix var_vpr var_bpl
-        assume "var_tr' var_vpr = Some var_bpl" 
+        fix x_vpr x_bpl
+        assume VarTrSome: "var_tr' x_vpr = Some x_bpl" 
         with \<open>var_tr' = _\<close>
-        have "var_bpl = (rev xs_bpl) ! var_vpr"
-          
+        have "x_vpr \<in> set [0..<length es]"
+          by (metis Some_Some_ifD map_upds_apply_nontin)
+        hence "x_vpr < length es"
+          by simp        
+        hence "x_vpr < length v_args"
+          using ListAllArgsEvalVpr
+          using list_all2_lengthD by force
+        hence "x_vpr < length (rev v_args)"
+          by simp
+        with ValRelArgs
+        have *:"lookup_var (var_context ctxt) nsdef ((rev xs_bpl) ! x_vpr) = Some (val_rel_vpr_bpl ((rev v_args) ! x_vpr))"
+          using list_all2_nthD list_all2_rev
+          by blast
         
-        have VprStoreSome: "get_store_total ?\<omega>0 var_vpr = Some ((rev v_args) ! var_vpr)"
-          apply simp
-          sorry
+        have "x_bpl = (rev xs_bpl) ! x_vpr"
+        proof -
+          from \<open>x_vpr \<in> _\<close> have *: "x_vpr = [0..<length es] ! x_vpr"
+            by simp
+          thus ?thesis
+            using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys = "rev xs_bpl"]
+                  LengthEqs VarTrSome \<open>x_vpr < length v_args\<close> \<open>var_tr' = _\<close> 
+            by auto
+        qed          
 
-        show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) (Tr\<lparr>var_translation := var_tr'\<rparr>) ?\<omega>0 nsdef var_vpr var_bpl"
+        hence "x_bpl \<in> set xs_bpl"
+          using \<open>x_vpr < length v_args\<close> \<open>length xs_bpl = length v_args\<close>
+          by (metis length_rev nth_mem set_rev)
+
+        from ValRelArgs obtain \<tau>_bpl where
+          XBplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some \<tau>_bpl" 
+                  "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev v_args ! x_vpr)) = \<tau>_bpl"
+          using  \<open>x_bpl = _\<close> \<open>x_vpr < length (rev v_args)\<close> list_all2_nthD by blast
+          
+
+        show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) (Tr\<lparr>var_translation := var_tr'\<rparr>) ?\<omega>0 nsdef x_vpr x_bpl"
           unfolding store_var_rel_aux_def
-          apply (rule exI)+
-          apply (intro conjI)
-             apply (rule VprStoreSome)
+        proof ((rule exI)+, intro conjI)
+          show "get_store_total ?\<omega>0 x_vpr = Some ((rev v_args) ! x_vpr)"
+            using shift_and_list_lookup \<open>x_vpr < length (rev _)\<close>
+            by auto
+        next
+          from * \<open>x_bpl = _\<close> 
+          show "lookup_var (var_context ctxt) nsdef x_bpl = Some (val_rel_vpr_bpl (rev v_args ! x_vpr))"
+            by simp  
+        next
+          show "lookup_var_ty (var_context ctxt) x_bpl = Some \<tau>_bpl"
+            using XBplTy
+            by blast
+        next
+          show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev v_args ! x_vpr)) = \<tau>_bpl"
+            using XBplTy
+            by blast
+        qed
+      qed      
 
-
-      qed            
+      have "ran var_tr' = set xs_bpl"
+      proof -
+        have "ran var_tr' = set (rev xs_bpl)"          
+          apply (subst \<open>var_tr' = _\<close>)
+          apply (rule map_upds_ran_distinct[OF distinct_upt])
+          using LengthEqs
+          by simp
+        thus ?thesis
+          by simp
+      qed
 
       have "state_rel Pr TyRep (Tr \<lparr> var_translation := Map.empty \<rparr>) ?AuxPredPre ctxt \<omega> \<omega> nsdef"
         apply (rule state_rel_aux_pred_remove)
@@ -1129,8 +1299,10 @@ proof (rule stmt_rel_intro_2)
           apply simp
         using StoreRel
          apply simp
-
-        sorry
+        apply (simp add: \<open>ran var_tr' = _\<close>)
+        using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> nsdef\<close>]] 
+              \<open>set xs_bpl \<subseteq> _\<close>
+        by auto       
     qed
      
 
