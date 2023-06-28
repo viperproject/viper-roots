@@ -441,73 +441,12 @@ next
     by (blast intro!: red_inhale_intros)      
 qed (rule HOL.TrueI)+
 
-(*
-lemma inhale_perm_single_mupd:
-  assumes  "\<omega>' \<in> inhale_perm_single R \<omega> lh popt"
-  shows "\<exists>mh. wf_mask_simple mh \<and> \<omega>' = update_mh_total_full \<omega> mh"
-proof -
-  from assms obtain m q where 
-       "\<omega>' = update_mh_total_full \<omega> m" and
-       A1:"pgte pwrite (padd (get_mh_total_full \<omega> lh) q)" and
-       A2:"m = (get_mh_total_full \<omega>)(lh := (padd (get_mh_total_full \<omega> lh) q))"
-    unfolding inhale_perm_single_def
-    by blast
-  have "wf_mask_simple (get_mh_total_full \<omega>)"
-    
-  hence "wf_mask_simple m"
-    unfolding wf_mask_simple_def
-    using A1 A2
-    by auto
-  thus ?thesis using A2 \<open>\<omega>' = _\<close>
-    by blast
-qed
-*)
-(*
-lemma inhale_perm_single_h_eq: 
-  assumes  "\<omega>' \<in> inhale_perm_single R \<omega> hloc popt"
-  shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
-  using assms inhale_perm_single_mupd update_mh_total_full_hh_eq by blast 
+subsection \<open>Relationship inhale and exhale\<close>
 
-lemma inhale_perm_single_pred_mupd:
-  assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lp popt"
-  shows "\<exists>mp. \<omega>' = update_mp_total_full \<omega> mp"
-  using assms inhale_perm_single_pred_def
-  by blast
-
-lemma inhale_perm_single_pred_h_eq: 
-  assumes  "\<omega>' \<in> inhale_perm_single_pred R \<omega> lp popt"
-  shows "get_h_total_full \<omega>' = get_h_total_full \<omega>"
-  using assms inhale_perm_single_pred_mupd update_mp_total_h_full_eq
-  by blast
-*)
-
-(*
-lemma inhale_heap_unchanged: 
-  assumes "red_inhale Pr \<Delta> R A \<omega> (RNormal \<omega>')"
-  shows "get_h_total_full \<omega> = get_h_total_full \<omega>'"
-  using assms
-proof (induct R A \<omega> "(RNormal \<omega>')" arbitrary: \<omega>' rule: red_inhale_induct)
-  case (InhAcc \<omega> e_r r e_p p W' R f)
-  hence "\<omega>' \<in> W'" using th_result_rel_normal  by blast
-  thus ?case using \<open>W' = _\<close> inhale_perm_single_h_eq by metis
-next
-  case (InhAccPred \<omega> e_p p e_args v_args W' R pred_id)
-  hence "\<omega>' \<in> W'" using th_result_rel_normal  by blast
-  thus ?case using \<open>W' = _\<close> inhale_perm_single_pred_h_eq by metis
-next
-case (InhAccWildcard \<omega> e_r r W' R f)
-  hence "\<omega>' \<in> W'" using th_result_rel_normal  by blast
-  thus ?case using \<open>W' = _\<close> inhale_perm_single_h_eq by metis
-next
-case (InhAccPredWildcard \<omega> e_args v_args W' R pred_id)
-  hence "\<omega>' \<in> W'" using th_result_rel_normal  by blast
-  thus ?case using \<open>W' = _\<close> inhale_perm_single_pred_h_eq by metis
-next
-case (InhPureNormalMagic \<omega> e b R)
-  then show ?case
-    by (insert InhPureNormalMagic.hyps, cases b) auto    
-qed auto
-*)
+lemma exhale_inhale_normal:
+  assumes "red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>')"
+  shows "\<exists>\<omega>_inh. red_inhale ctxt R A \<omega>_inh (RNormal \<omega>)"
+  oops
 
 subsection \<open>Unfold leads to one normal successor state\<close>
 
