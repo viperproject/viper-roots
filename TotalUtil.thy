@@ -485,6 +485,26 @@ lemma disjoint_list_subset_list_all2:
    apply (simp add: list_all2_lengthD[OF assms(2)])
   by (simp add: list_all2_nthD2[OF assms(2)])
 
+lemma disjoint_list_replace_set:
+  assumes Disj: "disjoint_list (xs@(M#ys))" and
+                "finite M'" and \<comment>\<open>I think the finite property is not required in general (here we use it
+                                   to reuse the lemma that adds a single element via induction)\<close>
+          Fresh: "\<forall>A \<in> set (xs@ys). disjnt M' A"
+        shows "disjoint_list (xs@(M'#ys))"
+proof -
+  from assms have "disjoint_list (xs@((M \<union> M')#ys))"
+    using disjoint_list_add_set
+    by blast
+  thus ?thesis
+  proof (rule disjoint_list_subset)
+    fix i j
+    assume "0 \<le> i" and "i < length (xs @ (M \<union> M') # ys)"
+    thus "(xs @ M' # ys) ! i \<subseteq> (xs @ (M \<union> M') # ys) ! i "
+      by (metis antisym_conv1 list_update_length nless_le nth_append_length nth_list_update_neq sup.orderI sup.right_idem)
+  qed simp
+qed
+    
+
 lemma count_multiset_at_least_two:
   assumes "xs ! i = xs ! j" and 
           "i \<noteq> j" and

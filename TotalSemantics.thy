@@ -262,10 +262,10 @@ always has at least one failure transition. This is in-sync with the recent Carb
     red_stmt_total ctxt R \<Lambda> (FieldAssign e_r f e) \<omega> RFailure"
 | RedMethodCall:
   " \<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) es \<omega> (Some v_args);
-      program.methods (program_total ctxt) m = Some mdecl;
-      list_all2 (\<lambda> y t. y = Some t) (map \<Lambda> ys) ts;
+      program.methods (program_total ctxt) m = Some mdecl;     
+      list_all2 (\<lambda> y t. y = Some t) (map \<Lambda> ys) (method_decl.rets mdecl); 
       \<comment>\<open>non-deterministically select values for return variables that conform to the declared type\<close>
-      vals_well_typed (absval_interp_total ctxt) v_rets ts; 
+      vals_well_typed (absval_interp_total ctxt) v_rets (method_decl.rets mdecl); 
       red_stmt_total ctxt R \<Lambda> (Exhale (method_decl.pre mdecl)) 
                               \<lparr> get_store_total = (shift_and_add_list Map.empty v_args), 
                                 get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 

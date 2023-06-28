@@ -205,6 +205,61 @@ shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont
   using assms(4) RedAssumeOk
   by blast
 
+subsection \<open>Lifting from single elements to lists of elements\<close>
+
+definition update_var_list 
+  where "update_var_list \<Lambda> ns xs vs \<equiv> foldl (\<lambda> ns0 x_v. (update_var \<Lambda> ns0 (fst x_v) (snd x_v))) ns (zip xs vs)"
+
+fun havocs_list_bpl :: "vname list \<Rightarrow> cmd list" where 
+  "havocs_list_bpl [] = []"
+| "havocs_list_bpl (x#xs) = Lang.Havoc x # havocs_list_bpl xs"
+
+lemma red_ast_bpl_havoc_list:
+  assumes  RtypeEmpty: "rtype_interp ctxt = []" and
+           "list_all2 (\<lambda>x v. lookup_var_decl (var_context ctxt) x = Some (type_of_val (type_interp ctxt) v, None)) xs vs"
+shows "red_ast_bpl P ctxt ((BigBlock name (havocs_list_bpl xs @ cs) str tr, cont), Normal ns)
+                          ((BigBlock name cs str tr, cont), Normal (update_var_list (var_context ctxt) ns xs vs))"
+  using assms(2)
+proof (induction xs arbitrary: vs ns)
+  case Nil
+  then show ?case 
+    using red_ast_bpl_refl
+    by (fastforce simp: update_var_list_def)
+next
+  case (Cons xs_hd xs_tl)
+  let ?b = "(BigBlock name cs str tr, cont)"
+  let ?\<Lambda> = "var_context ctxt"
+
+  from Cons.prems obtain vs_hd vs_tl where
+        "vs = vs_hd # vs_tl" and
+        LookupXsHd: "lookup_var_decl (var_context ctxt) xs_hd = Some (type_of_val (type_interp ctxt) vs_hd, None)" and
+        LookupXsTl: "list_all2 (\<lambda>x v. lookup_var_decl (var_context ctxt) x = Some (type_of_val (type_interp ctxt) v, None)) xs_tl vs_tl"
+    by (auto simp: list_all2_Cons1)
+
+  let ?ns' = "update_var (var_context ctxt) ns xs_hd vs_hd"
+
+  have RedHd: "red_ast_bpl P ctxt ((BigBlock name (havocs_list_bpl (xs_hd # xs_tl) @ cs) str tr, cont), Normal ns)
+        ((BigBlock name (havocs_list_bpl xs_tl @ cs) str tr, cont), Normal ?ns')"
+    apply simp
+    apply (rule red_ast_bpl_one_havoc)
+      apply (rule LookupXsHd)
+     apply (simp add: RtypeEmpty)
+    by simp
+
+  have "red_ast_bpl P ctxt ((BigBlock name (havocs_list_bpl xs_tl @ cs) str tr, cont), Normal ?ns')
+                                    ((BigBlock name cs str tr, cont), Normal (update_var_list (var_context ctxt) ?ns' xs_tl vs_tl))"
+    using Cons.IH[OF LookupXsTl]
+    by simp
+  hence "red_ast_bpl P ctxt ((BigBlock name (havocs_list_bpl xs_tl @ cs) str tr, cont), Normal ?ns')
+                            ((BigBlock name cs str tr, cont), Normal (update_var_list (var_context ctxt) ns (xs_hd#xs_tl) (vs_hd#vs_tl)))"
+    unfolding update_var_list_def
+    by auto
+
+  thus ?case 
+    using RedHd red_ast_bpl_transitive \<open>vs = _\<close>
+    by blast    
+qed
+
 subsection \<open>Misc\<close>
 
 lemma proc_is_correct_elim:

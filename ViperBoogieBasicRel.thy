@@ -1205,16 +1205,25 @@ lemma state_well_typed_upd_2:
 
 lemma state_rel0_store_update:
   assumes StateRel: "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+                    "Tr' = Tr\<lparr>var_translation := f\<rparr>" and
+              \<comment>\<open>This finiteness condition is currently needed because of the way we prove a theorem
+                (but could probably be dropped\<close>
+          FiniteRanVarTr: "Tr' \<noteq> Tr \<Longrightarrow> finite (ran f)" and 
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
      OnlyStoreAffectedVpr: 
-           "get_h_total_full \<omega> = get_h_total_full \<omega>'" 
-           "get_m_total_full \<omega> = get_m_total_full \<omega>'" and
-     OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran (var_translation Tr) \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
-     StoreRel: "store_rel A \<Lambda> Tr \<omega>' ns'" and
+           "get_total_full \<omega> = get_total_full \<omega>'"  and
+         (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
+     OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran f \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
+     StoreRel: "store_rel A \<Lambda> Tr' \<omega>' ns'" and
      ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
      OldStateEq: "old_global_state ns' = old_global_state ns" and
-     BinderEmpty: "binder_state ns' = Map.empty"
-   shows "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"
+     BinderEmpty: "binder_state ns' = Map.empty" and
+     RanVarTrDisj:    "ran f \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
+                                      {mask_var Tr, mask_var_def Tr} \<union>
+                                       ran (field_translation Tr) \<union>
+                                       range (const_repr Tr) \<union>
+                                       dom AuxPred) = {}"
+   shows "state_rel0 Pr A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
   show "wf_mask_simple (get_mh_total_full \<omega>def')"
@@ -1225,21 +1234,40 @@ proof (intro conjI)
     using state_rel0_wf_mask_simple[OF StateRel] OnlyStoreAffectedVpr    
     by fastforce
 
-  show "store_rel A \<Lambda> Tr \<omega>' ns'"
-    by (rule StoreRel)
+  show "store_rel A \<Lambda> Tr' \<omega>' ns'"
+    by (rule StoreRel)    
 
   show "disjoint_list
-     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
-    using StateRel
-    by (simp add: state_rel0_def)
+     [{heap_var Tr', heap_var_def Tr'}, {mask_var Tr', mask_var_def Tr'}, ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'), dom AuxPred]"
+  proof (cases "Tr = Tr'")
+    case True
+    then show ?thesis 
+      using state_rel0_disjoint[OF StateRel]
+      by blast
+  next
+    case False
+    from state_rel0_disjoint[OF StateRel]
+    have "disjoint_list
+          ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}]@
+           (ran (var_translation Tr) # [ran (field_translation Tr), range (const_repr Tr), dom AuxPred]))" (is "disjoint_list (?xs@(?M#?ys))")
+      by simp
+    hence "disjoint_list (?xs@ran f#?ys)"
+      apply (rule disjoint_list_replace_set)
+      using FiniteRanVarTr False
+       apply simp
+      using RanVarTrDisj
+      unfolding disjnt_def
+      by fastforce
+    thus ?thesis
+      by (simp add: \<open>Tr' = _\<close>)
+  qed
 
-  show "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) \<omega>' ns'"
+  show "heap_var_rel Pr \<Lambda> TyRep Tr' (heap_var Tr') \<omega>' ns'"
   proof -
     have "lookup_var \<Lambda> ns (heap_var Tr) = lookup_var \<Lambda> ns' (heap_var Tr)"
     proof -
-      from state_rel0_disjoint[OF StateRel]
-      have "heap_var Tr \<notin> ran (var_translation Tr)"
-        unfolding disjoint_list_def
+      from RanVarTrDisj
+      have "heap_var Tr \<notin> ran f"
         by fastforce
       thus ?thesis
         using OnlyStoreAffectedBpl
@@ -1247,15 +1275,15 @@ proof (intro conjI)
     qed
     thus ?thesis
     using heap_var_rel_stable[OF state_rel0_heap_var_rel[OF StateRel]] OnlyStoreAffectedVpr
-    by auto
-   qed
+    by (auto simp: \<open>Tr' = _\<close>)
+  qed
 
-  show "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var_def Tr) \<omega>def' ns'"
+  show "heap_var_rel Pr \<Lambda> TyRep Tr' (heap_var_def Tr') \<omega>def' ns'"
   proof -   
     have "lookup_var \<Lambda> ns (heap_var_def Tr) = lookup_var \<Lambda> ns' (heap_var_def Tr)"
     proof -
-      from heap_var_disjoint[OF StateRel]
-      have "heap_var_def Tr \<notin> ran (var_translation Tr)"
+      from RanVarTrDisj
+      have "heap_var_def Tr \<notin> ran f"
         by blast        
         
       thus ?thesis
@@ -1264,65 +1292,62 @@ proof (intro conjI)
     qed
     thus ?thesis    
     using heap_var_rel_stable[OF state_rel0_heap_var_def_rel[OF StateRel]] OnlyStoreAffectedVpr WellDefSame
-    by simp
+    by (simp add: \<open>Tr' = _\<close>)
   qed
 
-  show "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var Tr) \<omega>' ns'"
+  show "mask_var_rel Pr \<Lambda> TyRep Tr' (mask_var Tr') \<omega>' ns'"
   proof -  
     have "lookup_var \<Lambda> ns (mask_var Tr) = lookup_var \<Lambda> ns' (mask_var Tr)"
     proof -
-      have "mask_var Tr \<notin> ran (var_translation Tr)"
-        by (simp add: state_rel0_disj_mask_store[OF StateRel])
+      from RanVarTrDisj
+      have "mask_var Tr \<notin> ran f"
+        by blast
       thus ?thesis
         using OnlyStoreAffectedBpl
         by blast
     qed
     thus ?thesis
     using  mask_var_rel_stable[OF state_rel0_mask_var_rel[OF StateRel]] OnlyStoreAffectedVpr
-    by auto
+    by (auto simp: \<open>Tr' = _\<close>)
   qed 
 
-  show "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var_def Tr) \<omega>def' ns'"
+  show "mask_var_rel Pr \<Lambda> TyRep Tr' (mask_var_def Tr') \<omega>def' ns'"
   proof -  
     have "lookup_var \<Lambda> ns (mask_var_def Tr) = lookup_var \<Lambda> ns' (mask_var_def Tr)"
     proof -
-      have "mask_var_def Tr \<notin> ran (var_translation Tr)"
-        by (simp add: state_rel0_disj_mask_def_store[OF StateRel])
+      from RanVarTrDisj
+      have "mask_var_def Tr \<notin> ran f"
+        by blast
       thus ?thesis
         using OnlyStoreAffectedBpl
         by blast
     qed
     thus ?thesis
       using mask_var_rel_stable[OF state_rel0_mask_var_def_rel[OF StateRel]] OnlyStoreAffectedVpr WellDefSame
-      by auto    
+      by (auto simp: \<open>Tr' = _\<close>)
   qed 
 
-  show "field_rel Pr \<Lambda> Tr ns'"
+  show "field_rel Pr \<Lambda> Tr' ns'"
   proof (rule field_rel_stable[OF state_rel0_field_rel[OF StateRel]])
     fix x
      assume FieldElem: "x \<in> ran (field_translation Tr)"
-     from state_rel0_disjoint[OF StateRel] have
-        "disjnt (ran (var_translation Tr)) (ran (field_translation Tr))"
-      unfolding disjoint_list_def
-      apply (rule allE[where ?x=2])
-      apply (erule allE[where ?x=3])
-      by simp
+     from RanVarTrDisj have
+        "ran (field_translation Tr) \<inter> (ran f) = {}"
+       by blast
+      
     thus "lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
-      using OnlyStoreAffectedBpl FieldElem lookup_disj_aux by blast
-  qed (simp)
+      using OnlyStoreAffectedBpl FieldElem by blast
+  qed (simp add: \<open>Tr' = _\<close>)
 
-  show "boogie_const_rel (const_repr Tr) \<Lambda> ns'"
-  proof (rule boogie_const_rel_stable[OF state_rel0_boogie_const_rel[OF StateRel]])
+  show "boogie_const_rel (const_repr Tr') \<Lambda> ns'"
+  proof (simp add: \<open>Tr' = _\<close>, rule boogie_const_rel_stable[OF state_rel0_boogie_const_rel[OF StateRel]])
     fix x
     assume ConstElem: "x \<in> range (const_repr Tr)"
-    from state_rel0_disjoint[OF StateRel] have
-      "disjnt (ran (var_translation Tr)) (range (const_repr Tr))"
-      unfolding disjoint_list_def
-      apply (rule allE[where ?x=2])
-      apply (erule allE[where ?x=4])
-      by simp
+    from RanVarTrDisj have
+      "ran f \<inter> range (const_repr Tr) = {}"
+      by blast
     thus "lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
-      using OnlyStoreAffectedBpl ConstElem lookup_disj_aux by blast
+      using OnlyStoreAffectedBpl ConstElem by blast
   qed
 
   show "state_well_typed A \<Lambda> [] ns'"
@@ -1337,27 +1362,26 @@ proof (intro conjI)
       fix x t 
       assume LookupTy:"lookup_var_ty \<Lambda> x = Some t"
       show "?Q x t"
-      proof (cases "x \<in> ran (var_translation Tr)")
+      proof (cases "x \<in> ran (var_translation Tr')")
         case True
-        from this obtain x_vpr where "var_translation Tr x_vpr = Some x"          
+        from this obtain x_vpr where "var_translation Tr' x_vpr = Some x"          
           by (auto simp add: ran_def)          
         with LookupTy obtain v where
           "lookup_var \<Lambda> ns' x = Some v" and 
           "type_of_val A v = t"
           using store_rel_var_rel[OF StoreRel]
-          by fastforce          
+          by force                    
         then show ?thesis
           by simp        
       next
         case False
         hence "lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
-          using OnlyStoreAffectedBpl
+          using OnlyStoreAffectedBpl \<open>Tr' = _\<close>
           by simp
         then show ?thesis using StateWt LookupTy
           by (metis state_well_typed_lookup)
       qed
     qed
-
 
     show "state_well_typed A \<Lambda> [] ns'"
       apply (rule state_well_typed_upd_1)
@@ -1369,35 +1393,37 @@ proof (intro conjI)
 
   show "aux_vars_pred_sat \<Lambda> AuxPred ns'"
   proof -
-    from state_rel0_disjoint[OF StateRel]
-    have "disjnt (ran (var_translation Tr)) (dom  AuxPred)"
-      unfolding disjoint_list_def
-      apply (rule allE[where ?x=2])
-      apply (erule allE[where ?x=5])
-      by simp
+    from RanVarTrDisj
+    have "ran f \<inter> dom  AuxPred = {}"
+      by fast
+      
     thus "aux_vars_pred_sat \<Lambda> AuxPred ns'"
       using state_rel0_aux_vars_pred_sat[OF StateRel] OnlyStoreAffectedBpl
       unfolding aux_vars_pred_sat_def
-      by (metis disjnt_iff domI)  
+      by fastforce
   qed
 qed (insert StateRel, insert WellDefSame, unfold state_rel0_def, auto)
 
-lemma state_rel_store_update:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          VarCtxt: "var_context ctxt = \<Lambda>" and
+lemmas state_rel_store_update = state_rel0_state_rel[OF state_rel0_store_update[OF state_rel_state_rel0]]
+
+lemma state_rel0_store_update_same_tr:
+  assumes StateRel: "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
      OnlyStoreAffectedVpr: 
-           "get_h_total_full \<omega> = get_h_total_full \<omega>'" 
-           "get_m_total_full \<omega> = get_m_total_full \<omega>'" and
+           "get_total_full \<omega> = get_total_full \<omega>'"  and
+         (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
      OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran (var_translation Tr) \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
-     ShadowedGlobalsEq: "\<And>x. map_of (snd (var_context ctxt)) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
+     StoreRel: "store_rel A \<Lambda> Tr \<omega>' ns'" and
+     ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
      OldStateEq: "old_global_state ns' = old_global_state ns" and
-     BinderEmpty: "binder_state ns' = Map.empty" and
-     StoreRel: "store_rel (type_interp ctxt) \<Lambda> Tr \<omega>' ns'"
-   shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def' \<omega>' ns'"  
-  unfolding state_rel_def
-  using assms
-  by (auto intro!: state_rel0_store_update[OF state_rel_state_rel0[OF StateRel]])
+     BinderEmpty: "binder_state ns' = Map.empty"
+   shows "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"
+  apply (rule state_rel0_store_update[where ?Tr = Tr and ?f = "(var_translation Tr)", OF StateRel])
+  using assms apply simp_all
+  using var_translation_disjoint0[OF StateRel]
+  by simp
+
+lemmas state_rel_store_update_same_tr = state_rel0_state_rel[OF state_rel0_store_update_same_tr[OF state_rel_state_rel0]]
 
 lemma state_rel_store_update_2:
   assumes 
@@ -1408,21 +1434,20 @@ lemma state_rel_store_update_2:
          "v' = val_rel_vpr_bpl v" and
       TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
               "type_of_val (type_interp ctxt) v' = ty"
-       shows "state_rel Pr TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"  
-  apply (rule state_rel_store_update[OF StateRel])
-       apply simp
-         apply (simp add: VarCtxt)
+            shows "state_rel Pr TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+  apply (rule state_rel_store_update_same_tr[OF StateRel])
          apply (simp add: WellDefSame)
-        apply simp
-       apply simp
-  using VarCtxt VarTr ranI apply fastforce
+        apply simp       
+       using VarCtxt VarTr ranI 
+      apply fastforce
+      using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
+     apply blast
      apply (metis VarCtxt global_state_update_local global_state_update_other option.exhaust)
     apply (simp add: update_var_old_global_same)
    using state_rel0_state_well_typed[OF state_rel_state_rel0[OF StateRel]]
    unfolding state_well_typed_def
     apply (simp add: update_var_binder_same)   
-   using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
-   by blast
+   done 
 
 lemma state_rel_new_auxvar:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and

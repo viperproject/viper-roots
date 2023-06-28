@@ -10,6 +10,7 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
   "vpr_method_correct_total ctxt R mdecl \<equiv>
         \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
          (\<forall>(\<omega> :: 'a full_total_state) r. 
+                  \<comment>\<open>TODO: reverse list?\<close>
                   vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
                   total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
                   is_empty_total_full \<omega> \<longrightarrow>

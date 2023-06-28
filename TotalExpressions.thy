@@ -598,6 +598,7 @@ definition pheap_consistent :: "'a total_context \<Rightarrow> 'a full_total_sta
                       True
                       (ViperLang.predicate_decl.body pred_decl)"
 
+\<comment>\<open>alternative with pheap:
 inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context"
   where 
@@ -614,6 +615,29 @@ inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total
                  \<exists>\<omega>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<omega> \<omega>' \<and> total_heap_consistent ctxt \<omega>';
                  pheap_consistent ctxt \<omega> \<rbrakk> \<Longrightarrow>
                  total_heap_consistent ctxt \<omega>"
+\<close>
+
+inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  for ctxt :: "'a total_context" and m :: "mask \<times> 'a predicate_mask"
+  where 
+  \<comment>\<open>If a state does contain any permission to non-abstract predicates, then the state is trivially consistent.\<close>
+  ConsistentNoPred: 
+  " \<lbrakk> get_m_total_full \<omega> = m;
+      \<And> pred_id vs. option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None \<Longrightarrow>
+                    get_mp_total_full \<omega> (pred_id,vs) = pnone \<rbrakk> \<Longrightarrow> 
+                    total_heap_consistent_wrt_mask ctxt m \<omega>"
+  \<comment>\<open>If a state contains permission to a non-abstract predicate, then the state is consistent if some such non-abstract predicate
+     can be completely unfolded to reach another consistent state\<close>
+| UnfoldStep: "\<lbrakk> option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None;
+                 q = (get_mp_total_full \<omega> (pred_id,vs));
+                 pgt p pnone;
+                 \<exists>\<omega>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<omega> \<omega>' \<and> total_heap_consistent_wrt_mask ctxt m \<omega>'
+                 \<comment>\<open>ignore predicate heaps for now \<^term>\<open>pheap_consistent ctxt \<omega>\<close>\<close> 
+               \<rbrakk> \<Longrightarrow>
+                 total_heap_consistent_wrt_mask ctxt m \<omega>"
+
+definition total_heap_consistent
+  where "total_heap_consistent ctxt \<omega> \<equiv> \<exists>m. total_heap_consistent_wrt_mask ctxt m \<omega>"
 
 abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where "red_inhale_th_cons ctxt A \<omega> res \<equiv> red_inhale ctxt (total_heap_consistent ctxt) A \<omega> res"
