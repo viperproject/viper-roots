@@ -205,10 +205,164 @@ shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont
   using assms(4) RedAssumeOk
   by blast
 
+subsection \<open>map_upds\<close>
+
+lemma map_upds_dom:
+  assumes "length xs = length ys"
+  shows "dom (m(xs [\<mapsto>] ys)) = dom m \<union> (set xs)"
+  using assms
+  by auto
+
+lemma map_upds_ran_distinct:
+  assumes "distinct xs" and "length xs = length ys"
+  shows "ran [xs [\<mapsto>] ys] = set ys"  
+  using assms 
+  unfolding map_upds_def
+  by (metis distinct_rev empty_map_add length_rev ran_map_of_zip set_rev zip_rev)
+
+lemma map_upds_Cons_lookup_tail:
+  assumes "a \<in> set xs" and "length xs = length ys"
+  shows "[x # xs [\<mapsto>] y # ys] a = [xs [\<mapsto>] ys] a"
+proof -
+  have "[x#xs [\<mapsto>] y#ys] a = (Map.empty(x \<mapsto> y, xs [\<mapsto>] ys)) a"
+    by simp
+  also have "... = [xs [\<mapsto>] ys] a"
+    using assms
+    by (metis Un_iff domIff dom_map_upds fun_upd_other map_upd_upds_conv_if map_upds_dom)
+  finally show ?thesis
+    by simp
+qed
+
+lemma map_upds_upt_ran: "\<And> xs. length xs = j-i \<Longrightarrow> ran [[i..<j] [\<mapsto>] xs] = set xs"
+  by (simp add: map_upds_ran_distinct)
+
 subsection \<open>Lifting from single elements to lists of elements\<close>
 
 definition update_var_list 
   where "update_var_list \<Lambda> ns xs vs \<equiv> foldl (\<lambda> ns0 x_v. (update_var \<Lambda> ns0 (fst x_v) (snd x_v))) ns (zip xs vs)"
+
+lemma update_var_list_Cons [simp]:
+  "update_var_list \<Lambda> ns (x#xs) (v#vs) = update_var_list \<Lambda> (update_var \<Lambda> ns x v) xs vs"
+  unfolding update_var_list_def
+  by simp
+
+lemma update_var_list_Nil [simp]:
+  "update_var_list \<Lambda> ns [] vs = ns"
+  by (simp add: update_var_list_def)
+
+lemma update_var_list_Nil2 [simp]:
+  "update_var_list \<Lambda> ns xs [] = ns"
+  by (simp add: update_var_list_def)
+
+lemma lookup_update_var_list_other:
+  assumes "x \<notin> set xs" and "length xs = length vs"
+  shows "lookup_var \<Lambda> (update_var_list \<Lambda> ns xs vs) x = lookup_var \<Lambda> ns x"
+  using assms
+proof (induction xs arbitrary: vs ns)
+  case Nil
+  then show ?case 
+    by simp
+next
+  case (Cons a xs)
+  from this obtain vs_hd vs_tl where 
+    "vs = vs_hd # vs_tl" and "length xs = length vs_tl"
+    by (metis length_Suc_conv)
+
+  hence "lookup_var \<Lambda> (update_var_list \<Lambda> ns (a # xs) vs) x = 
+        lookup_var \<Lambda> (update_var_list \<Lambda> (update_var \<Lambda> ns a vs_hd) xs vs_tl) x"
+    by simp
+  hence "... = lookup_var \<Lambda> (update_var \<Lambda> ns a vs_hd) x"
+    using Cons \<open>vs = _\<close> \<open>length xs = _\<close>
+    by simp
+    
+  thus ?case 
+    using update_var_other Cons
+    by (simp add: \<open>vs = vs_hd # vs_tl\<close>)
+qed
+
+lemma lookup_update_var_list_same:
+  assumes "x \<in> set xs" and "length xs = length vs"
+  shows "lookup_var \<Lambda> (update_var_list \<Lambda> ns xs vs) x = [xs [\<mapsto>] vs] x"
+  using assms
+proof (induction xs arbitrary: ns vs)
+  case Nil
+  then show ?case
+    by simp \<comment>\<open>contradiction\<close>
+next
+  case (Cons a xs)
+  from this obtain vs_hd vs_tl where 
+    "vs = vs_hd # vs_tl" and "length xs = length vs_tl"
+    by (metis length_Suc_conv)
+
+  hence *: "lookup_var \<Lambda> (update_var_list \<Lambda> ns (a # xs) vs) x = 
+         lookup_var \<Lambda> (update_var_list \<Lambda> (update_var \<Lambda> ns a vs_hd) xs vs_tl) x"
+    by simp
+
+  show ?case 
+  proof (cases "x \<in> set xs")
+    case True
+    with Cons.IH * \<open>length xs  =_\<close>
+    have IHFact: "lookup_var \<Lambda> (update_var_list \<Lambda> ns (a # xs) vs) x =
+           [xs [\<mapsto>] vs_tl] x"
+      by simp
+
+    thus ?thesis
+      using True map_upds_Cons_lookup_tail \<open>length xs = length vs_tl\<close> \<open>vs = _\<close>
+      by metis
+  next
+    case False
+    hence "x = a"
+      using Cons
+      by simp
+
+    from False * lookup_update_var_list_other 
+    have "lookup_var \<Lambda> (update_var_list \<Lambda> ns (a # xs) vs) x = lookup_var \<Lambda> (update_var \<Lambda> ns a vs_hd) x"
+      using \<open>length xs = length vs_tl\<close>
+      by metis
+
+    also have "... = Some vs_hd"
+      using \<open>x = a\<close>
+      by simp
+
+    finally show ?thesis 
+      using False
+      unfolding \<open>vs = _\<close> \<open>x = a\<close> 
+      by simp
+  qed
+qed
+
+thm global_state_update_local[no_vars] global_state_update_other[no_vars]
+
+lemma global_state_update_var_list_local:
+  assumes "map_of (snd \<Lambda>) d = Some \<tau>"
+  shows "global_state (update_var_list \<Lambda> ns xs vs) = global_state ns"
+  oops
+(*
+proof (induction xs arbitrary: vs ns)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  note ConsOuter = Cons
+  show ?case
+  proof (cases vs)
+    case Nil
+    then show ?thesis by simp
+  next
+    case (Cons vs_hd vs_tl)
+    hence "global_state (update_var_list \<Lambda> ns (a # xs) vs) =
+           global_state (update_var_list \<Lambda> (update_var \<Lambda> ns a vs_hd) xs vs_tl)"
+      by simp
+    also have "... = global_state (update_var \<Lambda> ns a vs_hd)"
+      using ConsOuter
+      by simp                    
+    then show ?thesis 
+                       
+  qed
+
+    
+qed
+*)
 
 fun havocs_list_bpl :: "vname list \<Rightarrow> cmd list" where 
   "havocs_list_bpl [] = []"

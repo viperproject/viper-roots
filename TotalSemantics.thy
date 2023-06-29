@@ -267,6 +267,8 @@ always has at least one failure transition. This is in-sync with the recent Carb
       \<comment>\<open>non-deterministically select values for return variables that conform to the declared type\<close>
       vals_well_typed (absval_interp_total ctxt) v_rets (method_decl.rets mdecl); 
       red_stmt_total ctxt R \<Lambda> (Exhale (method_decl.pre mdecl)) 
+                               \<comment>\<open>TODO: here arguments (and then return variables below) are ordered reverse.
+                                        Could change this by using \<^const>\<open>shift_and_add_list_alt\<close> instead \<close>
                               \<lparr> get_store_total = (shift_and_add_list Map.empty v_args), 
                                 get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
                                 get_total_full = get_total_full \<omega> \<rparr>
@@ -274,9 +276,15 @@ always has at least one failure transition. This is in-sync with the recent Carb
       resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre;
       \<And> \<omega>Pre. resPre = RNormal \<omega>Pre \<Longrightarrow> 
       \<comment>\<open>can't use havoc here directly in a natural way to get updated state\<close>
-            red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.post mdecl)) 
-                                    (update_store_total \<omega>Pre (shift_and_add_list (get_store_total \<omega>Pre) v_rets))
-                                    resPost \<and>
+            red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.post mdecl))                                     
+                                    \<comment>\<open>(update_store_total \<omega>Pre (shift_and_add_list (get_store_total \<omega>Pre) v_rets))\<close>
+                                \<comment>\<open>arguments have the same names in the pre and post, that's why need to 
+                                   shift return values first (if use \<^const>\<open>shift_and_add_list_alt\<close>, then
+                                   would have to switch order)\<close>
+                              \<lparr> get_store_total = (shift_and_add_list Map.empty (v_rets@v_args)), 
+                                get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
+                                get_total_full = get_total_full \<omega>Pre \<rparr>
+                              resPost \<and>
             res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost \<rbrakk> \<Longrightarrow>        
       red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
 | RedUnfold:
