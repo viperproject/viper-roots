@@ -281,7 +281,7 @@ next
 qed
 
 lemma lookup_update_var_list_same:
-  assumes "x \<in> set xs" and "length xs = length vs"
+  assumes "x \<in> set xs" and "length xs = length vs"      
   shows "lookup_var \<Lambda> (update_var_list \<Lambda> ns xs vs) x = [xs [\<mapsto>] vs] x"
   using assms
 proof (induction xs arbitrary: ns vs)
@@ -331,13 +331,9 @@ next
   qed
 qed
 
-thm global_state_update_local[no_vars] global_state_update_other[no_vars]
-
 lemma global_state_update_var_list_local:
-  assumes "map_of (snd \<Lambda>) d = Some \<tau>"
-  shows "global_state (update_var_list \<Lambda> ns xs vs) = global_state ns"
-  oops
-(*
+  assumes "map_of (snd \<Lambda>) x = Some \<tau>"
+  shows  "global_state (update_var_list \<Lambda> ns xs vs) x = global_state ns x"
 proof (induction xs arbitrary: vs ns)
   case Nil
   then show ?case by simp
@@ -350,19 +346,40 @@ next
     then show ?thesis by simp
   next
     case (Cons vs_hd vs_tl)
-    hence "global_state (update_var_list \<Lambda> ns (a # xs) vs) =
-           global_state (update_var_list \<Lambda> (update_var \<Lambda> ns a vs_hd) xs vs_tl)"
+    hence "global_state (update_var_list \<Lambda> ns (a # xs) vs) x =
+           global_state (update_var_list \<Lambda> (update_var \<Lambda> ns a vs_hd) xs vs_tl) x"
       by simp
-    also have "... = global_state (update_var \<Lambda> ns a vs_hd)"
+    also have "... = global_state (update_var \<Lambda> ns a vs_hd) x"
       using ConsOuter
-      by simp                    
-    then show ?thesis 
-                       
-  qed
-
-    
+      by simp
+              
+    finally show ?thesis 
+      using assms
+      by (metis global_state_update_local global_state_update_other)                       
+  qed    
 qed
-*)
+
+lemma update_var_list_binder_state_same:
+  shows  "binder_state (update_var_list \<Lambda> ns xs vs) = binder_state ns"
+proof (induction xs arbitrary: vs ns)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  thus ?case
+    by (cases vs) (auto simp add: update_var_binder_same)   
+qed
+
+lemma update_var_list_old_global_state_same:
+  shows  "old_global_state (update_var_list \<Lambda> ns xs vs) = old_global_state ns"
+proof (induction xs arbitrary: vs ns)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  thus ?case
+  by (cases vs) (auto simp add: update_var_old_global_same)   
+qed
 
 fun havocs_list_bpl :: "vname list \<Rightarrow> cmd list" where 
   "havocs_list_bpl [] = []"

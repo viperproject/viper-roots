@@ -834,6 +834,12 @@ lemma map_upd_set_subset:
   shows "map_upd_set A B' f \<subseteq>\<^sub>m map_upd_set A B f"
   unfolding map_le_def
   by (smt (z3) Diff_Diff_Int Diff_iff assms(1) assms(2) domIff empty_iff map_add_None map_add_def subsetD)
+
+lemma map_upd_set_subset2:
+  assumes "dom A \<inter> B = {}"
+  shows "A \<subseteq>\<^sub>m map_upd_set A B f"
+  by (smt (verit) assms disjoint_iff domIff map_add_dom_app_simps(3) map_le_def)
+
  (*
 proof (rule ballI)
   fix a
@@ -1658,7 +1664,16 @@ proof (rule stmt_rel_intro_2)
      next
        fix x
        assume "map_of (snd (var_context ctxt)) x \<noteq> None"
-       show "global_state (update_var_list (var_context ctxt) nspre ys_bpl (map val_rel_vpr_bpl v_rets)) x = global_state nspre x"
+       thus "global_state ?nshavoc x = global_state nspre x"
+         using global_state_update_var_list_local 
+         by blast
+     next
+       show "old_global_state ?nshavoc = old_global_state nspre"
+         by (simp add: update_var_list_old_global_state_same)
+     next
+       show "binder_state ?nshavoc = Map.empty"
+         using state_rel_state_well_typed[OF \<open>?RCall \<omega>pre nspre\<close>, simplified state_well_typed_def]
+         by (simp add: update_var_list_binder_state_same)
      qed simp_all
 
       from RedMethodCall RNormal have 
@@ -1700,9 +1715,72 @@ proof (rule stmt_rel_intro_2)
           moreover from RNormal \<open>res = _\<close> have "res = RNormal (reset_state_after_call ys v_rets \<omega> \<omega>post)"
             by simp
             
-          moreover from \<open>?RCallPost \<omega>post nspost\<close> have 
+          moreover have 
              "state_rel_def_same Pr TyRep Tr AuxPred ctxt (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
-            sorry
+          proof -
+            from \<open>?RCallPost \<omega>post nspost\<close> have
+              "state_rel_def_same Pr TyRep (Tr\<lparr>var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
+              apply (rule state_rel_aux_pred_remove)
+              apply (rule map_upd_set_subset2)
+              using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+              by blast
+
+            thus ?thesis
+            proof (rule state_rel_store_update[where ?f="var_translation Tr"])
+              show "finite (ran (var_translation Tr))"
+                sorry \<comment>\<open>need to add finiteness of var translation to state relation\<close>
+            next
+              show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) 
+                              (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
+              proof (rule store_relI)
+                show "inj_on (var_translation Tr) (dom (var_translation Tr))"
+                  using state_rel_store_rel[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+                  by (simp add: store_rel_def)
+              next
+                fix var_vpr var_bpl
+                assume VarTrSome: "var_translation Tr var_vpr = Some var_bpl"
+                show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost var_vpr var_bpl"
+                proof (cases "var_vpr \<in> set ys")
+                  case True
+                  from this obtain id where "var_vpr = ys ! id" and "id < length ys"
+                    by (metis in_set_conv_nth)
+                  hence "var_bpl = ys_bpl ! id"
+                    using YsBplEq VarTrSome
+                    by auto
+ 
+                  show ?thesis
+                    sorry
+(*
+                  unfolding store_var_rel_aux_def
+                proof ((rule exI)+, intro conjI)
+                  show "get_store_total (reset_state_after_call ys v_rets \<omega> \<omega>post) var_vpr = Some (v_rets ! id)"
+                    unfolding reset_state_after_call_def
+                    apply simp
+                    using \<open>var_vpr = _\<close> \<comment>\<open>TODO: \<open>distinct ys\<close>\<close>    
+                    sorry
+                    *)
+
+                next
+                  case False
+                  then show ?thesis sorry
+                qed
+              qed
+            next
+              show "binder_state nspost = Map.empty"
+                sorry
+            next
+              show "ran (var_translation Tr) \<inter>
+                   ({heap_var (Tr\<lparr>var_translation := var_tr''\<rparr>), heap_var_def (Tr\<lparr>var_translation := var_tr''\<rparr>)} \<union>
+                    {mask_var (Tr\<lparr>var_translation := var_tr''\<rparr>), mask_var_def (Tr\<lparr>var_translation := var_tr''\<rparr>)} \<union>
+                    ran (field_translation (Tr\<lparr>var_translation := var_tr''\<rparr>)) \<union>
+                    range (const_repr (Tr\<lparr>var_translation := var_tr''\<rparr>)) \<union>
+                    dom AuxPred) =
+                   {}"
+                using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+                by simp
+            qed (simp_all add: reset_state_after_call_def  )
+              
+          qed
             
           ultimately show ?thesis 
             by (blast intro: rel_vpr_aux_intro)
