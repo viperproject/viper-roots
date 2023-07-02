@@ -748,6 +748,13 @@ lemma state_rel0_store_rel:
 
 lemmas state_rel_store_rel = state_rel0_store_rel[OF state_rel_state_rel0]
 
+lemma state_rel_var_tr_inj:
+  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  shows "inj_on (var_translation Tr) (dom (var_translation Tr))"
+  using state_rel_store_rel[OF assms]
+  unfolding store_rel_def
+  by blast
+
 lemma state_rel0_disjoint:
   assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "(disjoint_list [{heap_var Tr, heap_var_def Tr},
