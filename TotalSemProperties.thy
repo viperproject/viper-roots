@@ -441,6 +441,64 @@ next
     by (blast intro!: red_inhale_intros)      
 qed (rule HOL.TrueI)+
 
+subsection \<open>Exhale\<close>
+
+lemma exhale_only_changes_total_state_aux:
+  assumes
+         "red_exhale ctxt R A \<omega>def \<omega> res" and "res = RNormal \<omega>'"
+  shows  "get_store_total \<omega>' = get_store_total \<omega> \<and>
+          get_trace_total \<omega>' = get_trace_total \<omega> \<and>
+          get_h_total_full \<omega>' = get_h_total_full \<omega>"
+  using assms
+proof (induction arbitrary: \<omega>')
+  case (ExhAcc mh \<omega> e_r r e_p p a f)
+  then show ?case by (auto elim: exh_if_total.elims)
+next
+  case (ExhAccWildcard mh \<omega> e_r r q a f)
+  then show ?case by (auto elim: exh_if_total.elims)
+next
+  case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id r)
+  then show ?case by (auto elim: exh_if_total.elims)
+next
+  case (ExhAccPredWildcard mp \<omega> e_args v_args q a f pred_id)
+  then show ?case by (auto elim: exh_if_total.elims)
+next
+  case (ExhPure e \<omega> b)
+  then show ?case 
+    by (auto elim: exh_if_total.elims)
+next
+  case (SubAtomicFailure A \<omega>)
+  then show ?case by fastforce
+next
+  case (ExhStarNormal A \<omega> \<omega>' B res)
+  then show ?case by presburger
+next
+  case (ExhStarFailure A \<omega> B)
+  then show ?case by blast
+next
+  case (ExhImpTrue e \<omega> A res)
+  then show ?case by blast
+next
+  case (ExhImpFalse e \<omega> A)
+  then show ?case by fastforce
+next
+  case (ExhImpFailure e \<omega> A)
+  then show ?case by fast
+qed
+
+lemma exhale_only_changes_total_state:
+  assumes "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
+  shows "get_store_total \<omega> = get_store_total \<omega>' \<and>
+         get_trace_total \<omega> = get_trace_total \<omega>'"
+  using assms
+proof cases
+  case (RedExhale \<omega>_exh)
+  then show ?thesis 
+    using exhale_only_changes_total_state_aux
+    unfolding exhale_state_def
+    by (metis exhale_state_same_store exhale_state_same_trace \<open>\<omega>' \<in> _\<close>)
+qed
+
 subsection \<open>Relationship inhale and exhale\<close>
 
 lemma exhale_inhale_normal:

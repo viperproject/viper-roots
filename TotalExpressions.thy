@@ -446,13 +446,28 @@ lemma red_exp_list_failure_elim:
      "(\<And>v e_hd es_tl.
         es = e_hd # es_tl \<Longrightarrow>
         ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<Longrightarrow> 
+        es_tl \<noteq> [] \<Longrightarrow>
         red_pure_exps_total ctxt R \<omega>_def es_tl \<omega> None \<Longrightarrow> P)" and
      "(\<And>e_hd es_tl.
         es = e_hd # es_tl \<Longrightarrow>
         ctxt, R, \<omega>_def \<turnstile> \<langle>e_hd;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P)"
    shows "P"
+  using assms    
+  by (cases) (auto elim: RedExpListFailure_case)
+
+lemma red_exp_list_failure_nth:
+  assumes "red_pure_exps_total ctxt R \<omega>_def es \<omega> None" and 
+          "es \<noteq> []"
+  shows "\<exists>i. i < length es \<and> ctxt, R, \<omega>_def \<turnstile> \<langle>es ! i;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
   using assms
-  by (cases) auto
+proof (induction es)
+  case Nil
+  then show ?case by simp \<comment>\<open>contradiction\<close>
+next
+  case (Cons a es)
+  thus ?case 
+    by (fastforce elim: red_exp_list_failure_elim dest!: Cons.IH)  
+qed
 
 inductive_cases RedPerm_case: "ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 

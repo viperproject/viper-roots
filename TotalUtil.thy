@@ -91,6 +91,12 @@ lemma not_satisfies_prop_in_set:
   using assms
   by force
 
+lemma list_all2_revD:
+  assumes "list_all2 P xs ys"
+  shows "list_all2 P (rev xs) (rev ys)"
+  using assms
+  by simp
+
 text \<open>Some helper definitions for trivial Viper programs\<close>
 
 fun f_None :: "'a \<Rightarrow> 'b option"
@@ -176,7 +182,7 @@ lemma[fundef_cong]:
   "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some P x = if_Some Q y"
   by (cases y; simp)
 
-subsection \<open>positive rationals (TODO: move to Viper theory?)\<close>
+subsection \<open>Positive rationals (TODO: move to Viper theory?)\<close>
 
 lemma prat_non_negative: "\<And>q. Rep_prat q \<ge> 0"
   by (transfer) simp
@@ -666,6 +672,144 @@ proof clarify
       unfolding disjoint_list_def
       by simp
   qed
+qed
+
+subsection \<open>Maps\<close>
+
+lemma map_add_le_dom_disjoint: 
+  assumes "dom m1 \<inter> dom m3 = {}" and
+          "m2 \<subseteq>\<^sub>m m3" 
+  shows "m1 ++ m2 \<subseteq>\<^sub>m m1 ++ m3"
+  using assms
+  by (metis map_add_comm map_add_le_mapE map_add_le_mapI map_add_subsumed2 map_le_map_add)
+
+lemma map_upds_distinct_nth:
+  assumes "distinct xs" and 
+          "x = xs ! i" and
+          "i < length xs" and
+          "length xs = length ys"
+  shows "(m(xs [\<mapsto>] ys)) x = Some (ys ! i)"
+using assms
+proof (induction xs arbitrary: m i ys)
+  case Nil
+  then show ?case by simp \<comment>\<open>contradiction\<close>
+next
+  case (Cons a xs)
+    from this obtain b ys' where "ys = b#ys'"
+      by (metis list.set_cases nth_mem)
+
+    from Cons have "x \<in> set (a # xs)"
+      using nth_mem by blast
+
+  show ?case 
+  proof (cases "a = x")
+    case True
+    from Cons have "i = 0"
+      by (metis True length_greater_0_conv list.discI nth_Cons_0 nth_eq_iff_index_eq)
+    then show ?thesis 
+      using \<open>a = x\<close> Cons \<open>ys = _\<close>
+      by simp
+  next
+    case False
+
+    with Cons have "i > 0"
+      by (metis bot_nat_0.not_eq_extremum nth_Cons_0)    
+
+    let ?m' = "m(a \<mapsto> b)"
+    have "(m(a # xs [\<mapsto>] ys)) x = (?m'(xs [\<mapsto>] ys')) x"
+      using map_upds_Cons \<open>ys = _\<close>
+      by simp
+
+    have "... = Some (ys' ! (i-1))"
+      apply (rule Cons.IH)
+      using \<open>distinct (a#xs)\<close>
+         apply simp
+      using Cons
+        apply (meson \<open>0 < i\<close> nth_Cons_pos)
+      using Cons
+       apply (metis Suc_diff_1 \<open>0 < i\<close> length_Cons not_less_eq)
+      using \<open>length (a # xs) = length ys\<close> \<open>ys = _\<close>
+      by simp
+
+    thus ?thesis
+      using \<open>ys = _\<close> \<open>0 < i\<close>
+      by fastforce
+  qed   
+qed
+
+lemma map_upds_distinct_rev:
+  assumes "distinct xs" and "length xs = length ys"
+  shows "[xs [\<mapsto>] ys] = [rev xs [\<mapsto>] rev ys]"
+  using assms
+  unfolding map_upds_def
+  apply simp
+  by (metis distinct_rev length_rev map_fst_zip map_of_inject_set set_rev zip_rev)
+
+subsection \<open>Distinct\<close>
+
+lemma distinct_map_inj_on_subset:
+assumes 
+        "distinct ys"
+        "map f ys = ys'" and
+        "set ys \<subseteq> dom f" and
+        "inj_on f (dom f)"
+      shows "distinct ys'"
+  using assms distinct_map inj_on_subset
+  by blast
+
+lemma distinct_map_the_inj_on_subset:
+assumes 
+        "distinct ys"
+        "map (the \<circ> f) ys = ys'" and
+        "set ys \<subseteq> dom f" and
+        "inj_on f (dom f)"
+      shows "distinct ys'"
+proof -
+  let ?zs = "map f ys"
+
+  have "map (the \<circ> f) ys  = map the ?zs"
+    by simp
+
+  have "distinct ?zs"
+    using distinct_map_inj_on_subset assms
+    by blast
+
+  from \<open>set ys \<subseteq> _\<close> obtain zs_elems
+    where "?zs = map Some zs_elems"
+    by (smt (verit, ccfv_threshold) \<open>distinct (map f ys)\<close> distinct_map domIff ex_map_conv f_the_inv_into_f list.set_map option.exhaust the_inv_into_into)
+
+  with \<open>distinct ?zs\<close> have "distinct zs_elems"
+    using distinct_map by auto
+
+  thus ?thesis
+    using \<open>?zs = _\<close> \<open>map (the \<circ> f) ys = ys'\<close> 
+                    \<open>map (the \<circ> f) ys = map the ?zs\<close> 
+    by fastforce
+qed
+
+lemma map_the_inj_not_in:
+  assumes "ys' = map (the \<circ> f) ys" and
+          Inj: "inj_on f (dom f)" and
+          "a \<notin> set ys" and
+          "f a = Some b" and
+          "set ys \<subseteq> dom f"
+        shows "b \<notin> set ys'"
+proof
+  assume "b \<in> set ys'"
+
+  from this obtain i where
+    "b  = ys' ! i" and
+    "(the \<circ> f) (ys ! i) = (ys' ! i)" and
+    "i < length ys"
+    by (metis \<open>ys' = _\<close> in_set_conv_nth length_map nth_map)
+
+  hence "f (ys ! i) = Some (ys' ! i)"
+    using \<open>set ys \<subseteq> _\<close>
+    by (metis IntD2 Int_absorb2 comp_apply domD nth_mem option.sel)
+
+  thus False
+    using Inj \<open>b = _\<close> \<open>i < _\<close>    
+    by (metis \<open>a \<notin> _\<close> \<open>f a = Some b\<close> domIff inj_on_contraD nth_mem option.distinct(1))
 qed
 
 subsection \<open>Strictly Ordered Lists\<close>

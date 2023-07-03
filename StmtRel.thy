@@ -819,7 +819,7 @@ lemma state_rel_var_translation_remove:
   assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "f' \<subseteq>\<^sub>m var_translation Tr"
   shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
-  sorry
+  oops
 
 
 definition map_upd_set \<comment>\<open>make this a definition?\<close>
@@ -853,25 +853,6 @@ lemma map_upd_set_lookup_2:
   using assms
   unfolding map_upd_set_def
   by (simp add: map_add_def)
-
- (*
-proof (rule ballI)
-  fix a
-  assume "a \<in> dom (map_upd_set A B' f)"
-  from this consider "a \<in> dom A" | "a \<in> B'"
-    by fastforce
-
-  thus "map_upd_set A B' f a = map_upd_set A B f a"
-  proof cases
-    case 1
-    then show ?thesis sorry
-  next
-    case 2
-    then show ?thesis sorry
-  qed
-  *)
-
-thm state_rel_var_translation_remove
 
 lemma state_rel_transfer_var_tr_to_aux_pred:
   assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
@@ -927,80 +908,10 @@ lemma store_relI:
   unfolding store_rel_def store_var_rel_aux_def
   by blast
 
-\<comment>\<open>TODO: move to TotalUtil.thy\<close>
-lemma map_upds_distinct_nth:
-  assumes "distinct xs" and 
-          "x = xs ! i" and
-          "i < length xs" and
-          "length xs = length ys"
-  shows "(m(xs [\<mapsto>] ys)) x = Some (ys ! i)"
-using assms
-proof (induction xs arbitrary: m i ys)
-  case Nil
-  then show ?case by simp \<comment>\<open>contradiction\<close>
-next
-  case (Cons a xs)
-    from this obtain b ys' where "ys = b#ys'"
-      by (metis list.set_cases nth_mem)
-
-    from Cons have "x \<in> set (a # xs)"
-      using nth_mem by blast
-
-  show ?case 
-  proof (cases "a = x")
-    case True
-    from Cons have "i = 0"
-      by (metis True length_greater_0_conv list.discI nth_Cons_0 nth_eq_iff_index_eq)
-    then show ?thesis 
-      using \<open>a = x\<close> Cons \<open>ys = _\<close>
-      by simp
-  next
-    case False
-
-    with Cons have "i > 0"
-      by (metis bot_nat_0.not_eq_extremum nth_Cons_0)    
-
-    let ?m' = "m(a \<mapsto> b)"
-    have "(m(a # xs [\<mapsto>] ys)) x = (?m'(xs [\<mapsto>] ys')) x"
-      using map_upds_Cons \<open>ys = _\<close>
-      by simp
-
-    have "... = Some (ys' ! (i-1))"
-      apply (rule Cons.IH)
-      using \<open>distinct (a#xs)\<close>
-         apply simp
-      using Cons
-        apply (meson \<open>0 < i\<close> nth_Cons_pos)
-      using Cons
-       apply (metis Suc_diff_1 \<open>0 < i\<close> length_Cons not_less_eq)
-      using \<open>length (a # xs) = length ys\<close> \<open>ys = _\<close>
-      by simp
-
-    thus ?thesis
-      using \<open>ys = _\<close> \<open>0 < i\<close>
-      by fastforce
-  qed   
-qed
-
-lemma map_upds_distinct_rev:
-  assumes "distinct xs" and "length xs = length ys"
-  shows "[xs [\<mapsto>] ys] = [rev xs [\<mapsto>] rev ys]"
-  using assms
-  unfolding map_upds_def
-  apply simp
-  by (metis distinct_rev length_rev map_fst_zip map_of_inject_set set_rev zip_rev)
-
-lemma list_all2_revD:
-  assumes "list_all2 P xs ys"
-  shows "list_all2 P (rev xs) (rev ys)"
-  using assms
-  by simp
-
 lemma method_call_rel:
   assumes 
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
-          RdefEq:  "Rdef = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)" and
-                   "rtype_interp ctxt = []" and
+                      "rtype_interp ctxt = []" and
           DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr" and
           TyInterpBplEq:   "type_interp ctxt = vbpl_absval_ty TyRep" and
           StateRelConcrete: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and                  
@@ -1008,13 +919,10 @@ lemma method_call_rel:
                   "xs = map the_var es" and
                   "set xs \<subseteq> dom (var_translation Tr)" and
                   XsBplEq: "map (the \<circ> var_translation Tr) xs = xs_bpl" and
-                  "var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and
-            
-                  \<comment>\<open>"list_all (\<lambda>y. \<exists>a. var_translation Tr y = Some a) ys"\<close>
                   "set ys \<subseteq> dom (var_translation Tr)" and
                   "set xs_bpl \<inter> set ys_bpl = {}" and \<comment>\<open>simplifying assumption: targets and arguments do not clash\<close>
-                  "distinct xs_bpl" and \<comment>\<open>simplifying assumption: arguments are distinct\<close>
-                  "distinct ys_bpl" and
+                  "distinct xs" and \<comment>\<open>simplifying assumption: arguments are distinct\<close>
+                  "distinct ys" and
                   YsBplEq: "map (the \<circ> var_translation Tr) ys = ys_bpl" and     
              \<comment>\<open>TODO: One could probably track the following fact on declared types also via the variable relation
                       where one ensures that the declared Viper and Boogie types match for variables related by
@@ -1022,10 +930,11 @@ lemma method_call_rel:
           LookupDeclRetsBpl: 
                      "list_all2 (\<lambda>y_bpl t_vpr. \<exists>t_bpl. vpr_to_bpl_ty TyRep t_vpr = Some t_bpl \<and>
                                            lookup_var_decl (var_context ctxt) y_bpl = Some (t_bpl, None))
-                      ys_bpl (method_decl.rets mdecl)" and
+                                ys_bpl (method_decl.rets mdecl)" and
           \<comment>\<open> Since the rule only deals with variables in the arguments, well-definedness holds trivially
              ExpWfRel: "exprs_wf_rel Rdef ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>def"\<close>
                    \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
+                        "var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and   
           ExhalePreRel: "\<And> fpred.                                                
                         stmt_rel 
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt)
@@ -1045,9 +954,33 @@ lemma method_call_rel:
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
   assume "R \<omega> ns" 
+  \<comment>\<open>Prove various properties before showing the goal\<close>
   hence StateRel: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns"
     using StateRelConcrete
-    by blast
+    by blast  
+
+  have "es = map pure_exp.Var xs"
+  proof (rule nth_equalityI)
+    show "length es = length (map pure_exp.Var xs)"
+      using \<open>xs = _\<close>
+      by simp
+  next
+    fix i 
+    assume "i < length es"
+    show "es ! i = map pure_exp.Var xs ! i"
+    proof -
+      have "xs ! i = the_var (es ! i)"
+        using \<open>i < _\<close> \<open>xs = _\<close>
+        by simp
+      moreover from ArgsAreVars obtain x where
+          "es ! i = pure_exp.Var x"
+        using \<open>i < _\<close>                 
+        by (fastforce simp: list_all_length)
+
+      ultimately show ?thesis
+        using \<open>i < length es\<close> \<open>xs = _\<close> by auto
+    qed            
+  qed
 
   have "set xs_bpl \<subseteq> ran (var_translation Tr)"
   proof 
@@ -1081,23 +1014,26 @@ proof (rule stmt_rel_intro_2)
       by (simp add: ranI)
   qed
 
-  have "distinct ys"
+  have "distinct xs_bpl" and "distinct ys_bpl"
   proof -
     have "inj_on (var_translation Tr) (dom (var_translation Tr))"
     using state_rel_store_rel[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
     unfolding store_rel_def
     by blast
 
-    thus ?thesis
-    using \<open>distinct ys_bpl\<close> YsBplEq distinct_map 
-    by auto
+    thus "distinct ys_bpl" and "distinct xs_bpl"
+      using XsBplEq YsBplEq distinct_map_the_inj_on_subset \<open>distinct xs\<close> \<open>distinct ys\<close> \<open>set xs \<subseteq> _\<close> \<open>set ys \<subseteq> _\<close> 
+      by blast+
   qed
+
+  \<comment>\<open>Show the goal\<close>
 
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (MethodCall ys m es) \<omega> res"
 
   thus "rel_vpr_aux (state_rel_def_same Pr TyRep Tr AuxPred ctxt) P ctxt \<gamma> \<gamma>' ns res"
   proof (cases)
     case (RedMethodCall v_args mdecl' v_rets resPre resPost)
+     \<comment>\<open>All arguments evaluate normally\<close>
 
     from MdeclSome RedMethodCall have "mdecl = mdecl'"
       by force
@@ -1141,16 +1077,8 @@ proof (rule stmt_rel_intro_2)
         using ListAllArgsEvalVpr LengthEqs
         by (simp add: list_all2_conv_all_nth)
 
-      have "(xs ! i) = the_var (es ! i)"
-        using \<open>xs = _\<close> \<open>i < length xs\<close> 
-        by simp
-
-      moreover from \<open>i < length xs\<close> 
-      have "\<exists>a. es ! i = pure_exp.Var a"
-        using  ArgsAreVars LengthEqs
-        by (simp add: list_all_length)
-
-      ultimately have "es ! i = pure_exp.Var (xs ! i)"
+      have "es ! i = pure_exp.Var (xs ! i)"
+        using \<open>i < _\<close> \<open>es = _\<close>
         by auto
   
       thus "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>pure_exp.Var (xs ! i);\<omega>\<rangle> [\<Down>]\<^sub>t Val (v_args ! i)"
@@ -1211,7 +1139,9 @@ proof (rule stmt_rel_intro_2)
         by (simp add: list_all2_conv_all_nth)
     qed
 
-      \<comment>\<open>Show state rel with new var translation\<close>
+      \<comment>\<open>Show state rel with new var translation, which is required to use the exhale relation on the
+         precondition\<close>
+
     let ?\<omega>0 = "\<lparr>get_store_total = shift_and_add_list Map.empty v_args, 
                 get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
                 get_total_full = get_total_full \<omega>\<rparr>"
@@ -1220,15 +1150,10 @@ proof (rule stmt_rel_intro_2)
 
     note ExhalePreRelInst = ExhalePreRel
     (*note InhalePostRelInst = InhalePostRel[OF \<open>set ls = _\<close> \<open>length ls = length ?ps\<close>]*)
-
     let ?AuxPredPre = "(map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) ?fpred)"
     let ?RCall = "state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) ?AuxPredPre ctxt"
     have StateRelDuringCall: "?RCall ?\<omega>0 ns"
     proof -
-      have Aux: "\<And>m1 m2 m3. dom m1 \<inter> dom m3 = {} \<Longrightarrow> m2 \<subseteq>\<^sub>m m3 \<Longrightarrow>  m1 ++ m2 \<subseteq>\<^sub>m m1 ++ m3"
-        by (metis map_add_comm map_add_le_mapE map_add_le_mapI map_add_subsumed2 map_le_map_add)
-        \<comment>\<open>TODO: move to TotalUtil.thy\<close>
-
       from var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] have 
         *: "ran (var_translation Tr) \<inter> dom AuxPred = {}"
         by blast
@@ -1236,7 +1161,7 @@ proof (rule stmt_rel_intro_2)
       have AuxSub: "map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) ?fpred \<subseteq>\<^sub>m
             map_upd_set AuxPred (ran (var_translation Tr)) ?fpred"
         unfolding map_upd_set_def
-        apply (rule Aux)
+        apply (rule map_add_le_dom_disjoint)
         using *
          apply (smt (verit) disjoint_iff_not_equal domIff)
         by (smt (verit) Diff_iff domIff map_le_def)
@@ -1557,9 +1482,11 @@ proof (rule stmt_rel_intro_2)
                unfolding store_rel_def
                by fastforce
 
-             from ExhalePreRelInst have \<comment>\<open>exhale does not change the store\<close>
+             from RedMethodCall have \<comment>\<open>exhale does not change the store\<close>
                  StorePreVprEq: "get_store_total \<omega>pre = shift_and_add_list Map.empty v_args"
-               sorry 
+               using \<open>resPre = _\<close> exhale_only_changes_total_state
+               by force
+                 
 
              hence StorePreVprEqLookup: "get_store_total \<omega>pre var_vpr = Some ((rev v_args) ! var_vpr)"
                using True LengthEqs
@@ -1735,6 +1662,10 @@ proof (rule stmt_rel_intro_2)
             using RedBplPre red_ast_bpl_transitive
             by blast
 
+          moreover have "get_store_total \<omega>post = get_store_total ?\<omega>havoc"
+          using RedMethodCall \<open>resPre = _\<close> \<open>resPost = _\<close> inhale_only_changes_mask
+          by (metis RedInhale_case sub_expressions.simps(7))
+
           moreover from RNormal \<open>res = _\<close> have "res = RNormal (reset_state_after_call ys v_rets \<omega> \<omega>post)"
             by simp
             
@@ -1769,11 +1700,7 @@ proof (rule stmt_rel_intro_2)
                     by (metis in_set_conv_nth)
                   hence "var_bpl = ys_bpl ! id"
                     using YsBplEq VarTrSome
-                    by auto           
-
-                  have "get_store_total \<omega>post = get_store_total ?\<omega>havoc"
-                    using RedMethodCall \<open>resPre = _\<close> \<open>resPost = _\<close> inhale_only_changes_mask
-                    by (metis RedInhale_case sub_expressions.simps(7))
+                    by auto
 
                   let ?id_rev = "length v_rets - Suc id"
 
@@ -1850,10 +1777,13 @@ proof (rule stmt_rel_intro_2)
                   qed
                 next
                   case False
-                  \<comment>\<open>TODO: comment proof \<close>
+                  \<comment>\<open>In this case, \<^term>\<open>var_vpr\<close> is not a target variable and thus we need to show that
+                     it still contains the same value as before the call. \<close>
 
                   hence "var_bpl \<notin> set ys_bpl"
-                    sorry \<comment>\<open>use proof from below for xs_bpl (extract into separate lemma\<close>
+                    using map_the_inj_not_in state_rel_var_tr_inj[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+                          YsBplEq VarTrSome \<open>set ys \<subseteq> _\<close>
+                    by fast
 
                   have "get_store_total (reset_state_after_call ys v_rets \<omega> \<omega>post) var_vpr = 
                          get_store_total \<omega> var_vpr"
@@ -1872,30 +1802,64 @@ proof (rule stmt_rel_intro_2)
                     show ?thesis
                     proof (cases "var_vpr \<in> set xs")
                       case True
-                      then show ?thesis sorry
+                      \<comment>\<open>In this case, \<^term>\<open>var_vpr\<close> is an argument variable, which means the proof
+                         tracked the corresponding Boogie variable in the variable translation. Thus,
+                         by showing that the Viper local store did not change during the call (except
+                         for target variables), we can show that the Boogie variable was not modified either.\<close>
+
+                      have "var_bpl \<in> set xs_bpl"
+                      proof -
+                        from \<open>var_vpr \<in> set xs\<close> obtain i where
+                             "i < length xs" and "xs ! i = var_vpr"
+                          by (meson in_set_conv_nth)
+
+                        thus ?thesis
+                          using XsBplEq VarTrSome LengthEqs
+                          by (metis comp_eq_dest_lhs nth_map nth_mem option.sel)
+                      qed
+
+                      from this obtain i where "i < length xs_bpl" and "var_bpl = rev xs_bpl ! i"
+                        by (metis in_set_conv_nth length_rev set_rev)
+
+                      hence *: "i = [0..<length es+length ys] ! i"
+                        using LengthEqs
+                        by fastforce
+
+                      have "var_tr'' i = Some var_bpl"
+                        using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys="rev (ys_bpl @ xs_bpl)"] 
+                              LengthEqs
+                        unfolding \<open>var_tr'' = _\<close> \<open>var_bpl = _\<close>
+                        using \<open>i < _\<close>
+                        by (simp add: nth_append)
+                                                                                              
+                      with state_rel_store_rel[OF \<open>?RCallPost \<omega>post nspost\<close>] obtain val_vpr where 
+                        "get_store_total \<omega>post i = Some val_vpr" and
+                        "lookup_var (var_context ctxt) nspost var_bpl = Some (val_rel_vpr_bpl val_vpr)"
+                        unfolding store_rel_def
+                        by auto
+
+                      hence "lookup_var (var_context ctxt) nspost var_bpl = Some (val_rel_vpr_bpl ((rev v_args) ! i))"
+                        unfolding \<open>get_store_total \<omega>post = _\<close>
+                        using \<open>i < _\<close> LengthEqs
+                        by (simp add: shift_and_add_list_lookup nth_append)
+
+                      moreover from list_all2_revD[OF ValRelArgs] have
+                        "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl ((rev v_args) ! i))"
+                        using \<open>var_bpl = _\<close>
+                        by (simp add: \<open>i < length xs_bpl\<close> list_all2_conv_all_nth)
+
+                      ultimately show ?thesis
+                        by simp
                     next
                       case False
-                      \<comment>\<open>\<^term>\<open>var_vpr\<close> is auxiliary variable and thus was not modified during the call\<close>
+                      \<comment>\<open>In this case, \<^term>\<open>var_vpr\<close> is not an argument variable or target variable.
+                         Thus, the proof tracked the corresponding Boogie variable explicitly as an 
+                         auxiliary variable that must still have the same value as before the call.\<close>
                       
-                      have "var_bpl \<notin> set xs_bpl" 
-                      proof 
-                        assume "var_bpl \<in> set xs_bpl"
-
-                        from this obtain i where 
-                            "var_bpl = xs_bpl ! i" and
-                            "(the \<circ> var_translation Tr) (xs ! i) = (xs_bpl ! i)" and
-                            "i < length xs"
-                          using XsBplEq
-                          by (metis LengthEqs(2) in_set_conv_nth nth_map)
-
-                        hence "(var_translation Tr) (xs ! i) = Some (xs_bpl ! i)"
-                          using \<open>set xs \<subseteq> _\<close>
-                          by (metis IntD2 Int_absorb2 comp_apply domD nth_mem option.sel)
-
-                        with VarTrSome show False                        
-                          using state_rel_var_tr_inj[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] \<open>var_bpl = xs_bpl ! i\<close>
-                          by (metis False \<open>i < length xs\<close> domI inj_onD nth_mem)
-                      qed  
+                      hence "var_bpl \<notin> set xs_bpl" 
+                        using map_the_inj_not_in state_rel_var_tr_inj[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+                              XsBplEq VarTrSome \<open>set xs \<subseteq> _\<close>
+                        by fast
                                              
                       have *: "map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))
                                ?fpred var_bpl = Some (?fpred var_bpl)"
@@ -1919,7 +1883,8 @@ proof (rule stmt_rel_intro_2)
               qed
             next
               show "binder_state nspost = Map.empty"
-                sorry
+                using state_rel_state_well_typed[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified state_well_typed_def]
+                by simp
             next
               show "ran (var_translation Tr) \<inter>
                    ({heap_var (Tr\<lparr>var_translation := var_tr''\<rparr>), heap_var_def (Tr\<lparr>var_translation := var_tr''\<rparr>)} \<union>
@@ -1940,9 +1905,27 @@ proof (rule stmt_rel_intro_2)
       qed
   next
     case RedSubExpressionFailure
-    then show ?thesis 
-      using RdefEq \<open>R \<omega> ns\<close> ExpWfRel 
-      by (auto intro!: rel_vpr_aux_intro dest: exprs_wf_rel_failure_elim)
+    \<comment>\<open>Since the arguments are assumed to be arguments, this case cannot occur\<close>
+    have SubExpEq: "sub_expressions (MethodCall ys m es) = map ViperLang.Var xs"
+      by (simp add: \<open>es = _\<close>) 
+
+    from RedSubExpressionFailure
+    show ?thesis
+      unfolding SubExpEq
+    proof -
+      assume "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>) (map pure_exp.Var xs) \<omega> None"
+
+      from this obtain i where 
+        "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>pure_exp.Var (xs ! i); \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+        using red_exp_list_failure_nth
+        by (metis SubExpEq length_map local.RedSubExpressionFailure(2) nth_map)
+        
+      hence False
+        by (cases) auto
+
+      thus ?thesis
+        by simp
+    qed
   qed
 qed
 
