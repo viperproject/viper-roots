@@ -920,10 +920,10 @@ lemma method_call_stmt_rel:
                   "set xs \<subseteq> dom (var_translation Tr)" and
                   XsBplEq: "map (the \<circ> var_translation Tr) xs = xs_bpl" and
                   "set ys \<subseteq> dom (var_translation Tr)" and
+                  YsBplEq: "map (the \<circ> var_translation Tr) ys = ys_bpl" and     
                   "set xs_bpl \<inter> set ys_bpl = {}" and \<comment>\<open>simplifying assumption: targets and arguments do not clash\<close>
                   "distinct xs" and \<comment>\<open>simplifying assumption: arguments are distinct\<close>
                   "distinct ys" and
-                  YsBplEq: "map (the \<circ> var_translation Tr) ys = ys_bpl" and     
              \<comment>\<open>TODO: One could probably track the following fact on declared types also via the variable relation
                       where one ensures that the declared Viper and Boogie types match for variables related by
                       the variable relation.\<close>
@@ -934,7 +934,8 @@ lemma method_call_stmt_rel:
           \<comment>\<open> Since the rule only deals with variables in the arguments, well-definedness holds trivially
              ExpWfRel: "exprs_wf_rel Rdef ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>def"\<close>
                    \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
-                        "var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and   
+                        \<comment>\<open>"var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and \<close>
+                   "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]" and
           ExhalePreRel: "\<And> fpred.                                                
                         stmt_rel 
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt)
@@ -943,7 +944,8 @@ lemma method_call_stmt_rel:
                               (Exhale (method_decl.pre mdecl)) \<gamma> \<gamma>pre" and
                  "\<gamma>pre = (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)" and
                  "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix" and
-                 "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] rev (ys_bpl@xs_bpl))" and
+             \<comment>\<open>    "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] rev (ys_bpl@xs_bpl))" and\<close>
+               "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))" and
           InhalePostRel:         "\<And> fpred.
                         stmt_rel (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
@@ -1142,7 +1144,7 @@ proof (rule stmt_rel_intro_2)
       \<comment>\<open>Show state rel with new var translation, which is required to use the exhale relation on the
          precondition\<close>
 
-    let ?\<omega>0 = "\<lparr>get_store_total = shift_and_add_list Map.empty v_args, 
+    let ?\<omega>0 = "\<lparr>get_store_total = shift_and_add_list_alt Map.empty v_args, 
                 get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
                 get_total_full = get_total_full \<omega>\<rparr>"
 
@@ -1184,12 +1186,12 @@ proof (rule stmt_rel_intro_2)
           hence "i < length es" and "j < length es"
             by simp_all
 
-          have "var_tr' i = Some (rev xs_bpl ! i)"
+          have "var_tr' i = Some (xs_bpl ! i)"
             apply (subst \<open>var_tr' = _\<close>)
             using \<open>i \<in> set _\<close>  \<open>xs = _\<close> XsBplEq
             by (auto intro!: map_upds_distinct_nth)
 
-          moreover have "var_tr' j = Some (rev xs_bpl ! j)"
+          moreover have "var_tr' j = Some (xs_bpl ! j)"
             apply (subst \<open>var_tr' = _\<close>)
             using \<open>j \<in> set _\<close> \<open>xs = _\<close> XsBplEq
             by (auto intro!: map_upds_distinct_nth)
@@ -1200,7 +1202,7 @@ proof (rule stmt_rel_intro_2)
 
           ultimately show "i = j"
             using \<open>var_tr' i = var_tr' j\<close> \<open>distinct xs_bpl\<close> 
-            by (metis (no_types, lifting) distinct_rev length_rev nth_eq_iff_index_eq option.inject)
+            by (metis (no_types, lifting) nth_eq_iff_index_eq option.inject)
         qed
       next
         fix x_vpr x_bpl
@@ -1213,48 +1215,46 @@ proof (rule stmt_rel_intro_2)
         hence "x_vpr < length v_args"
           using ListAllArgsEvalVpr
           using list_all2_lengthD by force
-        hence "x_vpr < length (rev v_args)"
-          by simp
         with ValRelArgs
-        have *:"lookup_var (var_context ctxt) ns ((rev xs_bpl) ! x_vpr) = Some (val_rel_vpr_bpl ((rev v_args) ! x_vpr))"
-          using list_all2_nthD list_all2_rev
+        have *:"lookup_var (var_context ctxt) ns (xs_bpl ! x_vpr) = Some (val_rel_vpr_bpl ( v_args ! x_vpr))"
+          using list_all2_nthD 
           by blast
         
-        have "x_bpl = (rev xs_bpl) ! x_vpr"
+        have "x_bpl = xs_bpl ! x_vpr"
         proof -
           from \<open>x_vpr \<in> _\<close> have *: "x_vpr = [0..<length es] ! x_vpr"
             by simp
           thus ?thesis
-            using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys = "rev xs_bpl"]
+            using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys = "xs_bpl"]
                   LengthEqs VarTrSome \<open>x_vpr < length v_args\<close> \<open>var_tr' = _\<close> 
             by auto
         qed          
 
         hence "x_bpl \<in> set xs_bpl"
           using \<open>x_vpr < length v_args\<close> \<open>length xs_bpl = length v_args\<close>
-          by (metis length_rev nth_mem set_rev)
+          by force
 
         from ValRelArgs obtain \<tau>_bpl where
           XBplTy: "lookup_var_ty (var_context ctxt) x_bpl = Some \<tau>_bpl" 
-                  "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev v_args ! x_vpr)) = \<tau>_bpl"
-          using  \<open>x_bpl = _\<close> \<open>x_vpr < length (rev v_args)\<close> list_all2_nthD by blast          
+                  "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (v_args ! x_vpr)) = \<tau>_bpl"
+          using  \<open>x_bpl = _\<close> \<open>x_vpr < length v_args\<close> list_all2_nthD by blast          
 
         show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) ?\<omega>0 ns x_vpr x_bpl"
           unfolding store_var_rel_aux_def
         proof ((rule exI)+, intro conjI)
-          show "get_store_total ?\<omega>0 x_vpr = Some ((rev v_args) ! x_vpr)"
-            using shift_and_add_list_lookup_1 \<open>x_vpr < length (rev _)\<close>
+          show "get_store_total ?\<omega>0 x_vpr = Some (v_args ! x_vpr)"
+            using shift_and_add_list_alt_lookup_1 \<open>x_vpr < length v_args\<close>
             by auto
         next
           from * \<open>x_bpl = _\<close> 
-          show "lookup_var (var_context ctxt) ns x_bpl = Some (val_rel_vpr_bpl (rev v_args ! x_vpr))"
+          show "lookup_var (var_context ctxt) ns x_bpl = Some (val_rel_vpr_bpl (v_args ! x_vpr))"
             by simp  
         next
           show "lookup_var_ty (var_context ctxt) x_bpl = Some \<tau>_bpl"
             using XBplTy
             by blast
         next
-          show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev v_args ! x_vpr)) = \<tau>_bpl"
+          show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (v_args ! x_vpr)) = \<tau>_bpl"
             using XBplTy
             by blast
         qed
@@ -1263,7 +1263,7 @@ proof (rule stmt_rel_intro_2)
       have "ran var_tr' = set xs_bpl"
         using map_upds_upt_ran LengthEqs
         unfolding \<open>var_tr' = _\<close>
-        by (metis diff_zero length_rev set_rev)
+        by force
 
       hence FiniteRanVarTr': "finite (ran var_tr')"
         unfolding \<open>var_tr' = _\<close>        
@@ -1274,8 +1274,7 @@ proof (rule stmt_rel_intro_2)
          apply (rule state_rel_transfer_var_tr_to_aux_pred[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]])
           apply simp
          apply simp
-        by (rule AuxSub)            
-        
+        by (rule AuxSub)        
 
       thus ?thesis
         apply (rule state_rel_store_update[where ?f= var_tr'])
@@ -1325,7 +1324,7 @@ proof (rule stmt_rel_intro_2)
         using stmt_rel_normal_elim[OF ExhalePreRelInst StateRelDuringCall]
         by blast
 
-      let ?\<omega>havoc = "\<lparr> get_store_total = (shift_and_add_list Map.empty (v_rets@v_args)), 
+      let ?\<omega>havoc = "\<lparr> get_store_total = (shift_and_add_list_alt Map.empty (v_args@v_rets)), 
                        get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
                        get_total_full = get_total_full \<omega>pre \<rparr>"
  
@@ -1427,7 +1426,7 @@ proof (rule stmt_rel_intro_2)
          assume VarTrSome: "var_tr'' var_vpr = Some var_bpl"
 
          with \<open>var_tr'' = _\<close>
-         have "var_vpr \<in> dom [[0..<length es + length ys] [\<mapsto>] rev (ys_bpl @ xs_bpl)]"
+         have "var_vpr \<in> dom [[0..<length es + length ys] [\<mapsto>] xs_bpl @ ys_bpl]"
            by (fastforce intro: domI)
          hence "var_vpr < length es + length ys"
            using map_upds_dom LengthEqs
@@ -1437,13 +1436,13 @@ proof (rule stmt_rel_intro_2)
            by simp
 
          from VarTrSome \<open>var_tr'' = _\<close> 
-         have VarBplEqNth: "var_bpl = rev (ys_bpl @ xs_bpl) ! var_vpr"
+         have VarBplEqNth: "var_bpl = (xs_bpl @ ys_bpl) ! var_vpr"
            using LengthEqs \<open>var_vpr < length es + length ys\<close>
-                 map_upds_distinct_nth[OF distinct_upt \<open>var_vpr = _\<close>, where ?m=Map.empty and ?ys="rev (ys_bpl @ xs_bpl)"]
+                 map_upds_distinct_nth[OF distinct_upt \<open>var_vpr = _\<close>, where ?m=Map.empty and ?ys="xs_bpl @ ys_bpl"]
            by force
 
-         have HavocStoreVprLookupAux: "get_store_total ?\<omega>havoc var_vpr = Some (rev (v_rets @ v_args) ! var_vpr)"
-             apply (simp add: shift_and_add_list_lookup)
+         have HavocStoreVprLookupAux: "get_store_total ?\<omega>havoc var_vpr = Some ((v_args @ v_rets) ! var_vpr)"
+             apply (simp add: shift_and_add_list_alt_lookup)
              using \<open>var_vpr < _\<close> LengthEqs
              by linarith
 
@@ -1451,24 +1450,24 @@ proof (rule stmt_rel_intro_2)
          proof (cases "var_vpr < length es")
            case True
              \<comment>\<open>Prove facts properties \<^term>\<open>var_bpl\<close>\<close>
-             hence "var_bpl = rev xs_bpl ! var_vpr"
+             hence "var_bpl = xs_bpl ! var_vpr"
                using VarBplEqNth LengthEqs
                by (simp add: nth_append) 
              hence "var_bpl \<in> set xs_bpl"
                using LengthEqs True
-               by (metis length_rev nth_mem set_rev)
+               by simp
              hence LookupVarBplAux: "lookup_var (var_context ctxt) ?nshavoc var_bpl = lookup_var (var_context ctxt) nspre var_bpl"
                using \<open>set xs_bpl \<inter> set ys_bpl = {}\<close> lookup_update_var_list_other LengthEqs
                by (metis Int_iff empty_iff length_map)
 
-             have "var_tr' var_vpr = Some (rev xs_bpl ! var_vpr)"
+             have "var_tr' var_vpr = Some (xs_bpl ! var_vpr)"
              proof -
                have *: "var_vpr = [0..<length es] ! var_vpr"
                  using True
                  by simp
                show ?thesis
                unfolding \<open>var_tr' = _\<close>
-               using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys="rev xs_bpl"]
+               using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys="xs_bpl"]
                      LengthEqs True
                by fastforce
              qed
@@ -1478,62 +1477,61 @@ proof (rule stmt_rel_intro_2)
                   VarBplValRel: "lookup_var (var_context ctxt) nspre var_bpl = Some (val_rel_vpr_bpl (the (get_store_total \<omega>pre var_vpr)))" and
                   LookupTyVarBpl: "lookup_var_ty (var_context ctxt) var_bpl = Some ty_bpl" and
                   TypeOfValRel:  "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (the (get_store_total \<omega>pre var_vpr))) = ty_bpl"
-               using \<open>var_bpl = rev xs_bpl ! var_vpr\<close>
+               using \<open>var_bpl = xs_bpl ! var_vpr\<close>
                unfolding store_rel_def
                by fastforce
 
              from RedMethodCall have \<comment>\<open>exhale does not change the store\<close>
-                 StorePreVprEq: "get_store_total \<omega>pre = shift_and_add_list Map.empty v_args"
+                 StorePreVprEq: "get_store_total \<omega>pre = shift_and_add_list_alt Map.empty v_args"
                using \<open>resPre = _\<close> exhale_only_changes_total_state
                by force
                  
-
-             hence StorePreVprEqLookup: "get_store_total \<omega>pre var_vpr = Some ((rev v_args) ! var_vpr)"
+             hence StorePreVprEqLookup: "get_store_total \<omega>pre var_vpr = Some (v_args ! var_vpr)"
                using True LengthEqs
-               by (simp add: shift_and_add_list_lookup_1)
+               by (simp add: shift_and_add_list_alt_lookup_1)
 
              show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) ?\<omega>havoc ?nshavoc var_vpr var_bpl"
                unfolding store_var_rel_aux_def
              proof ( (rule exI)+, intro conjI, rule HavocStoreVprLookupAux)
                from StorePreVprEqLookup
                show "lookup_var (var_context ctxt) ?nshavoc var_bpl =
-                     Some (val_rel_vpr_bpl (rev (v_rets @ v_args) ! var_vpr))" 
+                     Some (val_rel_vpr_bpl ((v_args @ v_rets) ! var_vpr))" 
                using VarBplValRel LookupVarBplAux True LengthEqs
                by (simp add: nth_append)
              next
                show "lookup_var_ty (var_context ctxt) var_bpl = Some ty_bpl"
                  by (rule LookupTyVarBpl)
              next
-               show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev (v_rets @ v_args) ! var_vpr)) = ty_bpl"
-                 using TypeOfValRel StorePreVprEqLookup 
-                 by (metis LengthEqs(1) True length_rev nth_append option.sel rev_append)
-             qed             
+               show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl ((v_args @ v_rets) ! var_vpr)) = ty_bpl"
+                 using TypeOfValRel StorePreVprEqLookup LengthEqs
+                 by (metis True nth_append option.sel)
+             qed
          next
            case False
            hence VarVprLength: "var_vpr \<ge> length es \<and> var_vpr < length es + length ys"
              using \<open>var_vpr < _\<close>
              by simp
 
-           hence "rev (ys_bpl @ xs_bpl) ! var_vpr = (rev ys_bpl) ! (var_vpr - length xs_bpl)"
+           hence "(xs_bpl @ ys_bpl) ! var_vpr = ys_bpl ! (var_vpr - length xs_bpl)"
              using LengthEqs
              by (simp add: nth_append)
 
-           hence VarBplYsBplNth: "var_bpl = (rev ys_bpl) ! (var_vpr - length xs_bpl)" (is "_ = _ ! ?id_bpl")
+           hence VarBplYsBplNth: "var_bpl = ys_bpl ! (var_vpr - length xs_bpl)" (is "_ = _ ! ?id_bpl")
              using \<open>var_bpl  = _\<close>
              by blast
 
            hence "var_bpl \<in> set ys_bpl"
              using VarVprLength LengthEqs
-             by (metis add.commute length_rev less_diff_conv2 nth_mem set_rev)
+             by fastforce
 
            from VarBplYsBplNth obtain t_bpl where 
               LookupDeclVarBpl: 
-                  "vpr_to_bpl_ty TyRep ((rev (rets mdecl)) ! ?id_bpl) = Some t_bpl \<and> 
+                  "vpr_to_bpl_ty TyRep ((rets mdecl) ! ?id_bpl) = Some t_bpl \<and> 
                    lookup_var_decl (var_context ctxt) var_bpl = Some (t_bpl, None)"
-             using list_all2_nthD[OF list_all2_revD[OF LookupDeclRetsBpl]] VarVprLength LengthEqs
-             by fastforce    
+             using list_all2_nthD[OF LookupDeclRetsBpl] VarVprLength LengthEqs
+             by fastforce
 
-           have *: "(rev (v_rets @ v_args) ! var_vpr) = rev v_rets ! (var_vpr - length xs_bpl)" (is "_ = ?val_vpr")
+           have *: "((v_args @ v_rets) ! var_vpr) = v_rets ! (var_vpr - length xs_bpl)" (is "_ = ?val_vpr")
              using LengthEqs VarVprLength
              by (simp add: nth_append)
 
@@ -1544,17 +1542,14 @@ proof (rule stmt_rel_intro_2)
            show ?thesis
              unfolding store_var_rel_aux_def
            proof ((rule exI)+, intro conjI, rule HavocStoreVprLookupAux)
-             show "lookup_var (var_context ctxt) ?nshavoc var_bpl = Some (val_rel_vpr_bpl (rev (v_rets @ v_args) ! var_vpr))" (is "?lhs = ?rhs")
+             show "lookup_var (var_context ctxt) ?nshavoc var_bpl = Some (val_rel_vpr_bpl ((v_args @ v_rets) ! var_vpr))" (is "?lhs = ?rhs")
              proof -
 
                have "?lhs = [ ys_bpl [\<mapsto>] (map val_rel_vpr_bpl v_rets) ] var_bpl"
                  apply (rule lookup_update_var_list_same[ OF \<open>var_bpl \<in> _\<close> ])
                  using LengthEqs
                  by simp
-               also have "... = [ rev ys_bpl [\<mapsto>] (map val_rel_vpr_bpl (rev v_rets)) ] var_bpl"
-                 using map_upds_distinct_rev[OF \<open>distinct ys_bpl\<close>] 
-                 by (smt (verit, best) LengthEqs(5) length_map rev_map)
-               also have "... = Some ((map val_rel_vpr_bpl (rev v_rets)) ! (var_vpr - length xs_bpl))"
+               also have "... = Some ((map val_rel_vpr_bpl v_rets) ! (var_vpr - length xs_bpl))"
                  apply (rule map_upds_distinct_nth)
                  using \<open>distinct ys_bpl\<close>
                     apply simp
@@ -1573,16 +1568,16 @@ proof (rule stmt_rel_intro_2)
                using LookupDeclVarBpl
                by (simp add: lookup_var_decl_ty_Some)
            next         
-             from list_all2_revD[OF YsBplCorrectTypes]
-             have "lookup_var_decl (var_context ctxt) (rev ys_bpl ! ?id_bpl) = Some (type_of_val (type_interp ctxt) (val_rel_vpr_bpl ?val_vpr), None)"
-               using \<open>?id_bpl < _\<close> 
+             from YsBplCorrectTypes
+             have "lookup_var_decl (var_context ctxt) (ys_bpl ! ?id_bpl) = Some (type_of_val (type_interp ctxt) (val_rel_vpr_bpl ?val_vpr), None)"
+               using \<open>?id_bpl < _\<close>
                by (simp add: list_all2_conv_all_nth rev_map)
 
              hence "type_of_val (type_interp ctxt) (val_rel_vpr_bpl ?val_vpr) = t_bpl" 
                using LookupDeclVarBpl VarBplYsBplNth
                by simp
 
-             thus "type_of_val (type_interp ctxt) (val_rel_vpr_bpl (rev (v_rets @ v_args) ! var_vpr)) = t_bpl"
+             thus "type_of_val (type_interp ctxt) (val_rel_vpr_bpl ((v_args @ v_rets) ! var_vpr)) = t_bpl"
                using *
                by simp
            qed
@@ -1702,29 +1697,19 @@ proof (rule stmt_rel_intro_2)
                     using YsBplEq VarTrSome
                     by auto
 
-                  let ?id_rev = "length v_rets - Suc id"
-
-                  have "v_rets ! id = rev v_rets ! ?id_rev"
-                    using \<open>id < _\<close> LengthEqs
-                    by (simp add: rev_nth)
-
-                  have "var_bpl = (rev ys_bpl ! ?id_rev)"
-                    using \<open>var_bpl = _\<close> \<open>id < _\<close> LengthEqs
-                    by (simp add: rev_nth)
-
-                  have *: "(length es + ?id_rev) = [0..<length es + length ys] ! (length es + ?id_rev)"
+                  have *: "(length es + id) = [0..<length es + length ys] ! (length es + id)"
                     using \<open>id < _\<close> LengthEqs
                     by auto
 
-                  have "var_tr'' (length es + ?id_rev) = Some var_bpl"
+                  have "var_tr'' (length es + id) = Some var_bpl"
                     using \<open>id < _\<close> LengthEqs map_upds_distinct_nth[OF distinct_upt *, 
-                                                                   where ?m=Map.empty and ?ys="rev (ys_bpl @ xs_bpl)"]
-                    unfolding \<open>var_tr'' = _\<close> \<open>var_bpl = (rev ys_bpl ! ?id_rev)\<close>
+                                                                   where ?m=Map.empty and ?ys="xs_bpl @ ys_bpl"]
+                    unfolding \<open>var_tr'' = _\<close> \<open>var_bpl = (ys_bpl ! id)\<close>
                     by (smt (verit) True add.commute add_less_cancel_right diff_less diff_zero length_append length_pos_if_in_set length_rev length_upt nth_append_length_plus rev_append zero_less_Suc) 
 
                   from this obtain val_vpr ty_bpl where
                     AuxStoreRel:
-                     "get_store_total \<omega>post (length es + ?id_rev) = Some val_vpr \<and>
+                     "get_store_total \<omega>post (length es + id) = Some val_vpr \<and>
                      lookup_var (var_context ctxt) nspost var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
                      lookup_var_ty (var_context ctxt) var_bpl = Some ty_bpl \<and>
                      type_of_val (type_interp ctxt) (val_rel_vpr_bpl val_vpr) = ty_bpl"
@@ -1734,21 +1719,17 @@ proof (rule stmt_rel_intro_2)
 
                   have "val_vpr = v_rets ! id"
                   proof -
-                    have *: "(length es + ?id_rev) < length (v_rets @ v_args)"
+                    have *: "(length es + id) < length (v_args @ v_rets)"
                               using \<open>id < _\<close> LengthEqs
-                              by simp   
-                    have "get_store_total \<omega>post (length es + ?id_rev) = shift_and_add_list Map.empty (v_rets @ v_args) (length es + ?id_rev)"
-                            by (simp add: \<open>get_store_total \<omega>post = _\<close>)
-                    also have "... = Some ((rev (v_rets @ v_args)) ! (length es + ?id_rev))"
-                      using \<open>id < _\<close> shift_and_add_list_lookup_1[OF *] 
+                              by simp
+                    have "get_store_total \<omega>post (length es + id) = shift_and_add_list_alt Map.empty (v_args @ v_rets) (length es + id)"
+                        by (simp add: \<open>get_store_total \<omega>post = _\<close>)
+                    also have "... = Some ((v_args @ v_rets) ! (length es + id))"
+                      using \<open>id < _\<close> shift_and_add_list_alt_lookup_1[OF *] 
                       by blast
-                    also have "... = Some (rev v_rets ! ?id_rev)"
-                      using LengthEqs
-                      by (metis length_rev nth_append_length_plus rev_append)
                     also have "... = Some (v_rets ! id)"
-                      using \<open>id < _\<close> LengthEqs \<open>v_rets ! id = _\<close>
-                      by simp
-
+                      using LengthEqs
+                      by fastforce
                     finally show ?thesis
                       using AuxStoreRel
                       by auto  
@@ -1818,15 +1799,15 @@ proof (rule stmt_rel_intro_2)
                           by (metis comp_eq_dest_lhs nth_map nth_mem option.sel)
                       qed
 
-                      from this obtain i where "i < length xs_bpl" and "var_bpl = rev xs_bpl ! i"
-                        by (metis in_set_conv_nth length_rev set_rev)
+                      from this obtain i where "i < length xs_bpl" and "var_bpl = xs_bpl ! i"
+                        by (metis in_set_conv_nth)
 
                       hence *: "i = [0..<length es+length ys] ! i"
                         using LengthEqs
                         by fastforce
 
                       have "var_tr'' i = Some var_bpl"
-                        using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys="rev (ys_bpl @ xs_bpl)"] 
+                        using map_upds_distinct_nth[OF distinct_upt *, where ?m=Map.empty and ?ys="xs_bpl@ys_bpl"] 
                               LengthEqs
                         unfolding \<open>var_tr'' = _\<close> \<open>var_bpl = _\<close>
                         using \<open>i < _\<close>
@@ -1838,13 +1819,13 @@ proof (rule stmt_rel_intro_2)
                         unfolding store_rel_def
                         by auto
 
-                      hence "lookup_var (var_context ctxt) nspost var_bpl = Some (val_rel_vpr_bpl ((rev v_args) ! i))"
+                      hence "lookup_var (var_context ctxt) nspost var_bpl = Some (val_rel_vpr_bpl (v_args ! i))"
                         unfolding \<open>get_store_total \<omega>post = _\<close>
                         using \<open>i < _\<close> LengthEqs
-                        by (simp add: shift_and_add_list_lookup nth_append)
+                        by (simp add: shift_and_add_list_alt_lookup nth_append)
 
-                      moreover from list_all2_revD[OF ValRelArgs] have
-                        "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl ((rev v_args) ! i))"
+                      moreover from ValRelArgs have
+                        "lookup_var (var_context ctxt) ns var_bpl = Some (val_rel_vpr_bpl (v_args ! i))"
                         using \<open>var_bpl = _\<close>
                         by (simp add: \<open>i < length xs_bpl\<close> list_all2_conv_all_nth)
 
