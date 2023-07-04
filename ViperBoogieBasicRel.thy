@@ -877,6 +877,40 @@ lemma var_translation_disjoint0:
 
 lemmas var_translation_disjoint = var_translation_disjoint0[OF state_rel_state_rel0]
 
+lemma state_rel0_aux_pred_disjoint:
+  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  shows "dom AuxPred \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
+                                      {mask_var Tr, mask_var_def Tr} \<union>
+                                       ran (var_translation Tr) \<union>
+                                       ran (field_translation Tr) \<union>
+                                       range (const_repr Tr)) = {}"
+  apply (rule set_inter_union_conj, rule conjI)+
+  using state_rel0_disjoint[OF assms(1)]
+    apply (unfold disjoint_list_def)
+
+       apply (erule allE[where ?x=0])
+     apply (erule allE[where ?x=5])
+     apply simp
+
+       apply (erule allE[where ?x=1])
+     apply (erule allE[where ?x=5])
+    apply simp
+
+       apply (erule allE[where ?x=2])
+     apply (erule allE[where ?x=5])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=3])
+   apply (erule allE[where ?x=5])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=4])
+   apply (erule allE[where ?x=5])
+    apply (simp add: disjnt_def inf_commute)
+  done
+
+lemmas state_rel_aux_pred_disjoint = state_rel0_aux_pred_disjoint[OF state_rel_state_rel0]
+
 lemma state_rel0_eval_welldef_eq:
   assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "get_store_total \<omega>def = get_store_total \<omega> \<and>
@@ -1211,9 +1245,6 @@ lemma state_well_typed_upd_2:
 lemma state_rel0_store_update:
   assumes StateRel: "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
                     "Tr' = Tr\<lparr>var_translation := f\<rparr>" and
-              \<comment>\<open>This finiteness condition is currently needed because of the way we prove a theorem
-                (but could probably be dropped\<close>
-          FiniteRanVarTr: "Tr' \<noteq> Tr \<Longrightarrow> finite (ran f)" and 
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
      OnlyStoreAffectedVpr: 
            "get_total_full \<omega> = get_total_full \<omega>'"  and
@@ -1245,13 +1276,7 @@ proof (intro conjI)
 
   show "disjoint_list
      [{heap_var Tr', heap_var_def Tr'}, {mask_var Tr', mask_var_def Tr'}, ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'), dom AuxPred]"
-  proof (cases "Tr = Tr'")
-    case True
-    then show ?thesis 
-      using state_rel0_disjoint[OF StateRel]
-      by blast
-  next
-    case False
+  proof -
     from state_rel0_disjoint[OF StateRel]
     have "disjoint_list
           ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}]@
@@ -1259,8 +1284,6 @@ proof (intro conjI)
       by simp
     hence "disjoint_list (?xs@ran f#?ys)"
       apply (rule disjoint_list_replace_set)
-      using FiniteRanVarTr False
-       apply simp
       using RanVarTrDisj
       unfolding disjnt_def
       by fastforce
@@ -1567,10 +1590,20 @@ lemma state_rel_new_aux_var_no_state_upd:
          shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
-  show "disjoint_list
+  have "disjoint_list
+     ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
+      range (const_repr Tr)] @ ((dom AuxPred') # []))"
+    apply (rule disjoint_list_replace_set)
+    using state_rel_disjoint[OF StateRel]
+     apply simp
+    apply (simp add: disjnt_def)
+    using AuxVarFresh
+    by blast
+
+  thus "disjoint_list
      [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
       range (const_repr Tr), dom AuxPred']"
-    sorry
+    by simp
 qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto)
                    
 lemma state_rel0_heap_update:

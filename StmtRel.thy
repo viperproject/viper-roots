@@ -810,85 +810,12 @@ lemma dom_map_upds_test:
 
 subsubsection \<open>Helper lemmas\<close>
 
-term "a ` b "
-
-lemma dom_test: "dom (AuxPred ++ (\<lambda>x. if x \<in> B then Some (pred_eq (the (lookup_var (var_context ctxt) ns x))) else None)) = dom AuxPred \<union> B"
+lemma map_le_ran:
+  assumes "f \<subseteq>\<^sub>m g"
+  shows "ran f \<subseteq> ran g"
+  using assms
+  unfolding map_le_def ran_def
   by force
-
-lemma state_rel_var_translation_remove:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          "f' \<subseteq>\<^sub>m var_translation Tr"
-  shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
-  oops
-
-
-definition map_upd_set \<comment>\<open>make this a definition?\<close>
-  where "map_upd_set A B f \<equiv> A ++ (\<lambda>x. if x \<in> B then Some (f x) else None)"
-
-lemma map_upd_set_dom:
-  shows "dom (map_upd_set m B f) = dom m \<union> B"
-  by (auto simp: map_upd_set_def)
-
-lemma map_upd_set_subset:
-  assumes "B' \<subseteq> B" and "B \<inter> dom A = {}"
-  shows "map_upd_set A B' f \<subseteq>\<^sub>m map_upd_set A B f"
-  unfolding map_le_def map_upd_set_def
-  by (smt (z3) Diff_Diff_Int Diff_iff assms(1) assms(2) domIff empty_iff map_add_None map_add_def subsetD)
-
-lemma map_upd_set_subset2:
-  assumes "dom A \<inter> B = {}"
-  shows "A \<subseteq>\<^sub>m map_upd_set A B f"
-  unfolding map_upd_set_def
-  by (smt (verit) assms disjoint_iff domIff map_add_dom_app_simps(3) map_le_def)
-
-lemma map_upd_set_lookup_1:
-  assumes "x \<in> B"
-  shows "map_upd_set A B f x = Some (f x)"
-  using assms
-  by (simp add: map_upd_set_def)
-
-lemma map_upd_set_lookup_2:
-  assumes "x \<notin> B"
-  shows "map_upd_set A B f x = A x"
-  using assms
-  unfolding map_upd_set_def
-  by (simp add: map_add_def)
-
-lemma state_rel_transfer_var_tr_to_aux_pred:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          "f' \<subseteq>\<^sub>m var_translation Tr" and
-          "B = ran (var_translation Tr) - ran f'" 
-        shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) 
-                 (map_upd_set AuxPred B (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) 
-                 ctxt \<omega>def \<omega> ns"
-  sorry
-(*
-proof -
-  let ?Tr' = "Tr\<lparr> var_translation := f' \<rparr>"
-
-  from assms have "state_rel Pr TyRep ?Tr' AuxPred ctxt \<omega>def \<omega> ns"
-    using state_rel_var_translation_remove
-    by fast
-
-  thus ?thesis
-  proof (rule state_rel_new_aux_var_no_state_upd)
-    have "dom AuxPred' = dom AuxPred \<union> B"
-      using \<open>AuxPred' = _\<close>
-      by auto
-
-    let ?M = "({heap_var ?Tr', mask_var ?Tr', heap_var_def ?Tr',
-      mask_var_def ?Tr'} \<union>
-     ran (var_translation ?Tr') \<union>
-     ran (field_translation ?Tr') \<union>
-     range (const_repr ?Tr'))"
-
-    have "B \<inter> ?M = {}"
-      apply (subst \<open>B = _\<close>)
-      using var_translation_disjoint[OF StateRel]
-*)      
-
-
-subsubsection \<open>Main Lemma\<close>
 
 definition store_var_rel_aux
   where "store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl \<equiv>
@@ -907,6 +834,160 @@ lemma store_relI:
   using assms
   unfolding store_rel_def store_var_rel_aux_def
   by blast
+
+lemma state_rel_var_translation_remove:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
+          MapLe: "f' \<subseteq>\<^sub>m var_translation Tr" and
+          "finite (ran f')"
+        shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega> \<omega> ns"
+proof (rule state_rel_store_update[OF StateRel])
+
+  show "store_rel (type_interp ctxt) (var_context ctxt) f' \<omega> ns"
+  proof (rule store_relI)
+    show "inj_on f' (dom f')"
+      using state_rel_var_tr_inj[OF StateRel] MapLe
+      by (metis dom_map_add inj_on_Un inj_on_map_add_dom map_add_subsumed2)
+  next
+    fix var_vpr var_bpl
+    assume "f' var_vpr = Some var_bpl"
+    hence "var_translation Tr var_vpr = Some var_bpl"
+      using MapLe
+      unfolding map_le_def
+      by force
+    thus "store_var_rel_aux (type_interp ctxt) (var_context ctxt) \<omega> ns var_vpr var_bpl"
+      using state_rel_store_rel[OF StateRel, simplified store_rel_def]
+      unfolding store_var_rel_aux_def
+      by blast
+  qed
+next
+  show "binder_state ns = Map.empty"
+    using state_rel_state_well_typed[OF StateRel, simplified state_well_typed_def]
+    by simp
+next
+  show "ran f' \<inter>
+    ({heap_var Tr, heap_var_def Tr} \<union> {mask_var Tr, mask_var_def Tr} \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union>
+     dom AuxPred) = {}"
+    using var_translation_disjoint[OF assms(1)] map_le_ran[OF assms(2)]
+    by blast
+qed (insert assms, auto)
+
+
+lemma state_rel_transfer_var_tr_to_aux_pred:
+  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
+          "f' \<subseteq>\<^sub>m var_translation Tr" and
+          "finite (ran f')"
+          "B = ran (var_translation Tr) - ran f'" 
+        shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) 
+                 (map_upd_set AuxPred B (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) 
+                 ctxt \<omega> \<omega> ns"
+proof -
+  let ?Tr' = "Tr\<lparr> var_translation := f' \<rparr>"
+  let ?AuxPred' = "map_upd_set AuxPred B (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))"
+
+  from assms have "state_rel Pr TyRep ?Tr' AuxPred ctxt \<omega> \<omega> ns"
+    using state_rel_var_translation_remove
+    by fast
+
+  thus ?thesis
+  proof (rule state_rel_new_aux_var_no_state_upd)
+    have "dom ?AuxPred' = dom AuxPred \<union> B"
+      by (simp add: map_upd_set_dom)
+
+    let ?M = "({heap_var ?Tr', mask_var ?Tr', heap_var_def ?Tr',
+      mask_var_def ?Tr'} \<union>
+     ran (var_translation ?Tr') \<union>
+     ran (field_translation ?Tr') \<union>
+     range (const_repr ?Tr'))"
+
+    note disj_lemmas = state_rel_aux_pred_disjoint[OF StateRel]
+                       var_translation_disjoint[OF StateRel]
+
+    have *: "(dom AuxPred \<union> (ran (var_translation Tr) - ran f')) \<inter> ran f' = {}"
+    proof -
+      have "dom AuxPred \<inter> ran f' = {}"
+        using disj_lemmas \<open>f' \<subseteq>\<^sub>m _\<close>
+      proof -
+        have "ran f' \<subseteq> ran (var_translation Tr)"
+          using \<open>f' \<subseteq>\<^sub>m _\<close> map_le_ran
+          by blast
+
+        thus ?thesis
+          using disj_lemmas
+          by blast
+      qed
+      moreover have "dom AuxPred \<inter> (ran (var_translation Tr) - ran f') = {}"
+        using disj_lemmas
+        by blast
+      ultimately show ?thesis
+        by fast
+    qed
+
+    show "dom ?AuxPred' \<inter> ?M = {}"
+      apply (simp add: map_upd_set_dom)      
+      apply (subst \<open>B = _\<close>)+
+      apply (intro conjI)
+      using disj_lemmas
+              apply blast
+      using disj_lemmas
+             apply blast
+      using disj_lemmas
+            apply blast
+      using disj_lemmas
+           apply blast
+      using disj_lemmas
+          apply blast
+      using disj_lemmas
+         apply blast
+      using disj_lemmas
+        apply blast
+      using disj_lemmas
+       apply blast
+      using disj_lemmas *
+      by fast
+  next
+    let ?pred_fun = "(\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))"
+    show "aux_vars_pred_sat (var_context ctxt) ?AuxPred' ns"
+      unfolding aux_vars_pred_sat_def
+    proof (rule allI | rule impI)+
+      fix x P
+      assume SomePred: "map_upd_set AuxPred B ?pred_fun x = Some P"
+
+      from this consider (OldSetCase) "x \<in> dom AuxPred \<and> x \<notin> B" | (NewSetCase) "x \<in> B"
+        by (metis Some_Some_ifD domIff map_upd_set_lookup_2)
+
+      thus "has_Some P (lookup_var (var_context ctxt) ns x)"
+      proof cases
+        case OldSetCase        
+        then show ?thesis           
+          using state_rel_aux_vars_pred_sat[OF StateRel]
+          unfolding aux_vars_pred_sat_def
+          by (metis SomePred map_upd_set_lookup_2)
+      next
+        case NewSetCase
+        hence "P = ?pred_fun x"
+          using SomePred
+          by (simp add: map_upd_set_lookup_1)
+
+        moreover have "lookup_var (var_context ctxt) ns x \<noteq> None"
+        proof -
+          from NewSetCase obtain x_vpr where "var_translation Tr x_vpr = Some x"
+            unfolding \<open>B = _\<close> ran_def
+            by blast
+
+          thus ?thesis
+            using state_rel_store_rel[OF StateRel]
+            unfolding store_rel_def
+            by fast
+        qed
+        ultimately show ?thesis
+          unfolding pred_eq_def
+          by force          
+      qed
+    qed
+  qed
+qed
+
+subsubsection \<open>Main Lemma\<close>
 
 lemma method_call_stmt_rel:
   assumes 
@@ -1264,14 +1345,11 @@ proof (rule stmt_rel_intro_2)
         using map_upds_upt_ran LengthEqs
         unfolding \<open>var_tr' = _\<close>
         by force
-
-      hence FiniteRanVarTr': "finite (ran var_tr')"
-        unfolding \<open>var_tr' = _\<close>        
-        by force
   
       have "state_rel Pr TyRep (Tr \<lparr> var_translation := Map.empty \<rparr>) ?AuxPredPre ctxt \<omega> \<omega> ns"
         apply (rule state_rel_aux_pred_remove)
          apply (rule state_rel_transfer_var_tr_to_aux_pred[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]])
+          apply simp
           apply simp
          apply simp
         by (rule AuxSub)        
@@ -1279,7 +1357,6 @@ proof (rule stmt_rel_intro_2)
       thus ?thesis
         apply (rule state_rel_store_update[where ?f= var_tr'])
                  apply simp
-                apply (rule FiniteRanVarTr')
                apply simp
               apply simp
              apply simp
@@ -1401,11 +1478,6 @@ proof (rule stmt_rel_intro_2)
      hence
       "?RCallPost ?\<omega>havoc ?nshavoc"
      proof (rule state_rel_store_update[where ?f=var_tr''])
-       show "finite (ran var_tr'')"
-         using LengthEqs
-         unfolding \<open>var_tr'' = _\<close>
-         by (simp add: map_upds_ran_distinct)
-     next
        fix x
        assume "x \<notin> ran var_tr''"
        hence "x \<notin> set ys_bpl"
@@ -1676,9 +1748,6 @@ proof (rule stmt_rel_intro_2)
 
             thus ?thesis
             proof (rule state_rel_store_update[where ?f="var_translation Tr"])
-              show "finite (ran (var_translation Tr))"
-                sorry \<comment>\<open>need to add finiteness of var translation to state relation\<close>
-            next
               show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) 
                               (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
               proof (rule store_relI)

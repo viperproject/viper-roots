@@ -793,6 +793,38 @@ proof
     by (metis \<open>a \<notin> _\<close> \<open>f a = Some b\<close> domIff inj_on_contraD nth_mem option.distinct(1))
 qed
 
+definition map_upd_set \<comment>\<open>make this a definition?\<close>
+  where "map_upd_set A B f \<equiv> A ++ (\<lambda>x. if x \<in> B then Some (f x) else None)"
+
+lemma map_upd_set_dom:
+  shows "dom (map_upd_set m B f) = dom m \<union> B"
+  by (auto simp: map_upd_set_def)
+
+lemma map_upd_set_subset:
+  assumes "B' \<subseteq> B" and "B \<inter> dom A = {}"
+  shows "map_upd_set A B' f \<subseteq>\<^sub>m map_upd_set A B f"
+  unfolding map_le_def map_upd_set_def
+  by (smt (z3) Diff_Diff_Int Diff_iff assms(1) assms(2) domIff empty_iff map_add_None map_add_def subsetD)
+
+lemma map_upd_set_subset2:
+  assumes "dom A \<inter> B = {}"
+  shows "A \<subseteq>\<^sub>m map_upd_set A B f"
+  unfolding map_upd_set_def
+  by (smt (verit) assms disjoint_iff domIff map_add_dom_app_simps(3) map_le_def)
+
+lemma map_upd_set_lookup_1:
+  assumes "x \<in> B"
+  shows "map_upd_set A B f x = Some (f x)"
+  using assms
+  by (simp add: map_upd_set_def)
+
+lemma map_upd_set_lookup_2:
+  assumes "x \<notin> B"
+  shows "map_upd_set A B f x = A x"
+  using assms
+  unfolding map_upd_set_def
+  by (simp add: map_add_def)
+
 subsection \<open>Strictly Ordered Lists\<close>
 
 \<comment>\<open>TODO: the passification metatheory contains a more specific version of this --> move this to 
