@@ -491,7 +491,7 @@ lemma store_rel_var_rel:
   unfolding store_rel_def
   by auto
 
-lemma store_rel_var_tr_2:
+lemma store_rel_var_rel_2:
   assumes "store_rel A \<Lambda> var_tr \<omega> ns" and
           "var_tr var_vpr = Some var_bpl"
   shows "\<exists>val_vpr. ((get_store_total \<omega>) var_vpr) = Some val_vpr \<and>

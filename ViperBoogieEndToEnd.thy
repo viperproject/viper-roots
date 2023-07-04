@@ -1488,7 +1488,7 @@ proof -
         by (metis lookup_var_local lookup_vdecls_ty_map_of prod.exhaust_sel)
     qed
              
-    show "store_rel (type_interp ctxt) (var_context ctxt) Tr \<omega> ns"
+    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega> ns"
       unfolding store_rel_def
       apply (rule conjI[OF InjVarTr], (rule allI | rule impI)+)
       using VarTranslationTy TyInterp Aux
@@ -1553,7 +1553,7 @@ proof -
       using \<open>mask_var Tr = _\<close>
       by simp
   
-    show "field_rel (program_total ctxt_vpr) (var_context ctxt) Tr ns"
+    show "field_rel (program_total ctxt_vpr) (var_context ctxt) (field_translation Tr) ns"
       unfolding field_rel_def
     proof (rule conjI[OF InjFieldTr], (rule allI | rule impI)+)
       fix f_vpr t_vpr

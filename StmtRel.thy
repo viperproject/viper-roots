@@ -908,7 +908,7 @@ lemma store_relI:
   unfolding store_rel_def store_var_rel_aux_def
   by blast
 
-lemma method_call_rel:
+lemma method_call_stmt_rel:
   assumes 
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
                       "rtype_interp ctxt = []" and
