@@ -253,26 +253,26 @@ proof -
     by (simp add: add.commute)
 qed
 
-lemma disjoint_list_add:
+lemma disjoint_list_add_set:
   assumes Disj: "disjoint_list (xs@(M#ys))" and
-          Fresh: "\<forall>A \<in> set (xs@ys). m \<notin> A"
-        shows "disjoint_list (xs@((M \<union> {m})#ys))"
+          Fresh: "\<forall>A \<in> set (xs@ys). disjnt M' A"
+        shows "disjoint_list (xs@((M \<union> M')#ys))"
   unfolding disjoint_list_def
 proof (rule allI | rule impI)+
   fix i j
-  assume Bounds: "0 \<le> i \<and> i < length (xs @ (M \<union> {m}) # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> {m}) # ys) \<and> i \<noteq> j"
+  assume Bounds: "0 \<le> i \<and> i < length (xs @ (M \<union> M') # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> M') # ys) \<and> i \<noteq> j"
   hence "i \<noteq> j"
     by simp
 
-  have DisjXsM: "\<And>x. x \<in> set xs \<Longrightarrow> disjnt x (M \<union> {m})"
+  have DisjXsM: "\<And>x. x \<in> set xs \<Longrightarrow> disjnt x (M \<union> M')"
     using assms disjoint_list_app_disj
-    by fastforce
+    by (metis UnCI disjnt_Un2 disjnt_sym list.set_intros(1) set_append)
 
   have DisjXsYs: "\<And>x y. x \<in> set xs \<Longrightarrow> y \<in> set ys \<Longrightarrow> disjnt x y"
     using Disj disjoint_list_app_disj
     by fastforce
 
-  have DisjYsM: "\<And>y. y \<in> set ys \<Longrightarrow> disjnt (M \<union> {m}) y"
+  have DisjYsM: "\<And>y. y \<in> set ys \<Longrightarrow> disjnt (M \<union> M') y"
   proof -
     fix y
     assume "y \<in> set ys"
@@ -281,43 +281,43 @@ proof (rule allI | rule impI)+
     hence "disjnt M y"
       using \<open>y \<in> _\<close> disjoint_list_app_disj
       by fastforce
-    thus "disjnt (M \<union> {m}) y"
-      using Fresh \<open>y \<in> set ys\<close> by fastforce
+    thus "disjnt (M \<union> M') y"
+      using Fresh \<open>y \<in> set ys\<close> 
+      by (metis UnCI disjnt_Un2 disjnt_sym set_append)
   qed  
 
-  have ElemYsAux: "\<And>j. length xs < j \<Longrightarrow> j < length (xs @ (M \<union> {m}) # ys) \<Longrightarrow> (xs @ ((M \<union> {m}) # ys)) ! j \<in> set ys"
+  have ElemYsAux: "\<And>j. length xs < j \<Longrightarrow> j < length (xs @ (M \<union> M') # ys) \<Longrightarrow> (xs @ ((M \<union> M') # ys)) ! j \<in> set ys"
   proof -
     fix j
-    assume "length xs < j" and "j < length (xs @ (M \<union> {m}) # ys)"
+    assume "length xs < j" and "j < length (xs @ (M \<union> M') # ys)"
 
-    hence "j \<ge> length (xs @ [M \<union> {m}])"
+    hence "j \<ge> length (xs @ [M \<union> M'])"
             by simp 
 
-   let ?b = "(xs @ ((M \<union> {m}) # ys)) ! j"
+   let ?b = "(xs @ ((M \<union> M') # ys)) ! j"
           
-    have Eq: "(xs @ (M \<union> {m}) # ys) = ((xs @ [M \<union> {m}]) @ ys)"
+    have Eq: "(xs @ (M \<union> M') # ys) = ((xs @ [M \<union> M']) @ ys)"
       by simp
  
-    from \<open>j \<ge> length (xs @ [M \<union> {m}])\<close> \<open>j < length (xs @ (M \<union> {m}) # ys)\<close> obtain j' where
-       "?b = ys ! j'" and "j' = j - (length (xs @ [M \<union> {m}]))"
+    from \<open>j \<ge> length (xs @ [M \<union> M'])\<close> \<open>j < length (xs @ (M \<union> M') # ys)\<close> obtain j' where
+       "?b = ys ! j'" and "j' = j - (length (xs @ [M \<union> M']))"
       using Eq List.nth_append[where ?ys=ys] 
       by (metis linorder_not_less)            
       
     thus "?b \<in> set ys"
-      using \<open>j \<ge> length (xs @ [M \<union> {m}])\<close> and \<open>j < length (xs @ (M \<union> {m}) # ys)\<close>
+      using \<open>j \<ge> length (xs @ [M \<union> M'])\<close> and \<open>j < length (xs @ (M \<union> M') # ys)\<close>
       by simp
   qed
 
-
-  have Aux: "\<And>i j. 0 \<le> i \<and> i < length (xs @ (M \<union> {m}) # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> {m}) # ys) \<and> i \<noteq> j \<Longrightarrow>
-               i < length xs  \<Longrightarrow> disjnt ((xs @ (M \<union> {m}) # ys) ! i) ((xs @ (M \<union> {m}) # ys) ! j)"
+  have Aux: "\<And>i j. 0 \<le> i \<and> i < length (xs @ (M \<union> M') # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> M') # ys) \<and> i \<noteq> j \<Longrightarrow>
+               i < length xs  \<Longrightarrow> disjnt ((xs @ (M \<union> M') # ys) ! i) ((xs @ (M \<union> M') # ys) ! j)"
   proof -
     fix i j
-    assume Bounds: "0 \<le> i \<and> i < length (xs @ (M \<union> {m}) # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> {m}) # ys) \<and> i \<noteq> j"
+    assume Bounds: "0 \<le> i \<and> i < length (xs @ (M \<union> M') # ys) \<and> 0 \<le> j \<and> j < length (xs @ (M \<union> M') # ys) \<and> i \<noteq> j"
     hence "i \<noteq> j"
       by simp
     assume A: "i < length xs"
-    show "disjnt ((xs @ (M \<union> {m}) # ys) ! i) ((xs @ (M \<union> {m}) # ys) ! j)" (is "disjnt ?a ?b")
+    show "disjnt ((xs @ (M \<union> M') # ys) ! i) ((xs @ (M \<union> M') # ys) ! j)" (is "disjnt ?a ?b")
     proof -
       from A
       have "?a \<in> set xs"
@@ -345,13 +345,13 @@ proof (rule allI | rule impI)+
         by simp                
     next
       case False
-        with Bounds have "length xs \<le> j" and "j < length (xs @ (M \<union> {m}) # ys)"
+        with Bounds have "length xs \<le> j" and "j < length (xs @ (M \<union> M') # ys)"
           by auto
 
         show ?thesis
         proof (cases "j = length xs")
           case True
-          hence "?b = (M \<union> {m})"
+          hence "?b = (M \<union> M')"
             by simp
           then show ?thesis 
             using DisjXsM \<open>?a \<in> set xs\<close>
@@ -359,7 +359,7 @@ proof (rule allI | rule impI)+
         next
           case False
           hence "?b \<in> set ys"
-            using ElemYsAux \<open>j < length (xs @ (M \<union> {m}) # ys)\<close> \<open>length xs \<le> j\<close> by fastforce  
+            using ElemYsAux \<open>j < length (xs @ (M \<union> M') # ys)\<close> \<open>length xs \<le> j\<close> by fastforce  
 
           with \<open>?a \<in> set xs\<close>  show ?thesis
             using DisjXsYs
@@ -369,7 +369,7 @@ proof (rule allI | rule impI)+
     qed
   qed
 
-  show "disjnt ((xs @ (M \<union> {m}) # ys) ! i) ((xs @ (M \<union> {m}) # ys) ! j)" (is "disjnt ?a ?b")
+  show "disjnt ((xs @ (M \<union> M') # ys) ! i) ((xs @ (M \<union> M') # ys) ! j)" (is "disjnt ?a ?b")
   proof (cases "i < length xs")
     case True
     then show ?thesis using Aux[OF Bounds]
@@ -393,18 +393,18 @@ proof (rule allI | rule impI)+
       \<comment>\<open>Now we prove the case where \<^term>\<open>i = length xs\<close> and thus \<^term>\<open>j > length xs\<close>. We can then prove
         the case where  \<^term>\<open>i > length xs\<close> and \<^term>\<open>j = length xs\<close> by symmetry\<close>
 
-      have Aux2: "\<And>i j. i = length xs \<Longrightarrow> j > length xs \<Longrightarrow> j < length (xs @ (M \<union> {m}) # ys) \<Longrightarrow> i \<noteq> j \<Longrightarrow>
-                disjnt ((xs @ (M \<union> {m}) # ys) ! i) ((xs @ (M \<union> {m}) # ys) ! j)"
+      have Aux2: "\<And>i j. i = length xs \<Longrightarrow> j > length xs \<Longrightarrow> j < length (xs @ (M \<union> M') # ys) \<Longrightarrow> i \<noteq> j \<Longrightarrow>
+                disjnt ((xs @ (M \<union> M') # ys) ! i) ((xs @ (M \<union> M') # ys) ! j)"
       proof -
         fix i j
-        assume "i = length xs" and "length xs < j" and "j < length (xs @ (M \<union> {m}) # ys)" and "i \<noteq> j"
-        show "disjnt ((xs @ (M \<union> {m}) # ys) ! i) ((xs @ (M \<union> {m}) # ys) ! j)" (is "disjnt ?a ?b")
+        assume "i = length xs" and "length xs < j" and "j < length (xs @ (M \<union> M') # ys)" and "i \<noteq> j"
+        show "disjnt ((xs @ (M \<union> M') # ys) ! i) ((xs @ (M \<union> M') # ys) ! j)" (is "disjnt ?a ?b")
         proof -
-          from \<open>i = length xs\<close> have "?a = M \<union> {m}"
+          from \<open>i = length xs\<close> have "?a = M \<union> M'"
             by simp
 
           have "?b \<in> set ys"
-            using ElemYsAux \<open>j < length (xs @ (M \<union> {m}) # ys)\<close> \<open>length xs < j\<close> 
+            using ElemYsAux \<open>j < length (xs @ (M \<union> M') # ys)\<close> \<open>length xs < j\<close> 
             by blast
 
           thus ?thesis
@@ -428,7 +428,7 @@ proof (rule allI | rule impI)+
             by (metis disjnt_sym order_le_neq_trans)
         next
           case False
-          have Eq: "length (xs @ M # ys) = length (xs @ (M \<union> {m}) # ys)" 
+          have Eq: "length (xs @ M # ys) = length (xs @ (M \<union> M') # ys)" 
             by simp
 
           have "disjnt ((xs @ M # ys) ! i) ((xs @ M # ys) ! j)"
@@ -449,30 +449,13 @@ proof (rule allI | rule impI)+
   qed
 qed
 
-lemma disjoint_list_add_set:
+lemma disjoint_list_add:
   assumes Disj: "disjoint_list (xs@(M#ys))" and
-                "finite M'" and \<comment>\<open>I think the finite property is not required in general (here we use it
-                                   to reuse the lemma that adds a single element via induction)\<close>
-          Fresh: "\<forall>A \<in> set (xs@ys). disjnt M' A"
-        shows "disjoint_list (xs@((M \<union> M')#ys))"
-  using Fresh
-proof (induction rule: finite_induct[OF \<open>finite M'\<close>] )
-  case 1
-  then show ?case 
-    using Disj
-    by simp    
-next
-  case (2 a M')
-  hence *:"disjoint_list (xs @ (M \<union> M') # ys)"
-    by simp
-
-  have "disjoint_list (xs @ (M \<union> M' \<union> {a}) # ys)"
-    apply (rule disjoint_list_add[OF *])
-    using 2
-    by auto
-  then show ?case
-    by auto
-qed
+          Fresh: "\<forall>A \<in> set (xs@ys). m \<notin> A"
+        shows "disjoint_list (xs@((M \<union> {m})#ys))"
+  apply (rule disjoint_list_add_set)
+  using assms 
+  by auto
 
 lemma disjoint_list_subset: 
   assumes "disjoint_list xs" and
@@ -493,8 +476,6 @@ lemma disjoint_list_subset_list_all2:
 
 lemma disjoint_list_replace_set:
   assumes Disj: "disjoint_list (xs@(M#ys))" and
-                "finite M'" and \<comment>\<open>I think the finite property is not required in general (here we use it
-                                   to reuse the lemma that adds a single element via induction)\<close>
           Fresh: "\<forall>A \<in> set (xs@ys). disjnt M' A"
         shows "disjoint_list (xs@(M'#ys))"
 proof -
