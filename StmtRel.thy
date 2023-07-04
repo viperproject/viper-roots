@@ -1254,37 +1254,10 @@ proof (rule stmt_rel_intro_2)
         \<comment>\<open>Could adjust state rel with an additional parameter that switches off injectivity on the variable translation.
            Then, one could support multiple arguments being the same variable. Injectivity is useful only if there
            are changes to the local Viper variables.\<close>
-        show "inj_on var_tr' (dom var_tr')" 
-          unfolding inj_on_def
-        proof (rule ballI | rule impI)+
-          fix i j
-          assume "i \<in> dom var_tr'" and "j \<in> dom var_tr'" and "var_tr' i = var_tr' j"
-
-          hence "i \<in> set [0..<length es]" and "j \<in> set [0..<length es]"
-            using \<open>var_tr' = _\<close>
-            by (meson domIff map_upds_apply_nontin)+
-
-          hence "i < length es" and "j < length es"
-            by simp_all
-
-          have "var_tr' i = Some (xs_bpl ! i)"
-            apply (subst \<open>var_tr' = _\<close>)
-            using \<open>i \<in> set _\<close>  \<open>xs = _\<close> XsBplEq
-            by (auto intro!: map_upds_distinct_nth)
-
-          moreover have "var_tr' j = Some (xs_bpl ! j)"
-            apply (subst \<open>var_tr' = _\<close>)
-            using \<open>j \<in> set _\<close> \<open>xs = _\<close> XsBplEq
-            by (auto intro!: map_upds_distinct_nth)
-
-          moreover have "i < length xs_bpl" and "j < length xs_bpl"
-            using \<open>i < _\<close> \<open>j < _\<close> \<open>xs = _\<close> XsBplEq
-            by auto
-
-          ultimately show "i = j"
-            using \<open>var_tr' i = var_tr' j\<close> \<open>distinct xs_bpl\<close> 
-            by (metis (no_types, lifting) nth_eq_iff_index_eq option.inject)
-        qed
+        show "inj_on var_tr' (dom var_tr')"
+          unfolding \<open>var_tr' = _\<close>
+          using inj_on_upt_distinct \<open>distinct xs_bpl\<close> LengthEqs
+          by fastforce
       next
         fix x_vpr x_bpl
         assume VarTrSome: "var_tr' x_vpr = Some x_bpl" 
@@ -1492,7 +1465,17 @@ proof (rule stmt_rel_intro_2)
        show "store_rel (type_interp ctxt) (var_context ctxt) var_tr'' ?\<omega>havoc ?nshavoc"
        proof (rule store_relI)
          show "inj_on var_tr'' (dom var_tr'')"
-           sorry
+         proof -
+           have *: "distinct (xs_bpl @ ys_bpl)"
+             using \<open>distinct xs_bpl\<close> \<open>distinct ys_bpl\<close> \<open>set xs_bpl \<inter> set ys_bpl = {}\<close>
+                   distinct_append
+             by blast
+
+           thus ?thesis
+             using LengthEqs inj_on_upt_distinct[OF *]
+             unfolding \<open>var_tr'' = _\<close>
+             by simp
+         qed        
        next
          fix var_vpr var_bpl
          assume VarTrSome: "var_tr'' var_vpr = Some var_bpl"

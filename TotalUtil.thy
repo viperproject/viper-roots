@@ -768,6 +768,37 @@ proof -
     by fastforce
 qed
 
+lemma inj_on_upt_distinct:
+  assumes "distinct ys" and 
+          "length ys = length [0..<j]"
+  shows "inj_on [[0..<j] [\<mapsto>] ys] (set [0..<j])"
+  unfolding inj_on_def
+proof (rule ballI | rule impI)+
+  fix a b
+  assume "a \<in> set [0..<j]" and "b \<in> set [0..<j]" and
+         fun_val_eq: "[[0..<j] [\<mapsto>] ys] a = [[0..<j] [\<mapsto>] ys] b" 
+
+  hence a_nth: "a = [0..<j] ! a" and b_nth: "b = [0..<j] ! b"
+    by simp_all
+
+  from \<open>a \<in> _\<close> and \<open>b \<in> _\<close> have "a < length [0..<j]" and "b < length [0..<j]"
+    by simp_all
+
+  let ?f = "[[0..<j] [\<mapsto>] ys]"
+
+  have "?f a = Some (ys ! a)"
+    using map_upds_distinct_nth[OF distinct_upt a_nth \<open>a < _\<close>, where ?m=Map.empty and ?ys = ys] \<open>length ys = _\<close>
+    by argo
+
+  moreover have "?f b = Some (ys ! b)"
+    using map_upds_distinct_nth[OF distinct_upt b_nth \<open>b < _\<close>, where ?m=Map.empty and ?ys = ys] \<open>length ys = _\<close>
+    by argo
+    
+  ultimately show "a = b"
+    using \<open>a < _\<close> \<open>b < _\<close> \<open>distinct ys\<close>
+    by (metis fun_val_eq \<open>length ys = _\<close> nth_eq_iff_index_eq option.inject)
+qed
+
 lemma map_the_inj_not_in:
   assumes "ys' = map (the \<circ> f) ys" and
           Inj: "inj_on f (dom f)" and
