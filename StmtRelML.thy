@@ -105,6 +105,7 @@ ML \<open>
        exp_rel_info   (* rhs *)
   | InhaleHint of (atomic_inhale_rel_hint inhale_rel_hint)
   | ExhaleHint of (atomic_exhale_rel_hint exhale_rel_complete_hint)
+  | MethodCallHint
 
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
@@ -199,9 +200,8 @@ ML \<open>
     (resolve_tac ctxt @{thms red_ast_bpl_refl}) THEN'
     (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt)
                                                                                    
-  fun exhale_finish_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
-    let val basic_info = #basic_info info
-        val tr_thm = #tr_def_thm basic_info in
+  fun exhale_finish_tac ctxt (basic_info: basic_stmt_rel_info) (hint: 'a exhale_rel_complete_hint) =
+    let val tr_thm = #tr_def_thm basic_info in
       (Rmsg' "exhale finish 1" (resolve_tac ctxt @{thms exhale_stmt_rel_finish}) ctxt) THEN'
       (Rmsg' "exhale finish StateRel"  (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish CtxtWf"  (resolve_tac ctxt [#ctxt_wf_thm basic_info]) ctxt) THEN'
@@ -223,7 +223,7 @@ ML \<open>
     (#setup_well_def_state_tac hint) (#basic_info info) ctxt THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
-    exhale_finish_tac ctxt info hint
+    exhale_finish_tac ctxt (#basic_info info) hint
 
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
@@ -237,6 +237,7 @@ ML \<open>
         (Rmsg' "AtomicExh1" (resolve_tac ctxt @{thms exhale_stmt_rel_inst}) ctxt) THEN'
       (*  setup_well_def_state_tac basic_info (#lookup_ty_mask_def_thm exh_complete_hint) (#lookup_ty_heap_def_thm exh_complete_hint) ctxt THEN'*)
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
+     | MethodCallHint => K all_tac (* TODO *)
     )
 \<close>
 

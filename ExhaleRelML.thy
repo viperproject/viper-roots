@@ -110,10 +110,11 @@ ML \<open>
                         ]) ctxt) THEN'
           (Rmsg' "Prove Sufficient Perm - Red Assert" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
           (Rmsg' "Prove Sufficient Perm - Success Condition" 
-                     (K (unfold_tac ctxt @{thms exhale_field_acc_rel_perm_success_def}) THEN'
+                     (simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
                       fastforce_tac ctxt @{thms of_rat_less_eq}) ctxt) THEN'
           (Rmsg' "Prove Sufficient Perm - Finish Then Branch"
                      (resolve_tac ctxt @{thms rel_general_success_refl} THEN'
+                      simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
                       fastforce_tac ctxt @{thms of_rat_less_eq} THEN'
                       assm_full_simp_solved_tac ctxt) ctxt) THEN'
        (Rmsg' "Prove Sufficient Perm - Progress from then-branch" (progress_tac ctxt) ctxt) THEN'
@@ -124,13 +125,15 @@ ML \<open>
                        resolve_tac ctxt @{thms rel_propagate_pre_2},
                        progress_tac ctxt,
                        resolve_tac ctxt @{thms rel_general_success_refl},
+                       simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt,
                        fastforce_tac ctxt @{thms prat_non_negative},
-                       assm_full_simp_solved_tac ctxt]) ctxt)
+                       assm_full_simp_solved_tac ctxt]) ctxt) 
 
   fun upd_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
     (Rmsg' "UpdExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc_upd_rel}) ctxt) THEN'
     (Rmsg' "UpdExhField StateRel" (blast_tac ctxt) ctxt) THEN'
-    (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN'
+   (* old version: (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN' *)
+    (Rmsg' "UpdExhField Dom AuxPred" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField Wf TyRepr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
     (Rmsg' "UpdExhField MaskDef Different" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField TyInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
