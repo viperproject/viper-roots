@@ -86,22 +86,30 @@ abbreviation expr_wf_rel :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarr
   "expr_wf_rel R ctxt_vpr StateCons P ctxt e_vpr \<gamma> \<gamma>' \<equiv>
    wf_rel R R (\<lambda>\<omega>def \<omega>. \<exists>v. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v )) (\<lambda>\<omega>def \<omega>. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure)) P ctxt \<gamma> \<gamma>'"
 
-fun exprs_wf_rel :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> ('a vpr_state \<Rightarrow> bool) \<Rightarrow>  ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
+
+definition exprs_wf_rel :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> ('a vpr_state \<Rightarrow> bool) \<Rightarrow>  ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
+       viper_expr list \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
+  where "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<equiv>
+           wf_rel R R (\<lambda>\<omega>def \<omega>. \<exists>vs. red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some vs)) 
+                      (\<lambda>\<omega>def \<omega>. red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None) P ctxt"
+
+fun exprs_wf_rel_alt :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> ('a vpr_state \<Rightarrow> bool) \<Rightarrow>  ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
        viper_expr list \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
   where 
-    "exprs_wf_rel R ctxt_vpr StateCons P ctxt Nil \<gamma> \<gamma>' = (\<gamma> = \<gamma>')"
-  | "exprs_wf_rel R ctxt_vpr StateCons P ctxt (e#es) \<gamma> \<gamma>' = 
+    "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt Nil \<gamma> \<gamma>' = (\<gamma> = \<gamma>')"
+  | "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt (e#es) \<gamma> \<gamma>' = 
           (\<exists>\<gamma>''. expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>'' \<and>
-            exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>')"
+            exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>')"
+
 
 lemma wf_rel_intro [case_names normal failure]:
   assumes
-  cases:"\<And>v \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
+  cases:"\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
          IsNormal \<omega>def \<omega> \<Longrightarrow>
          \<exists> ns'.           
            red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
            R' \<omega>def \<omega> ns'" 
-    "\<And>v \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
+    "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
          IsFailure \<omega>def \<omega> \<Longrightarrow> 
          (\<exists>c'.           
           red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
@@ -124,13 +132,13 @@ lemma wf_rel_normal_elim:
 
 lemma exprs_wf_rel_normal_elim:
   assumes 
-       "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
+       "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
        "R \<omega>def \<omega> ns"
        "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some vs)"
   shows
         "\<exists> ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
   using assms
-proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns vs rule: exprs_wf_rel.induct)
+proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns vs rule: exprs_wf_rel_alt.induct)
   case (1 R ctxt_vpr StateCons P ctxt \<gamma> \<gamma>')
   then show ?case by (auto simp: red_ast_bpl_def)
 next
@@ -138,7 +146,7 @@ next
 
   from this obtain \<gamma>'' where 
     WfRelE:"expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>''" and 
-    WfRelEs:"exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>'" by auto
+    WfRelEs:"exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>'" by auto
 
   note RedExps=\<open>red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) (e # es) \<omega> (Some vs)\<close>
   from this obtain v' vs' where "vs = v'#vs'" and
@@ -172,13 +180,13 @@ lemma wf_rel_failure_elim:
   
 lemma exprs_wf_rel_failure_elim:
   assumes 
-       "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
+       "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
        "R \<omega>def \<omega> ns"
        "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
   shows
        "\<exists> c. red_ast_bpl P ctxt (\<gamma>, Normal ns) c \<and> snd c = Failure"
   using assms
-proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns rule: exprs_wf_rel.induct)
+proof (induction R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>' arbitrary: ns rule: exprs_wf_rel_alt.induct)
   case (1 R ctxt_vpr StateCons P ctxt \<gamma> \<gamma>')
   then show ?case
     \<comment>\<open>contradiction, since empty list never reduces to \<^const>\<open>None\<close>\<close>
@@ -189,7 +197,7 @@ next
 
   from this obtain \<gamma>'' where
     WfRelE:  "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>''" and 
-    WfRelEs: "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>'"
+    WfRelEs: "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma>'' \<gamma>'"
     by auto
 
   consider (FailHd) "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure" 
@@ -211,6 +219,14 @@ next
       by (blast dest: wf_rel_normal_elim)      
   qed
 qed
+
+lemma exprs_wf_rel_alt_implies_exprs_wf_rel:
+  assumes "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'"
+  shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'"
+  unfolding exprs_wf_rel_def
+  apply (rule wf_rel_intro)
+   apply (blast intro: exprs_wf_rel_normal_elim[OF assms])
+  by (blast intro: exprs_wf_rel_failure_elim[OF assms])
 
 lemma expr_wf_rel_intro:
   assumes
