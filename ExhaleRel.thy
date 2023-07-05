@@ -97,7 +97,6 @@ lemma exhale_rel_imp:
    RhsRel: "exhale_rel R ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
                 (is "exhale_rel R _ _ _ _ _ ?\<gamma>_thn (next, cont)") 
               shows "exhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
-  (*using RhsRel*)
   unfolding exhale_rel_def 
 proof (simp only: uncurry.simps, rule rel_general_cond[OF rev_iffD1_def[OF wf_rel_inst_eq_1[OF ExpWfRel] wf_rel_inst_def]])
   show "rel_general (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
@@ -120,15 +119,14 @@ next
   
   show "\<And> \<omega> \<omega>' ns. ?Success \<omega> \<omega>' \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<Longrightarrow>
                         ?SuccessExp \<omega> \<omega> \<and> \<comment>\<open>implicit assumption that success of conditional does not lead to side effects\<close>
-                       ((red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> ?SuccessThn \<omega> \<omega>') \<or> 
-                       (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> \<omega> = \<omega>'))"
+                       ((red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> ?SuccessThn \<omega> \<omega>') \<or> 
+                       (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> \<omega> = \<omega>'))"
+             (is "\<And> \<omega> \<omega>' ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> \<omega>' ns")
   proof - 
     fix \<omega> \<omega>' ns
     assume Success:"?Success \<omega> \<omega>'" and R: "R (fst \<omega>) (snd \<omega>) ns"
     from conjunct2[OF \<open>?Success \<omega> \<omega>'\<close>]
-    show "?SuccessExp \<omega> \<omega> \<and> \<comment>\<open>implicit assumption that success of conditional does not lead to side effects\<close>
-                       ((red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> ?SuccessThn \<omega> \<omega>') \<or> 
-                       (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> \<omega> = \<omega>'))"
+    show "?Goal \<omega> \<omega>' ns"
       apply cases
        apply (rule conjI)
       apply blast
@@ -141,17 +139,13 @@ next
  show "\<And> \<omega> ns. ?Fail \<omega> \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<Longrightarrow> 
                ?FailExp \<omega> \<or>
                (?SuccessExp \<omega> \<omega> \<and>
-                 ( (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> ?FailThn \<omega>) \<or> 
-                   (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> False) )
-               )"
+                 ( (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> ?FailThn \<omega>) \<or> 
+                   (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> False) )
+               )" (is "\<And> \<omega> ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> ns")
  proof -
    fix \<omega> ns
    assume Fail: "?Fail \<omega>" and "R (fst \<omega>) (snd \<omega>) ns" 
-   thus "?FailExp \<omega> \<or>
-               (?SuccessExp \<omega> \<omega> \<and>
-                 ( (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> ?FailThn \<omega>) \<or> 
-                   (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> False) )
-               )"
+   thus "?Goal \<omega> ns"
      apply cases
      using exp_rel_vpr_bpl_elim_2[OF ExpRel] Fail
       apply (metis val_rel_vpr_bpl.simps(2))

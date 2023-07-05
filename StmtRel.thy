@@ -140,8 +140,8 @@ proof (rule rel_general_cond)
   assume "R \<omega> ns"
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.If cond s_thn s_els) \<omega> (RNormal \<omega>')"
   thus "((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
-       ( red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> (RNormal \<omega>') \<or>
-       red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> (RNormal \<omega>'))"
+       ( red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R \<omega> ns \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> (RNormal \<omega>') \<or>
+       red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> (RNormal \<omega>'))"
     apply (cases)
     using exp_rel_vpr_bpl_elim_2[OF ExpRel]
     apply (metis \<open>R \<omega> ns\<close> val_rel_vpr_bpl.simps(2))
@@ -153,9 +153,9 @@ next
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.If cond s_thn s_els) \<omega> RFailure"
   thus " ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
        ((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
-       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R \<omega> ns \<and>
         red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> RFailure \<or>
-        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and>
         red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> RFailure)"
     apply(cases)
       apply (insert exp_rel_vpr_bpl_elim_2[OF ExpRel])
