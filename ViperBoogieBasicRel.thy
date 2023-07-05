@@ -2088,7 +2088,6 @@ next
     apply (rule disjoint_list_add_set)
     using state_rel0_disjoint[OF StateRel]
       apply simp
-     apply blast
     using Disj
     by fastforce
 
