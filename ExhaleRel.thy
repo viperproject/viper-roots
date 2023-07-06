@@ -56,6 +56,48 @@ lemma exhale_rel_failure_elim:
   unfolding exhale_rel_def rel_general_def
   by simp
 
+subsection \<open>Exhale rel definition that can handle optimizations\<close>
+
+definition exhale_opt_rel :: 
+    "('a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'b nstate \<Rightarrow> bool)
+     \<Rightarrow> ((pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool)
+     \<Rightarrow> 'a total_context
+        \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
+           \<Rightarrow> bigblock list \<Rightarrow> 'b econtext_bpl_general \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bigblock \<times> cont \<Rightarrow> bigblock \<times> cont \<Rightarrow> bool"
+  where "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<equiv>
+         rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q assertion_vpr \<omega>def \<omega>)) (uncurry R)
+           \<comment>\<open>The well-definedness state remains the same\<close>
+           (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. (fst \<omega>0_\<omega>) = (fst \<omega>0_\<omega>') \<and> red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) (RNormal (snd \<omega>0_\<omega>')))
+           (\<lambda> \<omega>0_\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) RFailure)
+           P ctxt \<gamma> \<gamma>'"
+
+definition is_assertion_red_invariant_2
+  where "is_assertion_red_invariant_2 ctxt StateCons Q Success \<equiv>
+          (\<forall> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<longrightarrow> 
+                  (Q A1 \<omega>def \<omega>) \<and>
+                  (\<forall>\<omega>'. Success A1 \<omega>def \<omega> \<omega>' \<longrightarrow> Q A2 \<omega>def \<omega>')) \<and>
+          (\<forall> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<longrightarrow> ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>def \<omega>)"
+
+lemma is_assertion_red_invariant_intro:
+  assumes "\<And> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Q A1 \<omega>def \<omega>" and
+          "\<And> A1 A2 \<omega>def \<omega> \<omega>'. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Success A1 \<omega>def \<omega> \<omega>' \<Longrightarrow> Q A2 \<omega>def \<omega>'" and
+          "\<And> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<Longrightarrow> 
+                    ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>def \<omega>"
+        shows "is_assertion_red_invariant_2 ctxt StateCons Q Success"
+  using assms
+  unfolding is_assertion_red_invariant_2_def
+  by blast
+
+definition is_assertion_red_invariant_exh
+  where "is_assertion_red_invariant_exh ctxt_vpr StateCons Q \<equiv> 
+          is_assertion_red_invariant_2 ctxt_vpr StateCons Q (\<lambda>A \<omega>def \<omega> \<omega>'. red_exhale ctxt_vpr StateCons \<omega>def A \<omega> (RNormal \<omega>'))"
+
+subsubsection \<open>Invariant to be propagated for optimized exhale\<close>
+
+definition framing_exh 
+  where "framing_exh ctxt_vpr StateCons A \<omega>def \<omega> \<equiv>
+           StateCons \<omega>def \<and> (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>sum \<le> \<omega> \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"
+
 subsection \<open>Propagation rules\<close>
 
 lemma exhale_rel_propagate_pre:
@@ -83,6 +125,28 @@ lemma exhale_rel_star:
   using assms
   unfolding exhale_rel_def
   apply (rule rel_general_comp)
+  by (fastforce elim: ExhStar_case)+
+
+lemma exhale_opt_rel_star: 
+  assumes Invariant1: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Q A1 \<omega>def \<omega>" and
+          Invariant2: "\<And> \<omega>def \<omega> \<omega>'. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> 
+                                    red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>def \<omega>'" and
+          RelA1: "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" and
+          RelA2: "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
+        shows "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
+  text\<open>Idea of proof:
+       \<^item> use general composition rule where the intermediate relation is chosen to be \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close>
+       \<^item> Prove the first premise by weakening the input relation from \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (A1 && A2) \<omega>def \<omega>\<close> 
+         to \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A1 \<omega>def \<omega>\<close> and by adjusting the output relation
+         \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close> to \<^term>\<open>R\<close> 
+       (\<^term>\<open>R\<close> is strong enough given the additional assumptions when adjusting the output relation)\<close>
+  unfolding exhale_opt_rel_def
+  apply (rule rel_general_comp[where ?R2.0="uncurry (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>)"])
+     apply (rule rel_general_conseq_input_output)
+       apply (rule RelA1[simplified exhale_opt_rel_def])
+      apply (simp add: Invariant1)
+     apply (fastforce dest: Invariant2)
+    apply (rule RelA2[simplified exhale_opt_rel_def])
   by (fastforce elim: ExhStar_case)+
 
 lemma exhale_rel_imp:
@@ -152,6 +216,20 @@ next
      by fast
  qed
 qed
+
+lemma exhale_opt_rel_imp:
+  assumes 
+   ExpWfRel:          
+        "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
+         \<gamma>1
+         (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
+        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if") and
+   EmptyElse: "is_empty_bigblock empty_else_block" and
+   ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt cond cond_bpl" and
+   RhsRel: "exhale_rel R ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+                (is "exhale_rel R _ _ _ _ _ ?\<gamma>_thn (next, cont)") 
+              shows "exhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
+  oops
 
 subsection \<open>Field access predicate rule\<close>
 
