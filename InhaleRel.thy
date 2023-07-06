@@ -170,7 +170,7 @@ lemma inhale_opt_rel_star:
        \<^item> use general composition rule where the intermediate relation is chosen to be \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>\<close>
        \<^item> Prove the first premise by weakening the input relation from \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q (A1 && A2) \<omega>\<close> to \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A1 \<omega>\<close>
          and by adjusting the output relation \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>\<close> to \<^term>\<open>R\<close> (\<^term>\<open>R\<close> is strong enough
-         to recover \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>\<close>)\<close>
+         given the additional assumptions when adjusting the output relation)\<close>
   unfolding inhale_opt_rel_def
   apply (rule rel_general_comp[where ?R2.0="\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>"])
      apply (rule rel_general_conseq_input_output)
