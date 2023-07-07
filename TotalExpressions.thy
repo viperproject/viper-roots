@@ -288,7 +288,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | RedUnfoldingDefNoPred:
    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega> (Some vs);
      ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
-     \<not> (pgte (get_mp_total_full \<omega> (pred_id,vs)) pwrite) \<rbrakk> \<Longrightarrow> \<comment>\<open>insufficient perrmision\<close>
+     \<not> (pgte (get_mp_total_full \<omega>_def (pred_id,vs)) pwrite) \<rbrakk> \<Longrightarrow> \<comment>\<open>insufficient perrmision\<close>
      ctxt, R, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 | RedUnfoldingDef: 
    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega> (Some vs);
@@ -374,7 +374,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      q \<noteq> pnone;
      m' = m( (pred_id,vs) := (m (pred_id, vs)) - q );
      \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
-     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     \<omega>' = \<omega>3\<lparr> get_store_total = get_store_total \<omega> \<rparr>;
+     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>3) \<rbrakk> \<Longrightarrow> 
      unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
 
 lemmas red_exp_inhale_unfold_inducts = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.inducts
