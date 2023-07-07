@@ -218,7 +218,8 @@ next
 qed
 
 lemma exhale_opt_rel_imp:
-  assumes 
+  assumes
+   Invariant: "\<And>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega>def \<omega> \<Longrightarrow> Q A \<omega>def \<omega>" and
    ExpWfRel:          
         "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
          \<gamma>1
@@ -226,10 +227,66 @@ lemma exhale_opt_rel_imp:
         (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if") and
    EmptyElse: "is_empty_bigblock empty_else_block" and
    ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt cond cond_bpl" and
-   RhsRel: "exhale_rel R ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
-                (is "exhale_rel R _ _ _ _ _ ?\<gamma>_thn (next, cont)") 
-              shows "exhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
-  oops
+   RhsRel: "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+                (is "exhale_opt_rel R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)") 
+              shows "exhale_opt_rel R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
+  unfolding exhale_opt_rel_def
+proof (simp only: uncurry.simps, 
+       rule rel_general_cond, 
+       fastforce intro: rel_general_conseq_input_output[OF rev_iffD1_def[OF wf_rel_inst_eq_1[OF ExpWfRel] wf_rel_inst_def]])
+  show "rel_general (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
+    apply (rule rel_intro)
+    using red_ast_bpl_empty_block_2[OF EmptyElse]
+    apply fastforce
+    by simp
+next
+  let ?Success = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) (RNormal (snd \<omega>'))"
+  let ?SuccessExp = "\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"
+  let ?Fail ="\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) RFailure"
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+  let ?FailExp = "\<lambda>\<omega>. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+
+  show "rel_general (\<lambda>a ns. R (fst a) (snd a) ns \<and> Q A (fst a) (snd a)) (\<lambda>a. R (fst a) (snd a)) ?SuccessThn ?FailThn P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+    using RhsRel
+    unfolding exhale_opt_rel_def
+    by simp
+  
+  show "\<And> \<omega> \<omega>' ns. ?Success \<omega> \<omega>' \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+                        ?SuccessExp \<omega> \<omega> \<and> \<comment>\<open>implicit assumption that success of conditional does not lead to side effects\<close>
+                       ((red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q A (fst \<omega>) (snd \<omega>)) \<and> ?SuccessThn \<omega> \<omega>') \<or> 
+                       (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> \<omega> = \<omega>'))"
+             (is "\<And> \<omega> \<omega>' ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> \<omega>' ns")
+  proof - 
+    fix \<omega> \<omega>' ns
+    assume Success:"?Success \<omega> \<omega>'" and R: "R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>)"
+    from conjunct2[OF \<open>?Success \<omega> \<omega>'\<close>]
+    show "?Goal \<omega> \<omega>' ns"
+      apply cases
+       apply (rule conjI)
+        apply blast
+      using ExpRel R Success 
+       apply (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)
+      using ExpRel R Success exp_rel_vpr_bpl_elim_2
+      by (metis prod_eqI val_rel_vpr_bpl.simps(2))
+  qed
+
+ show "\<And> \<omega> ns. ?Fail \<omega> \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow> 
+               ?FailExp \<omega> \<or>
+               (?SuccessExp \<omega> \<omega> \<and>
+                 ( (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q A (fst \<omega>) (snd \<omega>)) \<and> ?FailThn \<omega>) \<or> 
+                   (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R (fst \<omega>) (snd \<omega>) ns \<and> False) )
+               )" (is "\<And> \<omega> ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> ns")
+ proof -
+   fix \<omega> ns
+   assume Fail: "?Fail \<omega>" and "R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>)" 
+   thus "?Goal \<omega> ns"
+     apply cases
+     using exp_rel_vpr_bpl_elim_2[OF ExpRel] Fail Invariant
+      apply (metis val_rel_vpr_bpl.simps(2))
+     by fast
+ qed
+qed
 
 subsection \<open>Field access predicate rule\<close>
 
