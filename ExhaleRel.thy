@@ -1,5 +1,6 @@
 theory ExhaleRel
-  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation ViperBoogieRelUtil
+  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation ViperBoogieRelUtil 
+          TotalSemProperties
 begin
 
 definition exhale_rel :: 
@@ -94,10 +95,137 @@ definition is_assertion_red_invariant_exh
 
 subsubsection \<open>Invariant to be propagated for optimized exhale\<close>
 
+definition valid_heap_mask :: "mask \<Rightarrow> bool"
+  where "valid_heap_mask m \<equiv> (\<forall>l. m l \<noteq> pnone)"
+
 definition framing_exh 
   where "framing_exh ctxt_vpr StateCons A \<omega>def \<omega> \<equiv>
-           StateCons \<omega>def \<and> (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>sum \<le> \<omega> \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"
+           StateCons \<omega>def \<and> 
+           valid_heap_mask (get_mh_total_full \<omega>def) \<and>
+           (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"
 
+lemma valid_heap_mask_downward_mono:
+  assumes "valid_heap_mask m0" and "m0 \<succeq> m1"
+  shows "valid_heap_mask m1"
+  sorry
+
+lemma exhale_inhale_normal:
+  assumes "red_exhale ctxt StateCons \<omega>def A \<omega> (RNormal \<omega>')"
+      and "mono_prop_downward StateCons"
+      and "assertion_framing_state ctxt StateCons A \<omega>_inh"
+      and "\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'"
+      and "StateCons \<omega>_inh' \<and> valid_heap_mask (get_mh_total_full \<omega>_inh')"
+         \<comment>\<open>TODO: no permission introspection in A\<close>
+    shows "red_inhale ctxt StateCons A \<omega>_inh (RNormal \<omega>_inh')"
+  sorry
+
+lemma framing_exh_is_assertion_red_invariant_exh:
+  assumes MonoStateCons: "mono_prop_downward StateCons"
+  shows "is_assertion_red_invariant_exh ctxt_vpr StateCons (framing_exh ctxt_vpr StateCons)"
+  unfolding is_assertion_red_invariant_exh_def
+proof (rule is_assertion_red_invariant_intro)
+  \<comment>\<open>Separating Conjunction 1\<close>
+  fix A1 A2 \<omega>def \<omega>
+
+  assume "framing_exh ctxt_vpr StateCons (A1 && A2) \<omega>def \<omega>"
+  thus "framing_exh ctxt_vpr StateCons A1 \<omega>def \<omega>"
+    unfolding framing_exh_def
+    using assertion_framing_star
+    by blast
+next
+  \<comment>\<open>Separating Conjunction 2\<close>
+  fix A1 A2 \<omega>def \<omega> \<omega>'
+  assume FramingExh: "framing_exh ctxt_vpr StateCons (A1 && A2) \<omega>def \<omega>" and
+         RedExh: "red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>')"
+
+  from FramingExh obtain \<omega>_inh \<omega>sum
+    where \<omega>def_valid: "StateCons \<omega>def" "valid_heap_mask (get_mh_total_full \<omega>def)" and
+          "\<omega>_inh \<oplus> \<omega> = Some \<omega>sum" and
+          "\<omega>def \<succeq> \<omega>sum" and          
+          AssertionFraming: "assertion_framing_state ctxt_vpr StateCons (A1&&A2) \<omega>_inh"
+    unfolding framing_exh_def
+    by blast
+
+  have "\<omega>def \<succeq> \<omega>_inh"
+    using \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close> \<open>\<omega>def \<succeq> \<omega>sum\<close>
+    by (metis greater_def succ_trans)
+
+  from RedExh have "\<omega> \<succeq> \<omega>'"
+    using exhale_normal_result_smaller
+    by blast   
+
+  hence "\<omega>' \<oplus> (\<omega>\<ominus>\<omega>') = Some \<omega>"
+    by (simp add: minus_equiv_def)
+
+  show "framing_exh ctxt_vpr StateCons A2 \<omega>def \<omega>'"
+  proof -
+    obtain \<omega>_inh' where \<omega>_inh'_exists: "\<omega>_inh \<oplus> (\<omega>\<ominus>\<omega>') = Some \<omega>_inh'"
+      by (metis \<open>\<omega> \<succeq> \<omega>'\<close> \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close> commutative minus_and_plus)
+
+    have "red_inhale ctxt_vpr StateCons A1 \<omega>_inh (RNormal \<omega>_inh')"
+    proof (rule exhale_inhale_normal[OF RedExh MonoStateCons])
+      show "assertion_framing_state ctxt_vpr StateCons A1 \<omega>_inh"
+        using AssertionFraming assertion_framing_star
+        by blast
+    next
+      show "\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'"
+        using \<omega>_inh'_exists
+        by blast
+    next
+      show "StateCons \<omega>_inh' \<and> valid_heap_mask (get_mh_total_full \<omega>_inh')"
+      proof -
+        have "\<omega>def \<succeq> \<omega>_inh'"
+          using \<omega>_inh'_exists 
+          by (metis (mono_tags, lifting) \<open>\<omega> \<succeq> \<omega>'\<close> \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close> \<open>\<omega>def \<succeq> \<omega>sum\<close> addition_bigger commutative minus_smaller succ_trans)
+
+        thus ?thesis
+          using \<omega>def_valid MonoStateCons valid_heap_mask_downward_mono
+          unfolding mono_prop_downward_def 
+          by (metis core_fun core_is_smaller core_prat_def greater_equiv valid_heap_mask_def)
+      qed
+    qed
+
+    hence AssertionFramingA2: "assertion_framing_state ctxt_vpr StateCons A2 \<omega>_inh'"
+      using AssertionFraming assertion_framing_star
+      by fast
+
+    show ?thesis
+      unfolding framing_exh_def
+    proof (intro conjI)
+      have *: "\<omega>_inh' \<oplus> \<omega>' = Some \<omega>sum"
+        using \<omega>_inh'_exists \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close>
+        by (smt (verit) \<open>\<omega>' \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>\<close> asso1 commutative)
+
+      show "\<exists>\<omega>_inh \<omega>sum. \<omega>_inh \<oplus> \<omega>' = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A2 \<omega>_inh"
+        apply (rule exI[where ?x=\<omega>_inh'], rule exI[where ?x=\<omega>sum])
+        using * \<open>\<omega>def \<succeq> \<omega>sum\<close> AssertionFramingA2
+        by blast
+    qed (insert \<omega>def_valid, auto)
+  qed
+next
+  \<comment>\<open>Implication\<close>
+  fix e A 
+  fix \<omega>def \<omega> :: "'a full_total_state"
+
+  assume FramingExh: "framing_exh ctxt_vpr StateCons (assert.Imp e A) \<omega>def \<omega>" and
+         "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+
+  from FramingExh obtain \<omega>_inh \<omega>sum
+    where \<omega>def_valid: "StateCons \<omega>def" "valid_heap_mask (get_mh_total_full \<omega>def)" and
+          "\<omega>_inh \<oplus> \<omega> = Some \<omega>sum" and
+          "\<omega>def \<succeq> \<omega>sum" and          
+          AssertionFraming: "assertion_framing_state ctxt_vpr StateCons (assert.Imp e A) \<omega>_inh"
+    unfolding framing_exh_def
+    by blast
+
+
+  thus "framing_exh ctxt_vpr StateCons A \<omega>def \<omega>"
+    using assertion_framing_imp
+    unfolding framing_exh_def
+    sorry
+qed
+    
+ 
 subsection \<open>Propagation rules\<close>
 
 lemma exhale_rel_propagate_pre:
@@ -220,7 +348,7 @@ qed
 lemma exhale_opt_rel_imp:
   assumes
    Invariant: "\<And>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega>def \<omega> \<Longrightarrow> Q A \<omega>def \<omega>" and
-   ExpWfRel:          
+   ExpWfRel: 
         "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
          \<gamma>1
          (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 

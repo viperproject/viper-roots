@@ -501,10 +501,10 @@ qed
 
 subsection \<open>Relationship inhale and exhale\<close>
 
-lemma exhale_inhale_normal:
-  assumes "red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>')"
-  shows "\<exists>\<omega>_inh. red_inhale ctxt R A \<omega>_inh (RNormal \<omega>)"
-  oops
+lemma exhale_normal_result_smaller:
+  assumes "red_exhale ctxt StateCons \<omega>def A \<omega> (RNormal \<omega>')"
+  shows "\<omega> \<succeq> \<omega>'"
+  sorry
 
 subsection \<open>Unfold leads to one normal successor state\<close>
 
