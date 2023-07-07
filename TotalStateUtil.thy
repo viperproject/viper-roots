@@ -351,12 +351,6 @@ lemma add_masks_self_zero_mask:
   (* TODO: faster proof *)
   by (metis add.commute add_0 le_fun_def order_class.order_eq_iff padd_cancellative zero_mask_def zero_mask_less_eq_mask)
 
-lemma plus_total_state_cancellative:
-  assumes "Some a = b \<oplus> x" and
-          "Some a = b \<oplus> y"
-        shows "x = y"
-  sorry
-
 instantiation total_state_ext :: (type,type) pcm_with_core
 begin
 
@@ -414,8 +408,9 @@ instance proof
     by (clarsimp split: if_split if_split_asm simp: plus_mask_zero_mask_neutral)
 
   show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-    using plus_total_state_cancellative
-    by blast
+    sorry
+    
+    
 qed
 
 end
