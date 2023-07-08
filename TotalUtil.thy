@@ -914,5 +914,80 @@ proof clarify
     by (metis distinct_helper map_of_SomeD strictly_ordered_list_distinct)
 qed
 
+subsection \<open>Recursive predicates on assertions\<close>
+
+subsubsection \<open>General predicates\<close>
+
+fun pure_exp_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \<Rightarrow> bool" and
+    pure_exp_pred :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \<Rightarrow> bool"
+    where
+  "pure_exp_pred p e \<longleftrightarrow> (p e \<and> pure_exp_pred_rec p e)"
+| "pure_exp_pred_rec p (Var x) \<longleftrightarrow> True"
+| "pure_exp_pred_rec p (ELit lit) \<longleftrightarrow> True"
+| "pure_exp_pred_rec p (Unop uop e) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (Binop e1 bop e2) \<longleftrightarrow> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
+| "pure_exp_pred_rec p (CondExp cond e1 e2) \<longleftrightarrow> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
+| "pure_exp_pred_rec p (FieldAcc e f) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (Old lbl e) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (Perm e f) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (PermPred pname es) \<longleftrightarrow> list_all (pure_exp_pred p) es"
+| "pure_exp_pred_rec p (FunApp f es) \<longleftrightarrow> list_all (pure_exp_pred p) es"
+| "pure_exp_pred_rec p Result \<longleftrightarrow> True"
+| "pure_exp_pred_rec p (Unfolding pname es e) \<longleftrightarrow> list_all (pure_exp_pred p) es \<and> pure_exp_pred p e"
+| "pure_exp_pred_rec p (pure_exp.Let x e) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (PExists ty e) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (PForall ty e) \<longleftrightarrow> pure_exp_pred p e"
+
+fun
+  atomic_assert_pred :: "(pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool" and
+  atomic_assert_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool"
+  where 
+  "atomic_assert_pred p_atm p_e A_atm \<longleftrightarrow> p_atm A_atm \<and> atomic_assert_pred_rec p_e A_atm"
+| "atomic_assert_pred_rec p_e (Pure e) \<longleftrightarrow> pure_exp_pred p_e e"
+| "atomic_assert_pred_rec p_e (Acc e f Wildcard) \<longleftrightarrow> pure_exp_pred p_e e"
+| "atomic_assert_pred_rec p_e (Acc e1 f (PureExp e2)) \<longleftrightarrow> pure_exp_pred p_e e1 \<and> pure_exp_pred p_e e2"
+| "atomic_assert_pred_rec p_e (AccPredicate pname es Wildcard) \<longleftrightarrow> list_all (pure_exp_pred p_e) es"
+| "atomic_assert_pred_rec p_e (AccPredicate pname es (PureExp e2)) \<longleftrightarrow> (list_all (pure_exp_pred p_e) es) \<and> pure_exp_pred p_e e2"
+
+fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> bool" and
+    assert_pred_rec :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow>  bool"
+  where 
+  "assert_pred p_assert p_atm p_e A \<longleftrightarrow> p_assert A \<and> assert_pred_rec p_assert p_atm p_e A"
+| "assert_pred_rec p_assert p_atm p_e (Atomic A_atm) \<longleftrightarrow> atomic_assert_pred p_atm p_e A_atm"
+| "assert_pred_rec p_assert p_atm p_e (Imp e A) \<longleftrightarrow> pure_exp_pred p_e e \<and> assert_pred p_assert p_atm p_e A"
+| "assert_pred_rec p_assert p_atm p_e (A && B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
+| "assert_pred_rec p_assert p_atm p_e (ImpureAnd A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
+| "assert_pred_rec p_assert p_atm p_e (ImpureOr A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
+| "assert_pred_rec p_assert p_atm p_e (ForAll _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
+| "assert_pred_rec p_assert p_atm p_e (Exists _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
+| "assert_pred_rec p_assert p_atm p_e (Wand A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
+
+
+subsubsection \<open>Common instantiations\<close>
+
+text \<open>No permission introspection\<close>
+
+fun no_perm_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
+  where 
+    "no_perm_pure_exp_no_rec (Perm e f) = False"
+  | "no_perm_pure_exp_no_rec (PermPred e f) = False"
+  | "no_perm_pure_exp_no_rec _ = True"
+
+abbreviation no_perm_pure_exp
+  where "no_perm_pure_exp \<equiv> pure_exp_pred_rec no_perm_pure_exp_no_rec"
+
+abbreviation no_perm_assertion
+  where "no_perm_assertion \<equiv> assert_pred_rec (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
+
+fun no_unfolding_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
+  where 
+    "no_unfolding_pure_exp_no_rec (Unfolding p es e) = False"
+  | "no_unfolding_pure_exp_no_rec _ = True"
+
+abbreviation no_unfolding_pure_exp
+  where "no_unfolding_pure_exp \<equiv> pure_exp_pred_rec no_unfolding_pure_exp_no_rec"
+
+abbreviation no_unfolding_assertion
+  where "no_unfolding_assertion \<equiv> assert_pred_rec (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
 
 end
