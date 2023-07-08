@@ -294,16 +294,19 @@ end
 instantiation full_total_state_ext :: (type,type) pcm
 begin
 
+\<comment>\<open>In the following definitions, traces must be the same. A different design decision would be to add the traces.
+   Since our setting, elements of a trace once initialised are never modified it seems natural to force
+   the traces to be the same.\<close>
+
 definition plus_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext option"
   where "plus_full_total_state_ext \<omega>1 \<omega>2 = 
             (if get_store_total \<omega>1 = get_store_total \<omega>2 \<and> 
-                get_trace_total \<omega>1 ## get_trace_total \<omega>2 \<and>
+                get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> 
                 get_total_full \<omega>1 ## get_total_full \<omega>2 \<and>
                 full_total_state.more \<omega>1 = full_total_state.more \<omega>2 then
-                Some (\<omega>1\<lparr>get_trace_total := the (get_trace_total \<omega>1 \<oplus> get_trace_total \<omega>2),
-                         get_total_full := the (get_total_full \<omega>1 \<oplus> get_total_full \<omega>2) \<rparr>)
+                Some (\<omega>1\<lparr>get_total_full := the (get_total_full \<omega>1 \<oplus> get_total_full \<omega>2) \<rparr>)
             else 
-                undefined)"
+                None)"
 
 instance
   sorry
@@ -418,11 +421,24 @@ end
 instantiation full_total_state_ext :: (type,type) pcm_with_core
 begin
 
+text \<open>In the following, we do not take the core of the trace, because the addition of states is 
+      defined only if the traces are the same.\<close>
+
 definition full_core_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a, 'b) full_total_state_ext"
   where "full_core_total_state_ext \<phi> = 
-            \<phi> \<lparr> get_trace_total := |get_trace_total \<phi>|, get_total_full := |get_total_full \<phi>|\<rparr>"
+            \<phi> \<lparr> get_trace_total := get_trace_total \<phi>, get_total_full := |get_total_full \<phi>|\<rparr>"
 instance
   sorry
 end
+
+lemma full_total_state_greater_only_mask_changed:
+  assumes "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
+  shows "get_store_total \<omega> = get_store_total \<omega>' \<and>
+         get_trace_total \<omega> = get_trace_total \<omega>' \<and>
+         get_h_total_full \<omega> = get_h_total_full \<omega>'"
+  using assms
+  unfolding greater_def 
+  unfolding plus_full_total_state_ext_def defined_def plus_total_state_ext_def
+  by (force split: if_split if_split_asm)
 
 end
