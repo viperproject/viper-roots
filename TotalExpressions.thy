@@ -374,7 +374,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      q \<noteq> pnone;
      m' = m( (pred_id,vs) := (m (pred_id, vs)) - q );
      \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
-     \<omega>' = \<omega>3\<lparr> get_store_total = get_store_total \<omega> \<rparr>;
+     \<omega>' = \<omega>3\<lparr> get_store_total := get_store_total \<omega> \<rparr>;
      red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>3) \<rbrakk> \<Longrightarrow> 
      unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
 
