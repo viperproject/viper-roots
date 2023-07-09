@@ -77,17 +77,17 @@ definition is_assertion_red_invariant_2
           \<comment>\<open>currently, just added no permission introspection, since it is required for framedness
              maybe should generalize to a parameter\<close>
           (\<forall> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<longrightarrow>
-                  no_perm_assertion A1 \<longrightarrow> 
+                  no_perm_assertion A1 \<and> no_unfolding_assertion A1 \<longrightarrow> 
                   (Q A1 \<omega>def \<omega>) \<and>
                   (\<forall>\<omega>'. Success A1 \<omega>def \<omega> \<omega>' \<longrightarrow> Q A2 \<omega>def \<omega>')) \<and>
-          (\<forall> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<longrightarrow> no_perm_pure_exp e \<longrightarrow>
+          (\<forall> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<longrightarrow> no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<longrightarrow>
                          ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>def \<omega>)"
 
 lemma is_assertion_red_invariant_intro:
-  assumes "\<And> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> no_perm_assertion A1 \<Longrightarrow> Q A1 \<omega>def \<omega>" and
-          "\<And> A1 A2 \<omega>def \<omega> \<omega>'. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> no_perm_assertion A1 \<Longrightarrow> Success A1 \<omega>def \<omega> \<omega>' \<Longrightarrow> Q A2 \<omega>def \<omega>'" and
+  assumes "\<And> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> no_perm_assertion A1 \<and> no_unfolding_assertion A1 \<Longrightarrow> Q A1 \<omega>def \<omega>" and
+          "\<And> A1 A2 \<omega>def \<omega> \<omega>'. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> no_perm_assertion A1 \<and> no_unfolding_assertion A1 \<Longrightarrow> Success A1 \<omega>def \<omega> \<omega>' \<Longrightarrow> Q A2 \<omega>def \<omega>'" and
           "\<And> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<Longrightarrow> 
-                         no_perm_pure_exp e \<Longrightarrow>
+                         no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<Longrightarrow>
                     ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>def \<omega>"
         shows "is_assertion_red_invariant_2 ctxt StateCons Q Success"
   using assms
@@ -108,6 +108,14 @@ definition framing_exh
            StateCons \<omega>def \<and> 
            valid_heap_mask (get_mh_total_full \<omega>def) \<and>
            (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"
+
+lemma full_total_state_greater_mask:
+  assumes "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
+  shows "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>'"
+  using assms
+  unfolding greater_def plus_full_total_state_ext_def plus_total_state_ext_def
+  sorry
+  
 
 lemma valid_heap_mask_downward_mono:
   assumes "valid_heap_mask m0" and "m0 \<succeq> m1"
@@ -130,15 +138,16 @@ lemma red_pure_exp_different_def_state:
   sorry
 
 lemma exhale_inhale_normal:
-  assumes RedExh: "red_exhale ctxt StateCons \<omega>def A \<omega> (RNormal \<omega>')"
+  assumes RedExh: "red_exhale ctxt StateCons \<omega>def A \<omega> res" 
+      and "res = RNormal \<omega>'"
       and "mono_prop_downward StateCons"
       and "no_perm_assertion A \<and> no_unfolding_assertion A"
       and "assertion_framing_state ctxt StateCons A \<omega>_inh"
       and "\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'"
       and ValidInh':"StateCons \<omega>_inh' \<and> valid_heap_mask (get_mh_total_full \<omega>_inh')"
     shows "red_inhale ctxt StateCons A \<omega>_inh (RNormal \<omega>_inh')"
-  using assms exhale_normal_result_smaller[OF RedExh]
-proof (induction arbitrary: \<omega>_inh \<omega>_inh')
+  using assms exhale_normal_result_smaller[OF RedExh[simplified \<open>res = _\<close>]]
+proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
   case (ExhAcc mh \<omega> e_r r e_p p a f)
   let ?\<omega>\<Delta> = "\<omega> \<ominus> \<omega>'"
   let ?A = "(Acc e_r f (PureExp e_p))"
@@ -202,7 +211,67 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh')
       by blast
   qed
       
-  then show ?case sorry
+  show ?case
+  proof (cases "r = Null")
+    case True
+    hence "\<omega> = \<omega>'"
+      using ExhAcc(5)
+      by (simp add: exh_if_total_normal_2)
+
+    have "\<omega>_inh' = \<omega>_inh"
+      using \<open>\<omega>_inh \<oplus> ?\<omega>\<Delta> = Some \<omega>_inh'\<close>[simplified \<open>\<omega> = \<omega>'\<close>]
+      sorry
+
+    show ?thesis
+      apply (rule InhAcc[OF \<open>?RedRefInh\<close> \<open>?RedPermInh\<close>])
+       apply simp
+      using \<open>\<omega>_inh' = \<omega>_inh\<close> \<open>r = Null\<close> ExhAcc.prems(1) THResultNormal \<open>\<omega> = \<omega>'\<close> exh_if_total_normal 
+      by fastforce
+  next
+    case False
+    from this obtain a where "r = Address a"
+      using ref.exhaust by blast
+
+    hence PermConditions: "0 \<le> p \<and> pgte (mh (a, f)) (Abs_prat p)"
+      using ExhAcc.hyps(4) ExhAcc.prems(1) exh_if_total_normal by fastforce
+
+    let ?m\<Delta> = "\<lambda>loc. if loc = (a,f) then (Abs_prat p) else pnone"
+
+    have "\<omega> \<ominus> \<omega>' = \<omega> \<lparr> get_total_full := (get_total_full \<omega>)\<lparr> get_mh_total := ?m\<Delta> \<rparr> \<rparr>"
+      sorry
+
+    have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh (a,f) (padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p))"
+      sorry
+
+    hence "get_mh_total_full \<omega>_inh' (a,f) = (padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p))"
+      by simp
+
+    hence PermConstraint': "pgte pwrite (padd (get_mh_total_full \<omega>_inh (a, f)) (Abs_prat p))"
+      using ExhAcc.prems(6)
+      unfolding valid_heap_mask_def
+      by metis
+      
+    let ?W = "inhale_perm_single StateCons \<omega>_inh (a, f) (Some (Abs_prat p))"
+
+    have "\<omega>_inh' \<in> ?W"
+      unfolding inhale_perm_single_def
+      apply (rule Set.CollectI)
+      apply (rule exI)+
+      apply (intro conjI)
+          apply simp
+      using ExhAcc
+         apply blast
+        apply simp
+       apply (rule PermConstraint')
+      apply (simp add: \<open>\<omega>_inh' = _\<close>)
+      done
+      
+      show ?thesis        
+       apply (rule InhAcc[OF \<open>?RedRefInh\<close> \<open>?RedPermInh\<close>])
+       apply simp
+      using PermConditions \<open>\<omega>_inh' \<in> ?W\<close>
+      by (smt (verit) False Set.set_insert THResultNormal \<open>r = Address a\<close> insert_not_empty ref.sel)
+  qed
 next
   case (ExhAccWildcard mh \<omega> e_r r q a f)
   then show ?case sorry
@@ -235,6 +304,10 @@ next
   then show ?case sorry
 qed
 
+declare [[show_types]]
+declare [[show_sorts]]
+declare [[show_consts]]
+
 lemma framing_exh_is_assertion_red_invariant_exh:
   assumes MonoStateCons: "mono_prop_downward StateCons"
   shows "is_assertion_red_invariant_exh ctxt_vpr StateCons (framing_exh ctxt_vpr StateCons)"
@@ -252,7 +325,7 @@ next
   \<comment>\<open>Separating Conjunction 2\<close>
   fix A1 A2 \<omega>def \<omega> \<omega>'
   assume FramingExh: "framing_exh ctxt_vpr StateCons (A1 && A2) \<omega>def \<omega>" and
-         NoPermA1: "no_perm_assertion A1" and
+         NoPermA1: "no_perm_assertion A1 \<and> no_unfolding_assertion A1" and
          RedExh: "red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>')"
 
   from FramingExh obtain \<omega>_inh \<omega>sum
@@ -295,10 +368,13 @@ next
           using \<omega>_inh'_exists 
           by (metis (mono_tags, lifting) \<open>\<omega> \<succeq> \<omega>'\<close> \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close> \<open>\<omega>def \<succeq> \<omega>sum\<close> addition_bigger commutative minus_smaller succ_trans)
 
-        thus ?thesis
-          using \<omega>def_valid MonoStateCons valid_heap_mask_downward_mono
-          unfolding mono_prop_downward_def 
-          by (metis core_fun core_is_smaller core_prat_def greater_equiv valid_heap_mask_def)
+        show ?thesis
+          apply (rule conjI)
+          using mono_prop_downwardD[OF MonoStateCons \<open>StateCons \<omega>def\<close> \<open>\<omega>def \<succeq> \<omega>_inh'\<close>]
+           apply simp
+          using \<omega>def_valid valid_heap_mask_downward_mono
+              full_total_state_greater_mask[OF \<open>\<omega>def \<succeq> \<omega>_inh'\<close>]
+          by blast          
       qed
     qed
 
@@ -325,7 +401,7 @@ next
   fix \<omega>def \<omega> :: "'a full_total_state"
 
   assume FramingExh: "framing_exh ctxt_vpr StateCons (assert.Imp e A) \<omega>def \<omega>" and
-         "no_perm_pure_exp e" and
+         ConstrainedExp: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e" and
          RedCond: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
 
   from FramingExh obtain \<omega>inh \<omega>sum
@@ -343,13 +419,13 @@ next
     using full_total_state_greater_only_mask_changed
     by metis
 
-  with RedCond \<open>no_perm_pure_exp e\<close>
+  with RedCond ConstrainedExp
   have "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-    sorry
+    by (metis \<open>(\<omega>def::'a::type full_total_state) \<succeq> (\<omega>::'a::type full_total_state)\<close> \<open>(\<omega>def::'a::type full_total_state) \<succeq> (\<omega>inh::'a::type full_total_state)\<close> full_total_state_greater_only_mask_changed red_pure_exp_only_differ_on_mask)
 
   with \<open>\<omega>def \<succeq> \<omega>inh\<close> have "ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<or>
                            ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t VFailure"
-    sorry
+    by (simp add: ConstrainedExp red_pure_exp_different_def_state)
     
   hence "ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
     using AssertionFraming InhImpFailure
