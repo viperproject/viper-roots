@@ -101,7 +101,7 @@ definition is_assertion_red_invariant_exh
 subsubsection \<open>Invariant to be propagated for optimized exhale\<close>
 
 definition valid_heap_mask :: "mask \<Rightarrow> bool"
-  where "valid_heap_mask m \<equiv> (\<forall>l. pgt pwrite (m l))"
+  where "valid_heap_mask m \<equiv> (\<forall>l. pgte pwrite (m l))"
 
 definition framing_exh 
   where "framing_exh ctxt_vpr StateCons A \<omega>def \<omega> \<equiv>
