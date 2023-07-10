@@ -670,4 +670,39 @@ lemma full_total_state_greater_mask:
   using greater_full_total_state_total_state[OF assms] total_state_greater_mask
   by auto
 
+subsection \<open>valid mask (TODO: move to ViperLang?)\<close>
+
+definition valid_heap_mask :: "mask \<Rightarrow> bool"
+  where "valid_heap_mask m \<equiv> (\<forall>l. pgte pwrite (m l))"
+
+lemma valid_heap_maskD:
+  assumes "valid_heap_mask m"
+  shows "pgte pwrite (m l)"
+  using assms
+  unfolding valid_heap_mask_def
+  by blast
+
+lemma valid_heap_mask_downward_mono:
+  assumes "valid_heap_mask m0" and "m0 \<succeq> m1"
+  shows "valid_heap_mask m1"
+proof -
+  from \<open>m0 \<succeq> m1\<close> obtain m2 where "m0 = add_masks m1 m2"
+    unfolding greater_def
+    using mask_plus_Some
+    by (metis option.sel)
+
+  show "valid_heap_mask m1"
+    unfolding valid_heap_mask_def
+  proof
+    fix l
+    have "m0 l = padd (m1 l) (m2 l)"
+      using \<open>m0 = _\<close>
+      by (simp add: add_masks_def)
+
+    thus "pgte pwrite (m1 l)"
+      using valid_heap_maskD[of m0 l, OF assms(1)]
+      by (metis pgte_transitive sum_larger)
+  qed
+qed
+
 end
