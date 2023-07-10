@@ -60,7 +60,7 @@ subsection \<open>heap and mask in full total state\<close>
 
 subsubsection \<open>Definitions\<close>
 
-fun get_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
+fun get_h_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a total_heap \<times> 'a predicate_heap"
   where "get_h_total_full \<omega> = (get_hh_total_full \<omega>, get_hp_total_full \<omega>)"
 
 fun update_h_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"
@@ -80,7 +80,7 @@ fun update_hh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Ri
 fun get_m_total_full :: "'a full_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
   where "get_m_total_full \<omega> = (get_mh_total_full \<omega>, get_mp_total_full \<omega>)"
 
-fun update_m_total_full :: "'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a full_total_state"
+fun update_m_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a,'b) full_total_state_scheme"
   where "update_m_total_full \<omega> m pm = 
               \<omega>\<lparr> get_total_full := update_mp_total (update_mh_total (get_total_full \<omega>) m) pm \<rparr>"
 
@@ -424,18 +424,19 @@ begin
 text \<open>In the following, we do not take the core of the trace, because the addition of states is 
       defined only if the traces are the same.\<close>
 
-definition full_core_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a, 'b) full_total_state_ext"
-  where "full_core_total_state_ext \<phi> = 
+definition core_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a, 'b) full_total_state_ext"
+  where "core_full_total_state_ext \<phi> = 
             \<phi> \<lparr> get_trace_total := get_trace_total \<phi>, get_total_full := |get_total_full \<phi>|\<rparr>"
 instance
   sorry
 end
 
 lemma full_total_state_greater_only_mask_changed:
-  assumes "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
+  assumes "\<omega> \<succeq> \<omega>'"
   shows "get_store_total \<omega> = get_store_total \<omega>' \<and>
          get_trace_total \<omega> = get_trace_total \<omega>' \<and>
-         get_h_total_full \<omega> = get_h_total_full \<omega>'"
+         get_h_total_full \<omega> = get_h_total_full \<omega>' \<and>
+         full_total_state.more \<omega> = full_total_state.more \<omega>'"
   using assms
   unfolding greater_def 
   unfolding plus_full_total_state_ext_def defined_def plus_total_state_ext_def

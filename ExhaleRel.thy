@@ -103,24 +103,41 @@ subsubsection \<open>Invariant to be propagated for optimized exhale\<close>
 definition valid_heap_mask :: "mask \<Rightarrow> bool"
   where "valid_heap_mask m \<equiv> (\<forall>l. pgte pwrite (m l))"
 
+lemma valid_heap_maskD:
+  assumes "valid_heap_mask m"
+  shows "pgte pwrite (m l)"
+  using assms
+  unfolding valid_heap_mask_def
+  by blast
+
 definition framing_exh 
   where "framing_exh ctxt_vpr StateCons A \<omega>def \<omega> \<equiv>
            StateCons \<omega>def \<and> 
            valid_heap_mask (get_mh_total_full \<omega>def) \<and>
-           (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"
-
-lemma full_total_state_greater_mask:
-  assumes "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
-  shows "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>'"
-  using assms
-  unfolding greater_def plus_full_total_state_ext_def plus_total_state_ext_def
-  sorry
-  
+           (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"  
 
 lemma valid_heap_mask_downward_mono:
   assumes "valid_heap_mask m0" and "m0 \<succeq> m1"
   shows "valid_heap_mask m1"
-  sorry
+proof -
+  from \<open>m0 \<succeq> m1\<close> obtain m2 where "m0 = add_masks m1 m2"
+    unfolding greater_def
+    using mask_plus_Some
+    by (metis option.sel)
+
+  show "valid_heap_mask m1"
+    unfolding valid_heap_mask_def
+  proof
+    fix l
+    have "m0 l = padd (m1 l) (m2 l)"
+      using \<open>m0 = _\<close>
+      by (simp add: add_masks_def)
+
+    thus "pgte pwrite (m1 l)"
+      using valid_heap_maskD[of m0 l, OF assms(1)]
+      by (metis pgte_transitive sum_larger)
+  qed
+qed          
 
 lemma red_pure_exp_only_differ_on_mask:
   assumes "ctxt, StateCons, \<omega>def_opt \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
@@ -137,6 +154,229 @@ lemma red_pure_exp_different_def_state:
     shows "ctxt, StateCons, \<omega>def_opt' \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<or> ctxt, StateCons, \<omega>def_opt' \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
   sorry
 
+lemma pcm_plus_minus_empty:
+  assumes "|a| = |b|"
+  shows "a \<oplus> (b \<ominus> b) = Some a"
+  using assms
+  by (metis core_is_smaller minusI succ_refl)
+
+lemma total_state_defined_core_same:
+  assumes "(\<phi> :: 'a total_state) ## \<phi>'"
+  shows "|\<phi>| = |\<phi>'|"
+  using assms
+  unfolding defined_def plus_total_state_ext_def core_total_state_ext_def
+  by (simp split: if_split_asm)
+
+lemma full_total_state_defined_core_same:
+  assumes "(\<omega> :: 'a full_total_state) ## \<omega>'"
+  shows "|\<omega>| = |\<omega>'|"
+  using assms total_state_defined_core_same
+  unfolding defined_def plus_full_total_state_ext_def core_full_total_state_ext_def  
+  by (fastforce split: if_split_asm)    
+
+lemma full_total_state_defined_core_same_2:
+  assumes "(\<omega> :: 'a full_total_state) \<oplus> \<omega>' = Some \<omega>''"
+  shows "|\<omega>| = |\<omega>'|"
+  using assms full_total_state_defined_core_same
+  unfolding defined_def
+  by fast
+
+lemma plus_Some_total_state_eq:
+  assumes "\<phi> \<oplus> \<phi>' = Some \<phi>sum"
+  shows "\<phi>sum = \<phi> \<lparr> get_mh_total := add_masks (get_mh_total \<phi>) (get_mh_total \<phi>'),
+                    get_mp_total := add_masks (get_mp_total \<phi>) (get_mp_total \<phi>') \<rparr>"
+  using assms 
+  unfolding plus_total_state_ext_def
+  by (simp split: if_split_asm add: mask_plus_Some)
+
+lemma plus_Some_full_total_state_eq:
+  assumes "\<omega> \<oplus> \<omega>' = Some \<omega>sum"
+  shows "\<omega>sum = update_m_total_full \<omega> (add_masks (get_mh_total_full \<omega>) (get_mh_total_full \<omega>'))
+                                      (add_masks (get_mp_total_full \<omega>) (get_mp_total_full \<omega>'))"
+  using assms 
+  unfolding plus_full_total_state_ext_def defined_def
+  by (fastforce split: if_split_asm dest: plus_Some_total_state_eq)
+
+lemma add_masks_minus:
+  assumes "m1 = add_masks m2 m3"
+  shows "m3 = m1 - m2"
+  unfolding fun_diff_def
+proof
+  fix x
+
+  have "m1 x = padd (m2 x) (m3 x)"
+    using assms
+    by (simp add: add_masks_def)
+
+  thus "m3 x = m1 x - m2 x"
+    unfolding minus_prat_def
+    by (simp add: Rep_prat_inverse plus_prat.rep_eq)
+qed
+
+lemma minus_total_state:
+  assumes "\<phi> \<succeq> \<phi>'"
+  shows "\<phi> \<ominus> \<phi>' = \<phi> \<lparr> get_mh_total := get_mh_total \<phi> - get_mh_total \<phi>', 
+                      get_mp_total := get_mp_total \<phi> - get_mp_total \<phi>' \<rparr>" (is "_ = ?\<Delta>")
+proof -
+  from assms minus_exists obtain \<phi>m
+    where PlusSome: "Some \<phi> = \<phi>' \<oplus> \<phi>m" and "\<phi>m \<succeq> |\<phi>|"
+    by blast
+
+  hence "\<phi>m = \<phi> \<ominus> \<phi>'"
+    using minusI by auto
+
+  from PlusSome have 
+     PlusMh: "get_mh_total \<phi> = add_masks (get_mh_total \<phi>') (get_mh_total \<phi>m)" and
+     PlusMp: "get_mp_total \<phi> = add_masks (get_mp_total \<phi>') (get_mp_total \<phi>m)"
+    unfolding plus_total_state_ext_def
+    by (auto split: if_split_asm simp: mask_plus_Some)
+
+  have "get_mh_total \<phi>m = get_mh_total \<phi> - get_mh_total \<phi>'"
+    using add_masks_minus PlusMh
+    by blast
+
+  moreover have "get_mp_total \<phi>m = get_mp_total \<phi> - get_mp_total \<phi>'"
+    using add_masks_minus PlusMp
+    by blast
+
+  moreover from PlusSome have "get_hh_total \<phi> = get_hh_total \<phi>m \<and>
+                               get_hp_total \<phi> = get_hp_total \<phi>m \<and>
+                               total_state.more \<phi> = total_state.more \<phi>m"
+    by (metis total_state_plus_defined)
+  ultimately have "\<phi>m = ?\<Delta>"
+    by simp
+  thus ?thesis
+    using \<open>\<phi>m = \<phi> \<ominus> \<phi>'\<close>
+    by argo
+qed
+
+lemma greater_full_total_state_total_state:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_total_full \<omega> \<succeq> get_total_full \<omega>'"
+  using assms
+  unfolding greater_def plus_full_total_state_ext_def
+  by (metis defined_def full_total_state.select_convs(3) full_total_state.surjective full_total_state.update_convs(3) option.distinct(1) option.exhaust_sel option.sel)  
+
+lemma minus_full_total_state_only_mask_different:
+  shows "get_store_total (\<omega> \<ominus> \<omega>') = get_store_total \<omega> \<and>
+         get_trace_total (\<omega> \<ominus> \<omega>') = get_trace_total \<omega> \<and>
+         get_h_total_full (\<omega> \<ominus> \<omega>') = get_h_total_full \<omega>"
+  using full_total_state_greater_only_mask_changed minus_default minus_smaller
+  by metis
+
+lemma minus_full_total_state:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "\<omega> \<ominus> \<omega>' = \<omega> \<lparr> get_total_full := get_total_full \<omega> \<ominus> get_total_full \<omega>' \<rparr>" (is "_ = ?\<Delta>")
+proof -
+  from assms minus_exists obtain \<omega>m
+    where PlusSome: "\<omega>' \<oplus> \<omega>m = Some \<omega>" and "\<omega>m \<succeq> |\<omega>|"
+    by force
+
+  hence "\<omega>m = \<omega> \<ominus> \<omega>'"
+    using minusI 
+    by metis
+
+  from plus_Some_full_total_state_eq[OF PlusSome] have
+     PlusMh: "get_mh_total_full \<omega> = add_masks (get_mh_total_full \<omega>') (get_mh_total_full \<omega>m)" and
+     PlusMp: "get_mp_total_full \<omega> = add_masks (get_mp_total_full \<omega>') (get_mp_total_full \<omega>m)"
+    by simp_all
+    
+
+  have "get_mh_total_full \<omega>m = get_mh_total_full \<omega> - get_mh_total_full \<omega>'"
+    using add_masks_minus PlusMh
+    by blast
+
+  moreover have "get_mp_total_full \<omega>m = get_mp_total_full \<omega> - get_mp_total_full \<omega>'"
+    using add_masks_minus PlusMp
+    by blast
+
+  moreover from PlusSome have "get_store_total \<omega> = get_store_total \<omega>m \<and>
+                               get_trace_total \<omega> = get_trace_total \<omega>m \<and>
+                               get_h_total_full \<omega> = get_h_total_full \<omega>m \<and>
+                               full_total_state.more \<omega> = full_total_state.more \<omega>m"
+    by (metis \<open>\<omega>m = \<omega> \<ominus> \<omega>'\<close> core_is_smaller minus_equiv_def_any_elem minus_full_total_state_only_mask_different option.discI plus_full_total_state_ext_def)
+    
+  ultimately have "\<omega>m = ?\<Delta>"
+    using minus_total_state[OF greater_full_total_state_total_state[OF assms]]
+    by simp
+  thus ?thesis
+    using \<open>\<omega>m = \<omega> \<ominus> \<omega>'\<close>
+    by argo
+qed
+
+lemma minus_full_total_state_mask:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_mh_total_full (\<omega> \<ominus> \<omega>') = get_mh_total_full \<omega> - get_mh_total_full \<omega>' \<and>
+         get_mp_total_full (\<omega> \<ominus> \<omega>') = get_mp_total_full \<omega> - get_mp_total_full \<omega>'"
+proof -
+  from minus_full_total_state[OF assms] 
+  have "get_total_full (\<omega> \<ominus> \<omega>') = get_total_full \<omega> \<ominus> get_total_full \<omega>'" (is "_ = ?\<phi> \<ominus> ?\<phi>'")
+    by simp
+
+  thus ?thesis
+  using greater_full_total_state_total_state[OF assms, THEN minus_total_state] 
+  by simp
+qed
+
+lemma minus_masks_empty:
+ "m - m = zero_mask"
+  unfolding fun_diff_def
+proof
+  fix x
+  show "m x - m x = zero_mask x"
+    unfolding minus_prat_def zero_mask_def
+    by (simp add: zero_prat_def)
+qed
+
+lemma minus_prat_gte:
+  assumes "pgte p q" 
+  shows "p - (p - q) = q"
+proof -
+  have "p - q = Abs_prat (Rep_prat p - Rep_prat q)" (is "_ = ?pminusq")
+    by (simp add: minus_prat_def)
+
+  have "Rep_prat p \<ge> Rep_prat q"
+    using assms
+    apply transfer
+    by simp
+
+  hence "Rep_prat ?pminusq = (Rep_prat p - Rep_prat q)"
+    by (metis Rep_prat_inverse \<open>p - q = _\<close> of_rat_diff of_rat_eq_iff of_rat_less_eq prat_non_negative psub_aux)
+
+  hence "Rep_prat p - Rep_prat ?pminusq = Rep_prat q"
+    by simp
+
+  thus ?thesis
+    unfolding minus_prat_def
+    by (simp add: Rep_prat_inverse)
+qed
+
+lemma total_state_greater_mask:
+  assumes "\<phi> \<succeq> \<phi>'"
+  shows "get_mh_total \<phi> \<succeq> get_mh_total \<phi>' \<and> get_mp_total \<phi> \<succeq> get_mp_total \<phi>'"
+proof -
+
+  from assms obtain \<phi>a where "\<phi>' \<oplus> \<phi>a = Some \<phi>"
+    unfolding greater_def
+    by auto
+
+  hence "get_mh_total \<phi> = add_masks (get_mh_total \<phi>') (get_mh_total \<phi>a)" and
+        "get_mp_total \<phi> = add_masks (get_mp_total \<phi>') (get_mp_total \<phi>a)"
+    using plus_Some_total_state_eq 
+    by fastforce+
+
+  thus ?thesis
+    using mask_plus_Some
+    unfolding greater_def
+    by metis
+qed
+      
+lemma full_total_state_greater_mask:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>' \<and> get_mp_total_full \<omega> \<succeq> get_mp_total_full \<omega>'"
+  using greater_full_total_state_total_state[OF assms] total_state_greater_mask
+  by auto
+  
 lemma exhale_inhale_normal:
   assumes RedExh: "red_exhale ctxt StateCons \<omega>def A \<omega> res" 
       and "res = RNormal \<omega>'"
@@ -149,14 +389,13 @@ lemma exhale_inhale_normal:
   using assms exhale_normal_result_smaller[OF RedExh[simplified \<open>res = _\<close>]]
 proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
   case (ExhAcc mh \<omega> e_r r e_p p a f)
-  let ?\<omega>\<Delta> = "\<omega> \<ominus> \<omega>'"
   let ?A = "(Acc e_r f (PureExp e_p))"
   note AssertionFramed = \<open>assertion_framing_state ctxt StateCons (Atomic (Acc e_r f (PureExp e_p))) \<omega>_inh\<close>
 
   have SubExp: "sub_expressions_atomic ?A = [e_r, e_p]"
     by simp
 
-  from \<open>\<omega>_inh \<oplus> ?\<omega>\<Delta> = Some \<omega>_inh'\<close> and \<open>\<omega> \<succeq> \<omega>'\<close> have 
+  from \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close> and \<open>\<omega> \<succeq> \<omega>'\<close> have 
     OnlyMaskChanged:
     "get_store_total \<omega>_inh = get_store_total \<omega> \<and>
      get_trace_total \<omega>_inh = get_trace_total \<omega> \<and>
@@ -219,8 +458,9 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
       by (simp add: exh_if_total_normal_2)
 
     have "\<omega>_inh' = \<omega>_inh"
-      using \<open>\<omega>_inh \<oplus> ?\<omega>\<Delta> = Some \<omega>_inh'\<close>[simplified \<open>\<omega> = \<omega>'\<close>]
-      sorry
+      using \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close>[simplified \<open>\<omega> = \<omega>'\<close>]
+            full_total_state_defined_core_same_2 pcm_plus_minus_empty
+      by (metis option.sel)
 
     show ?thesis
       apply (rule InhAcc[OF \<open>?RedRefInh\<close> \<open>?RedPermInh\<close>])
@@ -230,18 +470,67 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
   next
     case False
     from this obtain a where "r = Address a"
-      using ref.exhaust by blast
+      using ref.exhaust by blast    
 
     hence PermConditions: "0 \<le> p \<and> pgte (mh (a, f)) (Abs_prat p)"
       using ExhAcc.hyps(4) ExhAcc.prems(1) exh_if_total_normal by fastforce
 
+    from \<open>r = Address a\<close> have "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p)"
+      using ExhAcc.hyps(4) ExhAcc.prems(1) exh_if_total_normal_2 by auto
+
     let ?m\<Delta> = "\<lambda>loc. if loc = (a,f) then (Abs_prat p) else pnone"
 
-    have "\<omega> \<ominus> \<omega>' = \<omega> \<lparr> get_total_full := (get_total_full \<omega>)\<lparr> get_mh_total := ?m\<Delta> \<rparr> \<rparr>"
-      sorry
+    let ?p' = "(padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p))"
+    have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh (a,f) ?p'" (is "_ = ?upd_\<omega>_inh")        
 
-    have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh (a,f) (padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p))"
-      sorry
+    proof -
+      from \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close>
+      have "\<omega>_inh' = update_m_total_full \<omega>_inh (add_masks (get_mh_total_full \<omega>_inh) (get_mh_total_full (\<omega> \<ominus> \<omega>')))
+                                               (add_masks (get_mp_total_full \<omega>_inh) (get_mp_total_full (\<omega> \<ominus> \<omega>')))"
+        using plus_Some_full_total_state_eq
+        by blast
+      moreover have "(add_masks (get_mp_total_full \<omega>_inh) (get_mp_total_full (\<omega> \<ominus> \<omega>'))) = (get_mp_total_full \<omega>_inh)"
+      proof -
+        have "get_mp_total_full (\<omega> \<ominus> \<omega>') = zero_mask"
+          apply (simp only: minus_full_total_state_mask[OF \<open>\<omega> \<succeq> \<omega>'\<close>])
+          by (simp add: \<open>\<omega>' = _\<close> minus_masks_empty)
+
+        thus ?thesis
+          by (simp add: add_masks_zero_mask)
+      qed
+      moreover have "add_masks (get_mh_total_full \<omega>_inh) (get_mh_total_full (\<omega> \<ominus> \<omega>')) =  
+                               (get_mh_total_full \<omega>_inh)( (a,f) := ?p')" (is "?lhs = ?rhs")
+      proof -
+        have *: "get_mh_total_full (\<omega> \<ominus> \<omega>') = get_mh_total_full \<omega> - (get_mh_total_full \<omega>)( (a,f) := (get_mh_total_full \<omega> (a, f) - Abs_prat p))"
+          apply (simp only: minus_full_total_state_mask[OF \<open>\<omega> \<succeq> \<omega>'\<close> ])
+          by (simp add: \<open>\<omega>' =_\<close> \<open>mh = _\<close>)
+
+        show ?thesis
+          unfolding add_masks_def
+        proof (subst *, standard)
+          fix hl
+          let ?mh_inh = "get_mh_total_full \<omega>_inh"
+          let ?mh = "get_mh_total_full \<omega>"
+
+          show "padd (?mh_inh hl) ((?mh - ?mh((a, f) := ?mh (a, f) - Abs_prat p)) hl) =
+                     (?mh_inh((a, f) := padd (?mh_inh (a, f)) (Abs_prat p))) hl"
+          proof (cases "hl = (a,f)")
+            case True
+            then show ?thesis 
+              using PermConditions[simplified \<open>mh = _\<close>, THEN HOL.conjunct2, THEN minus_prat_gte]
+              by simp
+          next
+            case False
+            then show ?thesis
+              using zero_prat_def
+              by (simp add: minus_prat_def)
+          qed
+        qed
+      qed
+
+      ultimately show ?thesis
+        by simp
+    qed        
 
     hence "get_mh_total_full \<omega>_inh' (a,f) = (padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p))"
       by simp
@@ -304,9 +593,7 @@ next
   then show ?case sorry
 qed
 
-declare [[show_types]]
-declare [[show_sorts]]
-declare [[show_consts]]
+
 
 lemma framing_exh_is_assertion_red_invariant_exh:
   assumes MonoStateCons: "mono_prop_downward StateCons"
@@ -353,7 +640,7 @@ next
       by (metis \<open>\<omega> \<succeq> \<omega>'\<close> \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close> commutative minus_and_plus)
 
     have "red_inhale ctxt_vpr StateCons A1 \<omega>_inh (RNormal \<omega>_inh')"
-    proof (rule exhale_inhale_normal[OF RedExh MonoStateCons NoPermA1])
+    proof (rule exhale_inhale_normal[OF RedExh _ MonoStateCons NoPermA1])
       show "assertion_framing_state ctxt_vpr StateCons A1 \<omega>_inh"
         using AssertionFraming assertion_framing_star
         by blast
@@ -376,7 +663,7 @@ next
               full_total_state_greater_mask[OF \<open>\<omega>def \<succeq> \<omega>_inh'\<close>]
           by blast          
       qed
-    qed
+    qed (simp)
 
     hence AssertionFramingA2: "assertion_framing_state ctxt_vpr StateCons A2 \<omega>_inh'"
       using AssertionFraming assertion_framing_star

@@ -124,7 +124,7 @@ fun good_state :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup
         | _ \<Rightarrow> None)"
 
 lemma good_state_Some_true:
-  assumes "wf_mask_simple (get_mh_total_full \<omega>)" and 
+  assumes "wf_mask_simple (get_mh_total_full (\<omega> :: 'a full_total_state))" and 
           "heap_rel Pr F (get_hh_total_full \<omega>) hb" and
           "mask_rel Pr F (get_mh_total_full \<omega>) mb"
   shows "good_state Pr F [] [AbsV (AHeap hb), AbsV (AMask mb)] = Some (BoolV True)"

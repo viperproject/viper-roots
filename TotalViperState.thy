@@ -330,24 +330,24 @@ lemma less_Some [simp]: "a < b \<Longrightarrow> Some a < Some b"
 
 subsection \<open>Destructors \<close>
 
-fun get_hh_total_full :: "'a full_total_state \<Rightarrow> 'a total_heap"
+fun get_hh_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a total_heap"
   where "get_hh_total_full \<omega> = get_hh_total (get_total_full \<omega>)"
 
-fun get_hp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_heap"
+fun get_hp_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a predicate_heap"
   where "get_hp_total_full \<omega> = get_hp_total (get_total_full \<omega>)"
 
-fun get_mh_total_full :: "'a full_total_state \<Rightarrow> mask"
+fun get_mh_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> mask"
   where "get_mh_total_full \<omega> = get_mh_total (get_total_full \<omega>)"
 
-fun get_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask"
+fun get_mp_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a predicate_mask"
   where "get_mp_total_full \<omega> = get_mp_total (get_total_full \<omega>)"
 
 subsection \<open>Empty states\<close>
 
-definition is_empty_total :: "'a total_state \<Rightarrow> bool"
+definition is_empty_total :: "('a,'b) total_state_scheme \<Rightarrow> bool"
   where "is_empty_total \<phi> \<equiv> get_mh_total \<phi> = zero_mask \<and> get_mp_total \<phi> = zero_mask"
 
-definition is_empty_total_full :: "'a full_total_state \<Rightarrow> bool"
+definition is_empty_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> bool"
   where "is_empty_total_full \<omega> \<equiv> is_empty_total (get_total_full \<omega>)"
 
 lemma is_empty_total_wf_mask: "is_empty_total_full \<omega> \<Longrightarrow> wf_mask_simple (get_mh_total_full \<omega>)"
