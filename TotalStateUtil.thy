@@ -1,5 +1,5 @@
 theory TotalStateUtil
-imports Viper.SepAlgebra TotalViperState Viper.DeBruijn
+imports Viper.SepAlgebra TotalUtil TotalViperState Viper.DeBruijn
 begin
 
 section \<open>update_store_total\<close>
@@ -165,7 +165,7 @@ proof -
     by (fastforce dest: less_eq_full_total_stateD)+
 qed
 
-subsection \<open>Partial Commutative Monoid Instantiation\<close>
+subsection \<open>Partial commutative monoid instantiation\<close>
 
 lemma plus_masks_defined: "(m1 :: 'a abstract_mask) ## m2"
   unfolding defined_def
@@ -431,6 +431,94 @@ instance
   sorry
 end
 
+subsection \<open>Properties of the partial commutative monoid instantiation \<close>
+
+lemma add_masks_minus:
+  assumes "m1 = add_masks m2 m3"
+  shows "m3 = m1 - m2"
+  unfolding fun_diff_def
+proof
+  fix x
+
+  have "m1 x = padd (m2 x) (m3 x)"
+    using assms
+    by (simp add: add_masks_def)
+
+  thus "m3 x = m1 x - m2 x"
+    unfolding minus_prat_def
+    by (simp add: Rep_prat_inverse plus_prat.rep_eq)
+qed
+
+lemma minus_masks_empty:
+ "m - m = zero_mask"
+  unfolding fun_diff_def
+proof
+  fix x
+  show "m x - m x = zero_mask x"
+    unfolding minus_prat_def zero_mask_def
+    by (simp add: zero_prat_def)
+qed
+
+lemma minus_prat_gte:
+  assumes "pgte p q" 
+  shows "p - (p - q) = q"
+proof -
+  have "p - q = Abs_prat (Rep_prat p - Rep_prat q)" (is "_ = ?pminusq")
+    by (simp add: minus_prat_def)
+
+  have "Rep_prat p \<ge> Rep_prat q"
+    using assms
+    apply transfer
+    by simp
+
+  hence "Rep_prat ?pminusq = (Rep_prat p - Rep_prat q)"
+    by (metis Rep_prat_inverse \<open>p - q = _\<close> of_rat_diff of_rat_eq_iff of_rat_less_eq prat_non_negative psub_aux)
+
+  hence "Rep_prat p - Rep_prat ?pminusq = Rep_prat q"
+    by simp
+
+  thus ?thesis
+    unfolding minus_prat_def
+    by (simp add: Rep_prat_inverse)
+qed
+
+lemma total_state_defined_core_same:
+  assumes "(\<phi> :: 'a total_state) ## \<phi>'"
+  shows "|\<phi>| = |\<phi>'|"
+  using assms
+  unfolding defined_def plus_total_state_ext_def core_total_state_ext_def
+  by (simp split: if_split_asm)
+
+lemma full_total_state_defined_core_same:
+  assumes "(\<omega> :: 'a full_total_state) ## \<omega>'"
+  shows "|\<omega>| = |\<omega>'|"
+  using assms total_state_defined_core_same
+  unfolding defined_def plus_full_total_state_ext_def core_full_total_state_ext_def  
+  by (fastforce split: if_split_asm)    
+
+lemma full_total_state_defined_core_same_2:
+  assumes "(\<omega> :: 'a full_total_state) \<oplus> \<omega>' = Some \<omega>''"
+  shows "|\<omega>| = |\<omega>'|"
+  using assms full_total_state_defined_core_same
+  unfolding defined_def
+  by fast
+
+lemma plus_Some_total_state_eq:
+  assumes "\<phi> \<oplus> \<phi>' = Some \<phi>sum"
+  shows "\<phi>sum = \<phi> \<lparr> get_mh_total := add_masks (get_mh_total \<phi>) (get_mh_total \<phi>'),
+                    get_mp_total := add_masks (get_mp_total \<phi>) (get_mp_total \<phi>') \<rparr>"
+  using assms 
+  unfolding plus_total_state_ext_def
+  by (simp split: if_split_asm add: mask_plus_Some)
+
+lemma plus_Some_full_total_state_eq:
+  assumes "\<omega> \<oplus> \<omega>' = Some \<omega>sum"
+  shows "\<omega>sum = update_m_total_full \<omega> (add_masks (get_mh_total_full \<omega>) (get_mh_total_full \<omega>'))
+                                      (add_masks (get_mp_total_full \<omega>) (get_mp_total_full \<omega>'))"
+  using assms 
+  unfolding plus_full_total_state_ext_def defined_def
+  by (fastforce split: if_split_asm dest: plus_Some_total_state_eq)
+
 lemma full_total_state_greater_only_mask_changed:
   assumes "\<omega> \<succeq> \<omega>'"
   shows "get_store_total \<omega> = get_store_total \<omega>' \<and>
@@ -441,5 +529,145 @@ lemma full_total_state_greater_only_mask_changed:
   unfolding greater_def 
   unfolding plus_full_total_state_ext_def defined_def plus_total_state_ext_def
   by (force split: if_split if_split_asm)
+
+lemma minus_total_state:
+  assumes "\<phi> \<succeq> \<phi>'"
+  shows "\<phi> \<ominus> \<phi>' = \<phi> \<lparr> get_mh_total := get_mh_total \<phi> - get_mh_total \<phi>', 
+                      get_mp_total := get_mp_total \<phi> - get_mp_total \<phi>' \<rparr>" (is "_ = ?\<Delta>")
+proof -
+  from assms minus_exists obtain \<phi>m
+    where PlusSome: "Some \<phi> = \<phi>' \<oplus> \<phi>m" and "\<phi>m \<succeq> |\<phi>|"
+    by blast
+
+  hence "\<phi>m = \<phi> \<ominus> \<phi>'"
+    using minusI by auto
+
+  from PlusSome have 
+     PlusMh: "get_mh_total \<phi> = add_masks (get_mh_total \<phi>') (get_mh_total \<phi>m)" and
+     PlusMp: "get_mp_total \<phi> = add_masks (get_mp_total \<phi>') (get_mp_total \<phi>m)"
+    unfolding plus_total_state_ext_def
+    by (auto split: if_split_asm simp: mask_plus_Some)
+
+  have "get_mh_total \<phi>m = get_mh_total \<phi> - get_mh_total \<phi>'"
+    using add_masks_minus PlusMh
+    by blast
+
+  moreover have "get_mp_total \<phi>m = get_mp_total \<phi> - get_mp_total \<phi>'"
+    using add_masks_minus PlusMp
+    by blast
+
+  moreover from PlusSome have "get_hh_total \<phi> = get_hh_total \<phi>m \<and>
+                               get_hp_total \<phi> = get_hp_total \<phi>m \<and>
+                               total_state.more \<phi> = total_state.more \<phi>m"
+    by (metis total_state_plus_defined)
+  ultimately have "\<phi>m = ?\<Delta>"
+    by simp
+  thus ?thesis
+    using \<open>\<phi>m = \<phi> \<ominus> \<phi>'\<close>
+    by argo
+qed
+
+lemma greater_full_total_state_total_state:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_total_full \<omega> \<succeq> get_total_full \<omega>'"
+  using assms
+  unfolding greater_def plus_full_total_state_ext_def
+  by (metis defined_def full_total_state.select_convs(3) full_total_state.surjective full_total_state.update_convs(3) option.distinct(1) option.exhaust_sel option.sel)  
+
+lemma minus_full_total_state_only_mask_different:
+  shows "get_store_total (\<omega> \<ominus> \<omega>') = get_store_total \<omega> \<and>
+         get_trace_total (\<omega> \<ominus> \<omega>') = get_trace_total \<omega> \<and>
+         get_h_total_full (\<omega> \<ominus> \<omega>') = get_h_total_full \<omega>"
+  using full_total_state_greater_only_mask_changed minus_default minus_smaller
+  by metis
+
+lemma minus_full_total_state_only_mask_different_2:
+  assumes "\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'"
+  shows
+    "get_store_total \<omega>_inh = get_store_total \<omega> \<and>
+     get_trace_total \<omega>_inh = get_trace_total \<omega> \<and>
+     get_h_total_full \<omega>_inh = get_h_total_full \<omega>"
+  by (metis assms full_total_state_greater_only_mask_changed greater_def minus_bigger minus_full_total_state_only_mask_different)
+
+lemma minus_full_total_state:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "\<omega> \<ominus> \<omega>' = \<omega> \<lparr> get_total_full := get_total_full \<omega> \<ominus> get_total_full \<omega>' \<rparr>" (is "_ = ?\<Delta>")
+proof -
+  from assms minus_exists obtain \<omega>m
+    where PlusSome: "\<omega>' \<oplus> \<omega>m = Some \<omega>" and "\<omega>m \<succeq> |\<omega>|"
+    by force
+
+  hence "\<omega>m = \<omega> \<ominus> \<omega>'"
+    using minusI 
+    by metis
+
+  from plus_Some_full_total_state_eq[OF PlusSome] have
+     PlusMh: "get_mh_total_full \<omega> = add_masks (get_mh_total_full \<omega>') (get_mh_total_full \<omega>m)" and
+     PlusMp: "get_mp_total_full \<omega> = add_masks (get_mp_total_full \<omega>') (get_mp_total_full \<omega>m)"
+    by simp_all
+    
+
+  have "get_mh_total_full \<omega>m = get_mh_total_full \<omega> - get_mh_total_full \<omega>'"
+    using add_masks_minus PlusMh
+    by blast
+
+  moreover have "get_mp_total_full \<omega>m = get_mp_total_full \<omega> - get_mp_total_full \<omega>'"
+    using add_masks_minus PlusMp
+    by blast
+
+  moreover from PlusSome have "get_store_total \<omega> = get_store_total \<omega>m \<and>
+                               get_trace_total \<omega> = get_trace_total \<omega>m \<and>
+                               get_h_total_full \<omega> = get_h_total_full \<omega>m \<and>
+                               full_total_state.more \<omega> = full_total_state.more \<omega>m"
+    by (metis \<open>\<omega>m = \<omega> \<ominus> \<omega>'\<close> core_is_smaller minus_equiv_def_any_elem minus_full_total_state_only_mask_different option.discI plus_full_total_state_ext_def)
+    
+  ultimately have "\<omega>m = ?\<Delta>"
+    using minus_total_state[OF greater_full_total_state_total_state[OF assms]]
+    by simp
+  thus ?thesis
+    using \<open>\<omega>m = \<omega> \<ominus> \<omega>'\<close>
+    by argo
+qed
+
+lemma minus_full_total_state_mask:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_mh_total_full (\<omega> \<ominus> \<omega>') = get_mh_total_full \<omega> - get_mh_total_full \<omega>' \<and>
+         get_mp_total_full (\<omega> \<ominus> \<omega>') = get_mp_total_full \<omega> - get_mp_total_full \<omega>'"
+proof -
+  from minus_full_total_state[OF assms] 
+  have "get_total_full (\<omega> \<ominus> \<omega>') = get_total_full \<omega> \<ominus> get_total_full \<omega>'" (is "_ = ?\<phi> \<ominus> ?\<phi>'")
+    by simp
+
+  thus ?thesis
+  using greater_full_total_state_total_state[OF assms, THEN minus_total_state] 
+  by simp
+qed
+
+
+lemma total_state_greater_mask:
+  assumes "\<phi> \<succeq> \<phi>'"
+  shows "get_mh_total \<phi> \<succeq> get_mh_total \<phi>' \<and> get_mp_total \<phi> \<succeq> get_mp_total \<phi>'"
+proof -
+
+  from assms obtain \<phi>a where "\<phi>' \<oplus> \<phi>a = Some \<phi>"
+    unfolding greater_def
+    by auto
+
+  hence "get_mh_total \<phi> = add_masks (get_mh_total \<phi>') (get_mh_total \<phi>a)" and
+        "get_mp_total \<phi> = add_masks (get_mp_total \<phi>') (get_mp_total \<phi>a)"
+    using plus_Some_total_state_eq 
+    by fastforce+
+
+  thus ?thesis
+    using mask_plus_Some
+    unfolding greater_def
+    by metis
+qed
+      
+lemma full_total_state_greater_mask:
+  assumes "\<omega> \<succeq> \<omega>'"
+  shows "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>' \<and> get_mp_total_full \<omega> \<succeq> get_mp_total_full \<omega>'"
+  using greater_full_total_state_total_state[OF assms] total_state_greater_mask
+  by auto
 
 end

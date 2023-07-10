@@ -1,7 +1,7 @@
 section \<open>Expression evaluation, well-definedness, inhale, total heap consistency\<close>
 
 theory TotalExpressions
-imports Viper.ViperLang Viper.ValueAndBasicState TotalViperState Viper.Binop Viper.DeBruijn Viper.PredicatesUtil TotalUtil
+imports Viper.ViperLang Viper.ValueAndBasicState TotalViperState Viper.Binop Viper.DeBruijn Viper.PredicatesUtil TotalStateUtil
 begin
 
 subsection \<open>Heap-dependent function interpretation\<close>
@@ -490,12 +490,25 @@ lemmas red_pure_exp_total_elims =
 
 subsubsection \<open>Inhale\<close>
 
+lemma inh_pure_normal:
+  assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+  shows "red_inhale ctxt R (Atomic (Pure e)) \<omega> (RNormal \<omega>)"
+  using assms InhPure
+  by force
+
+lemma inh_pure_magic:
+  assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+  shows "red_inhale ctxt R (Atomic (Pure e)) \<omega> RMagic"
+  using assms InhPure
+  by force
+
 lemmas red_inhale_intros = 
   InhAcc 
   InhAccPred 
   InhAccWildcard 
   InhAccPredWildcard 
-  InhPure 
+  inh_pure_normal
+  inh_pure_magic
   InhSubAtomicFailure
   InhStarNormal 
   InhStarFailureMagic

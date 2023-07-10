@@ -376,7 +376,7 @@ proof -
   have "get_total_full \<omega> \<le> get_total_full \<omega>'"
     using is_empty_total_less_eq assms 
     unfolding is_empty_total_full_def
-    by auto
+    by fastforce
 
   thus ?thesis
     using assms

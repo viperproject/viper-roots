@@ -1,5 +1,5 @@
 theory TotalUtil
-imports TotalStateUtil HOL.Real "HOL-Library.Multiset"
+imports Viper.ValueAndBasicState HOL.Real "HOL-Library.Multiset"
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
