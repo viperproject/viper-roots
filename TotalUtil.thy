@@ -926,7 +926,7 @@ fun pure_exp_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \
 | "pure_exp_pred_rec p (ELit lit) \<longleftrightarrow> True"
 | "pure_exp_pred_rec p (Unop uop e) \<longleftrightarrow> pure_exp_pred p e"
 | "pure_exp_pred_rec p (Binop e1 bop e2) \<longleftrightarrow> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
-| "pure_exp_pred_rec p (CondExp cond e1 e2) \<longleftrightarrow> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
+| "pure_exp_pred_rec p (CondExp cond e1 e2) \<longleftrightarrow> pure_exp_pred p cond \<and> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
 | "pure_exp_pred_rec p (FieldAcc e f) \<longleftrightarrow> pure_exp_pred p e"
 | "pure_exp_pred_rec p (Old lbl e) \<longleftrightarrow> pure_exp_pred p e"
 | "pure_exp_pred_rec p (Perm e f) \<longleftrightarrow> pure_exp_pred p e"
@@ -934,7 +934,7 @@ fun pure_exp_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \
 | "pure_exp_pred_rec p (FunApp f es) \<longleftrightarrow> list_all (pure_exp_pred p) es"
 | "pure_exp_pred_rec p Result \<longleftrightarrow> True"
 | "pure_exp_pred_rec p (Unfolding pname es e) \<longleftrightarrow> list_all (pure_exp_pred p) es \<and> pure_exp_pred p e"
-| "pure_exp_pred_rec p (pure_exp.Let x e) \<longleftrightarrow> pure_exp_pred p e"
+| "pure_exp_pred_rec p (pure_exp.Let e e_body) \<longleftrightarrow> pure_exp_pred p e \<and> pure_exp_pred p e_body"
 | "pure_exp_pred_rec p (PExists ty e) \<longleftrightarrow> pure_exp_pred p e"
 | "pure_exp_pred_rec p (PForall ty e) \<longleftrightarrow> pure_exp_pred p e"
 
@@ -974,10 +974,10 @@ fun no_perm_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
   | "no_perm_pure_exp_no_rec _ = True"
 
 abbreviation no_perm_pure_exp
-  where "no_perm_pure_exp \<equiv> pure_exp_pred_rec no_perm_pure_exp_no_rec"
+  where "no_perm_pure_exp \<equiv> pure_exp_pred no_perm_pure_exp_no_rec"
 
 abbreviation no_perm_assertion
-  where "no_perm_assertion \<equiv> assert_pred_rec (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
+  where "no_perm_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
 
 fun no_unfolding_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
   where 
@@ -985,9 +985,9 @@ fun no_unfolding_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
   | "no_unfolding_pure_exp_no_rec _ = True"
 
 abbreviation no_unfolding_pure_exp
-  where "no_unfolding_pure_exp \<equiv> pure_exp_pred_rec no_unfolding_pure_exp_no_rec"
+  where "no_unfolding_pure_exp \<equiv> pure_exp_pred no_unfolding_pure_exp_no_rec"
 
 abbreviation no_unfolding_assertion
-  where "no_unfolding_assertion \<equiv> assert_pred_rec (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
+  where "no_unfolding_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
 
 end
