@@ -512,7 +512,8 @@ shows "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl
                         \<gamma>Pre"
   unfolding post_framing_rel_def
 proof (rule allI | rule impI)+
-  fix \<omega>0 \<omega>1 ns
+  fix \<omega>0 \<omega>1 :: "'a full_total_state "
+  fix ns
   assume "state_rel_well_def_same ctxt Pr TyRep Tr AuxPred \<omega>0 ns" (is "?R Tr \<omega>0 ns") and
          StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
          HeapWellTy:  "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
@@ -566,6 +567,8 @@ lemma end_to_end_stmt_rel_2:
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and 
           StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
           VprMethodBodySome: "method_decl.body mdecl = Some body_vpr" and
+
+          VprNoPermUnfoldingPost: "no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)" and
 
           ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
 
@@ -761,7 +764,7 @@ proof (rule allI | rule impI)+
 
           with inhale_no_perm_failure_preserve_mono(3) StateConsAntiMono  RedInhPost 
           have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
-            using is_empty_empty_full_total_state \<open>res = _\<close> 
+            using is_empty_empty_full_total_state \<open>res = _\<close>  VprNoPermUnfoldingPost
             by blast
             
           with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrameStart _ _\<close>]
