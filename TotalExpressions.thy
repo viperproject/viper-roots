@@ -262,7 +262,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | RedFieldNullFailure:
    "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
        ctxt, R, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-
+\<comment>\<open>
 \<comment>\<open>Function application\<close>
 | RedFunApp: (* Should function application be expressed operationally? *)
    "\<lbrakk> (fun_interp_total ctxt) fname = Some f;
@@ -271,7 +271,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
                One could define two interpretations of the function, one that checks the precondition
                and one that does not.\<close>
       f vs \<omega> = Some res \<rbrakk> \<Longrightarrow> 
-      ctxt, R, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>]\<^sub>t res"
+      ctxt, R, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>] res"
+\<close>
 
 \<comment>\<open>Permission introspection\<close>
 | RedPermNull: (* TODO: should perm(null.f) reduce to failure? *)
