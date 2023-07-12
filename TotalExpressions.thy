@@ -548,6 +548,27 @@ next
     by blast
 qed
 
+lemma list_all2_red_pure_exps_total:
+  assumes "list_all2 (\<lambda>e v. red_pure_exp_total ctxt R \<omega>_def e \<omega> (Val v)) es vs"
+  shows "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)"
+  using assms
+proof (induction es arbitrary: vs)
+  case Nil
+  then show ?case 
+    by (auto intro: red_exp_inhale_unfold_intros)
+next
+  case (Cons e es)
+  from this obtain vs_hd vs_tail where 
+     "vs = vs_hd # vs_tail" and
+     "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val vs_hd" and
+     "list_all2 (\<lambda>e v. ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) es vs_tail"
+    by (metis (no_types, lifting) list_all2_Cons1)
+  with Cons.IH show ?case
+    unfolding \<open>vs = _\<close>
+    using option.simps(9) red_pure_exps_total.simps 
+    by fastforce
+qed
+
 subsection \<open>Total heap consistency\<close>
 
 definition unfold_rel_general :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
