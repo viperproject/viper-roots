@@ -57,7 +57,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
   "\<lbrakk> mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
      a = the_address r;
-     q = (SOME p. p \<noteq> pnone \<and> pgt (mh (a,f)) p) \<rbrakk> \<Longrightarrow>
+     q \<noteq> pnone \<and> pgt (mh (a,f)) q \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
                          (exh_if_total (mh (a,f) \<noteq> pnone \<and> r \<noteq> Null) 
                                        (update_mh_total_full \<omega> (mh((a,f) := q))))"
