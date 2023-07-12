@@ -72,7 +72,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-     q = (SOME p. p \<noteq> pnone \<and> pgt (mp (a,f)) p) \<rbrakk> \<Longrightarrow>
+     q \<noteq> pnone \<and> pgt (mp (a,f)) q \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>
                          (exh_if_total (mp (a,f) \<noteq> pnone)
                                        (update_mp_total_full \<omega> (mp ( (pred_id, v_args) := q ))))"
