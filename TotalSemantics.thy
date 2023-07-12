@@ -56,17 +56,18 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhAccWildcard:
   "\<lbrakk> mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
+     a = the_address r;
      q = (SOME p. p \<noteq> pnone \<and> pgt (mh (a,f)) p) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
                          (exh_if_total (mh (a,f) \<noteq> pnone \<and> r \<noteq> Null) 
-                                       (update_mh_total_full \<omega> (mh( (a,f) := q))))"
+                                       (update_mh_total_full \<omega> (mh((a,f) := q))))"
 \<comment>\<open>exhale acc(P(es), p)\<close>
 | ExhAccPred:
    "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
-            (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p) \<and> r \<noteq> Null) 
+            (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p)) 
                           (update_mp_total_full \<omega> (mp( (pred_id, v_args) := (mp (pred_id, v_args)) - (Abs_prat p)))))"
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
