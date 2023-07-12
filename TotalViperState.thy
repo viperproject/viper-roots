@@ -122,21 +122,13 @@ begin
 definition less_eq_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext \<Rightarrow> bool"
   where "\<omega>1 \<le> \<omega>2 \<equiv> 
          get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
-         dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>
-          \<comment>\<open>TODO: maybe use option type ordering to express this directly via function ordering\<close>
-         (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
-                      \<phi>1 \<le> \<phi>2) \<and>
+         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and>
          get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
          full_total_state.more \<omega>1 = full_total_state.more \<omega>2"
 
 definition less_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext \<Rightarrow> bool"
   where "\<omega>1 < \<omega>2 \<equiv> 
-           \<omega>1 \<le> \<omega>2 \<and>
-           ( 
-             (\<exists>lbl \<phi>1 \<phi>2.  get_trace_total \<omega>1 lbl = Some \<phi>1 \<and> get_trace_total \<omega>2 lbl = Some \<phi>2 \<and>
-                           \<phi>1 < \<phi>2) \<or>
-             get_total_full \<omega>1 < get_total_full \<omega>2 
-           )"
+           \<omega>1 \<le> \<omega>2 \<and> get_total_full \<omega>1 < get_total_full \<omega>2 "
 
 instance
 proof
@@ -170,40 +162,12 @@ proof
 
   show "x \<le> y \<Longrightarrow> y \<le> z \<Longrightarrow> x \<le> z"
     unfolding less_eq_full_total_state_ext_def
-    by (metis (mono_tags, opaque_lifting) domD domI dual_order.trans)
-
-  have *: "dom (get_trace_total x) = dom (get_trace_total y) \<Longrightarrow>
-        (\<forall>lbl \<phi>1 \<phi>2. get_trace_total x lbl = Some \<phi>1 \<longrightarrow> get_trace_total y lbl = Some \<phi>2 \<longrightarrow> \<phi>1 \<le> \<phi>2) \<Longrightarrow>
-        (\<forall>lbl \<phi>1 \<phi>2. get_trace_total y lbl = Some \<phi>1 \<longrightarrow> get_trace_total x lbl = Some \<phi>2 \<longrightarrow> \<phi>1 \<le> \<phi>2) \<Longrightarrow>
-        get_trace_total x = get_trace_total y" (is "?A1 \<Longrightarrow> ?A2 \<Longrightarrow> ?A3 \<Longrightarrow> ?goal")
-  proof (rule HOL.ext)
-    fix arg
-    assume "?A1" and "?A2" and "?A3"
-
-    show "get_trace_total x arg = get_trace_total y arg"
-    proof (cases "get_trace_total x arg = None")
-      case True
-      then show ?thesis using \<open>?A1\<close>
-        by (metis domIff)
-    next
-      case False
-      from this obtain \<phi>1 \<phi>2 where
-        "get_trace_total x arg = Some \<phi>1" and
-        "get_trace_total y arg = Some \<phi>2"
-        using \<open>?A1\<close>
-        by (metis domD domIff)
-
-      then show ?thesis 
-        using \<open>?A2\<close> \<open>?A3\<close>
-        by fastforce
-    qed
-  qed
+    by (metis (mono_tags, opaque_lifting) dual_order.trans)
 
   show "x \<le> y \<Longrightarrow> y \<le> x \<Longrightarrow> x = y"
     unfolding less_eq_full_total_state_ext_def
     apply (rule full_total_state.equality)
        apply blast
-    using *
       apply blast
      apply fastforce
     by blast
@@ -239,12 +203,9 @@ lemma less_eq_total_stateE:
   using assms 
   by (auto dest: less_eq_total_stateD)
 
-
 lemma less_eq_full_total_stateI:
     "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
-     dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>
-     (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
-                  \<phi>1 \<le> \<phi>2) \<Longrightarrow>
+     get_trace_total \<omega>1 = get_trace_total \<omega>2 \<Longrightarrow>
      get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
      full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow>
      \<omega>1 \<le> \<omega>2"
@@ -254,9 +215,7 @@ lemma less_eq_full_total_stateI:
 lemma less_eq_full_total_stateD:
   assumes "\<omega>1 \<le> \<omega>2"
   shows "get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
-         dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>
-         (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
-                      \<phi>1 \<le> \<phi>2) \<and>
+         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and>         
          get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
          full_total_state.more \<omega>1 = full_total_state.more \<omega>2"
   using assms
@@ -266,9 +225,7 @@ lemma less_eq_full_total_stateD:
 lemma less_eq_full_total_stateE:
   assumes "\<omega>1 \<le> \<omega>2" and
           "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
-           dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>
-           (\<forall>lbl \<phi>1 \<phi>2. get_trace_total \<omega>1 lbl = Some \<phi>1 \<longrightarrow> get_trace_total \<omega>2 lbl = Some \<phi>2 \<longrightarrow>
-                        \<phi>1 \<le> \<phi>2) \<Longrightarrow>
+           get_trace_total \<omega>1 = get_trace_total \<omega>2 \<Longrightarrow>
            get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
            full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow> P"
   shows P
