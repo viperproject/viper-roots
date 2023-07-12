@@ -10,7 +10,7 @@ lemma pure_exp_pred_subexp:
   using assms
   by (cases e) simp_all
 
-lemma atomic_assert_subexp:
+lemma atomic_assert_pred_subexp:
   assumes "atomic_assert_pred p_atm p_e atm"
   shows "list_all (pure_exp_pred p_e) (sub_expressions_atomic atm)"
   using assms
@@ -18,6 +18,13 @@ lemma atomic_assert_subexp:
     apply simp_all  
   apply (metis atomic_assert_pred_rec.simps(2) atomic_assert_pred_rec.simps(3) list.pred_inject(1) list.pred_inject(2) pure_exp_pred.simps sub_expressions_exp_or_wildcard.cases sub_expressions_exp_or_wildcard.simps(1) sub_expressions_exp_or_wildcard.simps(2))
   by (metis atomic_assert_pred_rec.simps(4) atomic_assert_pred_rec.simps(5) list.pred_inject(1) list.pred_inject(2) sub_expressions_exp_or_wildcard.cases sub_expressions_exp_or_wildcard.simps(1) sub_expressions_exp_or_wildcard.simps(2))
+
+lemma assert_pred_atomic_subexp:
+  assumes "assert_pred p_assert p_atm p_e (Atomic atm)"
+  shows "list_all (pure_exp_pred p_e) (sub_expressions_atomic atm)"
+  using assms atomic_assert_pred_subexp
+  by simp
+  
 
 subsection \<open>Expression evaluation\<close>
 
@@ -740,8 +747,15 @@ next
   case (InhSubAtomicFailure A \<omega>)
   moreover from this have "Some \<omega>2 \<le> Some \<omega>"
     by simp
-  moreover from InhSubAtomicFailure have "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) (sub_expressions_atomic A)"
-    sorry
+  moreover have "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) (sub_expressions_atomic A)"
+  proof -
+    from \<open>no_perm_assertion (Atomic A) \<and> no_unfolding_assertion (Atomic A)\<close> have
+         "list_all (\<lambda>e. no_perm_pure_exp e) (sub_expressions_atomic A) \<and> list_all (\<lambda>e. no_unfolding_pure_exp e) (sub_expressions_atomic A)"
+      using assert_pred_atomic_subexp
+      by blast
+    thus ?thesis
+      by (simp add: list_all_length)
+  qed
   ultimately show ?case 
     using InhSubAtomicFailure red_inhale_intros
     by meson
@@ -784,7 +798,7 @@ next
   next
     case 2
     then show ?thesis 
-      using InhImpTrue red_inhale_intros SubConstraint
+      using InhImpTrue TotalExpressions.InhImpTrue SubConstraint
       by metis
   qed  
 next
@@ -837,7 +851,7 @@ next
   case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id r)
   then show ?case by (auto elim: exh_if_total.elims)
 next
-  case (ExhAccPredWildcard mp \<omega> e_args v_args q a f pred_id)
+  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
   then show ?case by (auto elim: exh_if_total.elims)
 next
   case (ExhPure e \<omega> b)
@@ -876,6 +890,36 @@ proof cases
     by (metis exhale_state_same_store exhale_state_same_trace \<open>\<omega>' \<in> _\<close>)
 qed
 
+lemma mask_update_greater_aux:
+  assumes "pgte (m l) p"
+  shows "m \<ge> m(l := m l - p)"
+proof (simp add: le_fun_def)
+  show "m l - p \<le> m l"
+    unfolding minus_prat_def
+  proof (simp add: less_eq_prat.rep_eq)
+    have "Rep_prat (m l) - Rep_prat p \<le> Rep_prat (m l)" (is "?lhs \<le> ?rhs")
+      by (simp add: prat_non_negative)
+
+    moreover have "?lhs \<ge> 0"
+      using assms
+      by (simp add: pgte.rep_eq)
+
+    ultimately show "Rep_prat (Abs_prat ?lhs) \<le> ?rhs"
+      using Abs_prat_inverse[of ?lhs]
+      by simp
+  qed
+qed
+
+lemma mask_update_greater_aux_2:
+  assumes "pgte (m l) q"
+  shows "m \<ge> m(l := q)"
+  using assms
+  apply (simp add: le_fun_def)
+  by (simp add: less_eq_prat.rep_eq pgte.rep_eq)
+
+lemmas mask_update_succ_aux = succ_maskI[OF mask_update_greater_aux]
+lemmas mask_update_succ_aux_2 = succ_maskI[OF mask_update_greater_aux_2]
+
 lemma exhale_normal_result_smaller:
   assumes "red_exhale ctxt StateCons \<omega>def A \<omega> res" and
           "res = RNormal \<omega>'"
@@ -883,38 +927,93 @@ lemma exhale_normal_result_smaller:
   using assms
 proof (induction arbitrary: \<omega>')
   case (ExhAcc mh \<omega> e_r r e_p p a f)
-  then show ?case sorry
+  show ?case 
+  proof (cases "r = Null")
+    case True
+    then show ?thesis 
+      using ExhAcc
+      by (auto elim: exh_if_total.elims simp: succ_refl) 
+  next
+    case False
+    with ExhAcc have SufficientPerm: "pgte (mh (a, f)) (Abs_prat p)" and
+                     "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p)"
+      by (auto elim: exh_if_total.elims)
+
+    show ?thesis
+    proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
+        from SufficientPerm
+        show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p))"
+          using mask_update_succ_aux
+          unfolding \<open>mh = _\<close>
+         by fastforce
+    qed (simp_all add: succ_refl)
+  qed
 next
-  case (ExhAccWildcard mh \<omega> e_r r q a f)
-  then show ?case sorry
+  case (ExhAccWildcard mh \<omega> e_r r a q f)
+  hence "mh (a, f) \<noteq> pnone" and "\<omega>' = update_mh_total_full \<omega> (mh((a, f) := q))"
+    by (auto elim: exh_if_total.elims)
+
+  have "pgt (mh (a, f)) q" 
+    using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF \<open>mh (a, f) \<noteq> pnone\<close>]]
+    by blast
+
+  show ?case 
+  proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
+    from \<open>pgt (mh (a, f)) q\<close>
+    show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_total_full \<omega> (mh((a, f) := q)))"      
+      using mask_update_succ_aux_2[OF pgt_implies_pgte]
+      unfolding  \<open>mh = _\<close>
+      by fastforce
+  qed (simp_all add: succ_refl)
 next
-  case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id r)
-  then show ?case sorry
+  case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id)
+  hence SufficientPerm: "pgte (mp (pred_id, v_args)) (Abs_prat p)" and
+        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_prat p))"
+    by (auto elim: exh_if_total.elims)
+
+  show ?case 
+  proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
+    from SufficientPerm
+    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_prat p)))"
+      using mask_update_succ_aux
+      unfolding \<open>mp = _\<close>
+      by fastforce
+  qed (simp_all add: succ_refl)
 next
-  case (ExhAccPredWildcard mp \<omega> e_args v_args q a f pred_id)
-  then show ?case sorry
+  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
+  hence *: "mp (pred_id, v_args) \<noteq> pnone" and 
+        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := q))"
+    by (auto elim: exh_if_total.elims)
+
+  hence SufficientPerm: "pgt (mp (pred_id, v_args)) q"
+    using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF *]]
+    by blast
+
+  show ?case
+  proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
+    from SufficientPerm
+    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := q)))"
+      using mask_update_succ_aux_2[OF pgt_implies_pgte]
+      unfolding \<open>mp = _\<close>
+      by fastforce
+  qed (simp_all add: succ_refl)      
 next
   case (ExhPure e \<omega> b)
-  then show ?case sorry
+  then show ?case 
+    by (auto elim: exh_if_total.elims simp: succ_refl)
 next
-  case (SubAtomicFailure A \<omega>)
-  then show ?case sorry
-next
-  case (ExhStarNormal A \<omega> \<omega>' B res)
-  then show ?case sorry
-next
-  case (ExhStarFailure A \<omega> B)
-  then show ?case sorry
+  case (ExhStarNormal A \<omega>1 \<omega>2 B res)
+  then show ?case 
+    using succ_trans by blast
 next
   case (ExhImpTrue e \<omega> A res)
-  then show ?case sorry
+  then show ?case 
+    by blast
 next
   case (ExhImpFalse e \<omega> A)
-  then show ?case sorry
-next
-  case (ExhImpFailure e \<omega> A)
-  then show ?case sorry
-qed
+  then show ?case
+    by (simp add: succ_refl)
+qed (simp_all)
 
 subsection \<open>Relationship inhale and exhale\<close>
   
@@ -942,7 +1041,6 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
      get_trace_total \<omega>_inh = get_trace_total \<omega> \<and>
      get_h_total_full \<omega>_inh = get_h_total_full \<omega>"
     by (metis full_total_state_greater_only_mask_changed greater_def greater_equiv minus_smaller)
-
 
   have "ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e_r;\<omega>_inh\<rangle> [\<Down>]\<^sub>t Val (VRef r)" (is ?RedRefInh)
   proof (rule ccontr)

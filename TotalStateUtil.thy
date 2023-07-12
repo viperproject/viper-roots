@@ -431,6 +431,101 @@ instance
   sorry
 end
 
+subsubsection \<open>Helper definitions\<close>
+
+lemma succ_maskI:
+  assumes "(m :: 'a abstract_mask) \<ge> m'"
+  shows "m \<succeq> m'"
+  unfolding greater_def
+proof
+  let ?\<Delta> = "\<lambda>l. (m l) \<ominus> (m' l)"
+
+  have "m = add_masks m' ?\<Delta>"
+    unfolding add_masks_def
+  proof
+    fix l
+
+    from assms have "m l \<ge> m' l"
+      by (simp add: le_funD)
+
+    from this obtain p where "m l = padd (m' l) p"
+      using prat_gte_padd
+      by blast
+      
+    hence "Some (m l) = (m' l) \<oplus> p"
+      unfolding plus_prat_def
+      by simp
+
+    thus "m l = padd (m' l) (m l \<ominus> m' l)"
+      by (metis SepAlgebra.plus_prat_def add.commute greater_equiv minus_equiv_def option.inject)
+  qed
+
+  thus "Some m = m' \<oplus> ?\<Delta>"
+    by (simp add: mask_plus_Some)
+qed
+
+lemma succ_total_stateI:
+  assumes "get_mh_total \<phi> \<succeq> get_mh_total \<phi>'"  (is "?mh \<succeq> ?mh'")
+      and "get_mp_total \<phi> \<succeq> get_mp_total \<phi>'"  (is "?mp \<succeq> ?mp'")
+      and "get_hh_total \<phi> = get_hh_total \<phi>'" 
+      and "get_hp_total \<phi> = get_hp_total \<phi>'" 
+      and "total_state.more \<phi> = total_state.more \<phi>'"
+    shows "\<phi> \<succeq> \<phi>'"
+proof -
+  from assms(1-2) obtain mh_diff mp_diff where 
+    Eqns: "?mh' \<oplus> mh_diff = Some ?mh" "?mp' \<oplus> mp_diff = Some ?mp"
+    by (auto simp: greater_def)
+
+  have "\<phi>' \<oplus> (update_m_total \<phi>' (mh_diff,mp_diff)) = Some \<phi>"
+    unfolding plus_total_state_ext_def
+    apply (simp add: Eqns)
+    apply (rule total_state.equality)
+    using assms 
+    by auto
+
+  thus ?thesis
+    unfolding greater_def
+    by metis
+qed
+
+lemma succ_full_total_stateI:
+  assumes "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>'" 
+      and "get_mp_total_full \<omega> \<succeq> get_mp_total_full \<omega>'"
+      and "get_h_total_full \<omega> = get_h_total_full \<omega>'"
+      and "get_store_total \<omega> = get_store_total \<omega>'"
+      and "get_trace_total \<omega> = get_trace_total \<omega>'"
+      and "full_total_state.more \<omega> = full_total_state.more \<omega>'"
+    shows "\<omega> \<succeq> \<omega>'"
+proof -
+  have "get_total_full \<omega> \<succeq> get_total_full \<omega>'" (is "?\<phi> \<succeq> ?\<phi>'")
+    apply (rule succ_total_stateI)
+    using assms
+    by auto
+
+  from this obtain \<phi>_diff where *: "?\<phi>' \<oplus> \<phi>_diff = Some ?\<phi>"
+    by (auto simp: greater_def)
+
+  have "Some \<omega> = \<omega>' \<oplus> (\<omega> \<lparr> get_total_full := \<phi>_diff \<rparr>)"
+    unfolding plus_full_total_state_ext_def defined_def
+    apply (clarsimp split: if_split)
+    apply (intro conjI)
+  proof -
+    show "\<exists>y. get_total_full \<omega>' \<oplus> \<phi>_diff = Some y"
+      by (metis *)
+  next
+    fix A \<comment>\<open>LHS irrelevant\<close>
+    show "A \<longrightarrow> \<omega> = \<omega>'\<lparr>get_total_full := the (get_total_full \<omega>' \<oplus> \<phi>_diff)\<rparr>"
+    proof (rule impI, simp add: *)
+      show "\<omega> = \<omega>'\<lparr>get_total_full := get_total_full \<omega>\<rparr>"
+        apply (rule full_total_state.equality)
+        using assms by auto
+    qed
+  qed (insert assms, simp_all)
+
+  thus ?thesis
+    by (auto simp add: greater_def)
+qed
+
 subsection \<open>Properties of the partial commutative monoid instantiation \<close>
 
 lemma add_masks_minus:
