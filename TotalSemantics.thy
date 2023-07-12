@@ -63,25 +63,25 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
    \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
                          (exh_if_total (mh (a,f) \<noteq> pnone \<and> r \<noteq> Null) 
-                                       (update_mh_total_full \<omega> (mh((a,f) := q))))"
+                                       (update_mh_loc_total_full \<omega> (a,f) q))"
 \<comment>\<open>exhale acc(P(es), p)\<close>
 | ExhAccPred:
    "\<lbrakk> mp = get_mp_total_full \<omega>;
-     red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     red_pure_exps_total ctxt R (Some \<omega>0) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
             (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p)) 
-                          (update_mp_total_full \<omega> (mp( (pred_id, v_args) := (mp (pred_id, v_args)) - (Abs_prat p)))))"
+                          (update_mp_loc_total_full \<omega> (pred_id, v_args) (mp (pred_id, v_args) - (Abs_prat p))))"
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
-     red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+     red_pure_exps_total ctxt R (Some \<omega>0) e_args \<omega> (Some v_args);
     \<comment>\<open>q satisfies the right-hand side if \<^prop>\<open>mp (pred_id, v_args) \<noteq> pnone\<close> (thm prat_exists_stricly_smaller_nonzero). 
      If \<^prop>\<open>mp (pred_id, v_args) \<noteq> pnone\<close> does not hold, then the exhale fails and the value of q is irrelevant.\<close>
      q = (SOME p. p \<noteq> pnone \<and> pgt (mp (pred_id, v_args)) p)
    \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>
                          (exh_if_total (mp (pred_id, v_args) \<noteq> pnone)
-                                       (update_mp_total_full \<omega> (mp ( (pred_id, v_args) := q ))))"
+                                       (update_mp_loc_total_full \<omega> (pred_id, v_args) q))"
 
 | ExhPure:
   "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
