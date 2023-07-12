@@ -248,7 +248,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 \<comment>\<open>Old\<close>
 | RedOld: 
    "\<lbrakk> get_trace_total \<omega> l = Some \<phi> ; 
-     ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> 
+     \<omega>_def' = map_option (\<lambda>\<omega>_def_val. \<omega>_def_val\<lparr> get_total_full := \<phi> \<rparr>) \<omega>_def;                   
+     ctxt, R, \<omega>_def' \<turnstile> \<langle>e; \<omega>\<lparr> get_total_full := \<phi> \<rparr>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow> 
      ctxt, R, \<omega>_def \<turnstile> \<langle>Old l e; \<omega>\<rangle> [\<Down>]\<^sub>t v"
  | RedOldFailure: 
    "\<lbrakk> get_trace_total \<omega> l = None \<rbrakk> \<Longrightarrow> 
@@ -386,6 +387,64 @@ subsection \<open>Elimination and introduction rules\<close>
 lemmas red_exp_inhale_unfold_intros = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.intros
 
 subsubsection \<open>Expression evaluation and well-definedness\<close>
+(*
+| RedField: 
+   "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)); 
+      get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
+      ctxt, R, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) \<omega>_def) then Val v else VFailure)"
+*)
+
+lemma RedField_no_def_normalI:
+  assumes "ctxt, R, None \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
+      and "get_hh_total_full \<omega> (a, f) = v" 
+    shows "ctxt, R, None \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+proof -
+  let ?res = "(if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) (None :: ('a full_total_state) option)) then Val v else VFailure)"
+
+  have "ctxt, R, None \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t ?res"
+    apply (rule RedField)
+    using assms
+    by auto
+
+  thus ?thesis
+    by simp
+qed
+
+lemma RedField_def_normalI:
+  assumes "ctxt, R, Some \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
+      and "get_hh_total_full \<omega> (a, f) = v"  
+      and "(a,f) \<in> get_valid_locs \<omega>_def"
+    shows "ctxt, R, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+proof -
+  let ?res = "(if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) (Some \<omega>_def)) then Val v else VFailure)"
+
+  have "ctxt, R, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t ?res"
+    apply (rule RedField)
+    using assms
+    by auto
+
+  thus ?thesis
+    using assms
+    by simp
+qed
+
+lemma RedField_def_failureI:
+  assumes "ctxt, R, Some \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
+      and "get_hh_total_full \<omega> (a, f) = v"  
+      and "(a,f) \<notin> get_valid_locs \<omega>_def"
+    shows "ctxt, R, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+proof -
+  let ?res = "(if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) (Some \<omega>_def)) then Val v else VFailure)"
+
+  have "ctxt, R, Some \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t ?res"
+    apply (rule RedField)
+    using assms
+    by auto
+
+  thus ?thesis
+    using assms
+    by simp
+qed
 
 inductive_cases RedVar_case: "Pr, ctxt, \<omega>_def \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
 
