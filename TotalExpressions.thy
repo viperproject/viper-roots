@@ -323,8 +323,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
        th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res \<rbrakk> \<Longrightarrow>
        red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
 | InhAccPred:
-    "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
-       red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
+       ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);      
        W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p));
        th_result_rel (p \<ge> 0) (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>       
        red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> res"
