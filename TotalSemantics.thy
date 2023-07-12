@@ -57,7 +57,10 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
   "\<lbrakk> mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
      a = the_address r;
-     q \<noteq> pnone \<and> pgt (mh (a,f)) q \<rbrakk> \<Longrightarrow>
+     \<comment>\<open>\<^term>\<open>q\<close> satisfies the right-hand side if \<^prop>\<open>mh (a,f) \<noteq> pnone\<close> (thm prat_exists_stricly_smaller_nonzero). 
+     If \<^prop>\<open>mh (a,f) \<noteq> pnone\<close> does not hold, then the exhale fails and the value of q is irrelevant. \<close>
+     q = (SOME p. p \<noteq> pnone \<and> pgt (mh (a,f)) p) 
+   \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
                          (exh_if_total (mh (a,f) \<noteq> pnone \<and> r \<noteq> Null) 
                                        (update_mh_total_full \<omega> (mh((a,f) := q))))"
@@ -72,9 +75,12 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-     q \<noteq> pnone \<and> pgt (mp (a,f)) q \<rbrakk> \<Longrightarrow>
+    \<comment>\<open>q satisfies the right-hand side if \<^prop>\<open>mp (pred_id, v_args) \<noteq> pnone\<close> (thm prat_exists_stricly_smaller_nonzero). 
+     If \<^prop>\<open>mp (pred_id, v_args) \<noteq> pnone\<close> does not hold, then the exhale fails and the value of q is irrelevant.\<close>
+     q = (SOME p. p \<noteq> pnone \<and> pgt (mp (pred_id, v_args)) p)
+   \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>
-                         (exh_if_total (mp (a,f) \<noteq> pnone)
+                         (exh_if_total (mp (pred_id, v_args) \<noteq> pnone)
                                        (update_mp_total_full \<omega> (mp ( (pred_id, v_args) := q ))))"
 
 | ExhPure:
