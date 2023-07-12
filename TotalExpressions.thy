@@ -387,12 +387,6 @@ subsection \<open>Elimination and introduction rules\<close>
 lemmas red_exp_inhale_unfold_intros = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.intros
 
 subsubsection \<open>Expression evaluation and well-definedness\<close>
-(*
-| RedField: 
-   "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)); 
-      get_hh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
-      ctxt, R, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t (if (if_Some (\<lambda>res. (a,f) \<in> get_valid_locs res) \<omega>_def) then Val v else VFailure)"
-*)
 
 lemma RedField_no_def_normalI:
   assumes "ctxt, R, None \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
