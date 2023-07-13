@@ -994,6 +994,8 @@ subsubsection \<open>Main Lemma\<close>
 
 lemma method_call_stmt_rel:
   assumes 
+          MethodsSpecsFramed: "\<And> mname mdecl. program.methods (program_total ctxt_vpr) mname = Some mdecl \<Longrightarrow>
+                                              vpr_method_spec_correct_total ctxt_vpr StateCons mdecl" and
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
                       "rtype_interp ctxt = []" and
           DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr" and
@@ -1020,7 +1022,8 @@ lemma method_call_stmt_rel:
                    \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
                         \<comment>\<open>"var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and \<close>
                    "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]" and
-          ExhalePreRel: "\<And> fpred.                                                
+          ExhalePreRel:
+                      "\<And> fpred.                                                
                         stmt_rel 
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt)
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
@@ -1031,7 +1034,11 @@ lemma method_call_stmt_rel:
              \<comment>\<open>    "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] rev (ys_bpl@xs_bpl))" and\<close>
                "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))" and
           InhalePostRel:         "\<And> fpred.
-                        stmt_rel (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
+                        stmt_rel 
+                              (\<lambda> \<omega> ns. 
+                               state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
+                               assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
+                              )
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
                               (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
@@ -1390,7 +1397,7 @@ proof (rule stmt_rel_intro_2)
 
       let ?nshavoc = "update_var_list (var_context ctxt) nspre ys_bpl ?v_rets_bpl"
 
-         have *: "length ys_bpl = length (map val_rel_vpr_bpl v_rets)"
+        have *: "length ys_bpl = length (map val_rel_vpr_bpl v_rets)"
         proof -
             have "length ys = length ys_bpl"
               using YsBplEq by auto
@@ -1684,6 +1691,11 @@ proof (rule stmt_rel_intro_2)
          "res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost"
         by blast+
 
+      have PostFramed: "assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>havoc"
+        sorry
+
+      note RCallPostConj = conjI[OF \<open>?RCallPost ?\<omega>havoc ?nshavoc\<close> PostFramed]
+
       show ?thesis  
       proof (cases resPost)
         case RMagic
@@ -1692,7 +1704,9 @@ proof (rule stmt_rel_intro_2)
           by (auto intro: rel_vpr_aux_intro)
       next
         case RFailure
-          with RedInh stmt_rel_failure_elim[OF InhalePostRelInst \<open>?RCallPost ?\<omega>havoc ?nshavoc\<close>] \<open>mdecl = _\<close>
+        thm stmt_rel_failure_elim[OF InhalePostRelInst]
+
+          with RedInh stmt_rel_failure_elim[OF InhalePostRelInst RCallPostConj] \<open>mdecl = _\<close>
           obtain c where 
               "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) c" and
               "snd c = Failure"
@@ -1705,7 +1719,7 @@ proof (rule stmt_rel_intro_2)
             by (blast intro: rel_vpr_aux_intro)
       next
         case (RNormal \<omega>post)
-          with RedInh stmt_rel_normal_elim[OF InhalePostRelInst \<open>?RCallPost ?\<omega>havoc ?nshavoc\<close>] \<open>mdecl = _\<close>
+          with RedInh stmt_rel_normal_elim[OF InhalePostRelInst RCallPostConj] \<open>mdecl = _\<close>
           obtain nspost where 
               "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) (\<gamma>', Normal nspost)" and
               "?RCallPost \<omega>post nspost"
