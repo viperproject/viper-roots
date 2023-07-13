@@ -292,7 +292,7 @@ lemma exhale_rel_star_2:
 lemma exhale_rel_imp:
   assumes Invariant: "\<And>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega>def \<omega> \<Longrightarrow> Q A \<omega>def \<omega>"
       and ExpWfRel: 
-          "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (assert.Imp cond A) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt cond 
            \<gamma>1
            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
           (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
@@ -363,7 +363,7 @@ lemma exhale_rel_imp_2:
   assumes Invariant: "is_exh_rel_invariant ctxt_vpr StateCons cond_assert cond_exp Q"
       and Cond: "cond_exp cond"
       and ExpWfRel: 
-          "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (assert.Imp cond A) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt cond 
            \<gamma>1
            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
           (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
@@ -414,8 +414,8 @@ definition exhale_acc_normal_premise
 
 lemma exhale_field_acc_rel:
   assumes 
-    WfRcv: "expr_wf_rel R ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
-    WfPerm: "expr_wf_rel R ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and
+    WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
+    WfPerm: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and
     CorrectPermRel:  
             "\<And>r p. rel_general (uncurry R) (R' r p)
                   (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. \<omega>0_\<omega> = \<omega>0_\<omega>' \<and> 
@@ -432,17 +432,17 @@ lemma exhale_field_acc_rel:
   shows "exhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule exhale_rel_intro_2)
   fix \<omega>0 \<omega> ns res
-  assume R0:"R \<omega>0 \<omega> ns" 
+  assume R0:"R \<omega>0 \<omega> ns" and "Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>0 \<omega>"
   assume "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega> res"
   
   thus "rel_vpr_aux (R \<omega>0) P ctxt \<gamma> \<gamma>' ns res"
   proof cases
     case (ExhAcc mh r p a)
     from this obtain ns1 where R1: "R \<omega>0 \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF WfRcv R0]
+      using wf_rel_normal_elim[OF WfRcv] R0 \<open>Q _ \<omega>0 \<omega>\<close>
       by blast
     with ExhAcc obtain ns2 where "R \<omega>0 \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
-      using wf_rel_normal_elim[OF WfPerm R1] red_ast_bpl_transitive
+      using wf_rel_normal_elim[OF WfPerm] R1 \<open>Q _ \<omega>0 \<omega>\<close> red_ast_bpl_transitive
       by blast
 
     hence R2_conv:"uncurry R (\<omega>0, \<omega>) ns2"
@@ -502,12 +502,12 @@ proof (rule exhale_rel_intro_2)
       proof (cases "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
         case True
         then show ?thesis 
-          using wf_rel_failure_elim[OF WfRcv \<open>R \<omega>0 \<omega> ns\<close>]
+          using wf_rel_failure_elim[OF WfRcv] \<open>R \<omega>0 \<omega> ns\<close> \<open>Q _ \<omega>0 \<omega>\<close>
           by blast          
       next
         case False
         then show ?thesis 
-          using wf_rel_normal_elim[OF WfRcv \<open>R \<omega>0 \<omega> ns\<close>]
+          using wf_rel_normal_elim[OF WfRcv] \<open>R \<omega>0 \<omega> ns\<close> \<open>Q _ \<omega>0 \<omega>\<close>
                 wf_rel_failure_elim[OF WfPerm] SubexpFailCases red_ast_bpl_transitive
           by blast
       qed

@@ -141,7 +141,7 @@ lemma inhale_rel_star_2:
   unfolding is_inh_rel_invariant_def
   by (blast intro!: inhale_rel_star)
 
-lemma inhale_opt_rel_imp:
+lemma inhale_rel_imp:
   assumes Invariant: "\<And>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega> \<Longrightarrow> Q A \<omega>"
       and ExpWfRel:          
           "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>) ctxt_vpr StateCons P ctxt cond 
@@ -183,7 +183,7 @@ next
     by (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)+
 qed
 
-lemma inhale_opt_rel_imp_2:
+lemma inhale_rel_imp_2:
   assumes Invariant: "is_inh_rel_invariant ctxt_vpr StateCons Q"
       and ExpWfRel:          
           "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>) ctxt_vpr StateCons P ctxt cond 
@@ -197,7 +197,7 @@ lemma inhale_opt_rel_imp_2:
     shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
   using assms
   unfolding is_inh_rel_invariant_def
-  by (blast intro!: inhale_opt_rel_imp)
+  by (blast intro!: inhale_rel_imp)
 
 subsection \<open>Field access predicate rule\<close>
 
@@ -212,8 +212,10 @@ definition inhale_acc_normal_premise
 
 lemma inhale_field_acc_rel:
   assumes 
-    WfRcv: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
-    WfPerm: "expr_wf_rel (state_rel_ext R) ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and 
+    WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>) 
+                        ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
+    WfPerm: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>)
+                        ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and 
     PosPermRel:  "\<And>p. rel_general R (R' p)
                   (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
                   (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
@@ -224,7 +226,7 @@ lemma inhale_field_acc_rel:
   shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
   fix \<omega> ns res
-  assume "R \<omega> ns"
+  assume "R \<omega> ns" and "Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>"
   hence Rext0: "state_rel_ext R \<omega> \<omega> ns"
     by simp
 
@@ -233,13 +235,14 @@ proof (rule inhale_rel_intro_2)
   proof (cases)
     case (InhAcc r p W')
     from this obtain ns1 where Rext1: "state_rel_ext R \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF WfRcv Rext0]
+      using wf_rel_normal_elim[OF WfRcv] Rext0 \<open>Q _ \<omega>\<close>
       by blast
-    with InhAcc obtain ns2 where "state_rel_ext R \<omega> \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
-      using wf_rel_normal_elim[OF WfPerm Rext1] red_ast_bpl_transitive
+    moreover obtain ns2 where "state_rel_ext R \<omega> \<omega> ns2" and  "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)"
+      using InhAcc wf_rel_normal_elim[OF WfPerm] Rext1 \<open>Q _ \<omega>\<close>
       by blast
-    hence "R \<omega> ns2"
-      by simp
+    ultimately have "R \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+      using red_ast_bpl_transitive
+      by blast+
 
     show ?thesis
     proof (rule rel_vpr_aux_intro)
@@ -275,27 +278,33 @@ proof (rule inhale_rel_intro_2)
     qed
   next 
     case InhSubAtomicFailure
-    hence SubexpFailCases: 
-          "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
-           (\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> 
-                ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure)"
+    from this consider 
+          (RcvFail) "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure" |
+          (RcvNormal) "\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> 
+                           ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
       by (auto elim: red_exp_list_failure_elim)  
-    show ?thesis
-    proof (rule rel_vpr_aux_intro)
-      show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
-      proof (cases "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
-        case True
-        then show ?thesis 
-          using wf_rel_failure_elim[OF WfRcv] \<open>R \<omega> ns\<close>
-          by blast
-      next
-        case False
-        then show ?thesis 
-          using wf_rel_normal_elim[OF WfRcv] \<open>R \<omega> ns\<close> 
-                wf_rel_failure_elim[OF WfPerm] SubexpFailCases red_ast_bpl_transitive
-          by metis
-      qed
-    qed (simp add: \<open>res = _\<close>)
+    thus ?thesis
+    proof (cases)
+      case RcvFail
+      then show ?thesis 
+        using  \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close> wf_rel_failure_elim[OF WfRcv]        
+        unfolding \<open>res = _\<close>
+        by (auto intro!: rel_vpr_aux_intro)
+    next
+      case RcvNormal
+      with wf_rel_normal_elim[OF WfRcv] \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close>
+      obtain ns' where "R \<omega> ns'" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns')"
+        by blast
+
+      moreover from RcvNormal wf_rel_failure_elim[OF WfPerm] \<open>R \<omega> ns'\<close> \<open>Q _ \<omega>\<close> obtain c' where
+        "red_ast_bpl P ctxt (\<gamma>1, Normal ns') c' \<and> snd c' = Failure"
+        by blast
+
+      ultimately show ?thesis 
+        using red_ast_bpl_transitive
+        unfolding rel_vpr_aux_def \<open>res = _\<close>
+        by blast        
+    qed
   qed
 qed
 
