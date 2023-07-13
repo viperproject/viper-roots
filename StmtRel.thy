@@ -517,10 +517,11 @@ qed (insert assms, auto)
 subsection \<open>Inhale statement relation\<close>
 
 lemma inhale_stmt_rel:
-  assumes "inhale_rel R ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
+  assumes InhRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'" and
+          InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega>" 
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
   apply (rule stmt_rel_intro)
-  using inhale_rel_normal_elim[OF assms] inhale_rel_failure_elim[OF assms]
+  using inhale_rel_normal_elim[OF InhRel] inhale_rel_failure_elim[OF InhRel] InvHolds
   by (auto elim: RedInhale_case)
 
 subsection \<open>Exhale statement relation\<close>
@@ -531,7 +532,8 @@ lemma exhale_stmt_rel:
             there is potentially a step in the Boogie program that sets this differentiation up resulting a new
             relation that tracks both states (where in the beginning both states are the same)\<close>
           R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'" and                   
-          ExhaleRel: "exhale_rel Rexh ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+          ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+          InvHolds: "\<And> \<omega> ns. Rexh \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>" and
           \<comment>\<open>At the end of the exhale we require the Boogie program to reestablish the original relation on the 
              evaluation state\<close>
           Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
@@ -550,7 +552,7 @@ proof (rule stmt_rel_intro)
     case (RedExhale \<omega>_exh)
     with exhale_rel_normal_elim[OF ExhaleRel \<open>Rexh \<omega> \<omega> ns1\<close>] obtain ns2 where 
       "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)" and "Rexh \<omega> \<omega>_exh ns2"
-      using red_ast_bpl_transitive[OF Red1]
+      using red_ast_bpl_transitive[OF Red1] InvHolds[OF \<open>Rexh \<omega> \<omega> ns1\<close>]
       by blast
     with Rexh_to_R obtain ns3 where 
      "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R \<omega>_exh ns3"
@@ -571,7 +573,7 @@ next
   proof cases
     case RedExhaleFailure
     with exhale_rel_failure_elim[OF ExhaleRel \<open>Rexh \<omega> \<omega> ns1\<close>] show ?thesis
-      using red_ast_bpl_transitive[OF Red1]
+      using red_ast_bpl_transitive[OF Red1] InvHolds[OF \<open>Rexh \<omega> \<omega> ns1\<close>]
       by fastforce
   qed (simp)
 qed
@@ -584,7 +586,8 @@ text \<open>The following theorem is the same as exhale_stmt_rel except that Rex
 lemma exhale_stmt_rel_inst:
   assumes 
       "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')" and                   
-      "exhale_rel (state_rel Pr TyRep Tr' AuxPred' ctxt) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+      "exhale_rel (state_rel Pr TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+      InvHolds: "\<And> \<omega> ns. state_rel Pr TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
       "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
       "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
