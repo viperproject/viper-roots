@@ -663,6 +663,33 @@ lemma unfolding_wf_rel:
       shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (Unfolding p xs ubody) \<gamma>1 \<gamma>3"
   oops
 
+subsubsection \<open>Well-definedness for free if expressions are subexpressions of a framed assertion\<close>
+
+lemma assertion_framing_expr_wf_rel_inh:
+  assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and> assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and
+          "es = sub_expressions_atomic A" and
+          "es \<noteq> []"
+        shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+  unfolding exprs_wf_rel_def
+proof (rule wf_rel_intro)
+  fix contra
+  fix \<omega>def \<omega> ns
+  assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+  hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
+    using assms InhSubAtomicFailure
+    by blast
+
+  moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
+    using assms
+    by blast
+
+  ultimately have False
+    unfolding assertion_framing_state_def
+    by blast
+
+  thus contra
+    by blast
+qed (blast intro: red_ast_bpl_refl)
 
 subsection \<open>Connecting semantic well-definedness relation with concrete Boogie statements\<close>
 

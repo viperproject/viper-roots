@@ -4,14 +4,15 @@ begin
 
 definition inhale_rel ::
      "('a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool)
+     \<Rightarrow> (assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool)
      \<Rightarrow> 'a total_context
         \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
            \<Rightarrow> bigblock list
                     \<Rightarrow> 'a econtext_bpl
-                       \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert
+                       \<Rightarrow> assertion
                           \<Rightarrow> bigblock \<times> cont \<Rightarrow> bigblock \<times> cont \<Rightarrow> bool"
-  where "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<equiv>
-         rel_general R R 
+  where "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<equiv>
+         rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> Q assertion_vpr \<omega>)  R 
            (\<lambda> \<omega> \<omega>'. red_inhale ctxt_vpr StateCons assertion_vpr \<omega> (RNormal \<omega>'))
            (\<lambda> \<omega>. red_inhale ctxt_vpr StateCons assertion_vpr \<omega> RFailure)
            P ctxt \<gamma> \<gamma>'"
@@ -20,14 +21,15 @@ lemma inhale_rel_intro:
   assumes
     "\<And>\<omega> ns \<omega>'. 
       R \<omega> ns \<Longrightarrow> 
+      Q assertion_vpr \<omega> \<Longrightarrow>
       red_inhale ctxt_vpr StateCons assertion_vpr \<omega> (RNormal \<omega>') \<Longrightarrow>
       (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'))" and
-
     "\<And>\<omega> ns.
       R \<omega> ns \<Longrightarrow>
+      Q assertion_vpr \<omega> \<Longrightarrow>
       red_inhale ctxt_vpr StateCons assertion_vpr \<omega> RFailure \<Longrightarrow>
       (\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
   using assms
   unfolding inhale_rel_def
   by (auto intro: rel_intro)
@@ -36,16 +38,18 @@ lemma inhale_rel_intro_2:
   assumes
     "\<And>\<omega> ns res. 
       R \<omega> ns \<Longrightarrow> 
+      Q assertion_vpr \<omega> \<Longrightarrow>
       red_inhale ctxt_vpr StateCons assertion_vpr \<omega> res \<Longrightarrow>
       rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
   using assms
   unfolding inhale_rel_def rel_vpr_aux_def
   by (auto intro: rel_intro)
 
 lemma inhale_rel_normal_elim:
-  assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and 
+  assumes "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and 
           "R \<omega> ns" and 
+          "Q assertion_vpr \<omega>"
           "red_inhale ctxt_vpr StateCons assertion_vpr \<omega> (RNormal \<omega>')"
   shows "\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns')"
   using assms
@@ -53,98 +57,55 @@ lemma inhale_rel_normal_elim:
   by (auto intro: rel_success_elim)
 
 lemma inhale_rel_failure_elim:
-  assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and 
+  assumes "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'" and 
           "R \<omega> ns" and 
+          "Q assertion_vpr \<omega>" and
           "red_inhale ctxt_vpr StateCons assertion_vpr \<omega> RFailure"
   shows "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
   using assms
   unfolding inhale_rel_def rel_general_def
   by auto
 
-subsection \<open>Inhale rel definition that can handle optimizations\<close>
+subsection \<open>Inhale relation invariant\<close>
 
-definition inhale_opt_rel ::
-     "('a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool)
-     \<Rightarrow> ((pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a full_total_state \<Rightarrow> bool)
-     \<Rightarrow> 'a total_context
-        \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
-           \<Rightarrow> bigblock list
-                    \<Rightarrow> 'a econtext_bpl
-                       \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert
-                          \<Rightarrow> bigblock \<times> cont \<Rightarrow> bigblock \<times> cont \<Rightarrow> bool"
-  where "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<equiv>
-         rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> Q assertion_vpr \<omega>)  R 
-           (\<lambda> \<omega> \<omega>'. red_inhale ctxt_vpr StateCons assertion_vpr \<omega> (RNormal \<omega>'))
-           (\<lambda> \<omega>. red_inhale ctxt_vpr StateCons assertion_vpr \<omega> RFailure)
-           P ctxt \<gamma> \<gamma>'"
-
-definition is_assertion_red_invariant
-  where "is_assertion_red_invariant ctxt StateCons Q Success \<equiv>
+definition is_inh_rel_invariant
+  where "is_inh_rel_invariant ctxt StateCons Q  \<equiv>
           (\<forall> A1 A2 \<omega>. Q (A1 && A2) \<omega> \<longrightarrow> 
                   (Q A1 \<omega>) \<and>
-                  (\<forall>\<omega>'. Success A1 \<omega> \<omega>' \<longrightarrow> Q A2 \<omega>')) \<and>
+                  (\<forall>\<omega>'. red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>') \<longrightarrow> Q A2 \<omega>')) \<and>
           (\<forall> e A \<omega>. Q (assert.Imp e A) \<omega> \<longrightarrow> ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>)"
 
-lemma is_assertion_red_invariant_intro:
+lemma is_inh_rel_invariant_intro:
   assumes "\<And> A1 A2 \<omega>. Q (A1 && A2) \<omega> \<Longrightarrow> Q A1 \<omega>" and
-          "\<And> A1 A2 \<omega> \<omega>'. Q (A1 && A2) \<omega> \<Longrightarrow> Success A1 \<omega> \<omega>' \<Longrightarrow> Q A2 \<omega>'" and
+          "\<And> A1 A2 \<omega> \<omega>'. Q (A1 && A2) \<omega> \<Longrightarrow> red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>'" and
           "\<And> e A \<omega>. Q (assert.Imp e A) \<omega> \<Longrightarrow> 
                     ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>"
-        shows "is_assertion_red_invariant ctxt StateCons Q Success"
+        shows "is_inh_rel_invariant ctxt StateCons Q"
   using assms
-  unfolding is_assertion_red_invariant_def
+  unfolding is_inh_rel_invariant_def
   by blast
 
-definition is_assertion_red_invariant_inh
-  where "is_assertion_red_invariant_inh ctxt_vpr StateCons Q \<equiv> 
-              is_assertion_red_invariant ctxt_vpr StateCons Q (\<lambda>A \<omega> \<omega>'. red_inhale ctxt_vpr StateCons A \<omega> (RNormal \<omega>'))"
+subsubsection \<open>Invariant instantiations\<close>
 
 lemma is_assertion_red_invariant_inh:
-  "is_assertion_red_invariant_inh ctxt_vpr StateCons (assertion_framing_state ctxt_vpr StateCons)"
-  unfolding is_assertion_red_invariant_inh_def 
-  apply (rule is_assertion_red_invariant_intro)
-  by (blast dest: assertion_framing_star assertion_framing_imp)+
-
-lemma expr_wf_rel_inh_opt:
-  assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and> assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and
-          "es = sub_expressions_atomic A" and
-          "es \<noteq> []"
-        shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
-  unfolding exprs_wf_rel_def
-proof (rule wf_rel_intro)
-  fix contra
-  fix \<omega>def \<omega> ns
-  assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
-  hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
-    using assms InhSubAtomicFailure
-    by blast
-
-  moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
-    using assms
-    by blast
-
-  ultimately have False
-    unfolding assertion_framing_state_def
-    by blast
-
-  thus contra
-    by blast
-qed (blast intro: red_ast_bpl_refl)
+  "is_inh_rel_invariant ctxt_vpr StateCons (assertion_framing_state ctxt_vpr StateCons)"
+  by (blast intro: is_inh_rel_invariant_intro dest: assertion_framing_star assertion_framing_imp)
 
 subsection \<open>Propagation rules\<close>
 
 lemma inhale_propagate_pre:
-  assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
-          "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
-  using assms rel_propagate_pre
+  assumes PropagateBpl: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q assertion_vpr \<omega> \<Longrightarrow>
+               \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'"
+      and InhRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"   
   unfolding inhale_rel_def
-  by metis
+  apply (rule rel_propagate_pre[OF _ InhRel[simplified inhale_rel_def]])
+  by (fastforce intro: PropagateBpl)
 
 lemma inhale_propagate_post:
-  assumes "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" and
-          "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  assumes "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" 
+      and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   using assms rel_propagate_post
   unfolding inhale_rel_def
   by blast
@@ -152,110 +113,50 @@ lemma inhale_propagate_post:
 subsection \<open>Structural rules\<close>
 
 lemma inhale_rel_star: 
-  assumes "inhale_rel R ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" and
-          "inhale_rel R ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
-        shows "inhale_rel R ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
-  using assms
-  unfolding inhale_rel_def
-  apply (rule rel_general_comp)
-  by (auto elim: InhStar_case)
-
-lemma inhale_opt_rel_star:
-  assumes Invariant1: "\<And> \<omega>. Q (A1 && A2) \<omega> \<Longrightarrow> Q A1 \<omega>" and
-          Invariant2: "\<And> \<omega> \<omega>'. Q (A1 && A2) \<omega> \<Longrightarrow> red_inhale ctxt_vpr StateCons A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>'" and
-          RelA1: "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" and
-          RelA2: "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
-  shows "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
+  assumes Invariant1: "\<And> \<omega>. Q (A1 && A2) \<omega> \<Longrightarrow> Q A1 \<omega>"
+      and Invariant2: "\<And> \<omega> \<omega>'. Q (A1 && A2) \<omega> \<Longrightarrow> red_inhale ctxt_vpr StateCons A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>'"
+      and InhRelA1: "inhale_rel R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" 
+      and InhRelA2: "inhale_rel R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
   text\<open>Idea of proof:
        \<^item> use general composition rule where the intermediate relation is chosen to be \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>\<close>
        \<^item> Prove the first premise by weakening the input relation from \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q (A1 && A2) \<omega>\<close> to \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A1 \<omega>\<close>
          and by adjusting the output relation \<^term>\<open>\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>\<close> to \<^term>\<open>R\<close> (\<^term>\<open>R\<close> is strong enough
          given the additional assumptions when adjusting the output relation)\<close>
-  unfolding inhale_opt_rel_def
+  unfolding inhale_rel_def
   apply (rule rel_general_comp[where ?R2.0="\<lambda>\<omega> ns. R \<omega> ns \<and> Q A2 \<omega>"])
      apply (rule rel_general_conseq_input_output)
-       apply (rule RelA1[simplified inhale_opt_rel_def])
+       apply (rule InhRelA1[simplified inhale_rel_def])
       apply (simp add: Invariant1)
      apply (fastforce dest: Invariant2)
-    apply (rule RelA2[simplified inhale_opt_rel_def])
+    apply (rule InhRelA2[simplified inhale_rel_def])
   by (auto elim: InhStar_case)
 
-lemma inhale_opt_rel_star_2:
-  assumes Invariant: "is_assertion_red_invariant_inh ctxt_vpr StateCons Q" and
-          RelA1: "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" and
-          RelA2: "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
-        shows "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
-  apply (rule inhale_opt_rel_star)
-  using Invariant 
-  unfolding is_assertion_red_invariant_inh_def is_assertion_red_invariant_def
-     apply blast
-  using Invariant 
-  unfolding is_assertion_red_invariant_inh_def is_assertion_red_invariant_def
-    apply blast
+lemma inhale_rel_star_2: 
+  assumes Invariant: "is_inh_rel_invariant ctxt_vpr StateCons Q"
+      and InhRelA1: "inhale_rel R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2" 
+      and InhRelA2: "inhale_rel R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
   using assms
-  by auto
-
-lemma inhale_rel_imp:
-  assumes 
-   ExpWfRel:          
-        "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr StateCons P ctxt cond 
-         \<gamma>1
-         (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
-        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if") and
-   EmptyElse: "is_empty_bigblock empty_else_block" and
-   ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl" and
-   RhsRel: "inhale_rel R ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
-                (is "inhale_rel R _ _ _ _ _ ?\<gamma>_thn (next, cont)")
-              shows "inhale_rel R ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
-  using wf_rel_general_1[OF ExpWfRel] RhsRel
-  unfolding inhale_rel_def
-proof (rule rel_general_cond)
-  show "rel_general R R (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
-    apply (rule rel_intro)
-    using red_ast_bpl_empty_block_2[OF EmptyElse]
-    apply fastforce
-    by simp
-next
-  fix \<omega> \<omega>' ns
-  assume "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> (RNormal \<omega>')" and "R \<omega> ns"
-  thus "((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
-       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R \<omega> ns \<and> red_inhale ctxt_vpr StateCons A \<omega> (RNormal \<omega>') \<or>
-        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> \<omega> = \<omega>')"
-    apply (cases)
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
-    apply (metis val_rel_vpr_bpl.simps(2))
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
-    by (metis val_rel_vpr_bpl.simps(2))
-next
-  fix \<omega> ns
-  assume "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> RFailure" and "R \<omega> ns"
-  thus "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
-       ((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
-       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R \<omega> ns \<and> red_inhale ctxt_vpr StateCons A \<omega> RFailure \<or>
-        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> False)"
-    apply (cases)
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
-     apply (metis val_rel_vpr_bpl.simps(2))
-    by auto
-qed
+  unfolding is_inh_rel_invariant_def
+  by (blast intro!: inhale_rel_star)
 
 lemma inhale_opt_rel_imp:
-  assumes 
-   Invariant: "\<And>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega> \<Longrightarrow> Q A \<omega>" and
-   ExpWfRel:          
-        "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>) ctxt_vpr StateCons P ctxt cond 
-         \<gamma>1
-         (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
-        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if") and
-   EmptyElse: "is_empty_bigblock empty_else_block" and
-   ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl" and
-   RhsRel: "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
-                (is "inhale_opt_rel R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)")
-              shows "inhale_opt_rel R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
-  unfolding inhale_opt_rel_def
+  assumes Invariant: "\<And>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega> \<Longrightarrow> Q A \<omega>"
+      and ExpWfRel:          
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>) ctxt_vpr StateCons P ctxt cond 
+            \<gamma>1
+            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
+        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
+      and EmptyElse: "is_empty_bigblock empty_else_block"
+      and ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl"
+      and RhsRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" 
+                 (is "inhale_rel R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)")
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
+  unfolding inhale_rel_def
 proof (rule rel_general_cond,
        fastforce intro: rel_general_conseq_input_output[OF wf_rel_general_1[OF ExpWfRel]],
-       rule RhsRel[simplified inhale_opt_rel_def])
+       rule RhsRel[simplified inhale_rel_def])
   show "rel_general R R (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
     apply (rule rel_intro)
     using red_ast_bpl_empty_block_2[OF EmptyElse]
@@ -282,6 +183,22 @@ next
     by (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)+
 qed
 
+lemma inhale_opt_rel_imp_2:
+  assumes Invariant: "is_inh_rel_invariant ctxt_vpr StateCons Q"
+      and ExpWfRel:          
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>) ctxt_vpr StateCons P ctxt cond 
+            \<gamma>1
+            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) [empty_else_block], KSeq next cont)" 
+        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
+      and EmptyElse: "is_empty_bigblock empty_else_block"
+      and ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl"
+      and RhsRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" 
+                 (is "inhale_rel R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)")
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 (next, cont)"
+  using assms
+  unfolding is_inh_rel_invariant_def
+  by (blast intro!: inhale_opt_rel_imp)
+
 subsection \<open>Field access predicate rule\<close>
 
 definition inhale_acc_normal_premise
@@ -304,7 +221,7 @@ lemma inhale_field_acc_rel:
      UpdInhRel: "\<And>p r. rel_general (R' p) R \<comment>\<open>Here, the simulation needs to revert back to R\<close>
                   (inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r)
                   (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" 
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule inhale_rel_intro_2)
   fix \<omega> ns res
   assume "R \<omega> ns"
@@ -578,11 +495,11 @@ subsection \<open>Misc\<close>
 
 lemma inhale_rel_refl:
   assumes "\<And> \<omega> res. red_inhale ctxt_vpr StateCons A \<omega> res \<Longrightarrow> (res \<noteq> RFailure \<and> (\<forall> \<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>)) "
-  shows "inhale_rel R ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>"
   using assms
   by (auto intro!: inhale_rel_intro intro: red_ast_bpl_refl)
 
-lemma inhale_rel_true: "inhale_rel R ctxt_vpr StateCons P ctxt (Atomic (Pure (ELit (ViperLang.LBool True)))) \<gamma> \<gamma>"
+lemma inhale_rel_true: "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure (ELit (ViperLang.LBool True)))) \<gamma> \<gamma>"
 proof (rule inhale_rel_refl)
   fix \<omega> res
   assume "red_inhale ctxt_vpr StateCons (Atomic (Pure (ELit (ViperLang.lit.LBool True)))) \<omega> res"
