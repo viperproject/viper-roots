@@ -65,8 +65,6 @@ subsection \<open>Exhale relation invariant\<close>
 
 definition is_exh_rel_invariant
   where "is_exh_rel_invariant ctxt StateCons cond_assert cond_exp Q  \<equiv>
-          \<comment>\<open>currently, just added no permission introspection, since it is required for framedness
-             maybe should generalize to a parameter\<close>
           (\<forall> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<and> cond_assert A1 \<longrightarrow>
                   (Q A1 \<omega>def \<omega>) \<and> 
                   (\<forall>\<omega>'. red_exhale ctxt StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<longrightarrow> Q A2 \<omega>def \<omega>')) \<and>

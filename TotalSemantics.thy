@@ -451,7 +451,7 @@ definition predicate_obligations :: "'a total_context \<Rightarrow> ('a full_tot
           predicate_decl.body pdecl = Some e \<and>
           vals_well_typed (absval_interp_total ctxt) vs (predicate_decl.args pdecl) ) \<longrightarrow>
           assertion_self_framing_store ctxt StateCons e (nth_option vs)"
-
+(*
 definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow>  bool"
   where "stmt_correct_total ctxt StateCons \<Lambda> s \<equiv>
          heap_dep_interp_wf ctxt StateCons \<Lambda> \<longrightarrow>           
@@ -459,6 +459,95 @@ definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total
            predicate_obligations ctxt StateCons \<and>
            (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total_full \<omega> \<longrightarrow> 
                 red_stmt_total ctxt StateCons \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure)"
+*)
+
+definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp list \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_store_well_typed A vs \<sigma> \<equiv> \<forall>i. 0 \<le> i \<and> i < length vs \<longrightarrow> 
+                         map_option (\<lambda>v. get_type A v) (\<sigma> i) = Some (vs ! i)"
+
+definition vpr_method_correct_total_aux :: 
+          "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl 
+                \<Rightarrow> ('a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool) 
+               \<Rightarrow>  bool" where
+  "vpr_method_correct_total_aux ctxt R mdecl CorrectWrtPre \<equiv>
+        \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
+         (\<forall>(\<omega> :: 'a full_total_state) rpre. 
+            vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+            total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
+            is_empty_total_full \<omega> \<longrightarrow>
+            red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>
+            (
+              rpre \<noteq> RFailure \<and>
+              (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
+               CorrectWrtPre ctxt R mdecl \<omega>pre \<omega>
+              )
+            )
+         )"
+
+definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
+                   (\<forall>mh. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
+                         wf_mask_simple (get_mh_total mh) \<longrightarrow>
+                         assertion_framing_state ctxt R postcondition
+                                 \<lparr> get_store_total = \<sigma>,
+                                 \<comment>\<open>old state given by state that satisfies precondition\<close>
+                                  get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], 
+                                  get_total_full = mh \<rparr>
+                )"
+
+definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "vpr_method_body_correct ctxt R mdecl \<omega>pre \<equiv>
+            (\<forall>rbody. red_stmt_total ctxt R 
+                                (nth_option (method_decl.args mdecl @ method_decl.rets mdecl))
+                                (Seq (the (method_decl.body mdecl)) (Exhale (method_decl.post mdecl)))
+                                (update_trace_total \<omega>pre (Map.empty(old_label \<mapsto> get_total_full \<omega>pre))) 
+                                rbody \<longrightarrow> rbody \<noteq> RFailure)
+                        \<comment>\<open>  (rbody \<noteq> RFailure \<and> 
+                            (\<forall>\<omega>body. rbody = RNormal \<omega>body \<longrightarrow> 
+                                (\<forall> rpost. red_exhale ctxt R \<omega>body (method_decl.post mdecl) \<omega>body rpost \<longrightarrow> rpost \<noteq> RFailure)
+                            )
+                          )\<close>
+                "
+
+definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
+        \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
+         (\<forall>(\<omega> :: 'a full_total_state) rpre. 
+            vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+            total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
+            is_empty_total_full \<omega> \<longrightarrow>
+            red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>
+            (
+              rpre \<noteq> RFailure \<and>
+              (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
+                \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>pre\<close> since inhale does not change the store.\<close>
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
+                vpr_method_body_correct ctxt R mdecl \<omega>pre
+              )
+            )
+         )"
+
+definition vpr_method_correct_total_2_new :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total_2_new ctxt R mdecl \<equiv>
+         vpr_method_correct_total_aux ctxt R mdecl 
+          (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
+                vpr_method_body_correct ctxt R mdecl \<omega>pre
+          )
+       "
+
+lemma vpr_method_correct_total_2_new_equiv:
+  "vpr_method_correct_total_2 ctxt R mdecl = vpr_method_correct_total_2_new ctxt R mdecl"
+  unfolding vpr_method_correct_total_2_def vpr_method_correct_total_2_new_def vpr_method_correct_total_aux_def
+  by blast
+
+definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_spec_correct_total ctxt R mdecl \<equiv>
+         vpr_method_correct_total_aux ctxt R mdecl 
+          (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)
+          )
+       "
 
 (* TODO loops
 
