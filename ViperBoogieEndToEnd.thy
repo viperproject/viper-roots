@@ -567,9 +567,7 @@ lemma end_to_end_stmt_rel_2:
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and 
           StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
           VprMethodBodySome: "method_decl.body mdecl = Some body_vpr" and
-
           VprNoPermUnfoldingPost: "no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)" and
-
           ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
 
           \<comment>\<open>Viper encoding does not use Boogie procedure preconditions\<close>
