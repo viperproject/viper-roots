@@ -160,6 +160,14 @@ definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) 
                \<omega>' = update_mp_loc_total_full \<omega> lp (padd (get_mp_total_full \<omega> lp) q)
        }"
 
+lemma inhale_perm_single_pred_elem:
+  assumes "\<omega>' = update_mp_loc_total_full \<omega> lp (padd (get_mp_total_full \<omega> lp) q)" and
+          "R \<omega>'" and
+          "option_fold ((=) q) (q \<noteq> pnone) p_opt"
+        shows "\<omega>' \<in> inhale_perm_single_pred R \<omega> lp p_opt"
+  using assms
+  unfolding inhale_perm_single_pred_def
+  by blast
 
 subsection\<open>Main definitions for evaluation,  well-definedness, and inhale\<close>
 
