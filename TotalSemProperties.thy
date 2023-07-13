@@ -1820,9 +1820,9 @@ next
                 apply (rule PermSuccess)
                apply simp
               apply (simp add: False)
-              using \<open>\<omega>'' \<in> _\<close>
-              by (metis (full_types) InhAcc.hyps THResultNormal_alt \<open>res = RNormal \<omega>'\<close> emptyE th_result_rel_normal)            
-            then show ?thesis 
+              using \<open>\<omega>'' \<in> _\<close> InhAcc.hyps \<open>res = RNormal \<omega>'\<close> 
+              by (auto intro: THResultNormal_alt dest: th_result_rel_normal)
+            then show ?thesis
               using \<open>\<omega>'' \<le> \<omega>'\<close> \<open>res = _\<close>              
               by blast
           qed
@@ -1832,12 +1832,19 @@ next
 next
   case (InhAccPred \<omega> e_args v_args e_p p W' pred_id res)
   moreover from this have
-      Leq: "Some \<omega>2 \<le> Some \<omega>" and
-      SubExpConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) e_args \<and> no_perm_pure_exp e_p \<and> no_unfolding_pure_exp e_p"
-    sorry
+      Leq: "Some \<omega>2 \<le> Some \<omega>" 
+    by simp
+  moreover from InhAccPred have
+    SubExpConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) (e_args) \<and> no_perm_pure_exp e_p \<and> no_unfolding_pure_exp e_p"
+    proof (simp add: assert_pred_atomic_subexp del: pure_exp_pred.simps)
+      from InhAccPred have "list_all (\<lambda>e. no_perm_pure_exp e) e_args \<and> list_all (\<lambda>e. no_unfolding_pure_exp e) e_args"
+        by (simp add: assert_pred_atomic_subexp del: pure_exp_pred.simps)
+      thus "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) e_args"
+        by (simp add: list_all_length)
+    qed
   ultimately consider (ArgsFail) "red_pure_exps_total ctxt R (Some \<omega>2) e_args \<omega>2 None" | 
                       (ArgsSuccess) "red_pure_exps_total ctxt R (Some \<omega>2) e_args \<omega>2 (Some v_args)"
-    by (metis option.discI)    
+    by (meson Some_Some_ifD)
   thus ?case
   proof cases
     case ArgsFail
@@ -1848,7 +1855,7 @@ next
        apply (simp add: \<open>e_args \<noteq> []\<close>)
       apply simp
       using ArgsFail
-      sorry
+      by (auto intro: red_pure_exps_total_append_failure)
     thus ?thesis
       by simp            
   next
@@ -1862,7 +1869,8 @@ next
          have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 RFailure"
            apply (rule InhSubAtomicFailure)
            apply simp+
-           sorry                     
+           using ArgsSuccess PermFail
+           by (auto intro: red_pure_exps_total_append_failure_2 red_exp_inhale_unfold_intros)
          then show ?thesis 
            by simp
       next
@@ -1892,9 +1900,9 @@ next
           have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 (RNormal \<omega>'')"
             apply (rule TotalExpressions.InhAccPred[OF ArgsSuccess PermSuccess])
              apply simp
-            using \<open>\<omega>'' \<in> _\<close>
-            by (metis (full_types) InhAccPred.hyps THResultNormal_alt \<open>res = RNormal \<omega>'\<close> emptyE th_result_rel_normal)            
-          then show ?thesis 
+            using \<open>\<omega>'' \<in> _\<close> \<open>res = RNormal \<omega>'\<close> InhAccPred.hyps
+            by (auto intro: THResultNormal_alt dest: th_result_rel_normal)
+          then show ?thesis
             using \<open>\<omega>'' \<le> \<omega>'\<close> \<open>res = _\<close>              
             by blast
         qed
@@ -1941,9 +1949,16 @@ next
 next
   case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
   moreover from this have
-      Leq: "Some \<omega>2 \<le> Some \<omega>" and
-      SubExpConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) e_args"
-    sorry
+      Leq: "Some \<omega>2 \<le> Some \<omega>" 
+    by simp
+  moreover from InhAccPredWildcard have
+    SubExpConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) e_args"
+    proof (simp add: assert_pred_atomic_subexp del: pure_exp_pred.simps)
+      from InhAccPredWildcard have "list_all (\<lambda>e. no_perm_pure_exp e) e_args \<and> list_all (\<lambda>e. no_unfolding_pure_exp e) e_args"
+        by (simp add: assert_pred_atomic_subexp del: pure_exp_pred.simps)
+      thus "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) e_args"
+        by (simp add: list_all_length)
+    qed
   ultimately consider (ArgsFail) "red_pure_exps_total ctxt R (Some \<omega>2) e_args \<omega>2 None" | 
                       (ArgsSuccess) "red_pure_exps_total ctxt R (Some \<omega>2) e_args \<omega>2 (Some v_args)"
     by (metis option.discI)    
@@ -1954,10 +1969,7 @@ next
       by (meson list.distinct(1) red_exp_list_failure_elim)    
     have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>2 RFailure"
       apply (rule InhSubAtomicFailure)
-       apply (simp add: \<open>e_args \<noteq> []\<close>)
-      apply simp
-      using ArgsFail
-      sorry
+      by (simp_all add: \<open>e_args \<noteq> []\<close> ArgsFail)      
     thus ?thesis
       by simp            
   next
@@ -2030,7 +2042,7 @@ next
       by (simp add: list_all_length)
   qed
   ultimately show ?case 
-    using InhSubAtomicFailure red_inhale_intros
+    using InhSubAtomicFailure TotalExpressions.InhSubAtomicFailure
     by (metis option.discI)
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)

@@ -498,7 +498,7 @@ next
 qed
 
 lemma red_exp_list_failure_Nil:
-  assumes "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) [] \<omega> res"
+  assumes "red_pure_exps_total ctxt_vpr StateCons \<omega>_def [] \<omega> res"
   shows "res = Some []"
   using assms
   by cases
@@ -549,6 +549,46 @@ lemmas red_pure_exp_total_elims =
   RedLit_case RedVar_case
   RedUnop_case RedBinop_case RedFunApp_case  
   red_exp_list_normal_elim red_exp_list_failure_elim
+
+lemma red_pure_exps_total_append_failure:
+  assumes "red_pure_exps_total ctxt R \<omega>_def es \<omega> None"
+  shows "red_pure_exps_total ctxt R \<omega>_def (es@es') \<omega> None"
+  using assms
+proof (induction es)
+  case Nil
+  then show ?case 
+    using red_exp_list_failure_Nil
+    by blast    
+next
+  case (Cons e es)
+  then show ?case 
+    by (auto elim: red_exp_list_failure_elim intro: red_exp_inhale_unfold_intros)
+qed
+
+lemma red_pure_exps_total_append_failure_2:
+  assumes "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)"
+      and "red_pure_exps_total ctxt R \<omega>_def es' \<omega> None"
+    shows "red_pure_exps_total ctxt R \<omega>_def (es@es') \<omega> None"
+  using assms
+proof (induction es arbitrary: vs)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons e es)
+  from this obtain v vs_tl where 
+     "vs = v#vs_tl" and
+     RedE: "ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+     "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs_tl)"
+  by (auto elim: red_pure_exp_total_elims)
+      
+  then have "red_pure_exps_total ctxt R \<omega>_def (es @ es') \<omega> None"
+    using Cons
+    by blast
+
+  thus ?case
+    using RedE
+    by (auto intro: red_exp_inhale_unfold_intros) 
+qed
 
 subsubsection \<open>Inhale\<close>
 
