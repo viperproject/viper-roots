@@ -24,7 +24,29 @@ lemma assert_pred_atomic_subexp:
   shows "list_all (pure_exp_pred p_e) (sub_expressions_atomic atm)"
   using assms atomic_assert_pred_subexp
   by simp
-  
+
+lemma less_eq_valid_locs_subset_total_state:
+  assumes "\<omega> \<le> \<omega>'"
+  shows "get_valid_locs \<omega> \<subseteq> get_valid_locs \<omega>'"
+proof -
+  from \<open>\<omega> \<le> \<omega>'\<close> have "get_mh_total_full \<omega> \<le> get_mh_total_full \<omega>'" (is "?m \<le> ?m'")
+    using less_eq_full_total_stateD_2 
+    by auto
+
+  show ?thesis
+  proof
+    fix lh
+    assume "lh \<in> get_valid_locs \<omega>"    
+    hence "pgt (?m lh) pnone"
+      by (simp add: get_valid_locs_def)
+
+    hence "pgt (?m' lh) pnone"
+      using \<open>?m \<le> ?m'\<close>
+      by (metis le_fun_def padd_pos prat_gte_padd prat_pnone_pgt)
+    thus "lh \<in> get_valid_locs \<omega>'"
+      by (simp add: get_valid_locs_def)
+  qed
+qed  
 
 subsection \<open>Expression evaluation\<close>
 
@@ -1375,6 +1397,7 @@ lemma inhale_no_perm_failure_preserve_mono:
         no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<Longrightarrow>
         \<omega>2 \<le> \<omega>1 \<Longrightarrow> 
         \<omega>_def2 \<le> \<omega>_def1 \<Longrightarrow>
+        \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow> \<comment>\<open>needed since other may not need to check well-definedness in smaller state\<close>
         (if resE = VFailure then ctxt, R, \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure
          else ctxt, R, \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure \<or>
               ctxt, R, \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE)" and
@@ -1382,6 +1405,7 @@ lemma inhale_no_perm_failure_preserve_mono:
          list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es \<Longrightarrow>
          \<omega>2 \<le> \<omega>1 \<Longrightarrow> 
          \<omega>_def2 \<le> \<omega>_def1 \<Longrightarrow>
+         \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow>
          (if resES = None then red_pure_exps_total ctxt R \<omega>_def2 es \<omega>2 None
           else red_pure_exps_total ctxt R \<omega>_def2 es \<omega>2 None \<or>
                red_pure_exps_total ctxt R \<omega>_def2 es \<omega>2 resES)" and
@@ -1573,10 +1597,16 @@ next
   from RedOld have ***: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e"
     by simp
 
-  from RedOld.IH(2)[OF *** * **]
+  have ****: "map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def2 = None \<longleftrightarrow> (\<omega>_def' = None)"
+    unfolding \<open>\<omega>_def' = _\<close>
+    using \<open>(\<omega>_def2 = None) = (\<omega>_def = None)\<close>
+    by simp
+
+  from RedOld.IH(2)[OF *** * ** ****]
   consider "v = VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure" |
            "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t v" |
            "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure"
+    using \<open>(\<omega>_def2 = None) = (\<omega>_def = None)\<close>
     by (fastforce split: if_split_asm)
   thus ?case
     by (cases) (auto intro: TotalExpressions.RedOld Trace2)
@@ -1619,8 +1649,35 @@ next
       by auto
     next
       case (Some \<omega>_def_val)
-      then show ?thesis
-        sorry
+      from this obtain \<omega>_def2_val where "\<omega>_def2 = Some \<omega>_def2_val" and "\<omega>_def2_val \<le> \<omega>_def_val"
+        using \<open>\<omega>_def2 \<le> \<omega>_def\<close> \<open>(\<omega>_def2 = None) = (\<omega>_def = None)\<close>
+        unfolding less_eq_option_def
+        by blast        
+
+      hence ValidLocsSmaller: "get_valid_locs \<omega>_def2_val \<subseteq> get_valid_locs \<omega>_def_val"
+        using less_eq_valid_locs_subset_total_state
+        by blast
+
+      show ?thesis
+      proof (cases "(a, f) \<in> get_valid_locs \<omega>_def2_val")
+        case True
+        hence "ctxt, R, Some \<omega>_def2_val \<turnstile> \<langle>FieldAcc e f;\<omega>2\<rangle> [\<Down>]\<^sub>t Val v"
+          by (auto intro!: RedField_def_normalI 
+                   intro: ENormal[simplified \<open>\<omega>_def2 = _\<close>] HeapVal)
+        then show ?thesis
+          using True ValidLocsSmaller 
+          unfolding \<open>\<omega>_def = _\<close> \<open>\<omega>_def2 = _\<close>
+          by auto
+      next
+        case False
+        hence "ctxt, R, Some \<omega>_def2_val \<turnstile> \<langle>FieldAcc e f;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
+          by (auto intro!: RedField_def_failureI 
+                   intro: ENormal[simplified \<open>\<omega>_def2 = _\<close>] HeapVal)
+        then show ?thesis 
+          using False ValidLocsSmaller 
+          unfolding \<open>\<omega>_def = _\<close> \<open>\<omega>_def2 = _\<close>
+          by auto
+      qed
     qed
   qed
 next
@@ -1644,16 +1701,20 @@ next
   then show ?case by simp \<comment>\<open>cannot occur\<close>
 next
   case (RedSubFailure e' \<omega>_def \<omega>)
-  then show ?case sorry
+  then show ?case 
+    by (metis (mono_tags, lifting) Ball_set_list_all pure_exp_pred_subexp TotalExpressions.RedSubFailure)
 next
   case (RedExpListCons \<omega>_def e \<omega> v es res res')
-  then show ?case sorry
+  then show ?case 
+    by (metis (no_types, lifting) RedExpListFailure list_all_simps(1) option.simps(8) TotalExpressions.RedExpListCons)
 next
   case (RedExpListFailure \<omega>_def e \<omega> es)
-  then show ?case sorry
+  then show ?case 
+    by (simp add: TotalExpressions.RedExpListFailure)
 next
   case (RedExpListNil \<omega>_def \<omega>)
-  then show ?case sorry
+  then show ?case 
+    by (simp add: TotalExpressions.RedExpListNil)
 next
   case (InhAcc \<omega> e_r r e_p p W' f res)
   moreover from this have Leq: "Some \<omega>2 \<le> Some \<omega>"
@@ -1662,7 +1723,7 @@ next
     by simp
   ultimately consider (RefFail) "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_r; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | 
                        (RefSuccess) "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_r; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
-   by meson
+    by (metis option.discI)
     
   thus ?case
   proof cases
@@ -1677,7 +1738,7 @@ next
     case RefSuccess
       from Leq SubExpConstraint InhAcc consider (PermFail) "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_p; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | 
                                (PermSuccess) "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_p; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
-        by metis
+        by (metis option.discI)
       then show ?thesis 
       proof cases
         case PermFail
@@ -1758,7 +1819,7 @@ next
   moreover from InhPure have SubConstraint: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e"
     by simp
   ultimately consider "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
-    by meson
+    by (metis option.discI)
   thus ?case 
   proof cases
     case 1
@@ -1789,7 +1850,7 @@ next
   qed
   ultimately show ?case 
     using InhSubAtomicFailure red_inhale_intros
-    by meson
+    by (metis option.discI)
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)
   moreover from this have SubAssertionConstraint: "no_perm_assertion A \<and> no_unfolding_assertion A \<and> no_perm_assertion B \<and> no_unfolding_assertion B"
@@ -1820,7 +1881,7 @@ next
   moreover from InhImpTrue have SubConstraint: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<and> no_perm_assertion A \<and> no_unfolding_assertion A"
     by simp
   ultimately consider "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-    by metis
+    by (metis option.discI)
   thus ?case 
   proof cases
     case 1
@@ -1840,7 +1901,7 @@ next
     by simp
   ultimately consider "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
     using InhImpFalse
-    by meson
+    by (metis option.discI)
   thus ?case 
   proof cases
     case 1
