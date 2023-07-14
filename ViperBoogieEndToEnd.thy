@@ -251,8 +251,6 @@ lemma end_to_end_stmt_rel:
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-
- (*shows "stmt_correct_total_2 ctxt_vpr StateCons \<Lambda> stmt_vpr"*)
 shows "vpr_method_correct_total ctxt_vpr StateCons mdecl"
   unfolding vpr_method_correct_total_def
 proof (rule allI | rule impI)+
@@ -565,18 +563,14 @@ proof (rule allI | rule impI)+
   text \<open>start actual proof\<close>
 
   let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
-  fix \<omega> r  body_vpr_prf rpre
-  assume "method_decl.body mdecl = Some body_vpr_prf" and
+  fix \<omega> rpre
+  assume 
          StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
          "is_empty_total_full \<omega>" and
          RedInhPre: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> rpre"
-
-  hence "body_vpr_prf = body_vpr"
-    using VprMethodBodySome
-    by simp
   
-  let ?abs="vbpl_absval_ty TyRep"
+  let ?abs = "vbpl_absval_ty TyRep"
 
   note Boogie_correct_inst=Boogie_correct
 
@@ -641,7 +635,9 @@ proof (rule allI | rule impI)+
   show "rpre \<noteq> RFailure \<and>
        (\<forall>\<omega>pre.
            rpre = RNormal \<omega>pre \<longrightarrow>
-           vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)"
+           vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and> 
+           (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)
+        )"
         (is "?Goal1 \<and> ?Goal2")
   proof (rule conjI)
 
@@ -739,14 +735,15 @@ proof (rule allI | rule impI)+
         qed
       qed
 
-      show "vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
+      show "\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
         unfolding vpr_method_body_correct_def
       proof (rule allI | rule impI | rule conjI)+
         let ?\<omega>pre' = "(update_trace_total \<omega>pre [old_label \<mapsto> get_total_full \<omega>pre])"
         let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
         let ?mbody = "(the (method_decl.body mdecl))"
-        fix rpost
-        assume RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
+        fix mbody rpost
+        assume "method_decl.body mdecl = Some mbody" and
+              RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
                                (Seq ?mbody (Exhale (method_decl.post mdecl)))
                                ?\<omega>pre' rpost"
 

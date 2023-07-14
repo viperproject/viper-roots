@@ -795,14 +795,14 @@ lemma full_total_state_greater_mask:
 
 subsection \<open>valid mask (TODO: move to ViperLang?)\<close>
 
-definition valid_heap_mask :: "mask \<Rightarrow> bool"
-  where "valid_heap_mask m \<equiv> (\<forall>l. pgte pwrite (m l))"
+abbreviation valid_heap_mask :: "mask \<Rightarrow> bool"
+  where "valid_heap_mask \<equiv> wf_mask_simple"
 
 lemma valid_heap_maskD:
   assumes "valid_heap_mask m"
   shows "pgte pwrite (m l)"
   using assms
-  unfolding valid_heap_mask_def
+  unfolding wf_mask_simple_def
   by blast
 
 lemma valid_heap_mask_downward_mono:
@@ -815,7 +815,7 @@ proof -
     by (metis option.sel)
 
   show "valid_heap_mask m1"
-    unfolding valid_heap_mask_def
+    unfolding wf_mask_simple_def
   proof
     fix l
     have "m0 l = padd (m1 l) (m2 l)"

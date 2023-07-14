@@ -990,4 +990,44 @@ abbreviation no_unfolding_pure_exp
 abbreviation no_unfolding_assertion
   where "no_unfolding_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
 
+subsection \<open>Free variables\<close>
+
+fun free_var_pure_exp :: "pure_exp \<Rightarrow> var set"
+  where
+  "free_var_pure_exp (Var x) = {x}"
+| "free_var_pure_exp (ELit lit) = {}"
+| "free_var_pure_exp Result = {}"
+| "free_var_pure_exp (Unop uop e) = free_var_pure_exp e"
+| "free_var_pure_exp (Binop e1 bop e2) = free_var_pure_exp e1 \<union> free_var_pure_exp e2"
+| "free_var_pure_exp (CondExp cond e1 e2) = free_var_pure_exp cond \<union> free_var_pure_exp e1 \<union> free_var_pure_exp e2"
+| "free_var_pure_exp (FieldAcc e f) = free_var_pure_exp e"
+| "free_var_pure_exp (Old lbl e) = free_var_pure_exp e"
+| "free_var_pure_exp (Perm e f) = free_var_pure_exp e"
+| "free_var_pure_exp (PermPred pname es) = \<Union> (set (map free_var_pure_exp es))"
+| "free_var_pure_exp (FunApp f es) = \<Union> (set (map free_var_pure_exp es))"
+| "free_var_pure_exp (Unfolding pname es e) = \<Union> (set (map free_var_pure_exp es)) \<union> free_var_pure_exp e"
+| "free_var_pure_exp (pure_exp.Let e e_body) = undefined" \<comment>\<open>TODO\<close>
+| "free_var_pure_exp (PExists ty e) = undefined" \<comment>\<open>TODO\<close>
+| "free_var_pure_exp (PForall ty e) = undefined" \<comment>\<open>TODO\<close>
+
+fun
+  free_var_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> var set" where  
+  "free_var_atomic_assert (Pure e) = free_var_pure_exp e"
+| "free_var_atomic_assert (Acc e f Wildcard) = free_var_pure_exp e"
+| "free_var_atomic_assert (Acc e1 f (PureExp e2)) = free_var_pure_exp e1 \<union> free_var_pure_exp e2"
+| "free_var_atomic_assert (AccPredicate pname es Wildcard) = \<Union> (set (map free_var_pure_exp es))"
+| "free_var_atomic_assert (AccPredicate pname es (PureExp e2)) = \<Union> (set (map free_var_pure_exp es)) \<union> free_var_pure_exp e2"
+
+fun free_var_assertion :: "assertion \<Rightarrow> var set"  where  
+  "free_var_assertion (Atomic atm) = free_var_atomic_assert atm"
+| "free_var_assertion (Imp e A) = free_var_pure_exp e \<union> free_var_assertion A"
+| "free_var_assertion (A && B) = free_var_assertion A \<union> free_var_assertion B"
+| "free_var_assertion (ImpureAnd A B) = free_var_assertion A \<union> free_var_assertion B"
+| "free_var_assertion (ImpureOr A B) = free_var_assertion A \<union> free_var_assertion B"
+| "free_var_assertion (ForAll _ A) = free_var_assertion A"
+| "free_var_assertion (Exists _ A) = free_var_assertion A"
+| "free_var_assertion (Wand A B) = free_var_assertion A \<union> free_var_assertion B"
+
+
+
 end

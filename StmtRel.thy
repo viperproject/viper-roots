@@ -293,7 +293,8 @@ lemma field_assign_rel:
                      declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr \<Longrightarrow>
                      field_translation Tr f_vpr = Some f_bpl \<Longrightarrow>
                      vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>
-                     type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>
+                     \<comment>\<open>type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>\<close>
+                     get_type (domain_type TyRep) v = ty_vpr \<Longrightarrow>
                      (\<exists>hb f_bpl_val. 
                        lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and>
                        lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
@@ -358,7 +359,8 @@ proof (rule stmt_rel_intro)
                    (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
              )" (is "R _ ?ns_upd")
      using RFieldAssign[OF \<open>R \<omega> ns3\<close> \<open>declared_fields _ f_vpr = Some ty_vpr\<close>] \<open>\<omega>' = _\<close>
-     by blast
+           \<open>get_type _ v = ty_vpr\<close> \<open>domain_type TyRep = _\<close>
+     by metis
 
    from RcvRel have RedRcvBpl: "red_expr_bpl ctxt rcv_bpl ns3 (AbsV (ARef (Address addr)))"
      using \<open>Rext \<omega> \<omega> ns3\<close>  RedFieldAssign
@@ -473,7 +475,7 @@ proof (rule field_assign_rel)
          FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr" and
          FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
          TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-         NewValBplTy: "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
+         NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr"
 
   from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
@@ -487,7 +489,7 @@ proof (rule field_assign_rel)
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          )"      
-  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ FieldLookup FieldTranslation TyTranslation NewValBplTy]
+  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
   obtain hb f_bpl_val where
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
@@ -995,9 +997,14 @@ qed
 subsubsection \<open>Main Lemma\<close>
 
 lemma method_call_stmt_rel:
-  assumes 
-          MethodsSpecsFramed: "\<And> mname mdecl. program.methods (program_total ctxt_vpr) mname = Some mdecl \<Longrightarrow>
-                                              vpr_method_spec_correct_total ctxt_vpr StateCons mdecl" and
+  assumes                    "Pr = program_total ctxt_vpr" and
+          MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl" and
+          MethodSpecSubset:   "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
+                               no_perm_assertion (method_decl.post mdecl) \<and> 
+                               no_unfolding_assertion (method_decl.pre mdecl) \<and>
+                               no_unfolding_assertion (method_decl.post mdecl)" and
+          OnlyArgsInFree: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es" and
+          ConsistencyDownwardMono: "\<And>\<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
                       "rtype_interp ctxt = []" and
           DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr" and
@@ -1027,7 +1034,9 @@ lemma method_call_stmt_rel:
           ExhalePreRel:
                       "\<And> fpred.                                                
                         stmt_rel 
-                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt)
+                              (\<lambda>\<omega> ns.
+                                 state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt \<omega> ns \<and>
+                                 assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) \<omega>)
                               (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
                               (Exhale (method_decl.pre mdecl)) \<gamma> \<gamma>pre" and
@@ -1357,6 +1366,102 @@ proof (rule stmt_rel_intro_2)
         by (auto simp: map_upd_set_lookup_2)
     qed
 
+    have AssertionFramingInit: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0"
+    proof -
+      let ?\<omega>0' = "\<lparr> get_store_total = shift_and_add_list_alt Map.empty (v_args@v_rets), 
+                    get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
+                    get_total_full = (get_total_full \<omega>)\<lparr> get_mh_total := zero_mask, get_mp_total := zero_mask \<rparr> \<rparr>"
+      have "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0'"
+        unfolding assertion_framing_state_def
+      proof (rule allI, rule impI)+
+        fix res
+        assume "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0' res"           
+        moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0')"
+        proof (simp, unfold vpr_store_well_typed_def, rule allI | rule impI)+
+          fix i
+          assume *: "0 \<le> i \<and> i < length (method_decl.args mdecl @ rets mdecl)"
+          have LengthMdeclArgsRets: "length (method_decl.args mdecl) = length v_args \<and> length (method_decl.rets mdecl) = length v_rets"
+            using RedMethodCall \<open>mdecl = _\<close> LengthEqs
+            by (fastforce dest: vals_well_typed_same_lengthD)
+          with * have "i < length (v_args @ v_rets)"
+            by simp            
+
+          hence Lookup: "shift_and_add_list_alt Map.empty (v_args @ v_rets) i = Some ((v_args @ v_rets) !i)"
+            using * shift_and_add_list_alt_lookup_1
+            by (metis length_append)
+
+          show "map_option (get_type (absval_interp_total ctxt_vpr)) (shift_and_add_list_alt Map.empty (v_args @ v_rets) i) =
+                Some ((method_decl.args mdecl @ rets mdecl) ! i)"
+          proof (subst Lookup, simp)
+            show "get_type (absval_interp_total ctxt_vpr) ((v_args @ v_rets) ! i) = (method_decl.args mdecl @ method_decl.rets mdecl) ! i"
+            proof (cases "i < length v_args")
+              case True
+              hence "(v_args @ v_rets) ! i = v_args ! i" 
+                using nth_append 
+                by metis
+              moreover from True have "(method_decl.args mdecl @ method_decl.rets mdecl) ! i = method_decl.args mdecl ! i"
+                using nth_append * LengthEqs
+                by (metis LengthMdeclArgsRets)
+              ultimately show ?thesis          
+                using True \<open>vals_well_typed (absval_interp_total ctxt_vpr) v_args (method_decl.args mdecl')\<close> \<open>mdecl = _\<close>
+                unfolding vals_well_typed_def 
+                by (metis nth_map)
+            next
+              case False
+              thus ?thesis 
+                using \<open>i < length (v_args @ v_rets)\<close> \<open>vals_well_typed (absval_interp_total ctxt_vpr) v_rets (method_decl.rets mdecl')\<close> \<open>mdecl = _\<close>
+                unfolding vals_well_typed_def 
+                by (metis local.RedMethodCall(3) map_append nth_map vals_well_typed_def)
+            qed
+          qed
+        qed
+        moreover have "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>0')"
+          using state_rel_heap_var_rel[OF StateRel] \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
+          unfolding heap_var_rel_def
+          by simp
+        moreover have "is_empty_total_full ?\<omega>0'"
+          by (simp add: is_empty_total_full_def is_empty_total_def)        
+        ultimately show "res \<noteq> RFailure"
+          using MethodSpecsFramed
+          unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
+          by blast
+      qed
+
+      hence "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) (?\<omega>0'\<lparr> get_total_full := get_total_full \<omega>\<rparr>)"
+        apply (rule assertion_framing_state_mono)
+        apply (fastforce intro!: less_eq_full_total_stateI less_eq_total_stateI simp: zero_mask_less_eq_mask)
+        using MethodSpecSubset
+        apply blast        
+        by (fastforce intro: ConsistencyDownwardMono)
+        
+      thus ?thesis
+         \<comment>\<open>using that return variables do not appear in precondition\<close>
+      proof (rule assertion_framing_store_same_on_free_var)
+        fix x 
+        assume "x \<in> free_var_assertion (method_decl.pre mdecl)"
+        hence *: "x < length v_args"
+          using OnlyArgsInFree LengthEqs
+          by auto
+        hence **: "x < length (v_args @ v_rets)"
+          by simp
+
+        thus "get_store_total (?\<omega>0'\<lparr> get_total_full := get_total_full \<omega>\<rparr>) x = get_store_total ?\<omega>0 x"
+        proof simp
+          have "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = Some ((v_args @ v_rets) ! x)"
+            using shift_and_add_list_alt_lookup_1[OF **]
+            by blast
+          also have "... = Some (v_args ! x)"
+            using \<open>x < length v_args\<close>
+            by (simp add: nth_append)
+          finally show "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = shift_and_add_list_alt Map.empty v_args x"
+            using shift_and_add_list_alt_lookup_1[OF \<open>x < length v_args\<close>]
+            by simp
+        qed
+      qed (insert MethodSpecSubset, auto) 
+    qed
+
+    note RCallPre = conjI[OF \<open>?RCall ?\<omega>0 ns\<close> AssertionFramingInit]
+
     show ?thesis 
     proof (cases "resPre")
       case RMagic
@@ -1369,7 +1474,7 @@ proof (rule stmt_rel_intro_2)
       obtain c where 
           "red_ast_bpl P ctxt (\<gamma>, Normal ns) c" and
           "snd c = Failure"
-        using stmt_rel_failure_elim[OF ExhalePreRelInst StateRelDuringCall]
+        using stmt_rel_failure_elim[OF ExhalePreRelInst RCallPre]
         by blast
       moreover have "res = RFailure"
         using RFailure RedMethodCall
@@ -1383,7 +1488,7 @@ proof (rule stmt_rel_intro_2)
       obtain nspre where
         RedBplPre: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>pre, Normal nspre)" and
         "?RCall \<omega>pre nspre"
-        using stmt_rel_normal_elim[OF ExhalePreRelInst StateRelDuringCall]
+        using stmt_rel_normal_elim[OF ExhalePreRelInst RCallPre]
         by blast
 
       let ?\<omega>havoc = "\<lparr> get_store_total = (shift_and_add_list_alt Map.empty (v_args@v_rets)), 

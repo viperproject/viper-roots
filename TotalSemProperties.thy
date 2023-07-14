@@ -505,7 +505,7 @@ text \<open>inhale preserves failure for smaller states if there is no permissio
 
 lemma inhale_perm_single_leq:
   assumes "\<omega>0 \<le> \<omega>1" and
-          ConsistencyDonwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> R \<omega>' \<Longrightarrow> R \<omega>" 
+          ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> R \<omega>' \<Longrightarrow> R \<omega>" 
   shows "\<forall> \<omega>1' \<in> inhale_perm_single R \<omega>1 lh p_opt. \<exists>\<omega>0' \<le> \<omega>1'. \<omega>0' \<in> inhale_perm_single R \<omega>0 lh p_opt"
 proof 
   fix \<omega>1'
@@ -534,7 +534,7 @@ proof
   moreover have "?\<omega>0' \<in> inhale_perm_single R \<omega>0 lh p_opt"
     apply (rule inhale_perm_single_elem)
        apply (rule HOL.refl)
-    using ConsistencyDonwardMono \<open>\<omega>1' \<in> _\<close> \<open>?\<omega>0' \<le> \<omega>1'\<close> \<open>R \<omega>1'\<close>
+    using ConsistencyDownwardMono \<open>\<omega>1' \<in> _\<close> \<open>?\<omega>0' \<le> \<omega>1'\<close> \<open>R \<omega>1'\<close>
       apply blast
     apply (rule PermConstraint)
     using AtMostWrite *
@@ -1274,6 +1274,58 @@ next
     by (blast intro!: red_inhale_intros)      
 qed (rule HOL.TrueI)+
 
+lemma assertion_framing_state_mono:
+assumes "assertion_framing_state ctxt StateCons A \<omega>"
+    and "\<omega>' \<ge> \<omega>"
+    and "no_perm_assertion A \<and> no_unfolding_assertion A"
+    and ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+  shows "assertion_framing_state ctxt StateCons A \<omega>'"
+  using assms inhale_no_perm_downwards_mono(3)
+  unfolding assertion_framing_state_def
+  by blast
+
+lemma red_pure_exp_inhale_store_same_on_free_var:
+  shows "ctxt, R, Some \<omega>_def \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow> 
+        no_unfolding_pure_exp e \<Longrightarrow>
+        (\<And> x. x \<in> free_var_pure_exp e \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>     
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
+        ctxt, R, Some (\<omega>_def\<lparr> get_store_total := \<sigma> \<rparr>) \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE" and
+        "red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega>1 resES \<Longrightarrow> 
+         (\<And> x. x \<in> \<Union> (set (map free_var_pure_exp es)) \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
+         list_all (\<lambda>e. no_unfolding_pure_exp e) es \<Longrightarrow>
+         red_pure_exps_total ctxt R (Some (\<omega>_def2)) es \<omega>2 resES" and
+        "red_inhale ctxt R A \<omega>1 res \<Longrightarrow> 
+         no_unfolding_assertion A \<Longrightarrow>
+        (\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow> 
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
+         red_inhale ctxt R A \<omega>2 res" and
+        "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
+  sorry
+
+lemma assertion_framing_store_same_on_free_var:
+  assumes "assertion_framing_state ctxt StateCons A \<omega>"
+      and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>' x"
+      and "get_trace_total \<omega> = get_trace_total \<omega>' \<and> get_total_full \<omega> = get_total_full \<omega>'"
+      and "no_unfolding_assertion A"
+    shows "assertion_framing_state ctxt StateCons A \<omega>'"
+  thm assms red_pure_exp_inhale_store_same_on_free_var(3)
+  unfolding assertion_framing_state_def
+proof (rule allI | rule impI)+
+  fix res
+  assume RedInh: "red_inhale ctxt StateCons A \<omega>' res"
+
+  hence "red_inhale ctxt StateCons A \<omega> res"
+    apply (rule red_pure_exp_inhale_store_same_on_free_var(3))
+    using assms
+    by auto
+    
+  thus "res \<noteq> RFailure"
+    using assms(1)
+    unfolding assertion_framing_state_def
+    by blast
+qed
+
 subsection \<open>Exhale\<close>
 
 lemma exhale_only_changes_total_state_aux:
@@ -1695,7 +1747,7 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
 
     hence PermConstraint': "pgte pwrite (padd (get_mh_total_full \<omega>_inh ?loc) (Abs_prat p))"
       using ExhAcc.prems(6)
-      unfolding valid_heap_mask_def
+      unfolding wf_mask_simple_def
       by metis
       
     let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc (Some (Abs_prat p))"
