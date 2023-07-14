@@ -1,5 +1,5 @@
 theory TotalUtil
-imports Viper.ValueAndBasicState HOL.Real "HOL-Library.Multiset"
+imports Viper.ValueAndBasicState Viper.DeBruijn HOL.Real "HOL-Library.Multiset"
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
@@ -1006,9 +1006,9 @@ fun free_var_pure_exp :: "pure_exp \<Rightarrow> var set"
 | "free_var_pure_exp (PermPred pname es) = \<Union> (set (map free_var_pure_exp es))"
 | "free_var_pure_exp (FunApp f es) = \<Union> (set (map free_var_pure_exp es))"
 | "free_var_pure_exp (Unfolding pname es e) = \<Union> (set (map free_var_pure_exp es)) \<union> free_var_pure_exp e"
-| "free_var_pure_exp (pure_exp.Let e e_body) = undefined" \<comment>\<open>TODO\<close>
-| "free_var_pure_exp (PExists ty e) = undefined" \<comment>\<open>TODO\<close>
-| "free_var_pure_exp (PForall ty e) = undefined" \<comment>\<open>TODO\<close>
+| "free_var_pure_exp (pure_exp.Let e e_body) = free_var_pure_exp e \<union> (shift_down_set (free_var_pure_exp e_body))" 
+| "free_var_pure_exp (PExists ty e) = shift_down_set (free_var_pure_exp e)"
+| "free_var_pure_exp (PForall ty e) = shift_down_set (free_var_pure_exp e)"
 
 fun
   free_var_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> var set" where  

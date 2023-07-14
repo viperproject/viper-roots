@@ -25,6 +25,10 @@ lemma assert_pred_atomic_subexp:
   using assms atomic_assert_pred_subexp
   by simp
 
+lemma free_var_subexp:
+  shows "\<Union> (set (map free_var_pure_exp (sub_pure_exp_total e))) \<subseteq> free_var_pure_exp e"
+  by (cases e) auto  
+
 lemma less_eq_valid_locs_subset_total_state:
   assumes "\<omega> \<le> \<omega>'"
   shows "get_valid_locs \<omega> \<subseteq> get_valid_locs \<omega>'"
@@ -1284,25 +1288,6 @@ assumes "assertion_framing_state ctxt StateCons A \<omega>"
   unfolding assertion_framing_state_def
   by blast
 
-lemma red_pure_exp_inhale_store_same_on_free_var:
-  shows "ctxt, R, Some \<omega>_def \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow> 
-        no_unfolding_pure_exp e \<Longrightarrow>
-        (\<And> x. x \<in> free_var_pure_exp e \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>     
-        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
-        ctxt, R, Some (\<omega>_def\<lparr> get_store_total := \<sigma> \<rparr>) \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE" and
-        "red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega>1 resES \<Longrightarrow> 
-         (\<And> x. x \<in> \<Union> (set (map free_var_pure_exp es)) \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>
-        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
-         list_all (\<lambda>e. no_unfolding_pure_exp e) es \<Longrightarrow>
-         red_pure_exps_total ctxt R (Some (\<omega>_def2)) es \<omega>2 resES" and
-        "red_inhale ctxt R A \<omega>1 res \<Longrightarrow> 
-         no_unfolding_assertion A \<Longrightarrow>
-        (\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow> 
-        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
-         red_inhale ctxt R A \<omega>2 res" and
-        "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
-  sorry
-
 lemma assertion_framing_store_same_on_free_var:
   assumes "assertion_framing_state ctxt StateCons A \<omega>"
       and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>' x"
@@ -2137,6 +2122,181 @@ next
   case (ExhImpFailure e \<omega> A)
   then show ?case by simp \<comment>\<open>contradiction\<close>
 qed
+
+subsection \<open>Temp\<close>
+
+lemma red_pure_exp_inhale_store_same_on_free_var:
+  shows "ctxt, R, \<omega>_def_opt \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow>
+         \<omega>_def_opt = Some \<omega>_def \<Longrightarrow>
+        no_unfolding_pure_exp e \<Longrightarrow>
+        (\<And> x. x \<in> free_var_pure_exp e \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>     
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>      
+        get_trace_total \<omega>_def = get_trace_total \<omega>_def2 \<and> get_total_full \<omega>_def = get_total_full \<omega>_def2 \<Longrightarrow>  \<comment>\<open>just needed for IH (could also separate result on changing well-definedness state)\<close>                 
+        ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE" and
+        "red_pure_exps_total ctxt R \<omega>_def_opt es \<omega>1 resES \<Longrightarrow> 
+         \<omega>_def_opt = Some \<omega>_def \<Longrightarrow>
+         (\<And> x. x \<in> \<Union> (set (map free_var_pure_exp es)) \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>     
+        get_trace_total \<omega>_def = get_trace_total \<omega>_def2 \<and> get_total_full \<omega>_def = get_total_full \<omega>_def2 \<Longrightarrow>  \<comment>\<open>just needed for IH (could also separate result on changing well-definedness state)\<close>          
+         list_all (\<lambda>e. no_unfolding_pure_exp e) es \<Longrightarrow>
+         red_pure_exps_total ctxt R (Some (\<omega>_def2)) es \<omega>2 resES" and
+        "red_inhale ctxt R A \<omega>1 res \<Longrightarrow> 
+         no_unfolding_assertion A \<Longrightarrow>
+        (\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow> 
+        get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
+         red_inhale ctxt R A \<omega>2 res" and
+        "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
+proof (induction arbitrary: \<omega>_def \<omega>2 \<omega>_def2 and \<omega>_def \<omega>2 \<omega>_def2 and \<omega>2 rule: red_exp_inhale_unfold_inducts)
+  case (RedLit \<omega>_def l uu)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedVar \<omega> n v \<omega>_def_opt)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedResult \<omega> v \<omega>_def_opt)
+  then show ?case sorry \<comment>\<open>TODO: no result expression\<close>
+next
+  case (RedBinopLazy \<omega>_def_opt e1 \<omega> v1 bop v e2)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedBinop \<omega>_def_opt e1 \<omega> v1 e2 v2 bop v)  
+  hence "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e1; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v1" and "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e2; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v2"
+    by fastforce+
+  then show ?case 
+    using RedBinop
+    by (blast intro!: TotalExpressions.RedBinop)    
+next
+  case (RedBinopRightFailure \<omega>_def_opt e1 \<omega> v1 e2 bop)
+  hence "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e1; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v1" and "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e2; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
+    by fastforce+
+  then show ?case
+    using RedBinopRightFailure
+    by (blast intro!: TotalExpressions.RedBinopRightFailure)    
+next
+  case (RedBinopOpFailure \<omega>_def_opt e1 \<omega> v1 e2 v2 bop)
+  hence "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e1; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v1" and "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e2; \<omega>2\<rangle> [\<Down>]\<^sub>t Val v2"
+    by fastforce+
+  then show ?case
+    using RedBinopOpFailure
+    by (blast intro!: TotalExpressions.RedBinopOpFailure)    
+next
+  case (RedUnop \<omega>_def_opt e \<omega> v unop v')
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedCondExpTrue \<omega>_def_opt e1 \<omega> e2 r e3)
+  then show ?case 
+    by (auto intro!: TotalExpressions.RedCondExpTrue)
+next
+  case (RedCondExpFalse \<omega>_def_opt e1 \<omega> e3 r e2)  
+  then show ?case 
+    by (auto intro!: TotalExpressions.RedCondExpFalse)
+next
+  case (RedOld \<omega> l \<phi> \<omega>_def' \<omega>_def e v)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedOldFailure \<omega> l \<omega>_def e)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedField \<omega>_def_opt e \<omega> a f v)
+  hence RedRcv: "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a))"
+    by simp
+
+  from RedField have SameHeap: "get_hh_total_full \<omega>2 (a,f) = v"
+    by simp
+
+  show ?case 
+  proof (cases "(a,f) \<in> get_valid_locs \<omega>_def")
+    case True
+    then show ?thesis 
+      using RedField RedField_def_normalI[OF RedRcv SameHeap]
+      unfolding get_valid_locs_def
+      by auto
+  next
+    case False
+    then show ?thesis 
+      using RedField RedField_def_failureI[OF RedRcv SameHeap]
+      unfolding get_valid_locs_def
+      by auto
+  qed
+next
+  case (RedFieldNullFailure \<omega>_def_opt e \<omega> f)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedPermNull \<omega>_def_opt e \<omega> f)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedPerm \<omega>_def_opt e \<omega> a f v)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedUnfolding ubody \<omega> v p es)
+  then show ?case by simp
+next
+  case (RedUnfoldingDefNoPred \<omega>_def_opt es \<omega> vs pred_id pred_decl p ubody)
+  then show ?case by simp \<comment>\<open>cannot occur\<close>
+next
+  case (RedUnfoldingDef \<omega>_def_opt es \<omega> vs p \<omega>'_def ubody v)
+  then show ?case by simp \<comment>\<open>cannot occur\<close>
+next
+  case (RedSubFailure e' \<omega>_def_opt \<omega>)
+  hence "list_all no_unfolding_pure_exp (sub_pure_exp_total e')"
+    using pure_exp_pred_subexp by presburger
+  hence "red_pure_exps_total ctxt R (Some \<omega>_def2) (sub_pure_exp_total e') \<omega>2 None"
+    using RedSubFailure free_var_subexp
+    by blast 
+  then show ?case 
+    using \<open>sub_pure_exp_total e' \<noteq> []\<close>
+    by (auto intro!: TotalExpressions.RedSubFailure)
+next
+  case (RedExpListCons \<omega>_def_opt e \<omega> v es res res')
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (RedExpListFailure \<omega>_def_opt e \<omega> es)
+  hence "ctxt, R, Some \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
+    by auto
+  thus ?case
+    by (auto intro!: red_exp_inhale_unfold_intros) 
+next
+  case (RedExpListNil \<omega>_def_opt \<omega>)
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
+next
+  case (InhAcc \<omega> e_r r e_p p W' f res)
+  then show ?case sorry
+next
+  case (InhAccPred \<omega> e_args v_args e_p p W' pred_id res)
+  then show ?case sorry
+next
+  case (InhAccWildcard \<omega> e_r r W' f res)
+  then show ?case sorry
+next
+  case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
+  then show ?case sorry
+next
+  case (InhPure \<omega> e b)
+  then show ?case sorry
+next
+  case (InhSubAtomicFailure A \<omega>)
+  then show ?case sorry
+next
+  case (InhStarNormal A \<omega> \<omega>'' B res)
+  then show ?case sorry
+next
+  case (InhStarFailureMagic A \<omega> resA B)
+  then show ?case sorry
+next
+  case (InhImpTrue \<omega> e A res)
+  then show ?case sorry
+next
+  case (InhImpFalse \<omega> e A)
+  then show ?case sorry
+next
+  case (InhImpFailure \<omega> e A)
+  then show ?case sorry
+next
+  case (UnfoldRelStep pred_id pred_decl pred_body m \<omega> vs q m' \<omega>2 \<omega>' \<omega>3)
+  then show ?case by simp
+qed
+
+
 
 (*
 subsection \<open>Unfold leads to one normal successor state\<close>
