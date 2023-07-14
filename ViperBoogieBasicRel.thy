@@ -354,7 +354,8 @@ definition heap_var_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
                  (\<exists>hb. lookup_var \<Lambda> ns hvar = Some (AbsV (AHeap hb)) \<and>
                  lookup_var_ty \<Lambda> hvar = Some (TConSingle (THeapId TyRep)) \<and>
                  vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[]) \<and>
-                 heap_rel Pr (field_translation T) (get_hh_total_full \<omega>) hb)"
+                 heap_rel Pr (field_translation T) (get_hh_total_full \<omega>) hb) \<and>
+                 total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
 
 definition mask_var_rel :: "ViperLang.program \<Rightarrow>  var_context \<Rightarrow>  'a ty_repr_bpl \<Rightarrow> tr_vpr_bpl \<Rightarrow> vname \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where
@@ -658,6 +659,69 @@ abbreviation state_rel_def_same
 
 definition state_rel_empty
   where "state_rel_empty R \<omega> ns \<equiv> is_empty_total_full \<omega> \<and> R \<omega> ns"
+
+subsection \<open>Well formedness of type relation\<close>
+
+definition type_interp_rel_wf :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a vbpl_absval) absval_ty_fun  \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> bool"
+  where "type_interp_rel_wf A_vpr A_bpl Trep \<equiv> 
+    \<forall>v ty_vpr ty_bpl. get_type A_vpr v = ty_vpr \<longrightarrow>
+                      vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl \<longrightarrow>
+                      type_of_val A_bpl (val_rel_vpr_bpl v) = ty_bpl"
+
+lemma type_interp_rel_wf_vbpl: 
+  assumes "A_vpr = domain_type Trep"
+    shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
+  unfolding type_interp_rel_wf_def
+proof (rule allI | rule impI)+
+  fix v ty_vpr ty_bpl
+  assume *:"get_type A_vpr v = ty_vpr" and
+         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
+  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
+  proof (cases v)
+    case (VAbs a)
+    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
+    with ** obtain tid where "domain_translation Trep (A_vpr a) = Some tid" and "ty_bpl = TCon tid []"
+      by fastforce
+    hence "vbpl_absval_ty Trep (ADomainVal a) = (tid, [])" using \<open>A_vpr = domain_type Trep\<close>
+      by simp
+    hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
+      by simp
+    thus ?thesis using VAbs
+      by simp     
+  qed (insert * **, auto)
+qed
+
+lemma type_interp_rel_wf_vbpl_no_domains:
+  assumes "\<And> d. domain_translation Trep d = None"
+  shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
+  unfolding type_interp_rel_wf_def
+proof (rule allI | rule impI)+
+  fix v ty_vpr ty_bpl
+  assume *:"get_type A_vpr v = ty_vpr" and
+         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
+  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
+  proof (cases v)
+    case (VAbs a)
+    fix contra
+    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
+    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d"
+      by fastforce
+    with assms show contra 
+      by simp
+  qed (insert * **, auto)
+qed
+
+lemma vpr_to_bpl_val_type:
+  assumes "get_type A v = ty_vpr" and
+          "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
+          "domain_type TyRep = A"
+  shows "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
+proof (cases v)
+  case (VAbs x5)
+  then show ?thesis 
+    using assms
+    using type_interp_rel_wf_def type_interp_rel_wf_vbpl by blast
+qed (insert assms, auto)
 
 subsection \<open>Tactics\<close>
 
@@ -1810,7 +1874,7 @@ lemma heap_var_rel_update:
      LookupHeapVar: "lookup_var \<Lambda> ns (heap_var Tr) = Some (AbsV (AHeap hb))" and
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
                "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
-     VBplTy:   "type_of_val (vbpl_absval_ty TyRep) (val_rel_vpr_bpl v_vpr) = ty_bpl" and
+     VVprTy:   "get_type (domain_type TyRep) v_vpr = ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      FieldTranslationInj: "inj_on (field_translation Tr) (dom (field_translation Tr))"
   shows "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)
@@ -1822,13 +1886,18 @@ proof -
    "lookup_var_ty \<Lambda> (heap_var Tr) = Some (TConSingle (THeapId TyRep))" 
    "vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
    "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb"
+   "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
     unfolding heap_var_rel_def
     by auto
+  let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
+
+  have VBplTy: "type_of_val (vbpl_absval_ty TyRep) (val_rel_vpr_bpl v_vpr) = ty_bpl"
+    using VVprTy vpr_to_bpl_val_type \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>
+    by blast
 
   show ?thesis
   unfolding heap_var_rel_def
-  proof (rule exI, intro conjI)
-    let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
+  proof (intro conjI, rule exI, intro conjI)
     show "lookup_var \<Lambda> ?ns' (heap_var Tr) = Some (AbsV (AHeap ?hb'))"
       by (simp add: heap_bpl_upd_normal_field_def)
   next
@@ -1837,7 +1906,6 @@ proof -
       unfolding heap_var_rel_def
       by auto
   next
-    let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
     show "vbpl_absval_ty_opt TyRep (AHeap ?hb') = Some (THeapId TyRep, [])"
       apply (rule heap_upd_ty_preserved[OF HeapRelFacts(2)])
        apply (fastforce intro: \<open>vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl\<close>)
@@ -1851,7 +1919,6 @@ proof -
                                                    get_hh_total_full \<omega> l"
       by simp     
   
-    let ?hb' = "hb( (Address addr, NormalField f_bpl ty_vpr) \<mapsto> val_rel_vpr_bpl v_vpr)"
     show "ViperBoogieBasicRel.heap_rel Pr (field_translation Tr) (get_hh_total_full ?\<omega>') ?hb'"    
     proof (rule heap_rel_intro)
       fix l :: heap_loc
@@ -1875,6 +1942,28 @@ proof -
           by (metis AuxUpdateHeap False FieldLookupL FieldTranslationL HeapRel ViperBoogieBasicRel.heap_rel_def)
       qed
     qed
+  next
+    thm vpr_to_bpl_val_type
+    show "total_heap_well_typed Pr (domain_type TyRep)(get_hh_total_full (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr))"
+      unfolding total_heap_well_typed_def
+    proof (rule allI | rule impI)+
+      fix loc :: heap_loc
+      fix  \<tau>
+      assume *: "declared_fields Pr (snd loc) = Some \<tau>"
+      show "has_type (domain_type TyRep) \<tau> (get_hh_total_full (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr) loc) "
+      proof (cases "loc = (addr, f_vpr)")
+        case True
+        then show ?thesis 
+          using * has_type_get_type VVprTy FieldLookup
+          by auto
+      next
+        case False
+        then show ?thesis 
+          using HeapRelFacts *
+          unfolding total_heap_well_typed_def          
+          by fastforce
+      qed
+    qed
   qed
 qed
 
@@ -1887,7 +1976,7 @@ lemma state_rel_heap_update_3:
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
-     BplType:  "type_of_vbpl_val TyRep (val_rel_vpr_bpl v_vpr) = ty_bpl"
+     VVprTy: "get_type (domain_type TyRep) v_vpr = ty_vpr" 
    shows "state_rel Pr TyRep Tr AuxPred ctxt 
       (update_hh_loc_total_full \<omega>def (addr, f_vpr) v_vpr)
       (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)
@@ -1931,7 +2020,7 @@ lemma state_rel_heap_update_2_ext:
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
-     BplType:  "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = ty_bpl"
+     VVprTy: "get_type (domain_type TyRep) v = ty_vpr" 
    shows "\<exists>hb f_bpl_val.
     lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
     lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
@@ -2580,68 +2669,6 @@ lemma bg_expr_list_red_all2:
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>es, s\<rangle> [\<Down>] vs) = list_all2 (\<lambda>e v. A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e, s\<rangle> \<Down> v) es vs"
   by (induct es arbitrary:vs; simp add:bg_expr_list_red_iff list_all2_Cons1)
 
-subsection \<open>Well formedness of type relation\<close>
-
-definition type_interp_rel_wf :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a vbpl_absval) absval_ty_fun  \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> bool"
-  where "type_interp_rel_wf A_vpr A_bpl Trep \<equiv> 
-    \<forall>v ty_vpr ty_bpl. get_type A_vpr v = ty_vpr \<longrightarrow>
-                      vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl \<longrightarrow>
-                      type_of_val A_bpl (val_rel_vpr_bpl v) = ty_bpl"
-
-lemma type_interp_rel_wf_vbpl: 
-  assumes "A_vpr = domain_type Trep"
-    shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain tid where "domain_translation Trep (A_vpr a) = Some tid" and "ty_bpl = TCon tid []"
-      by fastforce
-    hence "vbpl_absval_ty Trep (ADomainVal a) = (tid, [])" using \<open>A_vpr = domain_type Trep\<close>
-      by simp
-    hence "type_of_vbpl_val Trep (AbsV (ADomainVal a)) = ty_bpl" using \<open>ty_bpl = _\<close>
-      by simp
-    thus ?thesis using VAbs
-      by simp     
-  qed (insert * **, auto)
-qed
-
-lemma type_interp_rel_wf_vbpl_no_domains:
-  assumes "\<And> d. domain_translation Trep d = None"
-  shows "type_interp_rel_wf A_vpr (vbpl_absval_ty Trep) Trep"
-  unfolding type_interp_rel_wf_def
-proof (rule allI | rule impI)+
-  fix v ty_vpr ty_bpl
-  assume *:"get_type A_vpr v = ty_vpr" and
-         **:"vpr_to_bpl_ty Trep ty_vpr = Some ty_bpl"
-  show "type_of_vbpl_val Trep (val_rel_vpr_bpl v) = ty_bpl"
-  proof (cases v)
-    case (VAbs a)
-    fix contra
-    from VAbs * have "ty_vpr = TAbs (A_vpr a)" by simp
-    with ** obtain d where "domain_translation Trep (A_vpr a) = Some d"
-      by fastforce
-    with assms show contra 
-      by simp
-  qed (insert * **, auto)
-qed
-
-lemma vpr_to_bpl_val_type:
-  assumes "get_type A v = ty_vpr" and
-          "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-          "domain_type TyRep = A"
-  shows "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
-proof (cases v)
-  case (VAbs x5)
-  then show ?thesis 
-    using assms
-    using type_interp_rel_wf_def type_interp_rel_wf_vbpl by blast
-qed (insert assms, auto)
 
 subsection \<open>Misc\<close>
 

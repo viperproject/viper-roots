@@ -625,7 +625,8 @@ proof -
   obtain hb where   LookupHeapVarTy: "lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep))" and
                     LookupHeapVar: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and  
                     HeapVarWellTy: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
-                    HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb"
+                    HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb" and
+                    HeapVprWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
       unfolding heap_var_rel_def
       by blast
 
@@ -772,7 +773,8 @@ proof -
       using ProgramTotal
       unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
-      by (fastforce intro: LookupHeapVarTy NewHeapWellTy NewHeapRel)      
+      using LookupHeapVarTy NewHeapWellTy NewHeapRel DomainType exhale_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] 
+      by auto
   next
     fix x
     assume "map_of (snd (var_context ctxt)) x \<noteq> None"

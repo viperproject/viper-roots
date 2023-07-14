@@ -638,7 +638,8 @@ proof -
   from state_rel_heap_var_def_rel[OF StateRel]
   obtain hb where LookupVarOldVar: "lookup_var (var_context ctxt) ns (heap_var_def Tr) = Some (AbsV (AHeap hb))" and
                   HeapTy: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and  
-                  HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>def) hb"
+                  HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>def) hb" and
+                  HeapTyVpr: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def)"
     unfolding heap_var_rel_def
     by blast
 
@@ -662,7 +663,7 @@ proof -
 
   have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) hvar_def' \<omega>def ?ns'"
     unfolding heap_var_rel_def 
-    using LookupTyNewVar HeapRel HeapTy
+    using LookupTyNewVar HeapRel HeapTy HeapTyVpr
     by fastforce
 
   have "state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
@@ -769,7 +770,7 @@ proof -
 
   have HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega> hh') ?ns'"
     unfolding heap_var_rel_def
-    using lookup_var_decl_ty_Some LookupDeclNewVar HeapTyBpl HeapRel
+    using lookup_var_decl_ty_Some LookupDeclNewVar HeapTyBpl HeapRel TotalHeapWellTy
     by auto
 
   hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep Tr hvar' (update_hh_total_full \<omega>def hh') ?ns'"
