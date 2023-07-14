@@ -7,6 +7,13 @@ begin
 definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
   where "vals_well_typed A vs ts \<equiv> map (get_type A) vs = ts"
 
+lemma vals_well_typed_same_lengthD:
+  assumes "vals_well_typed A vs ts"
+  shows "length vs = length ts"
+  using assms
+  unfolding vals_well_typed_def
+  by auto
+
 fun exh_if_total :: "bool \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total"  where
   "exh_if_total False _ = RFailure"
 | "exh_if_total True \<omega> = RNormal \<omega>"
@@ -270,6 +277,8 @@ always has at least one failure transition. This is in-sync with the recent Carb
 | RedMethodCall:
   " \<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) es \<omega> (Some v_args);
       program.methods (program_total ctxt) m = Some mdecl;     
+      \<comment>\<open>method call reduces only if argument values and return values have the correct type\<close>
+      vals_well_typed (absval_interp_total ctxt) v_args (method_decl.args mdecl); 
       list_all2 (\<lambda> y t. y = Some t) (map \<Lambda> ys) (method_decl.rets mdecl); 
       \<comment>\<open>non-deterministically select values for return variables that conform to the declared type\<close>
       vals_well_typed (absval_interp_total ctxt) v_rets (method_decl.rets mdecl); 
@@ -470,7 +479,6 @@ definition vpr_method_correct_total_aux ::
                 \<Rightarrow> ('a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool) 
                \<Rightarrow>  bool" where
   "vpr_method_correct_total_aux ctxt R mdecl CorrectWrtPre \<equiv>
-        \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
             vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
@@ -511,7 +519,6 @@ definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_t
 
 definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
-        \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
             vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
@@ -522,7 +529,7 @@ definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a ful
               (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
                 \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>pre\<close> since inhale does not change the store.\<close>
                 vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
-                vpr_method_body_correct ctxt R mdecl \<omega>pre
+                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
               )
             )
          )"
@@ -532,7 +539,7 @@ definition vpr_method_correct_total_2_new :: "'a total_context \<Rightarrow> ('a
          vpr_method_correct_total_aux ctxt R mdecl 
           (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
                 vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
-                vpr_method_body_correct ctxt R mdecl \<omega>pre
+                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
           )
        "
 
