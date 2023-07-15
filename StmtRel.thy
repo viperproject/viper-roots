@@ -1048,7 +1048,7 @@ lemma method_call_stmt_rel:
                                no_perm_assertion (method_decl.post mdecl) \<and> 
                                no_unfolding_assertion (method_decl.pre mdecl) \<and>
                                no_unfolding_assertion (method_decl.post mdecl)" and
-          OnlyArgsInFree: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es" and
+          OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es" and
           ConsistencyDownwardMono: "\<And>\<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
           MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
                       "rtype_interp ctxt = []" and
@@ -1410,6 +1410,32 @@ proof (rule stmt_rel_intro_2)
               \<open>set xs_bpl \<subseteq> _\<close> \<open>ran var_tr' = _\<close>
         by (auto simp: map_upd_set_lookup_2)
     qed
+
+      have StoreSameOnArgs: "\<And>x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow>
+                 shift_and_add_list_alt Map.empty (v_args @ v_rets) x = 
+                 shift_and_add_list_alt Map.empty v_args x" (is "\<And>x. _ \<Longrightarrow> ?store_args_rets x = ?store_args x")
+      proof -
+        fix x 
+        assume "x \<in> free_var_assertion (method_decl.pre mdecl)"
+        hence *: "x < length v_args"
+          using OnlyArgsInPre LengthEqs
+          by auto
+        hence **: "x < length (v_args @ v_rets)"
+          by simp
+
+        thus "?store_args_rets x = ?store_args x"
+        proof -
+          have "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = Some ((v_args @ v_rets) ! x)"
+            using shift_and_add_list_alt_lookup_1[OF **]
+            by blast
+          also have "... = Some (v_args ! x)"
+            using \<open>x < length v_args\<close>
+            by (simp add: nth_append)
+          finally show "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = shift_and_add_list_alt Map.empty v_args x"
+            using shift_and_add_list_alt_lookup_1[OF \<open>x < length v_args\<close>]
+            by simp
+        qed
+      qed
     
     have AssertionFramingInit: "framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0 ?\<omega>0"
     proof -
@@ -1441,28 +1467,9 @@ proof (rule stmt_rel_intro_2)
 
       hence AssertionFraming_\<omega>0'_only_args: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_empty"
      \<comment>\<open>using that return variables do not appear in precondition\<close>
-      proof (rule assertion_framing_store_same_on_free_var)
-        fix x 
-        assume "x \<in> free_var_assertion (method_decl.pre mdecl)"
-        hence *: "x < length v_args"
-          using OnlyArgsInFree LengthEqs
-          by auto
-        hence **: "x < length (v_args @ v_rets)"
-          by simp
-
-        thus "get_store_total ?\<omega>0_rets_empty x = get_store_total ?\<omega>0_empty x"
-        proof simp
-          have "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = Some ((v_args @ v_rets) ! x)"
-            using shift_and_add_list_alt_lookup_1[OF **]
-            by blast
-          also have "... = Some (v_args ! x)"
-            using \<open>x < length v_args\<close>
-            by (simp add: nth_append)
-          finally show "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = shift_and_add_list_alt Map.empty v_args x"
-            using shift_and_add_list_alt_lookup_1[OF \<open>x < length v_args\<close>]
-            by simp
-        qed
-      qed (insert MethodSpecSubset, auto)      
+        apply (rule assertion_framing_store_same_on_free_var)
+        apply (insert StoreSameOnArgs, insert MethodSpecSubset)
+        by auto
 
       show ?thesis
       proof (rule framing_exhI[OF _ _ AssertionFraming_\<omega>0'_only_args])
@@ -1840,31 +1847,45 @@ proof (rule stmt_rel_intro_2)
         let ?\<omega>pre_rets = "\<omega>pre \<lparr> get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets) \<rparr>"
         from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close> 
         obtain \<omega>pre_exh_aux where
-          RedExh: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal \<omega>pre_exh_aux)"
+          RedExh: "red_exhale ctxt_vpr StateCons ?\<omega>0 (method_decl.pre mdecl') ?\<omega>0 (RNormal \<omega>pre_exh_aux)"
           using \<open>resPre = _\<close>
-          apply cases
-            apply simp_all
-          sorry
+          by (cases) auto 
 
-        have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets \<ominus> ?\<omega>pre_rets))"
+        hence "?\<omega>0 \<succeq> \<omega>pre_exh_aux"
+          using exhale_normal_result_smaller
+          by blast
+
+        let ?\<omega>pre_exh_aux_rets = "\<omega>pre_exh_aux\<lparr> get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets) \<rparr>"
+
+        have "?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets"
         proof -
-          (* from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close>  *)
-          have RedExh: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal ?\<omega>pre_rets)"
-          proof (rule exhale_same_on_free_var) \<comment>\<open>using that the return variables do not appear in the precondition\<close>
-            from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close>
-            show "red_exhale ctxt_vpr StateCons ?\<omega>0 (method_decl.pre mdecl') ?\<omega>0 resPre"
-              apply cases
-                apply simp_all
+          have "?\<omega>0_rets \<ge> ?\<omega>pre_exh_aux_rets"
+            apply (rule less_eq_full_total_stateI)
+               apply simp
+              apply simp
+              defer
+            using \<open>?\<omega>0 \<succeq> \<omega>pre_exh_aux\<close> less_eq_full_total_stateD full_total_state_greater_equiv
+            sorry
+          thus ?thesis
+            by (simp add: full_total_state_greater_equiv)
+        qed
 
-            have "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (map_stmt_result_total (\<lambda>\<omega>. \<omega> \<lparr> get_store_total := get_store_total ?\<omega>0_rets \<rparr>) (RNormal ?\<omega>pre_rets))"
-              sorry
+        have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
+        proof -
+          have RedExhRets: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal ?\<omega>pre_exh_aux_rets)"
+            apply (rule exhale_same_on_free_var[OF RedExh]) \<comment>\<open>using that the return variables do not appear in the precondition\<close>
+            using StoreSameOnArgs \<open>mdecl = _\<close> MethodSpecSubset
+            by auto
 
-
-          moreover have SumDefined: "?\<omega>0_rets_empty \<oplus> (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) = Some (?\<omega>0_rets \<ominus> ?\<omega>pre_rets)"
-            sorry 
+          moreover have SumDefined: "?\<omega>0_rets_empty \<oplus> (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) = Some (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)"
+            apply (rule plus_full_total_state_zero_mask)
+            using \<open>?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets\<close>
+             apply simp
+            using minus_full_total_state_only_mask_different
+            sorry
           moreover have PreFramed: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl') ?\<omega>0_rets_empty"
             sorry \<comment>\<open>using that the precondition is self-framing\<close>
-          moreover have ValidRes: "StateCons (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) \<and> valid_heap_mask (get_mh_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_rets))"
+          moreover have ValidRes: "StateCons (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) \<and> valid_heap_mask (get_mh_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
             sorry    
           moreover have "mono_prop_downward StateCons"
             using ConsistencyDownwardMono
@@ -1886,12 +1907,12 @@ proof (rule stmt_rel_intro_2)
         moreover have "is_empty_total_full ?\<omega>0_rets_empty"
           unfolding is_empty_total_full_def is_empty_total_def
           by auto
-        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) (get_store_total ?\<omega>0_rets)"
+        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) (get_store_total ?\<omega>0_rets)"
           using MethodSpecsFramed
           unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
           by fastforce
         hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega> (get_store_total ?\<omega>0_rets)"
-          sorry   \<comment>\<open>using monotonicity argument\<close>
+          sorry   \<comment>\<open>using monotonicity argument on trace --> need another auxiliary lemma\<close>
         
         show ?thesis
         unfolding assertion_framing_state_def
