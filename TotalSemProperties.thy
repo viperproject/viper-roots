@@ -1288,29 +1288,6 @@ assumes "assertion_framing_state ctxt StateCons A \<omega>"
   unfolding assertion_framing_state_def
   by blast
 
-lemma assertion_framing_store_same_on_free_var:
-  assumes "assertion_framing_state ctxt StateCons A \<omega>"
-      and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>' x"
-      and "get_trace_total \<omega> = get_trace_total \<omega>' \<and> get_total_full \<omega> = get_total_full \<omega>'"
-      and "no_unfolding_assertion A"
-    shows "assertion_framing_state ctxt StateCons A \<omega>'"
-  thm assms red_pure_exp_inhale_store_same_on_free_var(3)
-  unfolding assertion_framing_state_def
-proof (rule allI | rule impI)+
-  fix res
-  assume RedInh: "red_inhale ctxt StateCons A \<omega>' res"
-
-  hence "red_inhale ctxt StateCons A \<omega> res"
-    apply (rule red_pure_exp_inhale_store_same_on_free_var(3))
-    using assms
-    by auto
-    
-  thus "res \<noteq> RFailure"
-    using assms(1)
-    unfolding assertion_framing_state_def
-    by blast
-qed
-
 subsection \<open>Exhale\<close>
 
 lemma exhale_only_changes_total_state_aux:
@@ -2144,7 +2121,7 @@ lemma red_pure_exp_inhale_store_same_on_free_var:
          no_unfolding_assertion A \<Longrightarrow>
         (\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow> 
         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>           
-         red_inhale ctxt R A \<omega>2 res" and
+         red_inhale ctxt R A \<omega>2 (map_stmt_result_total (\<lambda>\<omega>. \<omega> \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>) res)" and
         "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
 proof (induction arbitrary: \<omega>_def \<omega>2 \<omega>_def2 and \<omega>_def \<omega>2 \<omega>_def2 and \<omega>2 rule: red_exp_inhale_unfold_inducts)
   case (RedLit \<omega>_def l uu)
@@ -2296,7 +2273,39 @@ next
   then show ?case by simp
 qed
 
+lemma assertion_framing_store_same_on_free_var:
+  assumes "assertion_framing_state ctxt StateCons A \<omega>"
+      and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>' x"
+      and "get_trace_total \<omega> = get_trace_total \<omega>' \<and> get_total_full \<omega> = get_total_full \<omega>'"
+      and "no_unfolding_assertion A"
+    shows "assertion_framing_state ctxt StateCons A \<omega>'"
+  unfolding assertion_framing_state_def
+proof (rule allI | rule impI)+
+  fix res
+  assume RedInh: "red_inhale ctxt StateCons A \<omega>' res"
 
+  show "res \<noteq> RFailure"
+  proof 
+    assume "res = RFailure"
+    hence "red_inhale ctxt StateCons A \<omega> RFailure"
+      using red_pure_exp_inhale_store_same_on_free_var(3) RedInh assms
+      by fastforce
+    thus False
+      using assms(1)
+      unfolding assertion_framing_state_def
+      by blast
+  qed
+qed
+
+lemma exhale_same_on_free_var:
+  assumes "red_exhale ctxt StateCons \<omega>def1 A \<omega>1 res1"
+      and "res2 = map_stmt_result_total (\<lambda>\<omega>. \<omega> \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>) res"
+      and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x"
+      and "get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2"
+      and "get_trace_total \<omega>def1 = get_trace_total \<omega>def2 \<and> get_total_full \<omega>def1 = get_total_full \<omega>def2"
+      and "no_unfolding_assertion A"      
+    shows "red_exhale ctxt StateCons \<omega>def2 A \<omega>2 res2"
+  sorry
 
 (*
 subsection \<open>Unfold leads to one normal successor state\<close>

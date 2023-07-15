@@ -1833,13 +1833,47 @@ proof (rule stmt_rel_intro_2)
            From this we conclude the proof with a monotonicity argument (using that 
            \<^prop>\<open>get_total_full ?\<omega>0 \<succeq> get_total_full (?\<omega>0 \<ominus> \<omega>pre)\<close>)\<close>        
 
-        let  ?\<omega>0_rets_empty = "?\<omega>0\<lparr>   get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets),
+        let ?\<omega>0_rets =  "?\<omega>0\<lparr> get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets) \<rparr>"
+        let ?\<omega>0_rets_empty = "?\<omega>0\<lparr>   get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets),
                                       get_total_full := (get_total_full \<omega>)\<lparr> get_mh_total := zero_mask, get_mp_total := zero_mask \<rparr> \<rparr>" 
 
         let ?\<omega>pre_rets = "\<omega>pre \<lparr> get_store_total := shift_and_add_list_alt Map.empty (v_args@v_rets) \<rparr>"
-
-        have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets_empty \<ominus> ?\<omega>pre_rets))"
+        from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close> 
+        obtain \<omega>pre_exh_aux where
+          RedExh: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal \<omega>pre_exh_aux)"
+          using \<open>resPre = _\<close>
+          apply cases
+            apply simp_all
           sorry
+
+        have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets \<ominus> ?\<omega>pre_rets))"
+        proof -
+          (* from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close>  *)
+          have RedExh: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal ?\<omega>pre_rets)"
+          proof (rule exhale_same_on_free_var) \<comment>\<open>using that the return variables do not appear in the precondition\<close>
+            from \<open>red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (method_decl.pre mdecl')) ?\<omega>0 resPre\<close>
+            show "red_exhale ctxt_vpr StateCons ?\<omega>0 (method_decl.pre mdecl') ?\<omega>0 resPre"
+              apply cases
+                apply simp_all
+
+            have "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (map_stmt_result_total (\<lambda>\<omega>. \<omega> \<lparr> get_store_total := get_store_total ?\<omega>0_rets \<rparr>) (RNormal ?\<omega>pre_rets))"
+              sorry
+
+
+          moreover have SumDefined: "?\<omega>0_rets_empty \<oplus> (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) = Some (?\<omega>0_rets \<ominus> ?\<omega>pre_rets)"
+            sorry 
+          moreover have PreFramed: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl') ?\<omega>0_rets_empty"
+            sorry \<comment>\<open>using that the precondition is self-framing\<close>
+          moreover have ValidRes: "StateCons (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) \<and> valid_heap_mask (get_mh_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_rets))"
+            sorry    
+          moreover have "mono_prop_downward StateCons"
+            using ConsistencyDownwardMono
+            unfolding mono_prop_downward_def            
+            using full_total_state_greater_equiv by auto
+          ultimately show ?thesis
+            using exhale_inhale_normal MethodSpecSubset \<open>mdecl = _\<close>
+            by blast
+        qed
         moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0_rets_empty)"
           apply simp
           apply (rule vpr_store_well_typed_append)
@@ -1852,19 +1886,19 @@ proof (rule stmt_rel_intro_2)
         moreover have "is_empty_total_full ?\<omega>0_rets_empty"
           unfolding is_empty_total_full_def is_empty_total_def
           by auto
-        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets_empty \<ominus> ?\<omega>pre_rets) (get_store_total ?\<omega>0_rets_empty)"
-          using  MethodSpecsFramed
+        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets \<ominus> ?\<omega>pre_rets) (get_store_total ?\<omega>0_rets)"
+          using MethodSpecsFramed
           unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
-          by blast
-        hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega> (get_store_total ?\<omega>0_rets_empty)"
-          sorry          
+          by fastforce
+        hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega> (get_store_total ?\<omega>0_rets)"
+          sorry   \<comment>\<open>using monotonicity argument\<close>
         
         show ?thesis
         unfolding assertion_framing_state_def
       proof (rule allI, rule impI)+
         thm PostFramedAux
         let ?\<phi>havoc = "get_total_full ?\<omega>havoc"
-        let ?\<omega>havoc2 = "\<lparr> get_store_total = get_store_total ?\<omega>0_rets_empty, 
+        let ?\<omega>havoc2 = "\<lparr> get_store_total = get_store_total ?\<omega>0_rets, 
                           get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
                           get_total_full = ?\<phi>havoc \<rparr>"
 
