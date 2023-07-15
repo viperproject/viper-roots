@@ -30,31 +30,31 @@ lemma update_trace_total_mask_same: "get_mh_total_full (update_trace_total \<ome
 section \<open>heap and mask in total state\<close>
 
 fun get_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> mask \<times> 'a predicate_mask"
-  where "get_m_total \<phi> = (get_mh_total \<phi>, get_mp_total \<phi>)"
+  where "get_m_total \<omega> = (get_mh_total \<omega>, get_mp_total \<omega>)"
 
 fun update_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> ('a, 'b) total_state_scheme"
-  where "update_m_total \<phi> m = \<phi>\<lparr> get_mh_total := fst m, get_mp_total := snd m \<rparr>"
+  where "update_m_total \<omega> m = \<omega>\<lparr> get_mh_total := fst m, get_mp_total := snd m \<rparr>"
 
 fun update_hh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a total_state"
-  where "update_hh_loc_total \<phi> l v = \<phi>\<lparr>get_hh_total := (get_hh_total \<phi>)(l := v)\<rparr>"
+  where "update_hh_loc_total \<omega> l v = \<omega>\<lparr>get_hh_total := (get_hh_total \<omega>)(l := v)\<rparr>"
 
 fun update_mh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
-  where "update_mh_loc_total \<phi> l p = \<phi>\<lparr>get_mh_total := (get_mh_total \<phi>)(l := p)\<rparr>"
+  where "update_mh_loc_total \<omega> l p = \<omega>\<lparr>get_mh_total := (get_mh_total \<omega>)(l := p)\<rparr>"
 
 fun update_mp_loc_total :: "'a total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
-  where "update_mp_loc_total \<phi> lp p = \<phi>\<lparr>get_mp_total := (get_mp_total \<phi>)(lp := p)\<rparr>"
+  where "update_mp_loc_total \<omega> lp p = \<omega>\<lparr>get_mp_total := (get_mp_total \<omega>)(lp := p)\<rparr>"
 
 fun update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> 'a total_state"
-  where "update_mh_total \<phi> mh = \<phi>\<lparr>get_mh_total := mh\<rparr>"
+  where "update_mh_total \<omega> mh = \<omega>\<lparr>get_mh_total := mh\<rparr>"
 
 fun update_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a total_state"
-  where "update_mp_total \<phi> mp = \<phi>\<lparr>get_mp_total := mp\<rparr>"
+  where "update_mp_total \<omega> mp = \<omega>\<lparr>get_mp_total := mp\<rparr>"
 
 fun update_hh_total :: "'a total_state \<Rightarrow> 'a total_heap \<Rightarrow> 'a total_state"
-  where "update_hh_total \<phi> hh = \<phi>\<lparr>get_hh_total := hh\<rparr>"
+  where "update_hh_total \<omega> hh = \<omega>\<lparr>get_hh_total := hh\<rparr>"
 
 fun update_hp_total :: "'a total_state \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a total_state"
-  where "update_hp_total \<phi> hp = \<phi>\<lparr>get_hp_total := hp\<rparr>"
+  where "update_hp_total \<omega> hp = \<omega>\<lparr>get_hp_total := hp\<rparr>"
 
 subsection \<open>heap and mask in full total state\<close>
 
@@ -139,10 +139,10 @@ lemma less_eq_full_total_stateD_2:
   by (fastforce dest: less_eq_full_total_stateD less_eq_total_stateD)  
 
 lemma update_mh_loc_total_mono:
-  assumes "\<phi>1 \<le> \<phi>2" and "p1 \<le> p2"
-  shows "update_mh_loc_total \<phi>1 l p1 \<le> update_mh_loc_total \<phi>2 l p2"
+  assumes "\<omega>1 \<le> \<omega>2" and "p1 \<le> p2"
+  shows "update_mh_loc_total \<omega>1 l p1 \<le> update_mh_loc_total \<omega>2 l p2"
 proof -
-  have *: "(get_mh_total \<phi>1)(l := p1) \<le> (get_mh_total \<phi>2)(l := p2)"
+  have *: "(get_mh_total \<omega>1)(l := p1) \<le> (get_mh_total \<omega>2)(l := p2)"
     using assms 
     by (simp add: le_funD le_funI less_eq_total_stateD)
 
@@ -152,10 +152,10 @@ proof -
 qed
 
 lemma update_mp_loc_total_mono:
-  assumes "\<phi>1 \<le> \<phi>2" and "p1 \<le> p2"
-  shows "update_mp_loc_total \<phi>1 l p1 \<le> update_mp_loc_total \<phi>2 l p2"
+  assumes "\<omega>1 \<le> \<omega>2" and "p1 \<le> p2"
+  shows "update_mp_loc_total \<omega>1 l p1 \<le> update_mp_loc_total \<omega>2 l p2"
 proof -
-  have *: "(get_mp_total \<phi>1)(l := p1) \<le> (get_mp_total \<phi>2)(l := p2)"
+  have *: "(get_mp_total \<omega>1)(l := p1) \<le> (get_mp_total \<omega>2)(l := p2)"
     using assms 
     by (simp add: le_funD le_funI less_eq_total_stateD)
 
@@ -192,6 +192,13 @@ proof -
     by (fastforce dest: less_eq_full_total_stateD)+
 qed
 
+lemma less_eq_add_masks: "m1 \<le> add_masks m1 m2"
+  unfolding add_masks_def le_fun_def
+proof
+  fix x
+  show "m1 x \<le> padd (m1 x) (m2 x)"
+    by (transfer) simp
+qed  
 
 subsection \<open>Partial commutative monoid instantiation\<close>
 
@@ -453,8 +460,8 @@ text \<open>In the following, we do not take the core of the trace, because the 
       defined only if the traces are the same.\<close>
 
 definition core_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a, 'b) full_total_state_ext"
-  where "core_full_total_state_ext \<phi> = 
-            \<phi> \<lparr> get_trace_total := get_trace_total \<phi>, get_total_full := |get_total_full \<phi>|\<rparr>"
+  where "core_full_total_state_ext \<omega> = 
+            \<omega> \<lparr> get_trace_total := get_trace_total \<omega>, get_total_full := |get_total_full \<omega>|\<rparr>"
 instance
   sorry
 end
@@ -642,6 +649,32 @@ lemma plus_Some_full_total_state_eq:
   unfolding plus_full_total_state_ext_def defined_def
   by (fastforce split: if_split_asm dest: plus_Some_total_state_eq)
 
+lemma plus_total_state_zero_mask:
+  assumes "get_hh_total \<phi> = get_hh_total \<phi>' \<and> get_hp_total \<phi> = get_hp_total \<phi>' \<and> total_state.more \<phi> = total_state.more \<phi>'" and
+          "get_mh_total \<phi>' = zero_mask \<and> get_mp_total \<phi>' = zero_mask"
+        shows "\<phi>' \<oplus> \<phi> = Some \<phi>"
+  using assms
+  unfolding plus_total_state_ext_def
+  apply simp
+  by (metis (no_types, lifting) commutative option.sel plus_mask_zero_mask_neutral total_state.surjective total_state.update_convs(3) total_state.update_convs(4))  
+
+lemma plus_full_total_state_zero_mask:
+  assumes "get_store_total \<omega> = get_store_total \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>' \<and> get_h_total_full \<omega> = get_h_total_full \<omega>' \<and>
+           full_total_state.more \<omega> = full_total_state.more \<omega>'" and
+          "get_mh_total_full \<omega>' = zero_mask \<and> get_mp_total_full \<omega>' = zero_mask"
+  shows "\<omega>' \<oplus> \<omega> = Some \<omega>"
+proof -
+  have "get_total_full \<omega>' \<oplus> get_total_full \<omega> = Some (get_total_full \<omega>)"
+    apply (rule plus_total_state_zero_mask)
+    using assms 
+    by simp_all
+
+  thus ?thesis
+  unfolding plus_full_total_state_ext_def defined_def
+  using plus_total_state_zero_mask assms
+  by simp
+qed
+  
 lemma full_total_state_greater_only_mask_changed:
   assumes "\<omega> \<succeq> \<omega>'"
   shows "get_store_total \<omega> = get_store_total \<omega>' \<and>
@@ -792,6 +825,89 @@ lemma full_total_state_greater_mask:
   shows "get_mh_total_full \<omega> \<succeq> get_mh_total_full \<omega>' \<and> get_mp_total_full \<omega> \<succeq> get_mp_total_full \<omega>'"
   using greater_full_total_state_total_state[OF assms] total_state_greater_mask
   by auto
+
+lemma total_state_greater_equiv:
+  shows "(\<omega> :: 'a total_state) \<succeq> \<omega>' \<longleftrightarrow> \<omega> \<ge> \<omega>'"
+proof
+  assume "\<omega> \<succeq> \<omega>'"
+
+  from this obtain \<omega>2 where Sum: "\<omega>' \<oplus> \<omega>2 = Some \<omega>"
+    by (auto simp add: greater_def) 
+
+  show "\<omega> \<ge> \<omega>'"
+    unfolding plus_Some_total_state_eq[OF Sum]
+    by (rule less_eq_total_stateI) (simp_all add: less_eq_add_masks)
+next
+  assume *: "\<omega> \<ge> \<omega>'"
+
+  let ?mh2 = "\<lambda>l. get_mh_total \<omega> l - get_mh_total \<omega>' l"
+  let ?mp2 = "\<lambda>l. get_mp_total \<omega> l - get_mp_total \<omega>' l"
+
+  have MhEq: "get_mh_total \<omega> = add_masks (get_mh_total \<omega>') ?mh2"
+    unfolding add_masks_def
+  proof
+    fix hl
+    have "get_mh_total \<omega> hl \<ge> get_mh_total \<omega>' hl"
+    using less_eq_total_stateD[OF *]
+    by (simp add: le_funD)
+
+    thus "get_mh_total \<omega> hl = padd (get_mh_total \<omega>' hl) (get_mh_total \<omega> hl - get_mh_total \<omega>' hl)"
+      unfolding minus_prat_def
+      by (metis Rep_prat_inverse add.commute add_diff_cancel plus_prat.rep_eq prat_gte_padd)
+  qed
+
+  have MpEq: "get_mp_total \<omega> = add_masks (get_mp_total \<omega>') ?mp2"
+    unfolding add_masks_def
+  proof
+    fix hl
+    have "get_mp_total \<omega> hl \<ge> get_mp_total \<omega>' hl"
+    using less_eq_total_stateD[OF *]
+    by (simp add: le_funD)
+
+    thus "get_mp_total \<omega> hl = padd (get_mp_total \<omega>' hl) (get_mp_total \<omega> hl - get_mp_total \<omega>' hl)"
+      unfolding minus_prat_def
+      by (metis Rep_prat_inverse add.commute add_diff_cancel plus_prat.rep_eq prat_gte_padd)
+  qed  
+
+  have "Some \<omega> = \<omega>' \<oplus> (\<omega> \<lparr> get_mh_total := ?mh2, get_mp_total := ?mp2 \<rparr>)"
+    unfolding plus_total_state_ext_def
+    using MhEq MpEq less_eq_total_stateD[OF *]
+    by (auto simp: mask_plus_Some)
+
+  thus "\<omega> \<succeq> \<omega>'"
+    by (auto simp add: greater_def)
+qed
+
+
+lemma full_total_state_greater_equiv:
+  shows "(\<omega> :: 'a full_total_state) \<succeq> \<omega>' \<longleftrightarrow> \<omega> \<ge> \<omega>'"
+proof
+  assume "\<omega> \<succeq> \<omega>'"
+  from this obtain \<omega>2 where Sum: "\<omega>' \<oplus> \<omega>2 = Some \<omega>"
+    by (auto simp add: greater_def) 
+
+  show "\<omega> \<ge> \<omega>'"
+    unfolding plus_Some_full_total_state_eq[OF Sum]
+    apply (rule less_eq_full_total_stateI)
+       apply simp
+      apply simp
+    using less_eq_add_masks plus_Some_full_total_state_eq[OF Sum] \<open>\<omega> \<succeq> \<omega>'\<close> 
+          greater_full_total_state_total_state total_state_greater_equiv 
+     apply blast
+    by simp
+next
+  assume "\<omega> \<ge> \<omega>'"
+
+  hence "get_total_full \<omega> \<ge> get_total_full \<omega>'"
+    using less_eq_full_total_state_ext_def 
+    by auto
+
+  hence "get_total_full \<omega> \<succeq> get_total_full \<omega>'"    
+    by (simp add: total_state_greater_equiv)
+
+  thus "\<omega> \<succeq> \<omega>'"
+    by (metis \<open>\<omega>' \<le> \<omega>\<close> get_mh_total_full.simps get_mp_total_full.elims less_eq_full_total_stateD_2 less_eq_full_total_state_ext_def succ_full_total_stateI total_state_greater_mask)
+qed
 
 subsection \<open>valid mask (TODO: move to ViperLang?)\<close>
 

@@ -91,6 +91,17 @@ definition framing_exh
            valid_heap_mask (get_mh_total_full \<omega>def) \<and>
            (\<exists>\<omega>_inh \<omega>sum.  \<omega>_inh \<oplus> \<omega> = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A \<omega>_inh)"  
 
+lemma framing_exhI:
+  assumes "StateCons \<omega>def"
+      and "valid_heap_mask (get_mh_total_full \<omega>def)"
+      and "assertion_framing_state ctxt_vpr StateCons A \<omega>_inh"
+      and "\<omega>_inh \<oplus> \<omega> = Some \<omega>sum"
+      and "\<omega>def \<succeq> \<omega>sum"
+    shows "framing_exh ctxt_vpr StateCons A \<omega>def \<omega>"
+  using assms
+  unfolding framing_exh_def
+  by blast
+
 text \<open>\<^const>\<open>framing_exh\<close> expresses an exhale relation invariant from which one can show that the assertion is 
       framed in the well-definedness state (due to monotonicity of framedness). 
       \<^term>\<open>\<omega>_inh\<close> expresses the permissions that have been exhaled so far during the exhale. Since 
