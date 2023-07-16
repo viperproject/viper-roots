@@ -29,6 +29,7 @@ lemma free_var_subexp:
   shows "\<Union> (set (map free_var_pure_exp (sub_pure_exp_total e))) \<subseteq> free_var_pure_exp e"
   by (cases e) auto  
 
+
 lemma less_eq_valid_locs_subset_total_state:
   assumes "\<omega> \<le> \<omega>'"
   shows "get_valid_locs \<omega> \<subseteq> get_valid_locs \<omega>'"
@@ -2252,22 +2253,61 @@ next
   then show ?case sorry
 next
   case (InhSubAtomicFailure A \<omega>)
-  then show ?case sorry
+  moreover from this have "list_all no_unfolding_pure_exp (sub_expressions_atomic A)"
+    using assert_pred_atomic_subexp
+    by simp
+  moreover from InhSubAtomicFailure have
+    FreeVar: "\<And>x. x \<in> \<Union> (set (map free_var_pure_exp (sub_expressions_atomic A))) \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x"
+    sorry
+  ultimately show ?case 
+    using InhSubAtomicFailure  TotalExpressions.InhSubAtomicFailure 
+    by (metis map_stmt_result_total.simps(3))    
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)
-  then show ?case sorry
+  let ?\<omega>''2 = "(\<omega>'' \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>)"
+  from InhStarNormal have "red_inhale ctxt R A \<omega>2 (RNormal ?\<omega>''2)"
+    by simp
+  moreover have "red_inhale ctxt R B ?\<omega>''2
+                             (map_stmt_result_total (get_store_total_update (\<lambda>_. get_store_total ?\<omega>''2)) res)"
+  proof (rule InhStarNormal.IH(4))
+    from InhStarNormal show "no_unfolding_assertion B"
+      by simp
+  next
+    fix x 
+    assume "x \<in> free_var_assertion B"
+    hence "x \<in> free_var_assertion (A&&B)"
+      by simp
+    have "get_store_total \<omega>'' = get_store_total \<omega>"
+      using InhStarNormal inhale_only_changes_mask(3)
+      by metis
+    thus "get_store_total \<omega>'' x = get_store_total (\<omega>''\<lparr>get_store_total := get_store_total \<omega>2\<rparr>) x"
+      using InhStarNormal(6) \<open>x \<in> free_var_assertion (A&&B)\<close>
+      by auto
+  qed simp
+  ultimately show ?case
+    by (auto intro!: TotalExpressions.InhStarNormal)
 next
   case (InhStarFailureMagic A \<omega> resA B)
-  then show ?case sorry
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
 next
   case (InhImpTrue \<omega> e A res)
-  then show ?case sorry
+  then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
 next
   case (InhImpFalse \<omega> e A)
-  then show ?case sorry
+  hence "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    by simp
+  hence "red_inhale ctxt R (Imp e A) \<omega>2 (RNormal \<omega>2)"
+    by (auto intro!: TotalExpressions.InhImpFalse)
+  moreover have "\<omega>2 = \<omega>\<lparr>get_store_total := get_store_total \<omega>2\<rparr>"
+    apply (rule full_total_state.equality)
+    using InhImpFalse
+    by auto
+  ultimately show ?case 
+    by simp        
 next
   case (InhImpFailure \<omega> e A)
-  then show ?case sorry
+  then show ?case 
+    by (auto intro!: TotalExpressions.InhImpFailure)
 next
   case (UnfoldRelStep pred_id pred_decl pred_body m \<omega> vs q m' \<omega>2 \<omega>' \<omega>3)
   then show ?case by simp

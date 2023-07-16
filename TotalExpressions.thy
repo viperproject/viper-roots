@@ -118,6 +118,11 @@ fun sub_expressions_atomic :: "pure_exp atomic_assert \<Rightarrow> pure_exp lis
 | "sub_expressions_atomic (Acc x f p) = x # sub_expressions_exp_or_wildcard p"
 | "sub_expressions_atomic (AccPredicate P exps p) = exps @ sub_expressions_exp_or_wildcard p"
 
+fun sub_expressions_assertion :: "assertion \<Rightarrow> pure_exp list" where
+  "sub_expressions_assertion (Atomic A) = sub_expressions_atomic A"
+| "sub_expressions_assertion (Imp e A) = [e]"
+| "sub_expressions_assertion _ = []"
+
 subsection\<open>Auxiliary inhale definitions\<close>
 
 text \<open>Construct the set of states that can be reached after inhaling a field permission.

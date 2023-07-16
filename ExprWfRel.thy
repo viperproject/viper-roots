@@ -1,5 +1,5 @@
 theory ExprWfRel
-imports ViperBoogieBasicRel ViperBoogieFunctionInst ExpRel Simulation
+imports ViperBoogieBasicRel ViperBoogieFunctionInst ExpRel Simulation TotalSemProperties
 begin
 
 subsection \<open>Semantic relation well-definedness\<close>
@@ -666,7 +666,12 @@ lemma unfolding_wf_rel:
 subsubsection \<open>Well-definedness for free if expressions are subexpressions of a framed assertion\<close>
 
 lemma assertion_framing_expr_wf_rel_inh:
-  assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and> assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and
+  assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
+               assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+               get_store_total \<omega> = get_store_total \<omega>def \<and> 
+               get_trace_total \<omega> = get_trace_total \<omega>def \<and>
+               get_h_total_full \<omega> = get_h_total_full \<omega>def" and
+          ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es" and
           "es = sub_expressions_atomic A" and
           "es \<noteq> []"
         shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
@@ -675,6 +680,18 @@ proof (rule wf_rel_intro)
   fix contra
   fix \<omega>def \<omega> ns
   assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+
+  from \<open>R \<omega>def \<omega> ns\<close> have
+    AssertionFramed: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and
+    OnlyMaskDiffers: "get_store_total \<omega> = get_store_total \<omega>def \<and> 
+     get_trace_total \<omega> = get_trace_total \<omega>def \<and>
+     get_h_total_full \<omega> = get_h_total_full \<omega>def"
+    using assms
+    by auto
+
+  from RedExps OnlyMaskDiffers have "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega>def None"
+    using red_pure_exp_only_differ_on_mask(2) ExprConstraint
+    by blast
   hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
     using assms InhSubAtomicFailure
     by blast
@@ -682,7 +699,6 @@ proof (rule wf_rel_intro)
   moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
     using assms
     by blast
-
   ultimately have False
     unfolding assertion_framing_state_def
     by blast
