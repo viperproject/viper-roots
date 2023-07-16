@@ -1863,14 +1863,29 @@ proof (rule stmt_rel_intro_2)
             apply (rule less_eq_full_total_stateI)
                apply simp
               apply simp
-              defer
-            using \<open>?\<omega>0 \<succeq> \<omega>pre_exh_aux\<close> less_eq_full_total_stateD full_total_state_greater_equiv
-            sorry
+            using exhale_only_changes_total_state_aux[OF RedExh]
+              apply simp
+             apply simp
+            using iffD1[OF full_total_state_greater_equiv, OF \<open>?\<omega>0 \<succeq> \<omega>pre_exh_aux\<close>] less_eq_full_total_stateD
+            apply fastforce
+            by simp
           thus ?thesis
             by (simp add: full_total_state_greater_equiv)
         qed
 
-        have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
+        have StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0_rets_empty)"
+          apply simp
+          apply (rule vpr_store_well_typed_append)
+          using RedMethodCall \<open>mdecl = mdecl'\<close>
+          by (auto dest: vals_well_typed_same_lengthD)
+        moreover have HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>0_rets_empty)"
+          using state_rel_heap_var_rel[OF StateRel] \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
+          unfolding heap_var_rel_def
+          by simp
+        moreover have EmptyState: "is_empty_total_full ?\<omega>0_rets_empty"
+          unfolding is_empty_total_full_def is_empty_total_def
+          by auto
+        moreover have "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty (RNormal (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
         proof -
           have RedExhRets: "red_exhale ctxt_vpr StateCons ?\<omega>0_rets (method_decl.pre mdecl') ?\<omega>0_rets (RNormal ?\<omega>pre_exh_aux_rets)"
             apply (rule exhale_same_on_free_var[OF RedExh]) \<comment>\<open>using that the return variables do not appear in the precondition\<close>
@@ -1878,13 +1893,31 @@ proof (rule stmt_rel_intro_2)
             by auto
 
           moreover have SumDefined: "?\<omega>0_rets_empty \<oplus> (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) = Some (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)"
-            apply (rule plus_full_total_state_zero_mask)
-            using \<open>?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets\<close>
-             apply simp
+          proof -
+            have "get_h_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) = get_h_total_full ?\<omega>0_rets"
             using minus_full_total_state_only_mask_different
-            sorry
+            by blast
+            hence *: "get_h_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) = get_h_total_full ?\<omega>0_rets_empty"
+              by simp
+
+            show ?thesis
+              apply (rule plus_full_total_state_zero_mask)
+               apply (simp add: minus_full_total_state_only_mask_different)
+              using *
+               apply simp
+              by simp
+          qed
           moreover have PreFramed: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl') ?\<omega>0_rets_empty"
-            sorry \<comment>\<open>using that the precondition is self-framing\<close>
+            unfolding assertion_framing_state_def \<comment>\<open>using that the precondition is self-framing\<close>
+          proof (rule allI | rule impI)+
+            fix res
+            assume "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl') ?\<omega>0_rets_empty res"
+            with StoreWellTy HeapWellTy EmptyState
+            show "res \<noteq> RFailure"
+              using MethodSpecsFramed
+              unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def \<open>mdecl = _\<close>
+              by blast
+          qed
           moreover have ValidRes: "StateCons (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) \<and> valid_heap_mask (get_mh_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
             sorry    
           moreover have "mono_prop_downward StateCons"
@@ -1895,18 +1928,6 @@ proof (rule stmt_rel_intro_2)
             using exhale_inhale_normal MethodSpecSubset \<open>mdecl = _\<close>
             by blast
         qed
-        moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0_rets_empty)"
-          apply simp
-          apply (rule vpr_store_well_typed_append)
-          using RedMethodCall \<open>mdecl = mdecl'\<close>
-          by (auto dest: vals_well_typed_same_lengthD)
-        moreover have "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>0_rets_empty)"
-          using state_rel_heap_var_rel[OF StateRel] \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
-          unfolding heap_var_rel_def
-          by simp
-        moreover have "is_empty_total_full ?\<omega>0_rets_empty"
-          unfolding is_empty_total_full_def is_empty_total_def
-          by auto
         ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) (get_store_total ?\<omega>0_rets)"
           using MethodSpecsFramed
           unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
