@@ -519,11 +519,12 @@ qed (insert assms, auto)
 subsection \<open>Inhale statement relation\<close>
 
 lemma inhale_stmt_rel:
-  assumes InhRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'" and
+  assumes InhRel: "inhale_rel R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'" and
+          R_to_R': "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R' \<omega> ns" and
           InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega>" 
-  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
+  shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
   apply (rule stmt_rel_intro)
-  using inhale_rel_normal_elim[OF InhRel] inhale_rel_failure_elim[OF InhRel] InvHolds
+  using inhale_rel_normal_elim[OF InhRel R_to_R'] inhale_rel_failure_elim[OF InhRel R_to_R'] InvHolds
   by (auto elim: RedInhale_case)
 
 subsection \<open>Exhale statement relation\<close>
