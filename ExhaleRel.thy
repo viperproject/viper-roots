@@ -1,5 +1,5 @@
 theory ExhaleRel
-  imports ExpRel ExprWfRel TotalViper.ViperBoogieTranslationInterface Simulation ViperBoogieRelUtil 
+  imports ExpRel ExprWfRel ViperBoogieTranslationInterface Simulation ViperBoogieRelUtil 
           TotalSemProperties
 begin
 

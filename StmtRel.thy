@@ -1,5 +1,5 @@
 theory StmtRel
-imports ExpRel ExprWfRel InhaleRel ExhaleRel TotalSemProperties TotalViper.ViperBoogieTranslationInterface Simulation
+imports ExpRel ExprWfRel InhaleRel ExhaleRel TotalSemProperties ViperBoogieTranslationInterface Simulation
 begin
 
 subsection \<open>Statement relation - general statement\<close>
