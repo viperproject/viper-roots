@@ -647,8 +647,6 @@ which would mean another parameter. Not sure what the most abstract notion is he
 to have another Boogie state is input and then one could express two-state invariants such as 
 "value stays the same". It would also be interesting to understand whether Benjamin's auxiliary 
 constraints make sense here.
-\<close>
-
 
 lemma unfolding_wf_rel:
   assumes 
@@ -662,6 +660,7 @@ lemma unfolding_wf_rel:
         WfRel: "expr_wf_rel R' ctxt_vpr StateCons P ctxt ubody \<gamma>2 \<gamma>3"
       shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (Unfolding p xs ubody) \<gamma>1 \<gamma>3"
   oops
+\<close>
 
 subsubsection \<open>Well-definedness for free if expressions are subexpressions of a framed assertion\<close>
 

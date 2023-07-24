@@ -2308,10 +2308,7 @@ next
   case (InhImpFailure \<omega> e A)
   then show ?case 
     by (auto intro!: TotalExpressions.InhImpFailure)
-next
-  case (UnfoldRelStep pred_id pred_decl pred_body m \<omega> vs q m' \<omega>2 \<omega>' \<omega>3)
-  then show ?case by simp
-qed
+qed simp_all
 
 lemma assertion_framing_store_same_on_free_var:
   assumes "assertion_framing_state ctxt StateCons A \<omega>"

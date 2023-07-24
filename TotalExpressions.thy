@@ -207,7 +207,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
   ("_, _, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,51,0,51,51] 81) and
    red_pure_exps_total :: "'a total_context \<Rightarrow>  ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state option \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> (('a val) list) option \<Rightarrow> bool" and
    red_inhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool" and
-   unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+   unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a total_state \<Rightarrow> 'a total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool"
   where
 
@@ -307,7 +307,8 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      ctxt, R, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
 | RedUnfoldingDef: 
    "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>_def) es \<omega> (Some vs);
-     unfold_rel ctxt R p vs pwrite \<omega>_def \<omega>'_def; 
+     unfold_rel ctxt R p vs pwrite (get_total_full \<omega>_def) \<phi>'; 
+     \<omega>'_def = \<omega>_def \<lparr> get_total_full := \<phi>' \<rparr>;
      ctxt, R, (Some \<omega>'_def) \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
      ctxt, R, (Some \<omega>_def) \<turnstile> \<langle>Unfolding p es ubody ; \<omega>\<rangle> [\<Down>]\<^sub>t v"
 
@@ -384,14 +385,13 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | UnfoldRelStep: 
     "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
      ViperLang.predicate_decl.body pred_decl = Some pred_body;
-     m = get_mp_total_full \<omega>;
+     m = get_mp_total \<phi>;
      pgte (m (pred_id,vs)) q;
      q \<noteq> pnone;
-     m' = m( (pred_id,vs) := (m (pred_id, vs)) - q );
-     \<omega>2 = \<lparr> get_store_total = nth_option vs, get_trace_total = get_trace_total \<omega>, get_total_full = update_mp_total (get_total_full \<omega>) m' \<rparr>;
-     \<omega>' = \<omega>3\<lparr> get_store_total := get_store_total \<omega> \<rparr>;
-     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega>2 (RNormal \<omega>3) \<rbrakk> \<Longrightarrow> 
-     unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
+     m' = m( (pred_id,vs) := (m (pred_id,vs)) - q );
+     \<omega> = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = update_mp_total \<phi> m' \<rparr>;
+     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega> (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     unfold_rel ctxt R pred_id vs q \<phi> (get_total_full \<omega>')"
 
 lemmas red_exp_inhale_unfold_inducts = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.inducts
 
@@ -677,10 +677,10 @@ qed
 
 subsection \<open>Total heap consistency\<close>
 
-definition unfold_rel_general :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+definition unfold_rel_general :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a total_state \<Rightarrow> 'a total_state \<Rightarrow> bool"
   where "unfold_rel_general ctxt R \<omega> \<omega>' \<equiv> \<exists> pred_id vs q. unfold_rel ctxt R pred_id vs q \<omega> \<omega>'"
 
-definition unfold_rel_multi :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow>'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+definition unfold_rel_multi :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow>'a total_state \<Rightarrow> 'a total_state \<Rightarrow> bool"
   where "unfold_rel_multi ctxt R  \<equiv> rtranclp (unfold_rel_general ctxt R)"
 
 text \<open>Expression evaluation as a function. Using this function makes sense, when it is known that 
@@ -774,27 +774,30 @@ inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total
                  total_heap_consistent ctxt \<omega>"
 \<close>
 
-inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context" and m :: "mask \<times> 'a predicate_mask"
   where 
   \<comment>\<open>If a state does contain any permission to non-abstract predicates, then the state is trivially consistent.\<close>
   ConsistentNoPred: 
   " \<lbrakk> get_m_total_full \<omega> = m;
+      valid_heap_mask (fst m);
       \<And> pred_id vs. option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None \<Longrightarrow>
-                    get_mp_total_full \<omega> (pred_id,vs) = pnone \<rbrakk> \<Longrightarrow> 
-                    total_heap_consistent_wrt_mask ctxt m \<omega>"
+                    get_mp_total \<phi> (pred_id,vs) = pnone \<rbrakk> \<Longrightarrow> 
+      total_heap_consistent_wrt_mask ctxt m \<phi>"
   \<comment>\<open>If a state contains permission to a non-abstract predicate, then the state is consistent if some such non-abstract predicate
      can be completely unfolded to reach another consistent state\<close>
-| UnfoldStep: "\<lbrakk> option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None;
-                 q = (get_mp_total_full \<omega> (pred_id,vs));
-                 pgt p pnone;
-                 \<exists>\<omega>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<omega> \<omega>' \<and> total_heap_consistent_wrt_mask ctxt m \<omega>'
-                 \<comment>\<open>ignore predicate heaps for now \<^term>\<open>pheap_consistent ctxt \<omega>\<close>\<close> 
-               \<rbrakk> \<Longrightarrow>
-                 total_heap_consistent_wrt_mask ctxt m \<omega>"
+| UnfoldStep: 
+   "\<lbrakk> option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None;
+      q = (get_mp_total \<phi> (pred_id,vs));
+      pgt p pnone;
+      \<exists>\<phi>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<phi> \<phi>' \<and> total_heap_consistent_wrt_mask ctxt m \<phi>'
+      \<comment>\<open>ignore predicate heaps for now \<^term>\<open>pheap_consistent ctxt \<omega>\<close>\<close> 
+    \<rbrakk> \<Longrightarrow>
+    total_heap_consistent_wrt_mask ctxt m \<phi>"
 
-definition total_heap_consistent
-  where "total_heap_consistent ctxt \<omega> \<equiv> \<exists>m. total_heap_consistent_wrt_mask ctxt m \<omega>"
+definition total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "total_heap_consistent ctxt \<omega> \<equiv> (\<exists>m. total_heap_consistent_wrt_mask ctxt m (get_total_full \<omega>)) \<and>
+                                         (\<forall>l \<phi>. get_trace_total \<omega> l = Some \<phi> \<longrightarrow> (\<exists>m. total_heap_consistent_wrt_mask ctxt m \<phi>))"
 
 abbreviation red_inhale_th_cons :: "'a total_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where "red_inhale_th_cons ctxt A \<omega> res \<equiv> red_inhale ctxt (total_heap_consistent ctxt) A \<omega> res"

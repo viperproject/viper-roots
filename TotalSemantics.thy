@@ -302,14 +302,15 @@ always has at least one failure transition. This is in-sync with the recent Carb
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     W' = {\<omega>2. unfold_rel ctxt R pred_id v_args (Abs_prat v_p) \<omega> \<omega>2 \<and> R \<omega>2};
+     W' = {\<omega>'. \<exists>\<phi>'. \<omega>' = \<omega>\<lparr> get_total_full := \<phi>' \<rparr> \<and> unfold_rel ctxt R pred_id v_args (Abs_prat v_p) (get_total_full \<omega>) \<phi>' \<and> R \<omega>'};
      th_result_rel (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Unfold pred_id e_args (PureExp e_p)) \<omega> res"
 
 \<comment>\<open>\<^const>\<open>unfold_rel\<close> constrains permission \<^term>\<open>p\<close> to be strictly positive\<close>
 | RedUnfoldWildcard:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
-     unfold_rel ctxt R pred_id v_args p \<omega> \<omega>' \<rbrakk> \<Longrightarrow>
+     unfold_rel ctxt R pred_id v_args p (get_total_full \<omega>) \<phi>';
+     \<omega>' = \<omega> \<lparr> get_total_full := \<phi>' \<rparr> \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Unfold pred_id e_args Wildcard) \<omega> (RNormal \<omega>')"
 | RedUnfoldWildcardFailure:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
