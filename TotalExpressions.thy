@@ -789,7 +789,7 @@ inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> mask
 | UnfoldStep: 
    "\<lbrakk> option_fold (\<lambda>decl. ViperLang.predicate_decl.body decl) None (ViperLang.predicates (program_total ctxt) pred_id) \<noteq> None;
       q = (get_mp_total \<phi> (pred_id,vs));
-      pgt p pnone;
+      pgt q pnone;
       \<exists>\<phi>'. unfold_rel ctxt (\<lambda>_. True) pred_id vs q \<phi> \<phi>' \<and> total_heap_consistent_wrt_mask ctxt m \<phi>'
       \<comment>\<open>ignore predicate heaps for now \<^term>\<open>pheap_consistent ctxt \<omega>\<close>\<close> 
     \<rbrakk> \<Longrightarrow>
