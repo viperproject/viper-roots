@@ -189,7 +189,7 @@ next
       unfolding framing_exh_def
     proof (intro conjI)
       have *: "\<omega>_inh' \<oplus> \<omega>' = Some \<omega>sum"
-        using \<omega>_inh'_exists \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close>
+        using \<omega>_inh'_exists \<open>\<omega>_inh \<oplus> \<omega> = Some \<omega>sum\<close>        
         by (smt (verit) \<open>\<omega>' \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>\<close> asso1 commutative)
 
       show "\<exists>\<omega>_inh \<omega>sum. \<omega>_inh \<oplus> \<omega>' = Some \<omega>sum \<and> \<omega>def \<succeq> \<omega>sum \<and> assertion_framing_state ctxt_vpr StateCons A2 \<omega>_inh"
@@ -421,6 +421,61 @@ definition exhale_acc_normal_premise
               \<omega>' = update_mh_loc_total_full \<omega> (the_address r,f) ((mh (the_address r,f)) - (Abs_prat p))
        )"
 
+lemma exhale_acc_normal_red_exhale:
+  assumes "exhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega>0 \<omega> \<omega>'"
+  shows "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega> (RNormal \<omega>')"
+  sorry
+
+(*
+  shows "\<omega> \<succeq> \<omega>'"
+proof (cases r)
+  case (Address a) 
+  hence "\<omega>' = update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p))"
+    using assms
+    unfolding exhale_acc_normal_premise_def
+    by auto
+
+  find_theorems "(?\<phi> :: 'a full_total_state) \<succeq> ?\<phi>'"
+  thm update_mh_loc_total_full_mono
+  have "\<omega> = update_mh_loc_total_full \<omega> (a,f) (get_mh_total_full \<omega> (a,f))"
+    apply (rule full_total_state.equality)
+       apply simp
+      apply simp
+     apply (rule total_state.equality)
+    by simp_all
+
+  from assms have PermConstraint: "p \<ge> 0 \<and> p \<le> Rep_prat (get_mh_total_full \<omega> (the_address r, f))"
+    using Address
+    unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_perm_success_def
+    by simp
+
+  show ?thesis
+    apply (simp only: full_total_state_greater_equiv)
+    apply (subst  \<open>\<omega> = _\<close>)
+    apply (subst \<open>\<omega>' = _\<close>)
+    apply (rule update_mh_loc_total_full_mono)
+     apply simp
+    using PermConstraint
+    
+
+    
+    
+    
+    
+  then show ?thesis sorry
+next
+  case Null
+  then show ?thesis 
+    using assms
+    unfolding exhale_acc_normal_premise_def
+    by (simp add: succ_refl)
+qed
+*)
+
+
+    
+
+
 lemma exhale_field_acc_rel:
   assumes 
     WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
@@ -546,9 +601,10 @@ qed
   
 lemma exhale_rel_field_acc_upd_rel:
 assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longrightarrow>                            
-                           state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) ns" and
+                           state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) ns" and
         "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
+    WfConsistency: "wf_total_consistency ctxt_vpr StateCons Rt" and
     MaskDefDifferent: "mask_var_def Tr \<noteq> mask_var Tr" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
     MaskUpdateWf: "mask_update_wf TyRep ctxt mask_upd_bpl" and
@@ -557,15 +613,15 @@ assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longr
                    "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Sub\<guillemotright> (Var temp_perm)" and
     MaskVar: "m_bpl = mask_var Tr " and
     FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
-    RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
-shows "rel_general R (uncurry (state_rel Pr TyRep Tr AuxPred ctxt)) 
+    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+shows "rel_general R (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt)) 
                       (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. fst \<omega>0_\<omega> = fst \<omega>0_\<omega>' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) (snd \<omega>0_\<omega>'))
                       (\<lambda>_. False)
                       P ctxt 
                       (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont)
                       (BigBlock name cs str tr, cont)"
 proof (rule rel_general_conseq_output,
-       rule mask_upd_rel[OF StateRel WfTyRep TyInterp MaskUpdateWf MaskUpdateBpl MaskVar FieldRelSingle])
+       rule mask_upd_rel[OF StateRel _ WfTyRep TyInterp MaskUpdateWf MaskUpdateBpl MaskVar FieldRelSingle])
   fix \<omega>0_\<omega>def \<omega>' ns
   assume "fst \<omega>0_\<omega>def = fst \<omega>' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>def) (snd \<omega>0_\<omega>def) (snd \<omega>')"
   thus "fst \<omega>' = (if (mask_var_def Tr = mask_var Tr \<and> r \<noteq> Null) then (snd \<omega>') else (fst \<omega>0_\<omega>def)) \<and>
@@ -645,10 +701,21 @@ next
     by blast
 next
   fix \<omega>0_\<omega>def' ns
-  assume "uncurry (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) \<omega>0_\<omega>def' ns"
-  thus "uncurry (state_rel Pr TyRep Tr AuxPred ctxt) \<omega>0_\<omega>def' ns"
+  assume "uncurry (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) \<omega>0_\<omega>def' ns"
+  thus "uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt) \<omega>0_\<omega>def' ns"
     using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove
     using map_add_upd_left map_le_def by fastforce
+next
+  fix \<omega>0_\<omega>def \<omega>0_\<omega>def' ns a
+  assume "R \<omega>0_\<omega>def ns" and
+         Aux: "fst \<omega>0_\<omega>def = fst \<omega>0_\<omega>def' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>def) (snd \<omega>0_\<omega>def) (snd \<omega>0_\<omega>def')" and
+         "r = Address a"
+
+  from exhale_normal_result_smaller[OF exhale_acc_normal_red_exhale[OF conjunct2[OF Aux]]] and
+       state_rel_consistent[OF StateRel[OF \<open>R _ _\<close>]]
+  show "StateCons (snd \<omega>0_\<omega>def')"
+    using wf_total_consistency_trace_mono_downwardD[OF WfConsistency] mono_prop_downwardD
+    by blast
 qed (auto)
 
 end

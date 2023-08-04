@@ -164,7 +164,7 @@ qed
 lemma exp_rel_field_access:
   assumes 
        (* TODO: weaken assumption on R *)
-       StateRel0: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns" and
+       StateRel0: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns" and
        HeapReadWf: "heap_read_wf TyRep ctxt (heap_read Tr)" and
        "e_bpl = (heap_read Tr) (expr.Var (heap_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
@@ -223,7 +223,7 @@ qed
 lemma exp_rel_perm_access:
   assumes 
        MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
-       StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+       StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
        RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"               
      shows "red_expr_bpl ctxt (mask_read_bpl (expr.Var (mask_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
@@ -306,12 +306,12 @@ text \<open>This is the same lemma as above but expressed in a way such that the
 lemma exp_rel_perm_access_2:
   assumes 
        MaskReadWf: "mask_read_wf TyRep ctxt mask_read_bpl" and
-       StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+       StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
        RedRcvVpr: "ctxt_vpr, StateCons, \<omega>def_opt \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
        FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
              "mvar = mask_var Tr" and
              "f_ty_bpl = TConSingle (TNormalFieldId TyRep)" and
-       RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl" and
+       RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr ctxt e e_rcv_bpl" and
              "e_bpl = mask_read_bpl (expr.Var mvar) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl]"
      shows "red_expr_bpl ctxt e_bpl 
                               ns 

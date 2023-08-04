@@ -605,6 +605,7 @@ qed
 
 
 definition state_rel0 :: "ViperLang.program \<Rightarrow> 
+                          ('a full_total_state \<Rightarrow> bool) \<Rightarrow>
                           ('a vbpl_absval) absval_ty_fun \<Rightarrow> 
                           var_context \<Rightarrow> 
                           'a ty_repr_bpl \<Rightarrow> 
@@ -614,10 +615,13 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
                           'a full_total_state \<Rightarrow>
                           ('a vbpl_absval) nstate \<Rightarrow> 
                           bool"
-  where "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns \<equiv> 
+  where "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns \<equiv> 
          \<comment>\<open>field permissions can be at most one\<close>
             wf_mask_simple (get_mh_total_full \<omega>def) \<and>
             wf_mask_simple (get_mh_total_full \<omega>) \<and>
+         \<comment>\<open>the state consistency predicate must hold\<close> 
+            StateCons \<omega>def \<and>
+            StateCons \<omega> \<and>
          \<comment>\<open>type interpretation must be the expected one\<close>
            (A = vbpl_absval_ty TyRep) \<and>
          \<comment>\<open>Store relation (only Viper variables, auxiliaries are not included)\<close>
@@ -651,11 +655,11 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
            aux_vars_pred_sat \<Lambda> AuxPred ns"
 
 definition state_rel
-  where "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<equiv> 
-          state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
+  where "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<equiv> 
+          state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
 
 abbreviation state_rel_def_same
-  where "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns \<equiv> state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+  where "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<equiv> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
 
 definition state_rel_empty
   where "state_rel_empty R \<omega> ns \<equiv> is_empty_total_full \<omega> \<and> R \<omega> ns"
@@ -765,19 +769,19 @@ abbreviation state_rel_ext
   where "state_rel_ext R \<omega>def \<omega> ns \<equiv> R \<omega> ns \<and> \<omega>def = \<omega>"
 
 lemma state_rel_state_rel0:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-  shows "state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  shows "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
   using assms
   by (simp add: state_rel_def)
 
 lemma state_rel0_state_rel:
-  assumes "state_rel0 Pr (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
+  shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   using assms
   by (simp add: state_rel_def)
 
 lemma state_rel0_wf_mask_simple:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "wf_mask_simple (get_mh_total_full \<omega>)"
   using assms        
   unfolding state_rel0_def
@@ -785,8 +789,17 @@ lemma state_rel0_wf_mask_simple:
 
 lemmas state_rel_wf_mask_simple = state_rel0_wf_mask_simple[OF state_rel_state_rel0]
 
+lemma state_rel0_consistent:
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  shows "StateCons \<omega>def \<and> StateCons \<omega>"
+  using assms        
+  unfolding state_rel0_def
+  by blast
+
+lemmas state_rel_consistent = state_rel0_consistent[OF state_rel_state_rel0]
+
 lemma state_rel0_wf_mask_def_simple:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "wf_mask_simple (get_mh_total_full \<omega>def)"
   using assms        
   unfolding state_rel0_def
@@ -795,7 +808,7 @@ lemma state_rel0_wf_mask_def_simple:
 lemmas state_rel_wf_mask_def_simple = state_rel0_wf_mask_def_simple[OF state_rel_state_rel0]
 
 lemma state_rel0_type_interp:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "A = vbpl_absval_ty TyRep"
   using assms        
   unfolding state_rel0_def
@@ -804,7 +817,7 @@ lemma state_rel0_type_interp:
 lemmas state_rel_type_interp = state_rel0_type_interp[OF state_rel_state_rel0]
 
 lemma state_rel0_store_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "store_rel A \<Lambda> (var_translation Tr) \<omega> ns"
   using assms        
   unfolding state_rel0_def
@@ -813,14 +826,14 @@ lemma state_rel0_store_rel:
 lemmas state_rel_store_rel = state_rel0_store_rel[OF state_rel_state_rel0]
 
 lemma state_rel_var_tr_inj:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   shows "inj_on (var_translation Tr) (dom (var_translation Tr))"
   using state_rel_store_rel[OF assms]
   unfolding store_rel_def
   by blast
 
 lemma state_rel0_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "(disjoint_list [{heap_var Tr, heap_var_def Tr},
                       {mask_var Tr, mask_var_def Tr},
                       (ran (var_translation Tr)), 
@@ -834,7 +847,7 @@ lemma state_rel0_disjoint:
 lemmas state_rel_disjoint = state_rel0_disjoint[OF state_rel_state_rel0]
 
 lemma heap_var_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           "hvar = heap_var_def Tr \<or> hvar = heap_var Tr"
   shows "hvar \<noteq> mask_var Tr \<and> hvar \<noteq> mask_var_def Tr \<and> hvar \<notin> ran (var_translation Tr) \<and>
          hvar \<notin> ran (field_translation Tr) \<and> hvar \<notin> range (const_repr Tr) \<and>
@@ -869,7 +882,7 @@ lemma heap_var_disjoint:
   done
 
 lemma mask_var_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           "mvar = mask_var_def Tr \<or> mvar = mask_var Tr"
   shows "mvar \<noteq> heap_var Tr \<and> mvar \<noteq> heap_var_def Tr \<and> mvar \<notin> ran (var_translation Tr) \<and>
          mvar \<notin> ran (field_translation Tr) \<and> mvar \<notin> range (const_repr Tr) \<and>
@@ -907,7 +920,7 @@ lemma set_inter_union_conj: "A \<inter> B = {} \<and> A \<inter> C = {} \<Longri
   by auto
 
 lemma var_translation_disjoint0:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
   shows "ran (var_translation Tr) \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (field_translation Tr) \<union>
@@ -942,7 +955,7 @@ lemma var_translation_disjoint0:
 lemmas var_translation_disjoint = var_translation_disjoint0[OF state_rel_state_rel0]
 
 lemma state_rel0_aux_pred_disjoint:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "dom AuxPred \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (var_translation Tr) \<union>
@@ -976,7 +989,7 @@ lemma state_rel0_aux_pred_disjoint:
 lemmas state_rel_aux_pred_disjoint = state_rel0_aux_pred_disjoint[OF state_rel_state_rel0]
 
 lemma state_rel0_eval_welldef_eq:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "get_store_total \<omega>def = get_store_total \<omega> \<and>
          get_trace_total \<omega>def = get_trace_total \<omega> \<and>
          get_h_total_full \<omega>def = get_h_total_full \<omega>"
@@ -986,7 +999,7 @@ lemma state_rel0_eval_welldef_eq:
 lemmas state_rel_eval_welldef_eq = state_rel0_eval_welldef_eq[OF state_rel_state_rel0]
 
 lemma state_rel0_heap_var_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var Tr) \<omega> ns"
   using assms
   by (simp add: state_rel0_def)
@@ -994,7 +1007,7 @@ lemma state_rel0_heap_var_rel:
 lemmas state_rel_heap_var_rel = state_rel0_heap_var_rel[OF state_rel_state_rel0]
 
 lemma state_rel0_heap_var_def_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "heap_var_rel Pr \<Lambda> TyRep Tr (heap_var_def Tr) \<omega>def ns"
   using assms
   by (simp add: state_rel0_def)
@@ -1002,7 +1015,7 @@ lemma state_rel0_heap_var_def_rel:
 lemmas state_rel_heap_var_def_rel = state_rel0_heap_var_def_rel[OF state_rel_state_rel0]
 
 lemma state_rel0_mask_var_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var Tr) \<omega> ns"
   using assms
   by (simp add: state_rel0_def)
@@ -1010,7 +1023,7 @@ lemma state_rel0_mask_var_rel:
 lemmas state_rel_mask_var_rel = state_rel0_mask_var_rel[OF state_rel_state_rel0]
 
 lemma state_rel0_mask_var_def_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var_def Tr) \<omega>def ns"
   using assms
   by (simp add: state_rel0_def)
@@ -1018,7 +1031,7 @@ lemma state_rel0_mask_var_def_rel:
 lemmas state_rel_mask_var_def_rel = state_rel0_mask_var_def_rel[OF state_rel_state_rel0]
 
 lemma state_rel0_field_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "field_rel Pr \<Lambda> (field_translation Tr) ns"
   using assms
   by (simp add: state_rel0_def)
@@ -1026,7 +1039,7 @@ lemma state_rel0_field_rel:
 lemmas state_rel_field_rel = state_rel0_field_rel[OF state_rel_state_rel0]
 
 lemma state_rel0_boogie_const_rel:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
   shows "boogie_const_rel (const_repr Tr) \<Lambda> ns"
   using assms
   unfolding state_rel0_def
@@ -1035,7 +1048,7 @@ lemma state_rel0_boogie_const_rel:
 lemmas state_rel_boogie_const_rel = state_rel0_boogie_const_rel[OF state_rel_state_rel0]
 
 lemma state_rel_boogie_const_rel_2:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "C = const_repr Tr"
   shows "boogie_const_rel C (var_context ctxt) ns"
   using assms
@@ -1043,7 +1056,7 @@ lemma state_rel_boogie_const_rel_2:
   by simp
 
 lemma state_rel0_state_well_typed:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" 
   shows "state_well_typed A \<Lambda> [] ns"
   using assms
   unfolding state_rel0_def
@@ -1052,7 +1065,7 @@ lemma state_rel0_state_well_typed:
 lemmas state_rel_state_well_typed = state_rel0_state_well_typed[OF state_rel_state_rel0]
 
 lemma state_rel0_disj_mask_store:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "mask_var Tr \<notin> ran (var_translation Tr)"
 proof -
     from assms have Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
@@ -1067,7 +1080,7 @@ proof -
 lemmas state_rel_disj_mask_store = state_rel0_disj_mask_store[OF state_rel_state_rel0]
 
 lemma state_rel0_disj_mask_def_store:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "mask_var_def Tr \<notin> ran (var_translation Tr)"
 proof -
   from assms have Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
@@ -1082,7 +1095,7 @@ qed
 lemmas state_rel_disj_mask_def_store = state_rel0_disj_mask_def_store[OF state_rel_state_rel0]
 
 lemma state_rel0_aux_vars_pred_sat:
-  assumes "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "aux_vars_pred_sat \<Lambda> AuxPred ns"
   using assms
   unfolding state_rel0_def
@@ -1091,7 +1104,7 @@ lemma state_rel0_aux_vars_pred_sat:
 lemmas state_rel_aux_vars_pred_sat = state_rel0_aux_vars_pred_sat[OF state_rel_state_rel0]
 
 lemma state_rel_obtain_mask:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   obtains mb 
   where "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
         "lookup_var_ty (var_context ctxt) (mask_var Tr) = Some (TConSingle (TMaskId TyRep))" and
@@ -1101,7 +1114,7 @@ lemma state_rel_obtain_mask:
   by blast
 
 lemma state_rel_aux_pred_sat_lookup:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred aux_var = Some P"
   shows "has_Some P  (lookup_var (var_context ctxt) ns aux_var)"
   using assms state_rel_aux_vars_pred_sat
@@ -1109,7 +1122,7 @@ lemma state_rel_aux_pred_sat_lookup:
   by blast
 
 lemma state_rel_aux_pred_sat_lookup_2:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred aux_var = Some P"
   shows "\<exists>v. lookup_var (var_context ctxt) ns aux_var = Some v \<and> P v"
   using assms state_rel_aux_vars_pred_sat has_Some_iff state_rel_aux_pred_sat_lookup
@@ -1117,31 +1130,31 @@ lemma state_rel_aux_pred_sat_lookup_2:
   by fastforce
 
 lemma state_rel_aux_pred_sat_lookup_2_elim:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred aux_var = Some P"
         obtains v where "lookup_var (var_context ctxt) ns aux_var = Some v" and "P v"
   using assms state_rel_aux_pred_sat_lookup_2
   by blast
 
 lemma state_rel_aux_pred_sat_lookup_3:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred aux_var = Some (pred_eq v)"
   shows "lookup_var (var_context ctxt) ns aux_var = Some v"
   using state_rel_aux_pred_sat_lookup_2[OF assms]
   by (simp add: pred_eq_def)
 
 lemma state_rel_aux_pred_sat_lookup_3_elim:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred aux_var = Some (pred_eq v)"
   shows "lookup_var (var_context ctxt) ns aux_var = Some v"
   using state_rel_aux_pred_sat_lookup_2[OF assms]
   by (simp add: pred_eq_def)
 
 lemma state_rel_aux_pred_weaken:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "dom AuxPred' \<subseteq> dom AuxPred" and
           WeakerPred: "\<And>x P' P v. AuxPred x = Some P \<Longrightarrow> AuxPred' x = Some P' \<Longrightarrow> P v \<Longrightarrow> P' v"
-        shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+        shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
   note StateRel0 = state_rel_state_rel0[OF StateRel]
@@ -1197,9 +1210,9 @@ proof (intro conjI)
 qed (insert StateRel, unfold state_rel_def state_rel0_def, auto)
 
 lemma state_rel_aux_pred_remove:
-  assumes "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           "AuxPred' \<subseteq>\<^sub>m AuxPred"
-        shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+        shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
       apply (rule state_rel_aux_pred_weaken[OF assms(1)])
        apply (rule map_le_implies_dom_le[OF assms(2)])
     using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
@@ -1307,9 +1320,10 @@ lemma state_well_typed_upd_2:
   by (metis StateWt state_well_typed_def update_var_binder_same)
 
 lemma state_rel0_store_update:
-  assumes StateRel: "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
                     "Tr' = Tr\<lparr>var_translation := f\<rparr>" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
+        Consistent: "StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
            "get_total_full \<omega> = get_total_full \<omega>'"  and
          (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
@@ -1323,7 +1337,7 @@ lemma state_rel0_store_update:
                                        ran (field_translation Tr) \<union>
                                        range (const_repr Tr) \<union>
                                        dom AuxPred) = {}"
-   shows "state_rel0 Pr A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
+   shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
   show "wf_mask_simple (get_mh_total_full \<omega>def')"
@@ -1495,13 +1509,14 @@ proof (intro conjI)
       unfolding aux_vars_pred_sat_def
       by fastforce
   qed
-qed (insert StateRel, insert WellDefSame, unfold state_rel0_def, auto)
+qed (insert StateRel WellDefSame Consistent, unfold state_rel0_def, auto)
 
 lemmas state_rel_store_update = state_rel0_state_rel[OF state_rel0_store_update[OF state_rel_state_rel0]]
 
 lemma state_rel0_store_update_same_tr:
-  assumes StateRel: "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
+     Consistent: "StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
            "get_total_full \<omega> = get_total_full \<omega>'"  and
          (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
@@ -1510,7 +1525,7 @@ lemma state_rel0_store_update_same_tr:
      ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
      OldStateEq: "old_global_state ns' = old_global_state ns" and
      BinderEmpty: "binder_state ns' = Map.empty"
-   shows "state_rel0 Pr A \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"
+   shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"
   apply (rule state_rel0_store_update[where ?Tr = Tr and ?f = "(var_translation Tr)", OF StateRel])
   using assms apply simp_all
   using var_translation_disjoint0[OF StateRel]
@@ -1520,15 +1535,16 @@ lemmas state_rel_store_update_same_tr = state_rel0_state_rel[OF state_rel0_store
 
 lemma state_rel_store_update_2:
   assumes 
-         StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
+         StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+          WellDefSame: "\<omega>def = \<omega>" and
+         Consistent: "StateCons (update_var_total \<omega> x_vpr v)" and
          VarCtxt: "\<Lambda> = var_context ctxt" and
          VarTr: "var_translation Tr x_vpr = Some x_bpl" and
          "v' = val_rel_vpr_bpl v" and
       TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
               "type_of_val (type_interp ctxt) v' = ty"
-            shows "state_rel Pr TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
-  apply (rule state_rel_store_update_same_tr[OF StateRel])
+            shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+  apply (rule state_rel_store_update_same_tr[OF StateRel _ Consistent])
          apply (simp add: WellDefSame)
         apply simp       
        using VarCtxt VarTr ranI 
@@ -1543,7 +1559,7 @@ lemma state_rel_store_update_2:
    done 
 
 lemma state_rel_new_auxvar:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
      AuxVarFresh: "aux_var \<notin> 
                       ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
@@ -1554,7 +1570,7 @@ lemma state_rel_new_auxvar:
                  "type_interp ctxt = vbpl_absval_ty TyRep" and
      LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
                "type_of_val (type_interp ctxt) aux_val = \<tau>"
-   shows "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"  
+   shows "state_rel Pr StateCons TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"  
 proof -
   note StateRel0 = state_rel_state_rel0[OF StateRel]
 
@@ -1619,7 +1635,7 @@ proof -
 qed
 
 lemma state_rel_independent_var:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
      AuxVarFresh: "aux_var \<notin> 
                       ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
@@ -1629,10 +1645,10 @@ lemma state_rel_independent_var:
      TypeInterp:       "type_interp ctxt = vbpl_absval_ty TyRep" and
      LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
                "type_of_val (type_interp ctxt) aux_val = \<tau>"
-             shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+             shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
 
 proof -
-  have StateRelUpd: "state_rel Pr TyRep Tr (AuxPred(aux_var \<mapsto> pred_eq aux_val)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"    
+  have StateRelUpd: "state_rel Pr StateCons TyRep Tr (AuxPred(aux_var \<mapsto> pred_eq aux_val)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"    
     by (rule state_rel_new_auxvar[OF StateRel AuxVarFresh pred_eq_refl TypeInterp LookupTy])
 
   from AuxVarFresh have "aux_var \<notin> dom AuxPred"
@@ -1644,14 +1660,14 @@ proof -
 qed 
 
 lemma state_rel_new_aux_var_no_state_upd:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
      AuxVarFresh: "dom AuxPred' \<inter> 
                       ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr))) = {}"  and   
            "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
-         shows "state_rel Pr TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+         shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
   have "disjoint_list
@@ -1672,7 +1688,7 @@ qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto
                    
 lemma state_rel0_heap_update:
   assumes  
-     StateRel: "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+     StateRel: "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
                "TyInterp = vbpl_absval_ty TyRep" and
                "Tr' = Tr\<lparr> heap_var := hvar', heap_var_def := hvar_def' \<rparr>" and
     Disj: "{hvar', hvar_def'} \<inter>
@@ -1683,13 +1699,14 @@ lemma state_rel0_heap_update:
                       dom AuxPred) = {}" and
           UpdStates: "\<omega>def' = update_h_total_full \<omega>def hh' hp'" 
                      "\<omega>' = update_h_total_full \<omega> hh' hp'" and
+          Consistent: "StateCons \<omega>def'" "StateCons \<omega>'" and
           OnlyHeapAffected: "(\<And>x. x \<notin> {hvar', hvar_def'} \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
           HeapRel: "heap_var_rel Pr \<Lambda> TyRep Tr hvar' \<omega>' ns'" and
           HeapRelDef: "heap_var_rel Pr \<Lambda> TyRep Tr hvar_def' \<omega>def' ns'" and
           ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty"
-        shows "state_rel0 Pr TyInterp \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
+        shows "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
   proof (intro conjI)
     show "wf_mask_simple (get_mh_total_full \<omega>def')"
@@ -1826,9 +1843,10 @@ lemmas state_rel_heap_update =
 
 lemma state_rel0_heap_update_2:
   assumes                                
-     StateRel: "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+     StateRel: "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           TyInterp:     "TyInterp = vbpl_absval_ty TyRep" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>' \<and> heap_var Tr = heap_var_def Tr" and
+          Consistent: "StateCons \<omega>'" and
           OnlyHeapAffected: "(\<And>x. x \<noteq> heap_var Tr \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
           OnlyHeapAffectedVpr: "get_store_total \<omega> = get_store_total \<omega>'" 
                                "get_m_total_full \<omega> = get_m_total_full \<omega>'"
@@ -1837,7 +1855,7 @@ lemma state_rel0_heap_update_2:
           ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty"
-        shows "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"  
+        shows "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"  
 proof (rule state_rel0_heap_update[OF StateRel TyInterp])
   show "Tr = Tr\<lparr>heap_var := heap_var Tr, heap_var_def := heap_var_def Tr\<rparr>"
     by auto
@@ -1970,18 +1988,20 @@ qed
 lemma state_rel_heap_update_3:
   assumes  
      WfTyRep: "wf_ty_repr_bpl TyRep" and
-     StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-     WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>' \<and> heap_var Tr = heap_var_def Tr" and
+     StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+     WellDefSame: "\<omega>def = \<omega> \<and> heap_var Tr = heap_var_def Tr" and
+     Consistent: "StateCons (update_hh_loc_total_full \<omega>def (addr, f_vpr) v_vpr)" 
+                 "StateCons (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)" and
      LookupHeap:  "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
      VVprTy: "get_type (domain_type TyRep) v_vpr = ty_vpr" 
-   shows "state_rel Pr TyRep Tr AuxPred ctxt 
+   shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt 
       (update_hh_loc_total_full \<omega>def (addr, f_vpr) v_vpr)
       (update_hh_loc_total_full \<omega> (addr, f_vpr) v_vpr)
       (update_var (var_context ctxt) ns (heap_var Tr) (AbsV (AHeap (heap_bpl_upd_normal_field hb (Address addr) f_bpl ty_vpr (val_rel_vpr_bpl v_vpr)))))"
-         (is "state_rel Pr TyRep Tr AuxPred ctxt ?\<omega>def' ?\<omega>' ?ns'")
+         (is "state_rel Pr StateCons TyRep Tr AuxPred ctxt ?\<omega>def' ?\<omega>' ?ns'")
 proof (rule state_rel_heap_update_2[OF StateRel])
   show "\<And>x. x \<noteq> heap_var Tr \<Longrightarrow> lookup_var (var_context ctxt) ns x = lookup_var (var_context ctxt) ?ns' x"
     by simp
@@ -2015,8 +2035,10 @@ qed (insert assms, auto)
 lemma state_rel_heap_update_2_ext:
   assumes  
      WfTyRep: "wf_ty_repr_bpl TyRep" and
-     StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-     WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>' \<and> heap_var Tr = heap_var_def Tr" and
+     StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+     WellDefSame: "\<omega>def = \<omega> \<and> heap_var Tr = heap_var_def Tr" and
+     Consistent: "StateCons (update_hh_loc_total_full \<omega>def (addr, f_vpr) v)" 
+                 "StateCons (update_hh_loc_total_full \<omega> (addr, f_vpr) v)" and
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
@@ -2025,7 +2047,7 @@ lemma state_rel_heap_update_2_ext:
     lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
     lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
     field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), ty_bpl]) \<and>
-    state_rel Pr TyRep Tr AuxPred ctxt
+    state_rel Pr StateCons TyRep Tr AuxPred ctxt
       (update_hh_loc_total_full \<omega>def (addr, f_vpr) v)
       (update_hh_loc_total_full \<omega> (addr, f_vpr) v)
        (update_var (var_context ctxt) ns (heap_var Tr) 
@@ -2049,11 +2071,11 @@ proof -
   let ?\<omega>def' = "update_hh_loc_total_full \<omega>def (addr, f_vpr) v"
   let ?\<omega>' = "update_hh_loc_total_full \<omega> (addr, f_vpr) v"
   from state_rel_heap_update_3[OF WfTyRep StateRel]
-  have "state_rel Pr TyRep Tr AuxPred ctxt 
+  have "state_rel Pr StateCons TyRep Tr AuxPred ctxt 
         ?\<omega>def'
         ?\<omega>' 
         (update_var (var_context ctxt) ns (heap_var Tr) (AbsV (AHeap (heap_bpl_upd_normal_field hb (Address addr) f_bpl ty_vpr (val_rel_vpr_bpl v)))))"
-    using assms LookupHeapVar
+    using assms LookupHeapVar 
     by fast
    
   thus  ?thesis
@@ -2063,7 +2085,7 @@ proof -
 qed
 
 lemma state_rel0_mask_update:
-  assumes StateRel: "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
                     "TyInterp = vbpl_absval_ty TyRep" and
                     "Tr' = Tr\<lparr>mask_var := mvar', mask_var_def := mvar_def'\<rparr>" and
           Disj: "{mvar', mvar_def'} \<inter>
@@ -2075,17 +2097,19 @@ lemma state_rel0_mask_update:
           UpdStates: "\<omega>' = update_m_total_full \<omega> mh' mp'" 
              "get_store_total \<omega>def' = get_store_total \<omega>' \<and>
               get_trace_total \<omega>def' = get_trace_total \<omega>' \<and>
-              get_h_total_full \<omega>def' = get_h_total_full \<omega>'" and             
+              get_h_total_full \<omega>def' = get_h_total_full \<omega>'" and   
 
           OnlyMaskAffected: "\<And>x. x \<notin> {mvar', mvar_def'} \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
           WfMaskSimple: "wf_mask_simple mh'" 
                         "wf_mask_simple (get_mh_total_full \<omega>def')" and
+          Consistent: "StateCons \<omega>'" 
+                      "StateCons \<omega>def'" and
           MaskVarRel: "mask_var_rel Pr \<Lambda> TyRep Tr mvar' \<omega>' ns'" 
                       "mask_var_rel Pr \<Lambda> TyRep Tr mvar_def' \<omega>def' ns'" and
           ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty"
-        shows "state_rel0 Pr TyInterp \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
+        shows "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
   show "store_rel TyInterp \<Lambda> (var_translation Tr') \<omega>' ns'"
@@ -2191,7 +2215,7 @@ lemmas state_rel_mask_update_wip =
   state_rel0_state_rel[OF state_rel0_mask_update[OF state_rel_state_rel0]]
 
 lemma state_rel0_mask_update_2:
-  assumes StateRel: "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           TyInterp: "TyInterp = vbpl_absval_ty TyRep" and
                   \<comment>\<open>The following assumption only allows updating both the well-definedness and 
                      evaluation mask (in case the tracked Boogie variables are the same) or 
@@ -2205,11 +2229,12 @@ lemma state_rel0_mask_update_2:
                                "get_trace_total \<omega> = get_trace_total \<omega>'"
                                "get_h_total_full \<omega> = get_h_total_full \<omega>'" and
           WfMaskSimple: "wf_mask_simple (get_mh_total_full \<omega>')" and
+          Consistent: "StateCons \<omega>'" and
           MaskVarRel: "mask_var_rel Pr \<Lambda> TyRep Tr (mask_var Tr) \<omega>' ns'" and
           ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty"
-        shows "state_rel0 Pr TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'" 
+        shows "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'" 
 
 proof -
   have "\<omega>' = update_m_total_full \<omega> (get_mh_total_full \<omega>') (get_mp_total_full \<omega>')"
@@ -2240,7 +2265,10 @@ proof -
       using WfMaskSimple 
             apply simp
       using WfMaskSimple  \<open>\<omega>def' = _\<close>
-           apply simp
+             apply simp
+            apply (rule Consistent)
+      using Consistent state_rel0_consistent[OF StateRel] WellDefSame
+           apply blast      
           apply (rule MaskVarRel)
          apply (rule MaskVarRelDef)
         apply (meson ShadowedGlobalsEq)
@@ -2271,6 +2299,9 @@ proof -
              apply simp
             apply (rule WfMaskSimple)
       using \<open>\<omega>def' = _\<close> state_rel0_wf_mask_def_simple[OF StateRel]
+             apply blast
+            apply (rule Consistent)
+      using Consistent state_rel0_consistent[OF StateRel] WellDefSame
            apply blast
           apply (rule MaskVarRel)
          apply (rule MaskVarRelDef)
@@ -2282,7 +2313,7 @@ qed
 lemmas state_rel_mask_update_2 = state_rel0_state_rel[OF state_rel0_mask_update_2[OF state_rel_state_rel0]]
 
 lemma state_rel_mask_update_2b:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           WellDefSame: "mask_var Tr = mask_var_def Tr \<and> \<omega>def = \<omega>" and
           OnlyMaskAffected: "\<And>x. x \<noteq> mask_var Tr \<Longrightarrow> lookup_var (var_context ctxt) ns x = lookup_var (var_context ctxt) ns' x" and
           MaskRel: "mask_var_rel Pr (var_context ctxt) TyRep Tr (mask_var Tr) \<omega> ns'" and
@@ -2290,21 +2321,21 @@ lemma state_rel_mask_update_2b:
           OldStateEq: "old_global_state ns' = old_global_state ns" and
           BinderEmpty: "binder_state ns' = Map.empty" and
           TypeInterp: "type_interp ctxt = (vbpl_absval_ty TyRep)"
-        shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns'"
+        shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns'"
   unfolding state_rel_def
-  using assms state_rel0_wf_mask_simple[OF state_rel_state_rel0[OF StateRel]]
+  using assms state_rel0_wf_mask_simple[OF state_rel_state_rel0[OF StateRel]] state_rel0_consistent[OF state_rel_state_rel0[OF StateRel]]
   unfolding state_rel_def
   by (auto intro: state_rel0_mask_update_2)
 
 lemma state_rel_mask_update_3:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
           WellDefSame: "mask_var Tr = mask_var_def Tr \<and> \<omega>def = \<omega>" and
           MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) m'" and
           Eq: "mvar = mask_var Tr"
            "\<Lambda> = (var_context ctxt)" and
         TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
-        shows "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var \<Lambda> ns mvar (AbsV (AMask m')))" 
-                (is "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ?ns'")
+        shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var \<Lambda> ns mvar (AbsV (AMask m')))" 
+                (is "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ?ns'")
   apply (rule state_rel_mask_update_2b[OF StateRel WellDefSame])
    apply (metis update_var_other Eq )
   apply (unfold mask_var_rel_def)
@@ -2321,10 +2352,11 @@ lemma state_rel_mask_update_3:
       by (simp add: TypeInterp)
 
 lemma state_rel_mask_update_4:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
                     "\<Lambda> = (var_context ctxt)" and
           WellDefSame: "mask_var Tr = mask_var_def Tr \<Longrightarrow> \<omega>def' = update_mh_loc_total_full \<omega> (addr, f_vpr) p"
                        "mask_var Tr \<noteq> mask_var_def Tr \<Longrightarrow> \<omega>def' = \<omega>def"  and
+        Consistent: "StateCons (update_mh_loc_total_full \<omega> (addr, f_vpr) p)" and
         TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
         LookupMask: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
                     "pgte pwrite p" and
@@ -2332,14 +2364,14 @@ lemma state_rel_mask_update_4:
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
                     "p_bpl = real_of_rat (Rep_prat p)"
-                  shows "state_rel Pr TyRep Tr AuxPred ctxt 
+                  shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt 
                       \<omega>def'
                       (update_mh_loc_total_full \<omega> (addr, f_vpr) p) 
                       (update_var \<Lambda> ns (mask_var Tr) (AbsV (AMask (mask_bpl_upd_normal_field mb (Address addr) f_bpl ty_vpr p_bpl))))"
-            (is "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def' ?\<omega>' ?ns'")
+            (is "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def' ?\<omega>' ?ns'")
   unfolding state_rel_def TypeInterp
 proof (rule state_rel0_mask_update_2)
-  show "state_rel0 Pr (vbpl_absval_ty TyRep) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
+  show "state_rel0 Pr StateCons (vbpl_absval_ty TyRep) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
     using assms state_rel_state_rel0[OF StateRel]
     by auto
 next
@@ -2449,10 +2481,9 @@ next
     by (metis StateRel state_rel_state_well_typed state_well_typed_def update_var_binder_same)
 qed (insert assms, auto)
 
-
 lemma state_rel_set_def_to_eval:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-  shows "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>) AuxPred ctxt \<omega> \<omega> ns"
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>) AuxPred ctxt \<omega> \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
   show "disjoint_list
@@ -2474,14 +2505,14 @@ qed (insert StateRel,
      auto)
 
 lemma state_rel_mask_var_def_update:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and  
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and  
    MaskVarRel: "mask_var_rel Pr (var_context ctxt) TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) mvar_def' \<omega>def ns" and
           VarFresh: "mvar_def' \<notin> ({heap_var Tr, heap_var_def Tr, mask_var Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
                       dom AuxPred)" 
-        shows "state_rel Pr TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
+        shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
     from state_rel_disjoint[OF StateRel]
@@ -2529,14 +2560,14 @@ qed (insert StateRel,
      auto)   
 
 lemma state_rel_heap_var_def_update:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
           HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) hvar_def' \<omega>def ns" and
           VarFresh: "hvar_def' \<notin> ({heap_var Tr, mask_var Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
                       dom AuxPred)"
-        shows "state_rel Pr TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
+        shows "state_rel Pr StateCons TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
     from state_rel_disjoint[OF StateRel]

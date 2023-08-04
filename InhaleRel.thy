@@ -210,6 +210,19 @@ definition inhale_acc_normal_premise
        (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
        (W' \<noteq> {} \<and> \<omega>' \<in> W'))" 
 
+lemma inhale_acc_normal_premise_red_inhale:
+  assumes "inhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega> \<omega>'"
+  shows "red_inhale ctxt StateCons (Atomic (Acc e_r f (PureExp e_p))) \<omega> (RNormal \<omega>')"
+  apply (rule InhAcc)
+     apply (insert assms[simplified inhale_acc_normal_premise_def])
+     apply blast
+    apply blast
+   apply blast  
+  apply (rule THResultNormal_alt)
+    apply metis
+   apply argo
+  by meson
+
 lemma inhale_field_acc_rel:
   assumes 
     WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>) 
@@ -324,8 +337,8 @@ lemma pos_perm_rel_trivial_inh:
 
 lemma pos_perm_rel_nontrivial_inh:
 assumes "zero_perm = const_repr Tr CNoPerm"
-shows "rel_general (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
-                   (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+shows "rel_general (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+                   (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
      (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)
      (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0) P ctxt
      (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
@@ -338,9 +351,9 @@ shows "rel_general (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> 
   by simp
 
 lemma inhale_rcv_lookup:
-  assumes "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and
+  assumes "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns" and
           "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
-          ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr TyRep Tr AuxPred ctxt))
+          ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt))
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" 
         shows "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" 
   using assms(1-2) exp_rel_vpr_bpl_elim_2[OF ExpRel] 
@@ -348,9 +361,9 @@ lemma inhale_rcv_lookup:
   by (metis val_rel_vpr_bpl.simps(3))
 
 lemma inhale_field_acc_non_null_rcv_rel:
-  assumes  StateRel: "state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
+  assumes  StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
        InhAccNormal: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
- RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
+ RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" and
  NullConst: "null_const = const_repr Tr CNull" and
  NoPermConst: "no_perm_const = const_repr Tr CNoPerm"
@@ -388,8 +401,9 @@ qed
 lemma inhale_rel_field_acc_upd_rel:
   assumes
     StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
-                           state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+                           state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
+    WfConsistency: "wf_total_consistency ctxt_vpr StateCons Rt"  and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -399,15 +413,15 @@ lemma inhale_rel_field_acc_upd_rel:
                    "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Add\<guillemotright> (Var temp_perm)" and
     MaskVar: "m_bpl = mask_var Tr " and
     FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
-    RcvRel: "exp_rel_vpr_bpl (state_rel Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
   shows "rel_general R 
-                  (state_rel_def_same Pr TyRep Tr AuxPred ctxt)
+                  (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)
                   (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
                   (\<lambda> \<omega>. False) P ctxt 
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
                   (BigBlock name cs str tr, cont)"
 proof (rule rel_general_conseq_output,
-       rule mask_upd_rel_2[OF StateRel WfTyRep MaskVarDefSame TyInterp MaskUpdateWf MaskUpdateBpl MaskVar FieldRelSingle])
+       rule mask_upd_rel_2[OF StateRel _ WfTyRep MaskVarDefSame TyInterp MaskUpdateWf MaskUpdateBpl MaskVar FieldRelSingle])
   fix \<omega> ns
   assume "R \<omega> ns"
   thus "R \<omega> ns"
@@ -494,10 +508,20 @@ next
     by simp
 next
   fix \<omega> ns
-  assume StateRel: "state_rel_def_same Pr TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns"
-  thus "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns"    
+  assume StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns"
+  thus "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"    
     using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove[OF StateRel]
     by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)
+next
+  fix \<omega> \<omega>' ns a
+  assume "R \<omega> ns" and "r = Address a" and
+         InhAccPremise: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
+
+  from RedInhale[OF inhale_acc_normal_premise_red_inhale[OF InhAccPremise]] 
+       state_rel_consistent[OF StateRel[OF \<open>R \<omega> ns\<close>]] 
+  show "StateCons \<omega>'"
+    using total_consistency_red_stmt_preserve[OF WfConsistency]
+    by blast
 qed
 
 subsection \<open>Misc\<close>

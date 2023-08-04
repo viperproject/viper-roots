@@ -449,7 +449,7 @@ text \<open>Version of generic field assignment relation rule where state relati
 lemma field_assign_rel_inst:
   assumes 
     WfTyRep: "wf_ty_repr_bpl TyRep" and
-    RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns" and
+    RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns" and
     HeapVarDefSame: "heap_var_def Tr = heap_var Tr" and
     HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
@@ -477,7 +477,7 @@ proof (rule field_assign_rel)
          TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
          NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr"
 
-  from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt \<omega> ns"
+  from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
 
   have HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
@@ -494,7 +494,7 @@ proof (rule field_assign_rel)
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
     "field_ty_fun_opt TyRep f_bpl_val = Some (TFieldId TyRep, [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])" and
-    StateRelInstUpd: "state_rel_def_same (program_total ctxt_vpr) TyRep Tr AuxPred ctxt ?\<omega>'
+    StateRelInstUpd: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt ?\<omega>'
      (update_var (var_context ctxt) ns (heap_var Tr) (AbsV (AHeap (hb((Address addr, f_bpl_val) \<mapsto> val_rel_vpr_bpl v)))))"
     using HeapVarDefSame
     by fastforce
@@ -588,10 +588,10 @@ text \<open>The following theorem is the same as exhale_stmt_rel except that Rex
 
 lemma exhale_stmt_rel_inst:
   assumes 
-      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')" and                   
-      "exhale_rel (state_rel Pr TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
-      InvHolds: "\<And> \<omega> ns. state_rel Pr TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      "\<And> \<omega>def \<omega> ns. (state_rel Pr TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
+      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')" and                   
+      "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
+      InvHolds: "\<And> \<omega> ns. state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+      "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
       "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
@@ -844,10 +844,10 @@ lemma store_relI:
   by blast
 
 lemma state_rel_var_translation_remove:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
           MapLe: "f' \<subseteq>\<^sub>m var_translation Tr" and
           "finite (ran f')"
-        shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega> \<omega> ns"
+        shows "state_rel Pr StateCons TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega> \<omega> ns"
 proof (rule state_rel_store_update[OF StateRel])
 
   show "store_rel (type_interp ctxt) (var_context ctxt) f' \<omega> ns"
@@ -881,18 +881,18 @@ qed (insert assms, auto)
 
 
 lemma state_rel_transfer_var_tr_to_aux_pred:
-  assumes StateRel: "state_rel Pr TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
           "f' \<subseteq>\<^sub>m var_translation Tr" and
           "finite (ran f')"
           "B = ran (var_translation Tr) - ran f'" 
-        shows "state_rel Pr TyRep (Tr\<lparr> var_translation := f' \<rparr>) 
+        shows "state_rel Pr StateCons TyRep (Tr\<lparr> var_translation := f' \<rparr>) 
                  (map_upd_set AuxPred B (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) 
                  ctxt \<omega> \<omega> ns"
 proof -
   let ?Tr' = "Tr\<lparr> var_translation := f' \<rparr>"
   let ?AuxPred' = "map_upd_set AuxPred B (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))"
 
-  from assms have "state_rel Pr TyRep ?Tr' AuxPred ctxt \<omega> \<omega> ns"
+  from assms have "state_rel Pr StateCons TyRep ?Tr' AuxPred ctxt \<omega> \<omega> ns"
     using state_rel_var_translation_remove
     by fast
 
@@ -1386,7 +1386,7 @@ proof (rule stmt_rel_intro_2)
         unfolding \<open>var_tr' = _\<close>
         by force
   
-      have "state_rel Pr TyRep (Tr \<lparr> var_translation := Map.empty \<rparr>) ?AuxPredPre ctxt \<omega> \<omega> ns"
+      have "state_rel Pr StateCons TyRep (Tr \<lparr> var_translation := Map.empty \<rparr>) ?AuxPredPre ctxt \<omega> \<omega> ns"
         apply (rule state_rel_aux_pred_remove)
          apply (rule state_rel_transfer_var_tr_to_aux_pred[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]])
           apply simp

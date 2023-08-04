@@ -228,9 +228,10 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
     red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
 | RedExhale:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
-    \<comment>\<open>Here, we havoc all locations that for which there is no direct permission. This is sound but 
+    \<comment>\<open>TODO: Here, we havoc all locations that for which there is no direct permission. This is sound but 
       incomplete, because locations that are folded under a predicate need not be havoced. This should
       be revisited.\<close>
+    \<comment>\<open>TODO: We should make sure that \<^term>\<open>R \<omega>'\<close> holds.\<close>
     \<omega>' \<in> exhale_state ctxt \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
 | RedExhaleFailure:
@@ -406,71 +407,6 @@ lemma test:
 
 subsection \<open>Correctness\<close>
 
-definition assertion_sat :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
-  where "assertion_sat \<Lambda> R ctxt A \<omega> = 
-            (\<forall> res. red_stmt_total \<Lambda> R ctxt (Assert A) \<omega> res \<longrightarrow> res \<noteq> RFailure)"
-
-text \<open>Note that \<^const>\<open>assertion_sat\<close> is ``demonic'', i.e., every reduction of asserting \<^term>\<open>A\<close> must
-be a non-failing state, which is in-sync with the semantics of assert statements in programs. We might
-want to change both to be ``locally angelic''. \<close>
-
-definition heap_dep_interp_wf :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
-  where 
-    "heap_dep_interp_wf ctxt StateCons \<Lambda> \<equiv> \<forall>fid fdecl. ViperLang.funs (program_total ctxt) fid = Some fdecl \<longrightarrow> 
-       (\<exists>fsem. fun_interp_total ctxt fid = Some fsem \<and>
-            (\<forall>vs \<omega>.   
-               ( ( \<not>vals_well_typed (absval_interp_total ctxt) vs (args fdecl) ) \<longrightarrow> fsem vs \<omega> = None) \<and>
-
-               ( 
-                 ( vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and> assertion_self_framing_store ctxt StateCons (pre fdecl) (nth_option vs) ) \<longrightarrow>
-
-                     ( (\<not>assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs))) \<longrightarrow>
-                           fsem vs \<omega> = Some VFailure ) \<and>
-  
-                     (assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
-                         (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type (absval_interp_total ctxt) v = ret fdecl \<and>
-                              if_Some (\<lambda>e. ctxt, StateCons, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) (body fdecl) ) )
-              )
-            )
-       )"
-
-definition heap_dep_fun_obligations :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
-  where
-    "heap_dep_fun_obligations ctxt StateCons \<Lambda> \<equiv> 
-       \<forall> fid fdecl vs e p. 
-          ( ViperLang.funs (program_total ctxt) fid = Some fdecl \<and>            
-            body fdecl = Some e \<and>
-            vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and>
-            post fdecl = Some p)  \<longrightarrow>
-             (
-              assertion_self_framing_store ctxt StateCons (pre fdecl) (nth_option vs) \<and>
-                (\<forall> \<omega> extVal.
-                  assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
-    
-                    ctxt, StateCons, (Some (update_store_total \<omega> (nth_option vs))) \<turnstile> \<langle>e; (update_store_total \<omega> (nth_option vs))\<rangle> [\<Down>]\<^sub>t extVal \<and>
-                      ((\<exists> v. extVal = Val v \<and>
-                         assertion_sat ctxt StateCons \<Lambda> p (update_store_total \<omega> (nth_option (vs@[v])))))
-                )
-             )"
-
-definition predicate_obligations :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> bool"
-  where
-    "predicate_obligations ctxt StateCons \<equiv>
-       \<forall> pid pdecl vs e.
-        ( ViperLang.predicates (program_total ctxt) pid = Some pdecl \<and>
-          predicate_decl.body pdecl = Some e \<and>
-          vals_well_typed (absval_interp_total ctxt) vs (predicate_decl.args pdecl) ) \<longrightarrow>
-          assertion_self_framing_store ctxt StateCons e (nth_option vs)"
-(*
-definition stmt_correct_total :: " 'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow>  bool"
-  where "stmt_correct_total ctxt StateCons \<Lambda> s \<equiv>
-         heap_dep_interp_wf ctxt StateCons \<Lambda> \<longrightarrow>           
-           heap_dep_fun_obligations ctxt StateCons \<Lambda> \<and>
-           predicate_obligations ctxt StateCons \<and>
-           (\<forall>(\<omega> :: 'a full_total_state) r. is_empty_total_full \<omega> \<longrightarrow> 
-                red_stmt_total ctxt StateCons \<Lambda> s \<omega> r \<longrightarrow> r \<noteq> RFailure)"
-*)
-
 definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp list \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_store_well_typed A vs \<sigma> \<equiv> \<forall>i. 0 \<le> i \<and> i < length vs \<longrightarrow> 
                          map_option (\<lambda>v. get_type A v) (\<sigma> i) = Some (vs ! i)"
@@ -556,6 +492,64 @@ definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a 
                 vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)
           )
        "
+
+subsection \<open>Experimental definitions\<close>
+
+definition assertion_sat :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
+  where "assertion_sat \<Lambda> R ctxt A \<omega> = 
+            (\<forall> res. red_stmt_total \<Lambda> R ctxt (Assert A) \<omega> res \<longrightarrow> res \<noteq> RFailure)"
+
+text \<open>Note that \<^const>\<open>assertion_sat\<close> is ``demonic'', i.e., every reduction of asserting \<^term>\<open>A\<close> must
+be a non-failing state, which is in-sync with the semantics of assert statements in programs. We might
+want to change both to be ``locally angelic''. \<close>
+
+definition heap_dep_interp_wf :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
+  where 
+    "heap_dep_interp_wf ctxt StateCons \<Lambda> \<equiv> \<forall>fid fdecl. ViperLang.funs (program_total ctxt) fid = Some fdecl \<longrightarrow> 
+       (\<exists>fsem. fun_interp_total ctxt fid = Some fsem \<and>
+            (\<forall>vs \<omega>.   
+               ( ( \<not>vals_well_typed (absval_interp_total ctxt) vs (args fdecl) ) \<longrightarrow> fsem vs \<omega> = None) \<and>
+
+               ( 
+                 ( vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and> assertion_self_framing_store ctxt StateCons (pre fdecl) (nth_option vs) ) \<longrightarrow>
+
+                     ( (\<not>assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs))) \<longrightarrow>
+                           fsem vs \<omega> = Some VFailure ) \<and>
+  
+                     (assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+                         (\<exists>v. fsem vs \<omega> = Some (Val v) \<and> get_type (absval_interp_total ctxt) v = ret fdecl \<and>
+                              if_Some (\<lambda>e. ctxt, StateCons, (Some \<omega>) \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v)) (body fdecl) ) )
+              )
+            )
+       )"
+
+definition heap_dep_fun_obligations :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> bool"
+  where
+    "heap_dep_fun_obligations ctxt StateCons \<Lambda> \<equiv> 
+       \<forall> fid fdecl vs e p. 
+          ( ViperLang.funs (program_total ctxt) fid = Some fdecl \<and>            
+            body fdecl = Some e \<and>
+            vals_well_typed (absval_interp_total ctxt) vs (args fdecl) \<and>
+            post fdecl = Some p)  \<longrightarrow>
+             (
+              assertion_self_framing_store ctxt StateCons (pre fdecl) (nth_option vs) \<and>
+                (\<forall> \<omega> extVal.
+                  assertion_sat ctxt StateCons \<Lambda> (pre fdecl) (update_store_total \<omega> (nth_option vs)) \<longrightarrow>
+    
+                    ctxt, StateCons, (Some (update_store_total \<omega> (nth_option vs))) \<turnstile> \<langle>e; (update_store_total \<omega> (nth_option vs))\<rangle> [\<Down>]\<^sub>t extVal \<and>
+                      ((\<exists> v. extVal = Val v \<and>
+                         assertion_sat ctxt StateCons \<Lambda> p (update_store_total \<omega> (nth_option (vs@[v])))))
+                )
+             )"
+
+definition predicate_obligations :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> bool"
+  where
+    "predicate_obligations ctxt StateCons \<equiv>
+       \<forall> pid pdecl vs e.
+        ( ViperLang.predicates (program_total ctxt) pid = Some pdecl \<and>
+          predicate_decl.body pdecl = Some e \<and>
+          vals_well_typed (absval_interp_total ctxt) vs (predicate_decl.args pdecl) ) \<longrightarrow>
+          assertion_self_framing_store ctxt StateCons e (nth_option vs)"
 
 (* TODO loops
 
