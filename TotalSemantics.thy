@@ -429,14 +429,14 @@ definition vpr_method_correct_total_aux ::
             )
          )"
 
-definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a store \<Rightarrow> bool"
-  where "vpr_postcondition_framed ctxt R postcondition \<omega>pre \<sigma> \<equiv>
+definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a total_state \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_postcondition_framed ctxt R postcondition \<phi>pre \<sigma> \<equiv>
                    (\<forall>mh. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
                          wf_mask_simple (get_mh_total mh) \<longrightarrow>
                          assertion_framing_state ctxt R postcondition
                                  \<lparr> get_store_total = \<sigma>,
                                  \<comment>\<open>old state given by state that satisfies precondition\<close>
-                                  get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], 
+                                  get_trace_total = [old_label \<mapsto> \<phi>pre], 
                                   get_total_full = mh \<rparr>
                 )"
 
@@ -465,7 +465,7 @@ definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a ful
               rpre \<noteq> RFailure \<and>
               (\<forall>\<omega>pre. rpre = RNormal \<omega>pre \<longrightarrow> 
                 \<comment>\<open>\<^term>\<open>get_store_total \<omega>\<close> should be equal to \<^term>\<open>get_store_total \<omega>pre\<close> since inhale does not change the store.\<close>
-                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
                 (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
               )
             )
@@ -475,7 +475,7 @@ definition vpr_method_correct_total_2_new :: "'a total_context \<Rightarrow> ('a
   "vpr_method_correct_total_2_new ctxt R mdecl \<equiv>
          vpr_method_correct_total_aux ctxt R mdecl 
           (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
-                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>) \<and>
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
                 (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
           )
        "
@@ -489,7 +489,7 @@ definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a 
   "vpr_method_spec_correct_total ctxt R mdecl \<equiv>
          vpr_method_correct_total_aux ctxt R mdecl 
           (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
-                vpr_postcondition_framed ctxt R (method_decl.post mdecl) \<omega>pre (get_store_total \<omega>)
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>)
           )
        "
 

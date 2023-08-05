@@ -1875,9 +1875,9 @@ proof (rule stmt_rel_intro_2)
       have PostFramed: "assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>havoc"       
       proof -
         \<comment>\<open>We know that the postcondition is framed w.r.t. the precondition. More precisely, the assumption
-           tells us that \<^emph>\<open>if\<close> the precondition is normally inhaled from an empty state \<^term>\<open>\<omega>_empty\<close>, then the postcondition
+           tells us that \<^emph>\<open>if\<close> the precondition is normally inhaled from an empty state \<^term>\<open>\<omega>_empty\<close> to reach \<^term>\<open>\<omega>inh\<close>, then the postcondition
            is framed in any well-typed state whose store is the same as \<^term>\<open>get_store_total \<omega>_empty\<close> and whose old state is given 
-           by \<^term>\<open>\<omega>0\<close>.
+           by \<^term>\<open>\<omega>inh\<close>.
 
            We first show that we can inhale the precondition from an empty state to reach \<^term>\<open>RNormal (?\<omega>0 \<ominus> \<omega>pre)\<close>
            using the fact that the precondition was successfully exhaled from \<^term>\<open>?\<omega>0\<close> to reach \<^term>\<open>\<omega>pre\<close>.
@@ -1994,11 +1994,11 @@ proof (rule stmt_rel_intro_2)
             using exhale_inhale_normal MethodSpecSubset \<open>mdecl = _\<close>
             by blast
         qed
-        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) (get_store_total ?\<omega>0_rets)"
+        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)) (get_store_total ?\<omega>0_rets)"
           using MethodSpecsFramed
           unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
           by fastforce
-        hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) \<omega> (get_store_total ?\<omega>0_rets)"
+        hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>) (get_store_total ?\<omega>0_rets)"
           sorry   \<comment>\<open>using monotonicity argument on trace --> need another auxiliary lemma\<close>
         
         show ?thesis
