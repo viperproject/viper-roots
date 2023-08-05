@@ -15,7 +15,7 @@ definition wf_total_consistency
                (\<forall>\<omega> \<omega>' \<Lambda> stmt. R \<omega> \<longrightarrow> red_stmt_total ctxt R \<Lambda> stmt \<omega> (RNormal \<omega>') \<longrightarrow> R \<omega>') \<and>
                (\<forall>\<omega>. R \<omega> \<longleftrightarrow> (Rt (get_total_full \<omega>) \<and> (\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> Rt \<phi>)) )"
 
-lemma total_consisistencyI:
+lemma total_consistencyI:
   assumes "wf_total_consistency ctxt R Rt"
       and "Rt (get_total_full \<omega>)"
       and "\<And> lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<Longrightarrow> Rt \<phi>"

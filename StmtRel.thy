@@ -1114,16 +1114,16 @@ lemma method_call_stmt_rel:
       and "\<gamma>pre = (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
       and "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix"
       and "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))"
-      and InhalePostRel:         "\<And> fpred.
-                        stmt_rel 
-                              (\<lambda> \<omega> ns. 
-                               state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
-                               assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
-                              )
-                              (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
-                              ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                              (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
-    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
+      and InhalePostRel: 
+          "\<And> fpred.  stmt_rel 
+                        (\<lambda> \<omega> ns. 
+                         state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
+                         assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
+                        )
+                        (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
+                        ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
+                        (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
+      shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
   assume "R \<omega> ns" 
@@ -1131,6 +1131,11 @@ proof (rule stmt_rel_intro_2)
   hence StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     using StateRelConcrete
     by blast  
+
+  hence "StateCons_t (get_total_full \<omega>)"
+    using state_rel_consistent StateRel WfConsistency
+    unfolding wf_total_consistency_def
+    by blast
 
   have "es = map pure_exp.Var xs"
   proof (rule nth_equalityI)
@@ -1420,8 +1425,11 @@ proof (rule stmt_rel_intro_2)
       thus ?thesis
       proof (rule state_rel_store_update[where ?f= var_tr'])
         show "StateCons ?\<omega>0"
-          apply (rule total_consisistencyI[OF WfConsistency])
-          sorry 
+          apply (rule total_consistencyI[OF WfConsistency])
+           apply (insert \<open>StateCons_t (get_total_full \<omega>)\<close>)
+           apply (solves \<open>simp\<close>)
+          apply simp
+          by (metis option.distinct(1) option.inject)           
       next
         show "binder_state ns = Map.empty"
           using state_rel_state_well_typed[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>], simplified state_well_typed_def]
@@ -1831,10 +1839,19 @@ proof (rule stmt_rel_intro_2)
          using aux_disj_thms
          by (auto simp add: map_upd_set_dom)
      next 
+       have "StateCons_t (get_total_full \<omega>pre)"
+         using \<open>?RCall \<omega>pre nspre\<close> state_rel_consistent WfConsistency 
+         unfolding wf_total_consistency_def
+         by blast
+
        show "StateCons
-     \<lparr>get_store_total = shift_and_add_list_alt Map.empty (v_args @ v_rets), get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
-        get_total_full = get_total_full \<omega>pre\<rparr>"
-         sorry
+              \<lparr> get_store_total = shift_and_add_list_alt Map.empty (v_args @ v_rets), 
+                get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
+                get_total_full = get_total_full \<omega>pre \<rparr>"
+         apply (rule total_consistencyI[OF WfConsistency])
+          apply (simp add: \<open>StateCons_t (get_total_full \<omega>pre)\<close>)          
+         apply simp
+         by (fastforce  split: if_split_asm intro: \<open>StateCons_t (get_total_full \<omega>)\<close> )         
      next
        fix x
        assume "map_of (snd (var_context ctxt)) x \<noteq> None"
@@ -1948,7 +1965,27 @@ proof (rule stmt_rel_intro_2)
               by blast
           qed
           moreover have ValidRes: "StateCons (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets) \<and> valid_heap_mask (get_mh_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets))"
-            sorry    
+          proof (rule conjI)
+            let ?\<omega>minus = "?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets"
+            have gt_\<omega>minus: "?\<omega>0_rets \<succeq> ?\<omega>minus"
+            using \<open>?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets\<close> minus_smaller 
+            by auto
+
+            show "StateCons ?\<omega>minus"
+            proof (rule mono_prop_downwardD[OF wf_total_consistency_trace_mono_downwardD[OF WfConsistency] _ gt_\<omega>minus])
+              show "StateCons ?\<omega>0_rets"
+                apply (rule total_consistency_store_update[OF WfConsistency])
+                using state_rel_consistent StateRelDuringCall
+                  apply blast
+                by simp_all
+            qed
+          
+            show "valid_heap_mask (get_mh_total_full ?\<omega>minus)"
+              apply (rule valid_heap_mask_downward_mono)
+               apply (rule state_rel_wf_mask_simple[OF StateRelDuringCall])
+              using gt_\<omega>minus full_total_state_greater_mask 
+              by fastforce
+          qed
           moreover have "mono_prop_downward StateCons"
             using ConsistencyDownwardMono
             unfolding mono_prop_downward_def            
@@ -1967,7 +2004,6 @@ proof (rule stmt_rel_intro_2)
         show ?thesis
         unfolding assertion_framing_state_def
       proof (rule allI, rule impI)+
-        thm PostFramedAux
         let ?\<phi>havoc = "get_total_full ?\<omega>havoc"
         let ?\<omega>havoc2 = "\<lparr> get_store_total = get_store_total ?\<omega>0_rets, 
                           get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
@@ -2228,8 +2264,18 @@ proof (rule stmt_rel_intro_2)
                 qed
               qed
             next
+              have "StateCons_t (get_total_full \<omega>post)"
+                using \<open>?RCallPost \<omega>post _\<close> state_rel_consistent WfConsistency
+                unfolding wf_total_consistency_def
+                by blast
+
               show "StateCons (reset_state_after_call ys v_rets \<omega> \<omega>post)"
-                sorry
+                unfolding reset_state_after_call_def
+                apply (rule total_consistencyI[OF WfConsistency])
+                 apply (simp add: \<open>StateCons_t (get_total_full \<omega>post)\<close>)                 
+                using state_rel_consistent[OF StateRel] WfConsistency
+                unfolding wf_total_consistency_def
+                by simp
             next
               show "binder_state nspost = Map.empty"
                 using state_rel_state_well_typed[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified state_well_typed_def]
