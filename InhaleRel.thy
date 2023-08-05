@@ -403,7 +403,6 @@ lemma inhale_rel_field_acc_upd_rel:
     StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
                            state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
-    WfConsistency: "wf_total_consistency ctxt_vpr StateCons Rt"  and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
     TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -516,12 +515,10 @@ next
   fix \<omega> \<omega>' ns a
   assume "R \<omega> ns" and "r = Address a" and
          InhAccPremise: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
-
-  from RedInhale[OF inhale_acc_normal_premise_red_inhale[OF InhAccPremise]] 
-       state_rel_consistent[OF StateRel[OF \<open>R \<omega> ns\<close>]] 
-  show "StateCons \<omega>'"
-    using total_consistency_red_stmt_preserve[OF WfConsistency]
-    by blast
+  thus "StateCons \<omega>'"
+    using state_rel_consistent[OF StateRel[OF \<open>R \<omega> ns\<close>]] 
+    unfolding inhale_acc_normal_premise_def inhale_perm_single_def
+    by auto
 qed
 
 subsection \<open>Misc\<close>
