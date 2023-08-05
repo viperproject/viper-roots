@@ -273,6 +273,8 @@ subsection \<open>Field assignment relation\<close>
 
 lemma field_assign_rel:
   assumes 
+    WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
+    Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>" and
     HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -295,6 +297,7 @@ lemma field_assign_rel:
                      vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>
                      \<comment>\<open>type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>\<close>
                      get_type (domain_type TyRep) v = ty_vpr \<Longrightarrow>
+                     StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v) \<Longrightarrow>
                      (\<exists>hb f_bpl_val. 
                        lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and>
                        lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
@@ -315,12 +318,12 @@ proof (rule stmt_rel_intro)
   assume "R \<omega> ns"
   hence "Rext \<omega> \<omega> ns" using Rext by simp
 
-  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> (RNormal \<omega>')"
+  assume RedStmt: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> (RNormal \<omega>')"
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>' ns'"
   proof cases
     case (RedFieldAssign addr v ty_vpr)
-    from this  obtain ns1 where
+    from this obtain ns1 where
       "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
       using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
       by auto
@@ -344,6 +347,10 @@ proof (rule stmt_rel_intro)
    moreover have NewValTypeBpl: "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
      using vpr_to_bpl_val_type[OF \<open>get_type _ v = ty_vpr\<close> \<open>vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl\<close>]
            \<open>domain_type _ = _\<close>
+     by simp
+
+   moreover from RedStmt have "StateCons \<omega>'"
+     using total_consistency_red_stmt_preserve[OF WfConsistency] Consistent[OF \<open>R \<omega> ns\<close>]
      by simp
 
    ultimately obtain hb f_bpl_val
@@ -449,7 +456,8 @@ text \<open>Version of generic field assignment relation rule where state relati
 lemma field_assign_rel_inst:
   assumes 
     WfTyRep: "wf_ty_repr_bpl TyRep" and
-    RStateRel: "\<And>\<omega> ns. R \<omega> ns = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns" and
+    WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
+    RStateRel: "R = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt" and
     HeapVarDefSame: "heap_var_def Tr = heap_var Tr" and
     HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
@@ -461,7 +469,6 @@ lemma field_assign_rel_inst:
                  \<gamma>2 
                  ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
                    "h_bpl = heap_var Tr" and
-(*    HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))" and *)
     HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
     RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
     FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
@@ -469,13 +476,14 @@ lemma field_assign_rel_inst:
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
          \<gamma>
          (BigBlock name cs str tr, cont)" 
-proof (rule field_assign_rel)
+proof (rule field_assign_rel[OF WfConsistency])
   fix \<omega> ns ty_vpr hb addr  f_bpl v
   assume "R \<omega> ns" and
          FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr" and
          FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
          TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-         NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr"
+         NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr" and
+         ConsistentUpdState: "StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
 
   from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
@@ -489,7 +497,7 @@ proof (rule field_assign_rel)
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          )"      
-  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
+  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
   obtain hb f_bpl_val where
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
@@ -511,9 +519,15 @@ proof (rule field_assign_rel)
                          ))"
     using state_rel0_heap_var_rel[OF state_rel_state_rel0[OF StateRelInst]]
           state_rel0_heap_var_rel[OF state_rel_state_rel0[OF StateRelInstUpd]]
-          RStateRel \<open>h_bpl = _\<close>
+          RStateRel \<open>h_bpl = _\<close> 
     unfolding heap_var_rel_def
     by auto
+next
+  fix \<omega> ns
+  assume "R \<omega> ns"
+  thus "StateCons \<omega>"
+    using RStateRel state_rel_consistent
+    by blast
 qed (insert assms, auto)
 
 subsection \<open>Inhale statement relation\<close>
@@ -530,17 +544,18 @@ lemma inhale_stmt_rel:
 subsection \<open>Exhale statement relation\<close>
 
 lemma exhale_stmt_rel:
-  assumes 
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
           \<comment>\<open>Since the well-definedness must be differentiated from the evaluation state during the exhale,
             there is potentially a step in the Boogie program that sets this differentiation up resulting a new
             relation that tracks both states (where in the beginning both states are the same)\<close>
-          R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'" and                   
-          ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
-          InvHolds: "\<And> \<omega> ns. Rexh \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>" and
+      and R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'"                
+      and ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and InvHolds: "\<And> \<omega> ns. Rexh \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
           \<comment>\<open>At the end of the exhale we require the Boogie program to reestablish the original relation on the 
              evaluation state\<close>
-          Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-          ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
+      and Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'"
+      and ExhaleState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
@@ -549,8 +564,12 @@ proof (rule stmt_rel_intro)
   with R_to_Rexh obtain ns1 where Red1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "Rexh \<omega> \<omega> ns1"
     by blast
 
-  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>')"
-  thus "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>') \<Longrightarrow>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+  assume RedExhale: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>')"
+  hence "StateCons \<omega>'"
+    using Consistent[OF \<open>R \<omega> ns\<close>] WfConsistency total_consistency_red_stmt_preserve
+    by blast
+
+  from RedExhale show "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>') \<Longrightarrow>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
   proof cases
     case (RedExhale \<omega>_exh)
     with exhale_rel_normal_elim[OF ExhaleRel \<open>Rexh \<omega> \<omega> ns1\<close>] obtain ns2 where 
@@ -561,7 +580,8 @@ proof (rule stmt_rel_intro)
      "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R \<omega>_exh ns3"
       using red_ast_bpl_transitive
       by blast
-    with ExhaleState RedExhale show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+    with ExhaleState RedExhale \<open>StateCons \<omega>'\<close>
+    show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
       using red_ast_bpl_transitive
       by blast
   qed
@@ -587,20 +607,21 @@ text \<open>The following theorem is the same as exhale_stmt_rel except that Rex
       Isabelle picks a version that ignores the well-definedness state)\<close>
 
 lemma exhale_stmt_rel_inst:
-  assumes 
-      "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')" and                   
-      "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2" and
-      InvHolds: "\<And> \<omega> ns. state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
-                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'" and
-      "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
+      and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')"            
+      and "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and InvHolds: "\<And> \<omega> ns. state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+      and "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
+                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'"
+      and "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-        shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms
   by (rule exhale_stmt_rel)
 
 lemma exhale_stmt_rel_finish:
-  assumes StateRel: "state_rel_def_same Pr (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and
+  assumes StateRel: "state_rel_def_same Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and
           CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
           WfTyRepr: "wf_ty_repr_bpl TyRep" and
           ProgramTotal: "Pr = program_total ctxt_vpr" and
@@ -608,6 +629,7 @@ lemma exhale_stmt_rel_finish:
           WellDefSame: "heap_var Tr = heap_var_def Tr \<and> mask_var Tr = mask_var_def Tr" and 
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
+          "StateCons \<omega>'" and
           "\<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>)" and
           "hvar = heap_var Tr" and
           "mvar = mask_var Tr" and
@@ -622,7 +644,7 @@ lemma exhale_stmt_rel_finish:
                                                    Assign hvar (Var hvar_exh) #
                                                    cs) str tr, cont), Normal ns)
                              ((BigBlock name cs str tr, cont), Normal ns') \<and>
-               state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ns'" (is "\<exists>ns'. ?red ns' \<and> ?rel ns'")
+               state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ns'" (is "\<exists>ns'. ?red ns' \<and> ?rel ns'")
 proof -
   from state_rel_heap_var_rel[OF StateRel]
   obtain hb where   LookupHeapVarTy: "lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep))" and
@@ -727,7 +749,7 @@ proof -
     apply (rule IdOnKnownCond)
     done
 
-  have StateRel1: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ?ns1"
+  have StateRel1: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ?ns1"
     using StateRel
     apply (rule state_rel_independent_var)
     using ExhaleHeapFresh
@@ -748,7 +770,7 @@ proof -
     using NewHeapWellTy TypeInterp LookupHeapVarTy
     by (auto intro: RedVar)
 
-  moreover have "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega>' ?ns2"
+  moreover have "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ?ns2"
   proof (rule state_rel_heap_update_2[OF StateRel1])
     show " \<omega> = \<omega> \<and> \<omega>' = \<omega>' \<and> heap_var Tr = heap_var_def Tr"
       using WellDefSame
@@ -849,7 +871,6 @@ lemma state_rel_var_translation_remove:
           "finite (ran f')"
         shows "state_rel Pr StateCons TyRep (Tr\<lparr> var_translation := f' \<rparr>) AuxPred ctxt \<omega> \<omega> ns"
 proof (rule state_rel_store_update[OF StateRel])
-
   show "store_rel (type_interp ctxt) (var_context ctxt) f' \<omega> ns"
   proof (rule store_relI)
     show "inj_on f' (dom f')"
@@ -868,6 +889,10 @@ proof (rule state_rel_store_update[OF StateRel])
       by blast
   qed
 next
+  show "StateCons \<omega>"
+    using state_rel_consistent StateRel
+    by blast
+next
   show "binder_state ns = Map.empty"
     using state_rel_state_well_typed[OF StateRel, simplified state_well_typed_def]
     by simp
@@ -878,7 +903,6 @@ next
     using var_translation_disjoint[OF assms(1)] map_le_ran[OF assms(2)]
     by blast
 qed (insert assms, auto)
-
 
 lemma state_rel_transfer_var_tr_to_aux_pred:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
@@ -1043,69 +1067,68 @@ qed
 subsubsection \<open>Main Lemma\<close>
 
 lemma method_call_stmt_rel:
-  assumes                    "Pr = program_total ctxt_vpr" and
-          MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl" and
-          MethodSpecSubset:   "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
-                               no_perm_assertion (method_decl.post mdecl) \<and> 
-                               no_unfolding_assertion (method_decl.pre mdecl) \<and>
-                               no_unfolding_assertion (method_decl.post mdecl)" and
-          OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es" and
-          ConsistencyDownwardMono: "\<And>\<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
-          MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl" and
-                      "rtype_interp ctxt = []" and
-          DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr" and
-          TyInterpBplEq:   "type_interp ctxt = vbpl_absval_ty TyRep" and
-          StateRelConcrete: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns" and                  
-                  ArgsAreVars: "list_all (\<lambda>x. \<exists>a. x = ViperLang.Var a) es" \<comment>\<open>simplifying assumption: only variables as arguments\<close> and
-                  "xs = map the_var es" and
-                  "set xs \<subseteq> dom (var_translation Tr)" and
-                  XsBplEq: "map (the \<circ> var_translation Tr) xs = xs_bpl" and
-                  "set ys \<subseteq> dom (var_translation Tr)" and
-                  YsBplEq: "map (the \<circ> var_translation Tr) ys = ys_bpl" and     
-                  "set xs_bpl \<inter> set ys_bpl = {}" and \<comment>\<open>simplifying assumption: targets and arguments do not clash\<close>
-                  "distinct xs" and \<comment>\<open>simplifying assumption: arguments are distinct\<close>
-                  "distinct ys" and
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and "Pr = program_total ctxt_vpr"
+      and MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
+      and MethodSpecSubset:  "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
+                              no_perm_assertion (method_decl.post mdecl) \<and> 
+                              no_unfolding_assertion (method_decl.pre mdecl) \<and>
+                              no_unfolding_assertion (method_decl.post mdecl)"
+      and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es"
+      and ConsistencyDownwardMono: "\<And>\<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+      and MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
+      and "rtype_interp ctxt = []"
+      and DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr"
+      and TyInterpBplEq:   "type_interp ctxt = vbpl_absval_ty TyRep"
+      and StateRelConcrete: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"              
+      and ArgsAreVars: "list_all (\<lambda>x. \<exists>a. x = ViperLang.Var a) es" \<comment>\<open>simplifying assumption: only variables as arguments\<close>
+      and "xs = map the_var es"
+      and "set xs \<subseteq> dom (var_translation Tr)"
+      and XsBplEq: "map (the \<circ> var_translation Tr) xs = xs_bpl"
+      and "set ys \<subseteq> dom (var_translation Tr)"
+      and YsBplEq: "map (the \<circ> var_translation Tr) ys = ys_bpl"
+      and "set xs_bpl \<inter> set ys_bpl = {}" \<comment>\<open>simplifying assumption: targets and arguments do not clash\<close>
+      and "distinct xs" \<comment>\<open>simplifying assumption: arguments are distinct\<close>
+      and "distinct ys"
              \<comment>\<open>TODO: One could probably track the following fact on declared types also via the variable relation
                       where one ensures that the declared Viper and Boogie types match for variables related by
                       the variable relation.\<close>
-          LookupDeclRetsBpl: 
+      and LookupDeclRetsBpl: 
                      "list_all2 (\<lambda>y_bpl t_vpr. \<exists>t_bpl. vpr_to_bpl_ty TyRep t_vpr = Some t_bpl \<and>
                                            lookup_var_decl (var_context ctxt) y_bpl = Some (t_bpl, None))
-                                ys_bpl (method_decl.rets mdecl)" and
+                                ys_bpl (method_decl.rets mdecl)"
           \<comment>\<open> Since the rule only deals with variables in the arguments, well-definedness holds trivially
              ExpWfRel: "exprs_wf_rel Rdef ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>def"\<close>
                    \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
                         \<comment>\<open>"var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and \<close>
-                   "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]" and
-          ExhalePreRel:
+      and "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]"
+      and ExhalePreRel:
                       "\<And> fpred.                                                
                         stmt_rel 
                               (\<lambda>\<omega> ns.
-                                 state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt \<omega> ns \<and>
+                                 state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt \<omega> ns \<and>
                                  framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> \<omega>)
-                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
+                              (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                              (Exhale (method_decl.pre mdecl)) \<gamma> \<gamma>pre" and
-                 "\<gamma>pre = (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)" and
-                 "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix" and
-             \<comment>\<open>    "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] rev (ys_bpl@xs_bpl))" and\<close>
-               "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))" and
-          InhalePostRel:         "\<And> fpred.
+                              (Exhale (method_decl.pre mdecl)) \<gamma> \<gamma>pre"
+      and "\<gamma>pre = (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
+      and "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix"
+      and "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))"
+      and InhalePostRel:         "\<And> fpred.
                         stmt_rel 
                               (\<lambda> \<omega> ns. 
-                               state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
+                               state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
                                assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
                               )
-                              (state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
+                              (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
                               (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
-
-  shows "stmt_rel R (state_rel_def_same Pr TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'" 
+    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
   assume "R \<omega> ns" 
   \<comment>\<open>Prove various properties before showing the goal\<close>
-  hence StateRel: "state_rel_def_same Pr TyRep Tr AuxPred ctxt \<omega> ns"
+  hence StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     using StateRelConcrete
     by blast  
 
@@ -1180,7 +1203,7 @@ proof (rule stmt_rel_intro_2)
 
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (MethodCall ys m es) \<omega> res"
 
-  thus "rel_vpr_aux (state_rel_def_same Pr TyRep Tr AuxPred ctxt) P ctxt \<gamma> \<gamma>' ns res"
+  thus "rel_vpr_aux (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) P ctxt \<gamma> \<gamma>' ns res"
   proof (cases)
     case (RedMethodCall v_args mdecl' v_rets resPre resPost)
      \<comment>\<open>All arguments evaluate normally\<close>
@@ -1301,7 +1324,7 @@ proof (rule stmt_rel_intro_2)
     note ExhalePreRelInst = ExhalePreRel
     (*note InhalePostRelInst = InhalePostRel[OF \<open>set ls = _\<close> \<open>length ls = length ?ps\<close>]*)
     let ?AuxPredPre = "(map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) ?fpred)"
-    let ?RCall = "state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) ?AuxPredPre ctxt"
+    let ?RCall = "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) ?AuxPredPre ctxt"
     have StateRelDuringCall: "?RCall ?\<omega>0 ns"
     proof -
       from var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] have 
@@ -1395,21 +1418,20 @@ proof (rule stmt_rel_intro_2)
         by (rule AuxSub)        
 
       thus ?thesis
-        apply (rule state_rel_store_update[where ?f= var_tr'])
-                 apply simp
-               apply simp
-              apply simp
-             apply simp
-        using StoreRel
-         apply simp
-           apply simp
-          apply simp
-        using state_rel_state_well_typed[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>], simplified state_well_typed_def]
-        apply simp
-        
-        using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] 
-              \<open>set xs_bpl \<subseteq> _\<close> \<open>ran var_tr' = _\<close>
-        by (auto simp: map_upd_set_lookup_2)
+      proof (rule state_rel_store_update[where ?f= var_tr'])
+        show "StateCons ?\<omega>0"
+          apply (rule total_consisistencyI[OF WfConsistency])
+          sorry 
+      next
+        show "binder_state ns = Map.empty"
+          using state_rel_state_well_typed[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>], simplified state_well_typed_def]
+          by simp
+      next
+        show "store_rel (type_interp ctxt) (var_context ctxt) var_tr' ?\<omega>0 ns"
+          using StoreRel
+          by blast
+      qed (insert  var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] \<open>set xs_bpl \<subseteq> _\<close> \<open>ran var_tr' = _\<close>,
+           auto simp add: map_upd_set_lookup_2)
     qed
 
       have StoreSameOnArgs: "\<And>x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow>
@@ -1474,12 +1496,13 @@ proof (rule stmt_rel_intro_2)
 
       show ?thesis
       proof (rule framing_exhI[OF _ _ AssertionFraming_\<omega>0'_only_args])
-        show "StateCons ?\<omega>0" \<comment>\<open>Track state consistency in the state relation and require extra properties on state consistency
-                                (e.g., state consistency does not depend on store) \<close>
-          sorry
+        show "StateCons ?\<omega>0"
+          using StateRelDuringCall state_rel_consistent
+          by blast
       next
         show "valid_heap_mask (get_mh_total_full ?\<omega>0)"
-          sorry
+          using StateRelDuringCall state_rel_wf_mask_simple
+          by fast
       next        
         show "?\<omega>0_empty \<oplus> ?\<omega>0 = Some ?\<omega>0"
           by (rule plus_full_total_state_zero_mask) simp_all          
@@ -1527,7 +1550,7 @@ proof (rule stmt_rel_intro_2)
       note InhalePostRelInst = InhalePostRel
 
       let ?AuxPredPost = "(map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) ?fpred)"
-      let ?RCallPost = "state_rel_def_same Pr TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) ?AuxPredPost ctxt"
+      let ?RCallPost = "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) ?AuxPredPost ctxt"
 
       let ?v_rets_bpl = "map (val_rel_vpr_bpl) v_rets"
 
@@ -1586,7 +1609,7 @@ proof (rule stmt_rel_intro_2)
        by (simp add: map_upds_upt_ran)
 
      from \<open>?RCall \<omega>pre nspre\<close> have
-       "state_rel_def_same Pr TyRep (Tr\<lparr>var_translation := var_tr'\<rparr>)
+       "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>var_translation := var_tr'\<rparr>)
           (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) ctxt \<omega>pre nspre"
        apply (rule state_rel_aux_pred_remove)
        apply (rule map_upd_set_subset)
@@ -1807,6 +1830,11 @@ proof (rule stmt_rel_intro_2)
           apply blast
          using aux_disj_thms
          by (auto simp add: map_upd_set_dom)
+     next 
+       show "StateCons
+     \<lparr>get_store_total = shift_and_add_list_alt Map.empty (v_args @ v_rets), get_trace_total = [old_label \<mapsto> get_total_full \<omega>],
+        get_total_full = get_total_full \<omega>pre\<rparr>"
+         sorry
      next
        fix x
        assume "map_of (snd (var_context ctxt)) x \<noteq> None"
@@ -1954,7 +1982,8 @@ proof (rule stmt_rel_intro_2)
             unfolding heap_var_rel_def
             by simp
           moreover have "valid_heap_mask (get_mh_total ?\<phi>havoc)"
-            sorry
+            using \<open>?RCallPost ?\<omega>havoc ?nshavoc\<close> state_rel_wf_mask_simple
+            by fastforce
           ultimately show "res \<noteq> RFailure"
             using PostFramedAux
             unfolding vpr_postcondition_framed_def
@@ -2004,10 +2033,10 @@ proof (rule stmt_rel_intro_2)
             by simp
             
           moreover have                                          
-             "state_rel_def_same Pr TyRep Tr AuxPred ctxt (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
+             "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
           proof -
             from \<open>?RCallPost \<omega>post nspost\<close> have
-              "state_rel_def_same Pr TyRep (Tr\<lparr>var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
+              "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
               apply (rule state_rel_aux_pred_remove)
               apply (rule map_upd_set_subset2)
               using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
@@ -2041,7 +2070,7 @@ proof (rule stmt_rel_intro_2)
                     using \<open>id < _\<close> LengthEqs map_upds_distinct_nth[OF distinct_upt *, 
                                                                    where ?m=Map.empty and ?ys="xs_bpl @ ys_bpl"]
                     unfolding \<open>var_tr'' = _\<close> \<open>var_bpl = (ys_bpl ! id)\<close>
-                    by (smt (verit) True add.commute add_less_cancel_right diff_less diff_zero length_append length_pos_if_in_set length_rev length_upt nth_append_length_plus rev_append zero_less_Suc) 
+                    by (smt (verit) True add.commute add_less_cancel_right diff_less diff_zero length_append length_pos_if_in_set length_rev length_upt nth_append_length_plus rev_append zero_less_Suc)
 
                   from this obtain val_vpr ty_bpl where
                     AuxStoreRel:
@@ -2199,6 +2228,9 @@ proof (rule stmt_rel_intro_2)
                 qed
               qed
             next
+              show "StateCons (reset_state_after_call ys v_rets \<omega> \<omega>post)"
+                sorry
+            next
               show "binder_state nspost = Map.empty"
                 using state_rel_state_well_typed[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified state_well_typed_def]
                 by simp
@@ -2212,7 +2244,7 @@ proof (rule stmt_rel_intro_2)
                    {}"
                 using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
                 by simp
-            qed (simp_all add: reset_state_after_call_def  )
+            qed (simp_all add: reset_state_after_call_def)
               
           qed
             
