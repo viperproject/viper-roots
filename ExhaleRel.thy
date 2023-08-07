@@ -423,58 +423,14 @@ definition exhale_acc_normal_premise
 
 lemma exhale_acc_normal_red_exhale:
   assumes "exhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega>0 \<omega> \<omega>'"
-  shows "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega> (RNormal \<omega>')"
-  sorry
-
-(*
-  shows "\<omega> \<succeq> \<omega>'"
-proof (cases r)
-  case (Address a) 
-  hence "\<omega>' = update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p))"
-    using assms
-    unfolding exhale_acc_normal_premise_def
-    by auto
-
-  find_theorems "(?\<phi> :: 'a full_total_state) \<succeq> ?\<phi>'"
-  thm update_mh_loc_total_full_mono
-  have "\<omega> = update_mh_loc_total_full \<omega> (a,f) (get_mh_total_full \<omega> (a,f))"
-    apply (rule full_total_state.equality)
-       apply simp
-      apply simp
-     apply (rule total_state.equality)
-    by simp_all
-
-  from assms have PermConstraint: "p \<ge> 0 \<and> p \<le> Rep_prat (get_mh_total_full \<omega> (the_address r, f))"
-    using Address
-    unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_perm_success_def
-    by simp
-
-  show ?thesis
-    apply (simp only: full_total_state_greater_equiv)
-    apply (subst  \<open>\<omega> = _\<close>)
-    apply (subst \<open>\<omega>' = _\<close>)
-    apply (rule update_mh_loc_total_full_mono)
-     apply simp
-    using PermConstraint
-    
-
-    
-    
-    
-    
-  then show ?thesis sorry
-next
-  case Null
-  then show ?thesis 
-    using assms
-    unfolding exhale_acc_normal_premise_def
-    by (simp add: succ_refl)
-qed
-*)
-
-
-    
-
+  shows "red_exhale ctxt StateCons \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> (RNormal \<omega>')"
+  apply (rule red_exhale_acc_normalI)
+      apply (insert assms[simplified exhale_acc_normal_premise_def exhale_field_acc_rel_assms_def exhale_field_acc_rel_perm_success_def])
+      apply blast
+     apply blast
+    apply simp
+   apply (metis Abs_prat_inverse mem_Collect_eq pgte.rep_eq)
+  by presburger
 
 lemma exhale_field_acc_rel:
   assumes 
