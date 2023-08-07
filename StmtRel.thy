@@ -1905,18 +1905,22 @@ proof (rule stmt_rel_intro_2)
 
         have "?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets"
         proof -
-          have "?\<omega>0_rets \<ge> ?\<omega>pre_exh_aux_rets"
+          have TraceEq: "get_trace_total ?\<omega>0_rets = get_trace_total ?\<omega>pre_exh_aux_rets"
+            using exhale_only_changes_total_state_aux[OF RedExh]
+            by auto
+
+          have *: "?\<omega>0_rets \<ge> ?\<omega>pre_exh_aux_rets"
             apply (rule less_eq_full_total_stateI)
                apply simp
+            using TraceEq
               apply simp
-            using exhale_only_changes_total_state_aux[OF RedExh]
               apply simp
-             apply simp
-            using iffD1[OF full_total_state_greater_equiv, OF \<open>?\<omega>0 \<succeq> \<omega>pre_exh_aux\<close>] less_eq_full_total_stateD
+            using full_total_state_succ_implies_gte[OF \<open>?\<omega>0 \<succeq> \<omega>pre_exh_aux\<close>] less_eq_full_total_stateD
             apply fastforce
             by simp
-          thus ?thesis
-            by (simp add: full_total_state_greater_equiv)
+          show ?thesis 
+            using full_total_state_gte_implies_succ[OF *] TraceEq
+            by argo
         qed
 
         have StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0_rets_empty)"
@@ -1989,20 +1993,27 @@ proof (rule stmt_rel_intro_2)
           moreover have "mono_prop_downward StateCons"
             using ConsistencyDownwardMono
             unfolding mono_prop_downward_def            
-            using full_total_state_greater_equiv by auto
+            using full_total_state_succ_implies_gte by auto
           ultimately show ?thesis
             using exhale_inhale_normal MethodSpecSubset \<open>mdecl = _\<close>
             by blast
         qed
-        ultimately have "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)) (get_store_total ?\<omega>0_rets)"
+        ultimately have PostFramedAuxSmaller: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)) (get_store_total ?\<omega>0_rets)"
           using MethodSpecsFramed
           unfolding vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
           by fastforce
-        hence PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>) (get_store_total ?\<omega>0_rets)"
-          sorry   \<comment>\<open>using monotonicity argument on trace --> need another auxiliary lemma\<close>
-        
-        show ?thesis
-        unfolding assertion_framing_state_def
+
+        have PostFramedAux: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>) (get_store_total ?\<omega>0_rets)"
+        proof -
+          have "(get_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)) \<le> (get_total_full \<omega>)"
+            by (metis \<open>?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets\<close> full_total_state.select_convs(3) full_total_state.update_convs(1) greater_full_total_state_total_state minus_smaller total_state_greater_equiv)
+          thus ?thesis
+            using vpr_postcondition_framed_mono ConsistencyDownwardMono MethodSpecSubset PostFramedAuxSmaller 
+            by blast
+        qed
+
+      show ?thesis
+      unfolding assertion_framing_state_def
       proof (rule allI, rule impI)+
         let ?\<phi>havoc = "get_total_full ?\<omega>havoc"
         let ?\<omega>havoc2 = "\<lparr> get_store_total = get_store_total ?\<omega>0_rets, 

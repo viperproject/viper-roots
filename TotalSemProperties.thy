@@ -760,14 +760,15 @@ next
     qed
 next
   case (RedOld \<omega> l \<phi> \<omega>_def' \<omega>_def e v)
-  hence Trace2: "get_trace_total \<omega>2 l = Some \<phi>"
-    by (auto dest: less_eq_full_total_stateD)
+  from this obtain \<phi>' where Trace2: "get_trace_total \<omega>2 l = Some \<phi>'" and "\<phi>' \<le> \<phi>"
+    using less_eq_full_total_stateD
+    by blast
 
-  from \<open>\<omega>2 \<le> \<omega>\<close>
-  have *: "\<omega>2 \<lparr> get_total_full := \<phi> \<rparr> \<le> \<omega> \<lparr> get_total_full := \<phi> \<rparr>"
-    using full_total_state.surjective less_eq_full_total_stateD order_class.order_eq_iff 
-    by fastforce
-  let ?\<omega>_def2' = "map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def2"
+  from \<open>\<omega>2 \<le> \<omega>\<close> \<open>\<phi>' \<le> \<phi>\<close>
+  have *: "\<omega>2 \<lparr> get_total_full := \<phi>' \<rparr> \<le> \<omega> \<lparr> get_total_full := \<phi> \<rparr>"    
+    by (simp add: less_eq_full_total_state_ext_def)
+
+  let ?\<omega>_def2' = "map_option (get_total_full_update (\<lambda>_. \<phi>')) \<omega>_def2"
   have "?\<omega>_def2' \<le> map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def"
   proof (cases \<omega>_def2)
     case None
@@ -780,34 +781,39 @@ next
        "\<omega>_def2_val \<le> \<omega>_def_val"
       by (auto simp add: less_eq_option_def)
 
-    with Some show ?thesis 
-     using full_total_state.surjective less_eq_full_total_stateD order_class.order_eq_iff 
-     by fastforce
+    show ?thesis 
+      unfolding \<open>\<omega>_def2 =_\<close> \<open>\<omega>_def = _\<close>
+      apply (simp, rule less_eq_Some)
+      apply (rule less_eq_full_total_stateI2)
+      using less_eq_full_total_stateD[OF \<open>\<omega>_def2_val \<le> \<omega>_def_val\<close>] \<open>\<phi>' \<le> \<phi>\<close>
+      by simp_all     
   qed
 
-  hence **: "map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def2 \<le> \<omega>_def'"
+  hence **: "map_option (get_total_full_update (\<lambda>_. \<phi>')) \<omega>_def2 \<le> \<omega>_def'"
     by (simp add: \<open>\<omega>_def' = _\<close>)
 
   from RedOld have ***: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e"
     by simp
 
-  have ****: "map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def2 = None \<longleftrightarrow> (\<omega>_def' = None)"
+  have ****: "map_option (get_total_full_update (\<lambda>_. \<phi>')) \<omega>_def2 = None \<longleftrightarrow> (\<omega>_def' = None)"
     unfolding \<open>\<omega>_def' = _\<close>
     using \<open>(\<omega>_def2 = None) = (\<omega>_def = None)\<close>
     by simp
 
   from RedOld.IH(2)[OF *** * ** ****]
-  consider "v = VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure" |
-           "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t v" |
-           "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure"
+  consider "v = VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>'\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure" |
+           "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>'\<rparr>\<rangle> [\<Down>]\<^sub>t v" |
+           "v \<noteq> VFailure \<and> ctxt, R, ?\<omega>_def2' \<turnstile> \<langle>e;\<omega>2\<lparr>get_total_full := \<phi>'\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure"
     using \<open>(\<omega>_def2 = None) = (\<omega>_def = None)\<close>
     by (fastforce split: if_split_asm)
   thus ?case
-    by (cases) (auto intro: TotalExpressions.RedOld Trace2)
+   by (cases) (auto intro: TotalExpressions.RedOld Trace2)
 next
   case (RedOldFailure \<omega> l \<omega>_def e)
+  hence "get_trace_total \<omega>2 l = None"
+    by (blast dest: less_eq_full_total_stateD)
   then show ?case 
-  by (auto intro!: TotalExpressions.RedOldFailure dest: less_eq_full_total_stateD)
+    by (auto intro!: TotalExpressions.RedOldFailure dest: less_eq_full_total_stateD)
 next
   case (RedField \<omega>_def e \<omega> a f v)
   from this consider (EFail) "ctxt, R, \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | 
@@ -1287,7 +1293,35 @@ assumes "assertion_framing_state ctxt StateCons A \<omega>"
   shows "assertion_framing_state ctxt StateCons A \<omega>'"
   using assms inhale_no_perm_downwards_mono(3)
   unfolding assertion_framing_state_def
-  by blast
+  by blast  
+
+lemma vpr_postcondition_framed_mono:
+  assumes "vpr_postcondition_framed ctxt StateCons A \<phi> \<sigma>" 
+      and "\<phi> \<le> \<phi>'"
+      and "no_perm_assertion A \<and> no_unfolding_assertion A"
+      and ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+    shows "vpr_postcondition_framed ctxt StateCons A \<phi>' \<sigma>" 
+  unfolding vpr_postcondition_framed_def
+proof (rule allI | rule impI)+
+  fix mh
+  let ?\<omega>' = "\<lparr>get_store_total = \<sigma>, get_trace_total = [old_label \<mapsto> \<phi>'], get_total_full = mh\<rparr>"
+  let ?\<omega> = "\<lparr>get_store_total = \<sigma>, get_trace_total = [old_label \<mapsto> \<phi>], get_total_full = mh\<rparr>"
+  have Leq: "?\<omega> \<le> ?\<omega>'"
+    using \<open>\<phi> \<le> \<phi>'\<close>
+    unfolding less_eq_full_total_state_ext_def
+    by simp
+
+  assume "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh)"
+     and "valid_heap_mask (get_mh_total mh)"
+
+  moreover from this have "assertion_framing_state ctxt StateCons A ?\<omega>"
+    using assms Leq assertion_framing_state_mono
+    by (simp add: vpr_postcondition_framed_def)
+
+  thus "assertion_framing_state ctxt StateCons A ?\<omega>'"
+    using assertion_framing_state_mono Leq assms
+    by blast
+qed            
 
 subsection \<open>Exhale\<close>
 

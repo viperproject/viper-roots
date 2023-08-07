@@ -122,13 +122,18 @@ begin
 definition less_eq_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext \<Rightarrow> bool"
   where "\<omega>1 \<le> \<omega>2 \<equiv> 
          get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
-         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and>
+         dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>
+         (\<forall>lbl \<phi> \<phi>'. (get_trace_total \<omega>1 lbl = Some \<phi> \<and> 
+                      get_trace_total \<omega>2 lbl = Some \<phi>') \<longrightarrow> \<phi> \<le> \<phi>') \<and>
          get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
          full_total_state.more \<omega>1 = full_total_state.more \<omega>2"
 
 definition less_full_total_state_ext :: "('a,'b) full_total_state_ext \<Rightarrow> ('a,'b) full_total_state_ext \<Rightarrow> bool"
   where "\<omega>1 < \<omega>2 \<equiv> 
-           \<omega>1 \<le> \<omega>2 \<and> get_total_full \<omega>1 < get_total_full \<omega>2 "
+           \<omega>1 \<le> \<omega>2 \<and> 
+           (get_total_full \<omega>1 < get_total_full \<omega>2 \<or>
+           (\<exists>lbl \<phi> \<phi>'. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>2 lbl = Some \<phi>' \<and>
+                        \<phi> < \<phi>'))"
 
 instance
 proof
@@ -144,16 +149,19 @@ proof
         unfolding less_full_total_state_ext_def
         by simp
     next
-      from \<open>x < y\<close>
-      show "\<not> y \<le> x"
-        unfolding less_full_total_state_ext_def less_eq_full_total_state_ext_def
-        by fastforce
+      from \<open>x < y\<close> consider "get_total_full x < get_total_full y" |
+                            "(\<exists>lbl \<phi> \<phi>'. get_trace_total x lbl = Some \<phi> \<and> get_trace_total y lbl = Some \<phi>' \<and>
+                                         \<phi> < \<phi>')"
+        unfolding less_full_total_state_ext_def
+        by blast
+      thus "\<not> y \<le> x"
+        by (metis TotalViperState.less_eq_full_total_state_ext_def leD)
     qed
   next
     assume "x \<le> y \<and> \<not> y \<le> x"
     thus "x < y"
-    unfolding less_full_total_state_ext_def less_eq_full_total_state_ext_def    
-    by force
+      unfolding less_full_total_state_ext_def less_eq_full_total_state_ext_def
+      by fastforce
   qed
 
   show "x \<le> x"
@@ -161,17 +169,51 @@ proof
     by auto
 
   show "x \<le> y \<Longrightarrow> y \<le> z \<Longrightarrow> x \<le> z"
-    unfolding less_eq_full_total_state_ext_def
-    by (metis (mono_tags, opaque_lifting) dual_order.trans)
+  proof -
+    assume Leqs: "x \<le> y" "y \<le> z"
+
+    show "x \<le> z"
+      unfolding less_eq_full_total_state_ext_def
+    proof (intro conjI)
+      show "\<forall>lbl \<phi> \<phi>'. get_trace_total x lbl = Some \<phi> \<and> get_trace_total z lbl = Some \<phi>' \<longrightarrow> \<phi> \<le> \<phi>'"
+        using Leqs
+        unfolding less_eq_full_total_state_ext_def
+        by (metis (mono_tags, opaque_lifting) domIff dual_order.trans not_None_eq)
+    qed (insert Leqs[simplified less_eq_full_total_state_ext_def], auto)
+  qed
 
   show "x \<le> y \<Longrightarrow> y \<le> x \<Longrightarrow> x = y"
-    unfolding less_eq_full_total_state_ext_def
-    apply (rule full_total_state.equality)
-       apply blast
-      apply blast
-     apply fastforce
-    by blast
+  proof -
+    assume "x \<le> y" and "y \<le> x"
+
+    show ?thesis
+    proof (rule full_total_state.equality)
+      show "get_store_total x = get_store_total y"
+        using \<open>x \<le> y\<close> less_eq_full_total_state_ext_def by blast
+    
+      show "get_trace_total x = get_trace_total y"
+      proof -
+        have *: "\<And> lbl \<phi> \<phi>'. get_trace_total x lbl = Some \<phi> \<Longrightarrow> get_trace_total y lbl = Some \<phi>' \<Longrightarrow> \<phi> = \<phi>'"
+          using \<open>x \<le> y\<close> \<open>y \<le> x\<close> less_eq_full_total_state_ext_def
+          by fastforce
+        have DomEq: "dom (get_trace_total x) = dom (get_trace_total y)"
+          using \<open>x \<le> y\<close> less_eq_full_total_state_ext_def by blast
+        show ?thesis
+          apply (rule HOL.ext)
+          using * DomEq
+          by (metis domIff not_None_eq)
+      qed
+
+      show "get_total_full x = get_total_full y"
+        using \<open>x \<le> y\<close> \<open>y \<le> x\<close> less_eq_full_total_state_ext_def
+        by auto
+
+      show "full_total_state.more x = full_total_state.more y "
+        using \<open>x \<le> y\<close> less_eq_full_total_state_ext_def by blast
+    qed
+  qed         
 qed
+
 end
 
 lemma less_eq_total_stateI:
@@ -210,22 +252,37 @@ lemma less_eq_full_total_stateI:
      full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow>
      \<omega>1 \<le> \<omega>2"
   unfolding less_eq_full_total_state_ext_def
-  by blast
+  by auto
+
+lemma less_eq_full_total_stateI2:
+    "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
+     dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>
+     (\<forall>lbl \<phi> \<phi>'. (get_trace_total \<omega>1 lbl = Some \<phi> \<and> 
+                      get_trace_total \<omega>2 lbl = Some \<phi>') \<longrightarrow> \<phi> \<le> \<phi>') \<Longrightarrow>
+     get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
+     full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow>
+     \<omega>1 \<le> \<omega>2"
+  unfolding less_eq_full_total_state_ext_def
+  by auto
 
 lemma less_eq_full_total_stateD:
   assumes "\<omega>1 \<le> \<omega>2"
   shows "get_store_total \<omega>1 = get_store_total \<omega>2 \<and>
-         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and>         
+         dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<and>      
+         (\<forall>lbl \<phi> \<phi>'. (get_trace_total \<omega>1 lbl = Some \<phi> \<and> 
+                      get_trace_total \<omega>2 lbl = Some \<phi>') \<longrightarrow> \<phi> \<le> \<phi>') \<and>   
          get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<and>
          full_total_state.more \<omega>1 = full_total_state.more \<omega>2"
   using assms
   unfolding less_eq_full_total_state_ext_def
-  by blast
+  by argo
 
 lemma less_eq_full_total_stateE:
   assumes "\<omega>1 \<le> \<omega>2" and
           "get_store_total \<omega>1 = get_store_total \<omega>2 \<Longrightarrow>
-           get_trace_total \<omega>1 = get_trace_total \<omega>2 \<Longrightarrow>
+           dom (get_trace_total \<omega>1) = dom (get_trace_total \<omega>2) \<Longrightarrow>   
+           (\<forall>lbl \<phi> \<phi>'. (get_trace_total \<omega>1 lbl = Some \<phi> \<and> 
+                        get_trace_total \<omega>2 lbl = Some \<phi>') \<longrightarrow> \<phi> \<le> \<phi>') \<Longrightarrow>
            get_total_full \<omega>1 \<le> get_total_full \<omega>2 \<Longrightarrow>
            full_total_state.more \<omega>1 = full_total_state.more \<omega>2 \<Longrightarrow> P"
   shows P
@@ -286,7 +343,7 @@ proof -
   thus ?thesis
     using assms
     unfolding less_eq_full_total_state_ext_def
-    by simp
+    by auto
 qed
 
 definition empty_full_total_state :: "'a store \<Rightarrow> 'a total_trace \<Rightarrow> 'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> 'a full_total_state"

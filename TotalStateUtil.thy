@@ -176,7 +176,7 @@ proof -
 
   show ?thesis
     apply (insert assms *)
-    apply (rule less_eq_full_total_stateI)
+    apply (rule less_eq_full_total_stateI2)
     by (fastforce dest: less_eq_full_total_stateD)+
 qed
 
@@ -190,7 +190,7 @@ proof -
 
   show ?thesis
     apply (insert assms *)
-    apply (rule less_eq_full_total_stateI)
+    apply (rule less_eq_full_total_stateI2)
     by (fastforce dest: less_eq_full_total_stateD)+
 qed
 
@@ -743,12 +743,11 @@ next
     by (auto simp add: greater_def)
 qed
 
-
-lemma full_total_state_greater_equiv:
-  shows "(\<omega> :: 'a full_total_state) \<succeq> \<omega>' \<longleftrightarrow> \<omega> \<ge> \<omega>'"
-proof
-  assume "\<omega> \<succeq> \<omega>'"
-  from this obtain \<omega>2 where Sum: "\<omega>' \<oplus> \<omega>2 = Some \<omega>"
+lemma full_total_state_succ_implies_gte:
+  assumes "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
+  shows "\<omega> \<ge> \<omega>'"
+proof -
+  from assms obtain \<omega>2 where Sum: "\<omega>' \<oplus> \<omega>2 = Some \<omega>"
     by (auto simp add: greater_def) 
 
   show "\<omega> \<ge> \<omega>'"
@@ -760,10 +759,14 @@ proof
           greater_full_total_state_total_state total_state_greater_equiv 
      apply blast
     by simp
-next
-  assume "\<omega> \<ge> \<omega>'"
+qed
 
-  hence "get_total_full \<omega> \<ge> get_total_full \<omega>'"
+lemma full_total_state_gte_implies_succ:
+  assumes "\<omega> \<ge> \<omega>'"
+      and TraceEq: "get_trace_total \<omega> = get_trace_total \<omega>'"
+  shows "(\<omega> :: 'a full_total_state) \<succeq> \<omega>'"
+proof -
+  from \<open>\<omega> \<ge> \<omega>'\<close> have "get_total_full \<omega> \<ge> get_total_full \<omega>'"
     using less_eq_full_total_state_ext_def 
     by auto
 
@@ -771,9 +774,10 @@ next
     by (simp add: total_state_greater_equiv)
 
   thus "\<omega> \<succeq> \<omega>'"
-    by (metis \<open>\<omega>' \<le> \<omega>\<close> get_mh_total_full.simps get_mp_total_full.elims less_eq_full_total_stateD_2 less_eq_full_total_state_ext_def succ_full_total_stateI total_state_greater_mask)
+    using TraceEq less_eq_full_total_stateD
+    using assms(1) less_eq_full_total_stateD_2 succ_full_total_stateI total_state_greater_mask 
+    by fastforce
 qed
-
 
 subsection \<open>Partial commutative monoid with core instantiation\<close>
 
