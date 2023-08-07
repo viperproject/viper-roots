@@ -37,10 +37,6 @@ record tr_vpr_bpl =
   mask_var :: Lang.vname
   heap_var_def :: Lang.vname
   mask_var_def :: Lang.vname
-  mask_read :: "boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr" \<comment>\<open>arguments: mask, receiver, field, field type arguments\<close>
-  mask_update :: "boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr" \<comment>\<open>arguments: mask, receiver, field, new value, field type arguments\<close>
-  heap_read :: "boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr" \<comment>\<open>arguments: heap, receiver, field, field type arguments\<close>
-  heap_update :: "boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> boogie_expr \<Rightarrow> Lang.ty list \<Rightarrow> expr" \<comment>\<open>arguments: heap, receiver, field, new value, field type arguments\<close>
   field_translation :: "field_ident \<rightharpoonup> Lang.vname"
   fun_translation :: "ViperLang.function_ident \<rightharpoonup> Lang.fname"
   var_translation :: "ViperLang.var \<rightharpoonup> Lang.vname" \<comment>\<open>local Boogie variables\<close>
@@ -54,13 +50,6 @@ lemma tr_def_field_translation:
           "field_translation tr_def = F"
         shows "field_translation tr = F"
   using assms by simp
-
-text \<open>
-Some parts here are irrelevant for the semantic relationship. For example, \<^const>\<open>mask_read\<close>
-and \<^const>\<open>heap_read\<close> abstract over how the mask and heap read accesses are encoded as Boogie 
-expressions. Other parts are required for the semantic relationship. For example \<^const>\<open>field_translation\<close>
-indicates the related pairs of Viper field names and corresponding Boogie constants
-\<close>
 
 subsection \<open>Value relation\<close>
 
@@ -2637,9 +2626,7 @@ definition fun_interp_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rig
 
 definition tr_wf 
   where "tr_wf Pr ctxt_vpr ctxt tyrep Tr  \<equiv> 
-           fun_interp_rel Pr (field_translation Tr) (fun_translation Tr) ctxt_vpr (fun_interp ctxt) \<and>
-           heap_read_wf tyrep ctxt (heap_read Tr) \<and>
-           mask_read_wf tyrep ctxt (mask_read Tr)"
+           fun_interp_rel Pr (field_translation Tr) (fun_translation Tr) ctxt_vpr (fun_interp ctxt)"
 
 fun block_from_config :: "'a ast_config \<Rightarrow> bigblock"
   where "block_from_config c = fst c"
