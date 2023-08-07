@@ -119,7 +119,6 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
  "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
    red_exhale ctxt R \<omega>0 (Imp e A) \<omega> RFailure"
 
-
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 
 (* old version with predicate heap
@@ -492,6 +491,27 @@ definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a 
                 vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>)
           )
        "
+
+subsection \<open>Alternative introduction rules\<close>
+
+lemma red_exhale_acc_normalI:
+  assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+      and "a = the_address r"
+      and "p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_prat p))" (is "?Success")
+      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p)))" (is "\<omega>' = ?\<omega>def")
+    shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> (RNormal \<omega>')"
+proof -
+  have Eq: "RNormal \<omega>' = exh_if_total ?Success ?\<omega>def"
+    using assms
+    by auto
+
+  show ?thesis
+    apply (subst Eq)
+    apply (rule ExhAcc)
+    using assms
+    by auto
+qed
 
 subsection \<open>Experimental definitions\<close>
 
