@@ -668,9 +668,9 @@ next
          "r = Address a"
 
   from exhale_normal_result_smaller[OF exhale_acc_normal_red_exhale[OF conjunct2[OF Aux]]] and
-       state_rel_consistent[OF StateRel[OF \<open>R _ _\<close>]]
-  show "StateCons (snd \<omega>0_\<omega>def')"
-    using wf_total_consistency_trace_mono_downwardD[OF WfConsistency] mono_prop_downwardD
+       state_rel_consistent[OF StateRel[OF \<open>R _ _\<close>]] 
+  show "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (snd \<omega>0_\<omega>def')"
+    using wf_total_consistency_trace_mono_downwardD[OF WfConsistency] mono_prop_downwardD 
     by blast
 qed (auto)
 

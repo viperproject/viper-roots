@@ -274,7 +274,7 @@ subsection \<open>Field assignment relation\<close>
 lemma field_assign_rel:
   assumes 
     WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
-    Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>" and
+    Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> (\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>)" and
     HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
@@ -297,7 +297,7 @@ lemma field_assign_rel:
                      vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>
                      \<comment>\<open>type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>\<close>
                      get_type (domain_type TyRep) v = ty_vpr \<Longrightarrow>
-                     StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v) \<Longrightarrow>
+                     (consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)) \<Longrightarrow>
                      (\<exists>hb f_bpl_val. 
                        lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and>
                        lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
@@ -349,8 +349,8 @@ proof (rule stmt_rel_intro)
            \<open>domain_type _ = _\<close>
      by simp
 
-   moreover from RedStmt have "StateCons \<omega>'"
-     using total_consistency_red_stmt_preserve[OF WfConsistency] Consistent[OF \<open>R \<omega> ns\<close>]
+   moreover from RedStmt have "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'"
+     using total_consistency_red_stmt_preserve[OF WfConsistency] Consistent[OF _ \<open>R \<omega> ns\<close>]
      by simp
 
    ultimately obtain hb f_bpl_val
@@ -483,7 +483,7 @@ proof (rule field_assign_rel[OF WfConsistency])
          FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
          TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
          NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr" and
-         ConsistentUpdState: "StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
+         ConsistentUpdState: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
 
   from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
@@ -497,7 +497,7 @@ proof (rule field_assign_rel[OF WfConsistency])
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          )"      
-  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
+  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
   obtain hb f_bpl_val where
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
@@ -525,7 +525,7 @@ proof (rule field_assign_rel[OF WfConsistency])
 next
   fix \<omega> ns
   assume "R \<omega> ns"
-  thus "StateCons \<omega>"
+  thus "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>"
     using RStateRel state_rel_consistent
     by blast
 qed (insert assms, auto)
@@ -794,7 +794,7 @@ proof -
       using \<open>\<omega>' \<in> _\<close> exhale_state_same_trace
       by metis
   next
-    show "heap_var_rel Pr (var_context ctxt) TyRep Tr (heap_var Tr) \<omega>' ?ns2"
+    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) \<omega>' ?ns2"
       using ProgramTotal
       unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
@@ -889,9 +889,9 @@ proof (rule state_rel_store_update[OF StateRel])
       by blast
   qed
 next
-  show "StateCons \<omega>"
+  show "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := f'\<rparr>)) \<Longrightarrow> StateCons \<omega>"
     using state_rel_consistent StateRel
-    by blast
+    by fastforce
 next
   show "binder_state ns = Map.empty"
     using state_rel_state_well_typed[OF StateRel, simplified state_well_typed_def]
@@ -1069,6 +1069,8 @@ subsubsection \<open>Main Lemma\<close>
 lemma method_call_stmt_rel:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and "Pr = program_total ctxt_vpr"
+          \<comment>\<open>We need to require state consistency, otherwise framing_exh cannot be established.\<close>
+      and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
       and MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
       and MethodSpecSubset:  "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
                               no_perm_assertion (method_decl.post mdecl) \<and> 
@@ -1133,9 +1135,10 @@ proof (rule stmt_rel_intro_2)
     by blast  
 
   hence "StateCons_t (get_total_full \<omega>)"
-    using state_rel_consistent StateRel WfConsistency
+    using state_rel_consistent StateRel WfConsistency ConsistencyEnabled
     unfolding wf_total_consistency_def
     by blast
+    
 
   have "es = map pure_exp.Var xs"
   proof (rule nth_equalityI)
@@ -1424,7 +1427,7 @@ proof (rule stmt_rel_intro_2)
 
       thus ?thesis
       proof (rule state_rel_store_update[where ?f= var_tr'])
-        show "StateCons ?\<omega>0"
+        show "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr'\<rparr>)) \<Longrightarrow> StateCons ?\<omega>0"
           apply (rule total_consistencyI[OF WfConsistency])
            apply (insert \<open>StateCons_t (get_total_full \<omega>)\<close>)
            apply (solves \<open>simp\<close>)
@@ -1502,11 +1505,11 @@ proof (rule stmt_rel_intro_2)
         apply (insert StoreSameOnArgs, insert MethodSpecSubset)
         by auto
 
-      show ?thesis
+      show ?thesis        
       proof (rule framing_exhI[OF _ _ AssertionFraming_\<omega>0'_only_args])
         show "StateCons ?\<omega>0"
-          using StateRelDuringCall state_rel_consistent
-          by blast
+          using StateRelDuringCall state_rel_consistent ConsistencyEnabled
+          by fastforce
       next
         show "valid_heap_mask (get_mh_total_full ?\<omega>0)"
           using StateRelDuringCall state_rel_wf_mask_simple
@@ -1840,9 +1843,14 @@ proof (rule stmt_rel_intro_2)
          by (auto simp add: map_upd_set_dom)
      next 
        have "StateCons_t (get_total_full \<omega>pre)"
-         using \<open>?RCall \<omega>pre nspre\<close> state_rel_consistent WfConsistency 
-         unfolding wf_total_consistency_def
-         by blast
+       proof -
+         have "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr'\<rparr>))"
+           by (simp add: ConsistencyEnabled)
+         with state_rel_consistent[OF \<open>?RCall \<omega>pre nspre\<close>]  WfConsistency 
+         show ?thesis
+           unfolding wf_total_consistency_def
+           by blast
+       qed                  
 
        show "StateCons
               \<lparr> get_store_total = shift_and_add_list_alt Map.empty (v_args @ v_rets), 
@@ -1979,8 +1987,8 @@ proof (rule stmt_rel_intro_2)
             proof (rule mono_prop_downwardD[OF wf_total_consistency_trace_mono_downwardD[OF WfConsistency] _ gt_\<omega>minus])
               show "StateCons ?\<omega>0_rets"
                 apply (rule total_consistency_store_update[OF WfConsistency])
-                using state_rel_consistent StateRelDuringCall
-                  apply blast
+                using state_rel_consistent StateRelDuringCall ConsistencyEnabled
+                apply fastforce
                 by simp_all
             qed
           
@@ -2276,15 +2284,21 @@ proof (rule stmt_rel_intro_2)
               qed
             next
               have "StateCons_t (get_total_full \<omega>post)"
-                using \<open>?RCallPost \<omega>post _\<close> state_rel_consistent WfConsistency
-                unfolding wf_total_consistency_def
+              proof -
+                have "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr''\<rparr>))"
+                  by (simp add: ConsistencyEnabled)
+
+                with \<open>?RCallPost \<omega>post _\<close> state_rel_consistent WfConsistency 
+                show ?thesis
+                unfolding wf_total_consistency_def                
                 by blast
+              qed
 
               show "StateCons (reset_state_after_call ys v_rets \<omega> \<omega>post)"
                 unfolding reset_state_after_call_def
                 apply (rule total_consistencyI[OF WfConsistency])
                  apply (simp add: \<open>StateCons_t (get_total_full \<omega>post)\<close>)                 
-                using state_rel_consistent[OF StateRel] WfConsistency
+                using state_rel_consistent[OF StateRel] WfConsistency ConsistencyEnabled
                 unfolding wf_total_consistency_def
                 by simp
             next

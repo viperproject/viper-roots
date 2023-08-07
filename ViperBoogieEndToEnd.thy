@@ -440,6 +440,7 @@ definition method_rel
 lemma post_framing_rel_aux:
   assumes
           WfTyRep: "wf_ty_repr_bpl TyRep" and
+          WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
                       "domain_type TyRep = absval_interp_total ctxt_vpr" and
                       "Pr = program_total ctxt_vpr" and
@@ -483,14 +484,18 @@ proof (rule allI | rule impI)+
     R1: "?R Tr \<omega>0 ns1"
     by blast
 
-  have *: "\<And>\<omega>0 \<omega> ns hvar' hvar. state_rel Pr StateCons TyRep (Tr\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
+  have *: "\<And>\<omega>0 \<omega> ns hvar' hvar. state_rel Pr StateCons TyRep ((disable_consistent_state_rel_opt Tr)\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
                     red_expr_bpl ctxt (Var zero_mask_var) ns (AbsV (AMask zero_mask_bpl))"
     apply (rule RedVar)
     using boogie_const_rel_lookup[OF state_rel_boogie_const_rel, where ?const = CZeroMask]
           ZeroMaskConst
     by fastforce
 
-  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+  have "StateCons \<omega>1"
+    using WfConsistency[simplified wf_total_consistency_def] IsEmpty
+    by blast
+
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ \<open>StateCons \<omega>1\<close> _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
        HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
@@ -498,9 +503,9 @@ proof (rule allI | rule impI)+
          Normal ns1)
         ((BigBlock name cs str tr, cont), Normal ns2)" and
     R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
-    using is_empty_total_wf_mask[OF IsEmpty]
-    by force    
-
+    using is_empty_total_wf_mask[OF IsEmpty] 
+    by force
+    
   with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
     using red_ast_bpl_transitive
     by fast
@@ -757,7 +762,7 @@ proof (rule allI | rule impI)+
         \<comment>\<open>the following will have to be adjusted once we track old states\<close>
         have Rpre_old_upd:"?R (update_trace_total \<omega>pre ([old_label \<mapsto> get_total_full \<omega>pre])) nspre"
         proof -
-          have *: "StateCons_t (get_total_full \<omega>pre)"
+          have *: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons_t (get_total_full \<omega>pre)"
             using WfConsistency state_rel_consistent[OF Rpre]
             unfolding wf_total_consistency_def
             by blast
@@ -1467,7 +1472,7 @@ proof -
   
   next
   
-    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var Tr) \<omega> ns"
+    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var Tr) \<omega> ns"
       unfolding heap_var_rel_def
     proof (intro conjI, rule exI, intro conjI)
       have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
@@ -1495,11 +1500,11 @@ proof -
         using DomainTy ViperHeapWellTy by auto
     qed
   
-    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (heap_var_def Tr) \<omega> ns"
+    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var_def Tr) \<omega> ns"
       using \<open>heap_var Tr = _\<close>
       by simp
   next  
-    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var Tr) \<omega> ns"
+    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var Tr) \<omega> ns"
       unfolding mask_var_rel_def
     proof (rule exI, intro conjI)
                     
@@ -1523,7 +1528,7 @@ proof -
         by (simp add: zero_prat.rep_eq)
     qed
   
-    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T Tr (mask_var_def Tr) \<omega> ns"
+    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) \<omega> ns"
       using \<open>mask_var Tr = _\<close>
       by simp
   
