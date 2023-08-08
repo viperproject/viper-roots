@@ -299,6 +299,11 @@ always has at least one failure transition. This is in-sync with the recent Carb
                               resPost \<and>
             res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost \<rbrakk> \<Longrightarrow>        
       red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
+ \<comment>\<open>Labels are not overwritten (would not be possible anyway in well-formed programs)\<close>
+| RedLabel:  "\<lbrakk> \<omega>' = (if get_trace_total \<omega> lbl = None then 
+                             update_trace_total \<omega> ((get_trace_total \<omega>)(lbl \<mapsto> get_total_full \<omega>)) 
+                      else \<omega>) \<rbrakk> \<Longrightarrow> 
+              red_stmt_total ctxt R \<Lambda> (Label lbl) \<omega> (RNormal \<omega>')"   
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
@@ -389,26 +394,16 @@ lemmas red_stmt_total_inversion_thms =
    RedExhaleNormal_case
    RedExhaleFailure_case
 
-text \<open>lift red stmt total to extended initial state \<close>
-abbreviation red_stmt_total_lift 
-  where "red_stmt_total_lift ctxt R \<Lambda> stmt initState targetState \<equiv> True"
-                                                                  
-lemma test:
-  assumes "red_pure_exps_total ctxt R (Some \<omega>) es \<omega> (Some v_args)"
-         "program.methods (program_total ctxt) m = Some mdecl"
-         "red_stmt_total ctxt R \<Lambda> (Exhale (method_decl.pre mdecl)) (update_store_total \<omega> (store_for_spec v_args)) resPre" and
-         "resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre" and
-         "\<And> \<omega>Pre. resPre = RNormal \<omega>Pre \<Longrightarrow> 
-              red_stmt_total ctxt R \<Lambda> (Havoc y) \<omega>Pre (RNormal \<omega>PreHavoc) \<and>
-              red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.pre mdecl)) \<omega>PreHavoc res"   
-  shows "red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
-  oops
-
 subsection \<open>Correctness\<close>
 
+\<comment> \<open>
 definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp list \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_store_well_typed A vs \<sigma> \<equiv> \<forall>i. 0 \<le> i \<and> i < length vs \<longrightarrow> 
                          map_option (\<lambda>v. get_type A v) (\<sigma> i) = Some (vs ! i)"
+\<close>
+
+definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> type_context \<Rightarrow> 'a store \<Rightarrow> bool"
+  where "vpr_store_well_typed A \<Lambda> \<sigma> \<equiv> \<forall>x t. \<Lambda> x = Some t \<longrightarrow> map_option (\<lambda>v. get_type A v) (\<sigma> x) = Some t"
 
 definition vpr_method_correct_total_aux :: 
           "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl 
@@ -416,7 +411,7 @@ definition vpr_method_correct_total_aux ::
                \<Rightarrow>  bool" where
   "vpr_method_correct_total_aux ctxt R mdecl CorrectWrtPre \<equiv>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
-            vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+            vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
             is_empty_total_full \<omega> \<longrightarrow>
             red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>
@@ -428,16 +423,40 @@ definition vpr_method_correct_total_aux ::
             )
          )"
 
+lemma vpr_method_correct_total_aux_normalD:
+  assumes "vpr_method_correct_total_aux ctxt R mdecl CorrectWrtPre"
+      and "red_inhale ctxt R (method_decl.pre mdecl) \<omega> (RNormal \<omega>pre)"
+      and "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) (get_store_total \<omega>)"
+      and "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>)"
+      and "is_empty_total_full \<omega>"
+    shows "CorrectWrtPre ctxt R mdecl \<omega>pre \<omega>"
+  using assms
+  unfolding vpr_method_correct_total_aux_def
+  by blast
+
 definition vpr_postcondition_framed :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a total_state \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_postcondition_framed ctxt R postcondition \<phi>pre \<sigma> \<equiv>
-                   (\<forall>mh. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
-                         wf_mask_simple (get_mh_total mh) \<longrightarrow>
-                         assertion_framing_state ctxt R postcondition
-                                 \<lparr> get_store_total = \<sigma>,
-                                 \<comment>\<open>old state given by state that satisfies precondition\<close>
-                                  get_trace_total = [old_label \<mapsto> \<phi>pre], 
-                                  get_total_full = mh \<rparr>
+               (\<forall>mh trace. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh) \<longrightarrow>
+                     wf_mask_simple (get_mh_total mh) \<longrightarrow>
+                    \<comment>\<open>old state given by state that satisfies precondition, any other available labels
+                       are irrelevant, since well-formed postconditions can only have the label \<^const>\<open>old_label\<close>\<close>
+                     trace old_label = Some \<phi>pre \<longrightarrow>
+                     assertion_framing_state ctxt R postcondition
+                             \<lparr> get_store_total = \<sigma>,
+                               get_trace_total = trace, 
+                               get_total_full = mh \<rparr>
                 )"
+
+lemma vpr_postcondition_framed_assertion_framing_state:
+  assumes "vpr_postcondition_framed ctxt R postcondition \<phi>pre \<sigma>"
+      and "\<omega> = \<lparr> get_store_total = \<sigma>, get_trace_total = trace, get_total_full = mh \<rparr>"
+      and "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh)"
+      and "wf_mask_simple (get_mh_total mh)"
+      and "trace old_label = Some \<phi>pre"
+    shows "assertion_framing_state ctxt R postcondition \<omega>"
+  using assms
+  unfolding vpr_postcondition_framed_def
+  by blast
 
 definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "vpr_method_body_correct ctxt R mdecl \<omega>pre \<equiv>
@@ -456,7 +475,7 @@ definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_t
 definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
-            vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+            vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
             is_empty_total_full \<omega> \<longrightarrow>
             red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre \<longrightarrow>

@@ -1019,47 +1019,47 @@ proof -
   qed
 qed
 
-lemma  vpr_store_well_typed_append:
-  assumes ArgsWellTy: "vals_well_typed A v_args (method_decl.args mdecl) " 
+lemma vpr_store_well_typed_append:
+  assumes ArgsWellTy: "vals_well_typed A v_args (method_decl.args mdecl)" 
       and RetsWellTy: "vals_well_typed A v_rets (method_decl.rets mdecl)" 
       and LengthArgs: "length (method_decl.args mdecl) = length v_args"
       and LengthRets: "length (method_decl.rets mdecl) = length v_rets"
-    shows "vpr_store_well_typed A (method_decl.args mdecl @ rets mdecl) (shift_and_add_list_alt Map.empty (v_args@v_rets))"
-proof (unfold vpr_store_well_typed_def, rule allI | rule impI)+
-  fix i
-  assume *: "0 \<le> i \<and> i < length (method_decl.args mdecl @ rets mdecl)"
+    shows "vpr_store_well_typed A (nth_option (method_decl.args mdecl @ rets mdecl)) (shift_and_add_list_alt Map.empty (v_args@v_rets))"
+proof (unfold vpr_store_well_typed_def, (rule allI | rule impI)+)
+  fix x t
+  assume *: "nth_option (method_decl.args mdecl @ rets mdecl) x = Some t"
   have LengthMdeclArgsRets: "length (method_decl.args mdecl) = length v_args \<and> length (method_decl.rets mdecl) = length v_rets"
     using RedMethodCall assms
     by (fastforce dest: vals_well_typed_same_lengthD)
-  with * have "i < length (v_args @ v_rets)"
-    by simp            
+  with * have "x < length (v_args @ v_rets)"
+    by (simp split: if_split_asm)
 
-  hence Lookup: "shift_and_add_list_alt Map.empty (v_args @ v_rets) i = Some ((v_args @ v_rets) !i)"
+  hence Lookup: "shift_and_add_list_alt Map.empty (v_args @ v_rets) x = Some ((v_args @ v_rets) ! x)"
     using * shift_and_add_list_alt_lookup_1
     by metis
 
-  show "map_option (get_type A) (shift_and_add_list_alt Map.empty (v_args @ v_rets) i) =
-        Some ((method_decl.args mdecl @ rets mdecl) ! i)"
+  show "map_option (get_type A) (shift_and_add_list_alt Map.empty (v_args @ v_rets) x) = Some t"
   proof (subst Lookup, simp)
-    show "get_type A ((v_args @ v_rets) ! i) = (method_decl.args mdecl @ method_decl.rets mdecl) ! i"
-    proof (cases "i < length v_args")
+    show "get_type A ((v_args @ v_rets) ! x) = t"
+    proof (cases "x < length v_args")
       case True
-      hence "(v_args @ v_rets) ! i = v_args ! i" 
+      hence "(v_args @ v_rets) ! x = v_args ! x" 
         using nth_append 
         by metis
-      moreover from True have "(method_decl.args mdecl @ method_decl.rets mdecl) ! i = method_decl.args mdecl ! i"
+      moreover from True have "(method_decl.args mdecl @ method_decl.rets mdecl) ! x = method_decl.args mdecl ! x"
         using nth_append * LengthArgs
         by (metis LengthMdeclArgsRets)
       ultimately show ?thesis          
         using True ArgsWellTy
         unfolding vals_well_typed_def 
-        by (metis nth_map)
+        by (metis "*" LengthArgs LengthRets \<open>x < length (v_args @ v_rets)\<close> length_append nth_map nth_option.elims option.inject)
     next
       case False
       thus ?thesis 
-        using \<open>i < length (v_args @ v_rets)\<close> RetsWellTy ArgsWellTy
+        using \<open>x < length (v_args @ v_rets)\<close> RetsWellTy ArgsWellTy
         unfolding vals_well_typed_def 
-        by (metis map_append nth_map)
+        apply simp
+        by (metis (mono_tags, lifting) "*" \<open>x < length (v_args @ v_rets)\<close> length_map map_append nth_map nth_option.elims option.inject)        
     qed
   qed
 qed
@@ -1483,7 +1483,7 @@ proof (rule stmt_rel_intro_2)
       proof (rule allI, rule impI)+
         fix res
         assume "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_rets_empty res"           
-        moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (shift_and_add_list_alt Map.empty (v_args@v_rets))"
+        moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (shift_and_add_list_alt Map.empty (v_args@v_rets))"
           apply (rule vpr_store_well_typed_append)
           using RedMethodCall \<open>mdecl = mdecl'\<close>
           by (auto dest: vals_well_typed_same_lengthD)
@@ -1931,7 +1931,7 @@ proof (rule stmt_rel_intro_2)
             by argo
         qed
 
-        have StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total ?\<omega>0_rets_empty)"
+        have StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total ?\<omega>0_rets_empty)"
           apply simp
           apply (rule vpr_store_well_typed_append)
           using RedMethodCall \<open>mdecl = mdecl'\<close>
@@ -2043,7 +2043,7 @@ proof (rule stmt_rel_intro_2)
             using PostFramedAux
             unfolding vpr_postcondition_framed_def
             using assertion_framing_state_def 
-            by blast                        
+            by (metis fun_upd_same)                     
         qed
       qed
 

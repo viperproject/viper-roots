@@ -7,7 +7,7 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
         \<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow>
          (\<forall>(\<omega> :: 'a full_total_state) r. 
                   \<comment>\<open>TODO: reverse list?\<close>
-                  vpr_store_well_typed (absval_interp_total ctxt) (method_decl.args mdecl @ method_decl.rets mdecl) (get_store_total \<omega>) \<longrightarrow>
+                  vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) (get_store_total \<omega>) \<longrightarrow>
                   total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
                   is_empty_total_full \<omega> \<longrightarrow>
                   red_stmt_total ctxt R (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) mbody \<omega> r \<longrightarrow> r \<noteq> RFailure)"
@@ -249,7 +249,7 @@ lemma end_to_end_stmt_rel:
 \<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
      FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)" and
      InitialStateRel: "\<And> \<omega>.  
-                       vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
+                       vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
                        is_empty_total_full \<omega> \<Longrightarrow>
                        \<exists>ns ls gs.
@@ -263,7 +263,7 @@ proof (rule allI | rule impI)+
   let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
   fix \<omega> r  body_vpr_prf
   assume "method_decl.body mdecl = Some body_vpr_prf" and
-         StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
+         StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
          "is_empty_total_full \<omega>" and
          RedStmtVpr:"red_stmt_total ctxt_vpr StateCons ?\<Lambda> body_vpr_prf \<omega> r"
@@ -426,21 +426,24 @@ definition post_framing_rel
                                total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1) \<longrightarrow>
                                post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
                    )"
-
 definition method_rel
   where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
                    post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 \<gamma>Pre \<and>
-                   (  \<comment>\<open>The correctness of spec must be taken into account in this left-hand side here and 
+                   (  \<comment>\<open>The correctness of the spec must be taken into account in this left-hand side here and 
                          not in a previous conjunct, since the previous conjunct is required to justify the 
                          correctness of the spec.
                          We need this left-hand side, because the Boogie encoding may rely on the correctness
-                         of the specs.\<close>
+                         of the specs.\<close> 
                       vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
                       (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
                        \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
-                       stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>                       
-                       stmt_rel R1 R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post)
+                         stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>    
+                          \<comment>\<open>because framedness of the postcondition was checked above, we may use it here.
+                             TODO: could make sense to abstract the \<^term>\<open>framing_exh\<close> away via a paremeter\<close>                   
+                         stmt_rel (\<lambda> \<omega> ns. R1 \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>) 
+                                  R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post
+                      )
                    )
           )"
 
@@ -565,6 +568,103 @@ proof -
     by blast
 qed
 
+lemma vpr_store_well_typed_map_upds:
+  assumes "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> \<sigma>"
+      and "vals_well_typed (absval_interp_total ctxt_vpr) v_rets ts"
+      and "list_all2 (\<lambda>y t. y = Some t) (map \<Lambda> ys) ts"
+    shows "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (map_upds \<sigma> ys v_rets)"
+  sorry
+
+lemma red_stmt_preserves_well_typed_store:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res"
+      and "res = RNormal \<omega>'"
+      and "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (get_store_total \<omega>)"
+    shows "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (get_store_total \<omega>')"
+  using assms
+proof (induction arbitrary: \<omega>')
+  case (RedSkip \<omega>)
+  then show ?case by simp
+next
+  case (RedInhale A \<omega> res)
+  then show ?case 
+    by (metis inhale_only_changes_mask(3))
+next
+  case (RedExhale \<omega> A \<omega>_exh \<omega>')
+  then show ?case 
+    by (metis exhale_only_changes_total_state_aux exhale_state_same_store stmt_result_total.inject)
+next
+  case (RedHavoc x ty v \<omega>)
+  then show ?case 
+    unfolding vpr_store_well_typed_def
+    by auto
+next
+  case (RedLocalAssign \<omega> e v x ty)
+  then show ?case 
+    unfolding vpr_store_well_typed_def
+    by auto
+next
+  case (RedMethodCall \<omega> es v_args m mdecl ys v_rets resPre res resPost)
+  obtain \<omega>pre where "resPre = RNormal \<omega>pre"
+    using \<open>resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre\<close> \<open>res = _\<close>
+    by (cases res; cases resPre; auto)
+
+  with RedMethodCall have ResMap: "res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost"
+    by blast
+
+  with \<open>res = RNormal \<omega>'\<close> obtain \<omega>post where "resPost = RNormal \<omega>post"
+    by (auto elim: map_stmt_result_total.elims)
+
+  with \<open>res = RNormal \<omega>'\<close> ResMap have "\<omega>' = (reset_state_after_call ys v_rets \<omega> \<omega>post)"
+    by simp
+
+  moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (map_upds (get_store_total \<omega>) ys v_rets)"
+    using RedMethodCall vpr_store_well_typed_def vpr_store_well_typed_map_upds
+    by fast
+  ultimately show ?case
+    by (simp add: reset_state_after_call_def) 
+next
+  case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res)
+  then show ?case sorry
+next
+  case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>')
+  then show ?case sorry
+next
+  case (RedUnfoldWildcardFailure \<omega> e_args v_args pred_id)
+  then show ?case sorry
+next
+  case (RedFold \<omega> e_args v_args e_p v_p pred_id res)
+  then show ?case sorry
+next
+  case (RedFoldWildcard \<omega> e_args v_args pred_id p res)
+  then show ?case sorry
+next
+  case (RedScope v \<tau> scopeBody \<omega> res res_unshift)
+  then show ?case sorry
+next
+  case (RedIfTrue \<omega> e_b s_thn res s_els)
+  then show ?case by blast
+next
+  case (RedIfFalse \<omega> e_b s_els res s_thn)
+  then show ?case by blast
+next
+  case (RedSeq s1 \<omega> \<omega>' s2 res)
+  then show ?case by blast
+qed (auto)
+
+lemma red_stmt_preserves_labels:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res" 
+      and "res = RNormal \<omega>'"
+      and "get_trace_total \<omega> lbl = Some \<phi>"
+    shows "get_trace_total \<omega>' lbl = Some \<phi>"
+  sorry
+
+lemma red_stmt_preserves_unmodified_variables:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res"
+      and "res = RNormal \<omega>'"
+      and "x \<notin> modif stmt"
+    shows "get_store_total \<omega> x = get_store_total \<omega>' x"
+  sorry
+
 lemma end_to_end_stmt_rel_2:
   assumes 
           \<comment>\<open>The Boogie procedure is correct. Note that we need to explicitly provide the types such that
@@ -572,39 +672,47 @@ lemma end_to_end_stmt_rel_2:
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
       and StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+      and ProgMethod: "methods (program_total ctxt_vpr) mname = Some mdecl"
       and VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
+      and VprNoPermUnfoldingPre: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl)"
       and VprNoPermUnfoldingPost: "no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)"
+      and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
+      and ArgsAndRetsUnmodified: "\<And>x. x < (length (method_decl.args mdecl) + length (method_decl.rets mdecl)) \<Longrightarrow> x \<notin> modif body_vpr"
       and ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)"
 
           \<comment>\<open>The Viper encoding does not use Boogie procedure preconditions\<close>
       and ProcPresEmpty: "proc_pres proc_bpl = []"
-                         "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))"
-                         "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"
+      and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
+      and "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"
       and VprMethodRel: "method_rel 
-               (state_rel_empty (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
-               (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+               (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
+               (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
                ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl               
                (convert_ast_to_program_point proc_body_bpl)" 
           (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0")
-      and TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep"                 
+      and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
+      and TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep"  
+      and DomainType: "domain_type TyRep = absval_interp_total ctxt_vpr"
       and ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []"
       and VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)"
       and WfTyRep: "wf_ty_repr_bpl TyRep"
       and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)"
       and InitialStateRel: "\<And> \<omega>.  
-                       vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
+                       vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
                        is_empty_total_full \<omega> \<Longrightarrow>
                        \<exists>ns ls gs.
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
-                           (state_rel_empty (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
+                           (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
 shows "vpr_method_correct_total_partial ctxt_vpr StateCons mdecl"
   unfolding vpr_method_correct_total_partial_def vpr_method_correct_total_aux_def
 proof (rule allI | rule impI)+
   text \<open>Proof setup: deconstruct relation statement\<close>
+
+  let ?R1Post = "\<lambda>\<omega> ns. ?R1 \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>"
 
   from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
@@ -612,17 +720,17 @@ proof (rule allI | rule impI)+
     BodyRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
               stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
     PostExhRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
-              stmt_rel ?R1 Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
+              stmt_rel ?R1Post Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
     using VprMethodBodySome
-    by auto  
+    by auto     
 
   text \<open>start actual proof\<close>
 
   let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
   fix \<omega> rpre
   assume 
-         StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>)" and
+         StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>)" and
          HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
          "is_empty_total_full \<omega>" and
          RedInhPre: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> rpre"
@@ -634,13 +742,13 @@ proof (rule allI | rule impI)+
   obtain ns ls gs where 
     "ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>" and
   StateRelInitialInst: 
-    "state_rel_empty (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
+    "state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
     using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total_full \<omega>\<close>]
     by blast
 
-  from StateRelInitialInst have StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+  from StateRelInitialInst have StateRel: "state_rel (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
     by (simp add: state_rel_empty_def)
     
   have
@@ -732,19 +840,20 @@ proof (rule allI | rule impI)+
       from stmt_rel_normal_elim[OF PreInhRel StateRelInitialInst] RedInhPre
           obtain nspre where
             RedPreBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) (\<gamma>Pre, Normal nspre)" and
-            Rpre: "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>pre nspre" (is "?R \<omega>pre nspre")
+            Rpre: "state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons TyRep Tr AuxPred \<omega>pre nspre" (is "?R \<omega>pre nspre")
             using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
             by blast
 
-      show "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>)"
+      show PostFramed: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>)"
         unfolding vpr_postcondition_framed_def assertion_framing_state_def
       proof (rule allI | rule impI)+
-        fix mh res
-        let ?\<omega>Post = "\<lparr>get_store_total = get_store_total \<omega>, get_trace_total = [old_label \<mapsto> get_total_full \<omega>pre], get_total_full = mh\<rparr>"
-        let ?\<omega>PostEmpty = "empty_full_total_state (get_store_total \<omega>) [old_label \<mapsto> get_total_full \<omega>pre] (get_hh_total mh) (get_hp_total mh)"
+        fix mh trace res
+        let ?\<omega>Post = "\<lparr>get_store_total = get_store_total \<omega>, get_trace_total = trace, get_total_full = mh\<rparr>"
+        let ?\<omega>PostEmpty = "empty_full_total_state (get_store_total \<omega>) trace (get_hh_total mh) (get_hp_total mh)"
         assume 
-              "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total mh)" and
-              RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
+              "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total mh)"
+          and TraceOldState: "trace old_label = Some (get_total_full \<omega>pre)"
+          and RedInhPost:"red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>Post res"
 
         hence HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>PostEmpty)"
           by (simp add: empty_full_total_state_def)
@@ -862,14 +971,91 @@ proof (rule allI | rule impI)+
             from stmt_rel_normal_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain nsbody
               where 
                RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Body, Normal nsbody)" and
-               Rbody: "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>body nsbody"
+               Rbody: "state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons TyRep Tr AuxPred \<omega>body nsbody"
               using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect
               by auto
 
-            with stmt_rel_failure_elim[OF PostExhRel Rbody]
+            have FramingExhPost: "framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega>body \<omega>body"
+            proof (rule framing_exhI_state_rel[OF Rbody ConsistencyEnabled])
+
+              from SpecsCorrect and ProgMethod 
+              have SpecCorrectMdecl: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
+                unfolding vpr_all_method_spec_correct_total_def
+                by blast
+
+              thm \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close>
+
+              let ?\<omega>_store_body = "(\<omega> \<lparr> get_store_total := get_store_total \<omega>body \<rparr>)"
+              have StoresAgreeOnArgs: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> get_store_total \<omega> x = get_store_total ?\<omega>_store_body x" (is "\<And>x. ?A x \<Longrightarrow> ?B x")
+                  \<comment>\<open>use that body does not modify arguments\<close>
+              proof -
+                fix x
+                assume "?A x"
+                hence "x < length (method_decl.args mdecl)"
+                  using OnlyArgsInPre
+                  by blast
+                hence "x \<notin> modif body_vpr"
+                  using ArgsAndRetsUnmodified
+                  by simp
+                hence "get_store_total \<omega> x = get_store_total \<omega>body x"
+                  using red_stmt_preserves_unmodified_variables VprMethodBodySome RedBodyVpr \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close>
+                  by fastforce
+                thus "?B x"
+                  by simp           
+              qed                
+
+              with OnlyArgsInPre VprNoPermUnfoldingPre RedInhPre \<open>rpre = RNormal \<omega>pre\<close>
+              have RedInhStoreBody: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) 
+                        ?\<omega>_store_body (RNormal (\<omega>pre \<lparr> get_store_total := get_store_total \<omega>body \<rparr>))"
+                using red_pure_exp_inhale_store_same_on_free_var(3)[OF RedInhPre _ StoresAgreeOnArgs]
+                by simp
+                
+              hence 
+               PostFramedStoreBody: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full (\<omega>pre\<lparr>get_store_total := get_store_total \<omega>body\<rparr>))
+                                                                                     (get_store_total ?\<omega>_store_body)"            
+              proof (rule vpr_method_correct_total_aux_normalD[OF SpecCorrectMdecl[simplified vpr_method_spec_correct_total_def]])
+                show "vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total ?\<omega>_store_body)"
+                  apply simp
+                  using RedBodyVpr \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close> red_stmt_preserves_well_typed_store StoreWellTy
+                  by (metis update_trace_total_store_same)
+              next
+                show "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full (\<omega>\<lparr>get_store_total := get_store_total \<omega>body\<rparr>))"
+                  using HeapWellTy 
+                  by simp
+              next
+                show "is_empty_total_full (\<omega>\<lparr>get_store_total := get_store_total \<omega>body\<rparr>)"
+                  using \<open>is_empty_total_full \<omega>\<close>
+                  unfolding is_empty_total_full_def
+                  by simp
+              qed
+
+              let ?\<phi> = "get_total_full \<omega>body \<lparr> get_mh_total := zero_mask, get_mp_total := zero_mask \<rparr>"
+
+              show "assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) (update_m_total_full \<omega>body zero_mask zero_mask)"
+              proof (rule vpr_postcondition_framed_assertion_framing_state[OF PostFramedStoreBody])
+                show "update_m_total_full \<omega>body zero_mask zero_mask = 
+                     \<lparr>get_store_total = get_store_total (\<omega>\<lparr>get_store_total := get_store_total \<omega>body\<rparr>), get_trace_total = get_trace_total \<omega>body, 
+                                                           get_total_full = ?\<phi>\<rparr>"
+                  by auto
+              next
+                show "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total ?\<phi>)"
+                  using state_rel_heap_var_rel[OF Rbody] DomainType
+                  unfolding heap_var_rel_def
+                  by simp
+              next
+                show "valid_heap_mask (get_mh_total ?\<phi>)"
+                  using wf_zero_mask by auto                                    
+              next
+                show "get_trace_total \<omega>body old_label = Some (get_total_full (\<omega>pre\<lparr>get_store_total := get_store_total \<omega>body\<rparr>))"
+                  using red_stmt_preserves_labels RedBodyVpr \<comment>\<open>Use that body does not overwrite the old label\<close>
+                  by fastforce
+              qed
+            qed
+
+            with stmt_rel_failure_elim[OF PostExhRel]
             obtain c' where "snd c' = Failure" and 
                             "red_ast_bpl proc_body_bpl ctxt (\<gamma>Body, Normal nsbody) c'"
-              using RedExhPost RedExhaleFailure SpecsCorrect
+              using Rbody FramingExhPost RedExhPost RedExhaleFailure SpecsCorrect 
               by blast
 
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
@@ -1366,7 +1552,9 @@ definition var_rel_prop
                    lookup_vdecls_ty local_decls (snd var_vpr_var_bpl) = Some ty_bpl"
 
 lemma var_rel_prop_aux:
-  assumes WellTy: "vpr_store_well_typed A vs \<sigma>" and 
+  assumes WellTy: "vpr_store_well_typed A \<Lambda> \<sigma>" and 
+          "\<Lambda> = map_of var_ty_list" and
+          "vs = map snd var_ty_list" and
           "domain_type T = A" and
           ListAll2: "list_all2 (var_rel_prop T local_decls) vs var_rel_list" and
           VarRelFst: "map fst var_rel_list = upt 0 (length vs)" and
@@ -1374,6 +1562,8 @@ lemma var_rel_prop_aux:
   shows "\<exists>v_vpr. \<sigma> x_vpr = Some v_vpr \<and> 
                                       (\<exists>t. lookup_vdecls_ty local_decls x_bpl = Some t \<and>
                                            type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t)"
+  oops
+(*
 proof -
   from LookupVarRel obtain i
     where  "i < length var_rel_list" and
@@ -1391,9 +1581,9 @@ proof -
     by (metis add_0 fst_conv nth_map nth_upt)
 
   from WellTy obtain v_vpr where "\<sigma> i = Some v_vpr" and "get_type A v_vpr = vs ! i"
-    using \<open>i < _\<close> \<open>length vs = _\<close>
+    using \<open>i < _\<close> \<open>length vs = _\<close> assms
     unfolding vpr_store_well_typed_def
-    by auto
+    
 
   thus ?thesis
     using vpr_to_bpl_val_type \<open>domain_type _  = _\<close> \<open>i = _\<close>
@@ -1401,6 +1591,7 @@ proof -
     unfolding var_rel_prop_def
     by fastforce
 qed
+*)
  
 lemma boogie_const_rel_aux:
   assumes ConstTy: "\<And>c. lookup_vdecls_ty (fst \<Lambda>) (const_repr Tr c) = Some (boogie_const_ty T c)" and

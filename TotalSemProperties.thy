@@ -1303,20 +1303,28 @@ lemma vpr_postcondition_framed_mono:
     shows "vpr_postcondition_framed ctxt StateCons A \<phi>' \<sigma>" 
   unfolding vpr_postcondition_framed_def
 proof (rule allI | rule impI)+
-  fix mh
-  let ?\<omega>' = "\<lparr>get_store_total = \<sigma>, get_trace_total = [old_label \<mapsto> \<phi>'], get_total_full = mh\<rparr>"
-  let ?\<omega> = "\<lparr>get_store_total = \<sigma>, get_trace_total = [old_label \<mapsto> \<phi>], get_total_full = mh\<rparr>"
+  fix mh trace
+
+  assume TraceOldLabel: "trace old_label = Some \<phi>'"
+  
+  let ?trace' = "trace (old_label \<mapsto> \<phi>')"
+  let ?\<omega>' = "\<lparr>get_store_total = \<sigma>, get_trace_total = trace, get_total_full = mh\<rparr>"
+  let ?\<omega> = "\<lparr>get_store_total = \<sigma>, get_trace_total = ?trace', get_total_full = mh\<rparr>"
   have Leq: "?\<omega> \<le> ?\<omega>'"
-    using \<open>\<phi> \<le> \<phi>'\<close>
+    using \<open>\<phi> \<le> \<phi>'\<close> TraceOldLabel
     unfolding less_eq_full_total_state_ext_def
-    by simp
+    by auto
 
   assume "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total mh)"
      and "valid_heap_mask (get_mh_total mh)"
 
   moreover from this have "assertion_framing_state ctxt StateCons A ?\<omega>"
-    using assms Leq assertion_framing_state_mono
-    by (simp add: vpr_postcondition_framed_def)
+    using assms Leq assertion_framing_state_mono TraceOldLabel
+    unfolding vpr_postcondition_framed_def
+    \<comment>\<open>Important to look at this step next\<close>
+   
+    
+ (*   by (simp add: vpr_postcondition_framed_def)*)
 
   thus "assertion_framing_state ctxt StateCons A ?\<omega>'"
     using assertion_framing_state_mono Leq assms
