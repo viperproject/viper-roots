@@ -431,10 +431,17 @@ definition method_rel
   where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
                    post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 \<gamma>Pre \<and>
-                   (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
+                   (  \<comment>\<open>The correctness of spec must be taken into account in this left-hand side here and 
+                         not in a previous conjunct, since the previous conjunct is required to justify the 
+                         correctness of the spec.
+                         We need this left-hand side, because the Boogie encoding may rely on the correctness
+                         of the specs.\<close>
+                      vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
+                      (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
                        \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
                        stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>                       
                        stmt_rel R1 R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post)
+                   )
           )"
 
 lemma post_framing_rel_aux:
@@ -519,37 +526,73 @@ proof (rule allI | rule impI)+
     done
 qed
 
+definition vpr_method_correct_total_partial :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total_partial ctxt StateCons mdecl \<equiv>
+         vpr_method_correct_total_aux ctxt StateCons mdecl 
+          (\<lambda>ctxt R mdecl \<omega>pre \<omega>.
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
+                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> 
+                         vpr_all_method_spec_correct_total ctxt StateCons (program_total ctxt) \<longrightarrow>
+                         vpr_method_body_correct ctxt R mdecl \<omega>pre)
+          )
+       "
+
+lemma vpr_method_correct_total_from_partial:
+  assumes "\<And> m' mdecl' . methods (program_total ctxt) m' = Some mdecl' \<Longrightarrow> vpr_method_correct_total_partial ctxt StateCons mdecl'"
+      and "methods (program_total ctxt) m = Some mdecl"
+    shows  "vpr_method_correct_total_2_new ctxt StateCons mdecl"
+proof -
+  have SpecsCorrect: "vpr_all_method_spec_correct_total ctxt StateCons (program_total ctxt)"
+    unfolding vpr_all_method_spec_correct_total_def
+  proof (rule allI | rule impI)+
+    fix m mdecl
+    assume "methods (program_total ctxt) m = Some mdecl"
+    hence "vpr_method_correct_total_partial ctxt StateCons mdecl"
+      using assms
+      by blast    
+    thus "vpr_method_spec_correct_total ctxt StateCons mdecl"
+      unfolding vpr_method_correct_total_partial_def vpr_method_spec_correct_total_def vpr_method_correct_total_aux_def
+      by blast
+  qed
+
+  have "vpr_method_correct_total_partial ctxt StateCons mdecl"
+    using assms
+    by auto
+
+  thus "vpr_method_correct_total_2_new ctxt StateCons mdecl"
+    using SpecsCorrect
+    unfolding vpr_method_correct_total_partial_def vpr_method_correct_total_2_new_def vpr_method_correct_total_aux_def
+    by blast
+qed
 
 lemma end_to_end_stmt_rel_2:
   assumes 
-          \<comment>\<open>The Boogie procedure is correct.\<close>             
-             \<comment>\<open>Note that we need to explicitly provide the type for \<^term>\<open>A\<close> to 
-                be able to instantiate \<^term>\<open>A\<close> with \<^term>\<open>vbpl_absval_ty TyRep\<close>\<close>
+          \<comment>\<open>The Boogie procedure is correct. Note that we need to explicitly provide the types such that
+             we can then instantiate the Boogie type interpretation with \<^term>\<open>vbpl_absval_ty TyRep\<close>.\<close>
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
-                  (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))" and 
-          StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>" and
-          VprMethodBodySome: "method_decl.body mdecl = Some body_vpr" and
-          VprNoPermUnfoldingPost: "no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)" and
-          ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)" and
+                  (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
+      and StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+      and VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
+      and VprNoPermUnfoldingPost: "no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)"
+      and ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)"
 
-          \<comment>\<open>Viper encoding does not use Boogie procedure preconditions\<close>
-          ProcPresEmpty: "proc_pres proc_bpl = []" and
-                         "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))" and
-
-          VprMethodRel: "method_rel 
+          \<comment>\<open>The Viper encoding does not use Boogie procedure preconditions\<close>
+      and ProcPresEmpty: "proc_pres proc_bpl = []"
+                         "\<Lambda> = (nth_option (method_decl.args mdecl @ rets mdecl))"
+                         "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"
+      and VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
                ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl               
                (convert_ast_to_program_point proc_body_bpl)" 
-          (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0") and
-    TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep" and                  
-    ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []" and
-    VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)" and
-    WfTyRep: "wf_ty_repr_bpl TyRep" and
-    WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
-\<comment>\<open>TODO: I have not yet proved the following assumptions for specific Boogie programs\<close>
-     FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)" and
-     InitialStateRel: "\<And> \<omega>.  
+          (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0")
+      and TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep"                 
+      and ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []"
+      and VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)"
+      and WfTyRep: "wf_ty_repr_bpl TyRep"
+      and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)"
+      and InitialStateRel: "\<And> \<omega>.  
                        vpr_store_well_typed (absval_interp_total ctxt_vpr) (method_decl.args mdecl @ rets mdecl) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
                        is_empty_total_full \<omega> \<Longrightarrow>
@@ -558,19 +601,21 @@ lemma end_to_end_stmt_rel_2:
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
-shows "vpr_method_correct_total_2 ctxt_vpr StateCons mdecl"
-  unfolding vpr_method_correct_total_2_def
+shows "vpr_method_correct_total_partial ctxt_vpr StateCons mdecl"
+  unfolding vpr_method_correct_total_partial_def vpr_method_correct_total_aux_def
 proof (rule allI | rule impI)+
   text \<open>Proof setup: deconstruct relation statement\<close>
 
   from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
     PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 \<gamma>Pre" and
-    BodyRel: "stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
-    PostExhRel: "stmt_rel ?R1 Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
+    BodyRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
+              stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
+    PostExhRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
+              stmt_rel ?R1 Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
     using VprMethodBodySome
-    by force    
+    by auto  
 
   text \<open>start actual proof\<close>
 
@@ -648,7 +693,8 @@ proof (rule allI | rule impI)+
        (\<forall>\<omega>pre.
            rpre = RNormal \<omega>pre \<longrightarrow>
            vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and> 
-           (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)
+           (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow>
+                    vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)
         )"
         (is "?Goal1 \<and> ?Goal2")
   proof (rule conjI)
@@ -747,15 +793,16 @@ proof (rule allI | rule impI)+
         qed
       qed
 
-      show "\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
+      show "\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
         unfolding vpr_method_body_correct_def
       proof (rule allI | rule impI | rule conjI)+
         let ?\<omega>pre' = "(update_trace_total \<omega>pre [old_label \<mapsto> get_total_full \<omega>pre])"
         let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
         let ?mbody = "(the (method_decl.body mdecl))"
         fix mbody rpost
-        assume "method_decl.body mdecl = Some mbody" and
-              RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
+        assume "method_decl.body mdecl = Some mbody"
+           and SpecsCorrect: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"   
+           and RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
                                (Seq ?mbody (Exhale (method_decl.post mdecl)))
                                ?\<omega>pre' rpost"
 
@@ -791,7 +838,7 @@ proof (rule allI | rule impI)+
    
             with stmt_rel_failure_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain c' 
               where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) c'"
-              using \<open>\<Lambda> = _\<close> VprMethodBodySome
+              using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect
               by fastforce
   
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
@@ -816,13 +863,13 @@ proof (rule allI | rule impI)+
               where 
                RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Body, Normal nsbody)" and
                Rbody: "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>body nsbody"
-              using \<open>\<Lambda> = _\<close> VprMethodBodySome
+              using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect
               by auto
 
             with stmt_rel_failure_elim[OF PostExhRel Rbody]
             obtain c' where "snd c' = Failure" and 
                             "red_ast_bpl proc_body_bpl ctxt (\<gamma>Body, Normal nsbody) c'"
-              using RedExhPost RedExhaleFailure
+              using RedExhPost RedExhaleFailure SpecsCorrect
               by blast
 
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"

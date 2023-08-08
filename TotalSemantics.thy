@@ -492,6 +492,9 @@ definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a 
           )
        "
 
+definition vpr_all_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> program \<Rightarrow> bool" where
+  "vpr_all_method_spec_correct_total ctxt R Pr \<equiv> \<forall>m mdecl. methods Pr m = Some mdecl \<longrightarrow> vpr_method_spec_correct_total ctxt R mdecl"
+
 subsection \<open>Alternative introduction rules\<close>
 
 lemma red_exhale_acc_normalI:
