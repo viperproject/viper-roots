@@ -102,6 +102,27 @@ lemma framing_exhI:
   unfolding framing_exh_def
   by blast
 
+lemma framing_exhI_state_rel:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+      and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"      
+      and Framed: "assertion_framing_state ctxt_vpr StateCons A (update_m_total_full \<omega> zero_mask zero_mask)"      
+    shows "framing_exh ctxt_vpr StateCons A \<omega> \<omega>"
+proof (rule framing_exhI[OF _ _ Framed])
+  show "StateCons \<omega>"
+    using state_rel_consistent[OF StateRel ConsistencyEnabled]
+    by blast
+next
+  show "valid_heap_mask (get_mh_total_full \<omega>)"
+    using state_rel_wf_mask_simple[OF StateRel]
+    by blast
+next
+  show "update_m_total_full \<omega> zero_mask zero_mask \<oplus> \<omega> = Some \<omega>"
+    by (rule plus_full_total_state_zero_mask) simp_all
+next
+  show "\<omega> \<succeq> \<omega>"
+    by (simp add: succ_refl)
+qed
+
 text \<open>\<^const>\<open>framing_exh\<close> expresses an exhale relation invariant from which one can show that the assertion is 
       framed in the well-definedness state (due to monotonicity of framedness). 
       \<^term>\<open>\<omega>_inh\<close> expresses the permissions that have been exhaled so far during the exhale. Since 
