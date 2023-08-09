@@ -26,9 +26,6 @@ datatype boogie_const =
      | CKnownFoldedZeroMask
      | CEmptyFrame     
 
-definition total_context_trivial :: "program \<Rightarrow> 'a total_context"
-  where "total_context_trivial Pr \<equiv> \<lparr> program_total = Pr, fun_interp_total=f_None, absval_interp_total=(\<lambda>_.''dummy'')  \<rparr>"
-
 text \<open>The following records tracks options controlling whether certain parts of the state relation should
       or should not be enforced.\<close>
 

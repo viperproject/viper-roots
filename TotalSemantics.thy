@@ -1,7 +1,7 @@
 section \<open>Total heap semantics of statements\<close>
 
 theory TotalSemantics
-imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools" TotalUtil
+imports Viper.ViperLang TotalExpressions "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools"
 begin
 
 definition vals_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> ('a val) list \<Rightarrow> vtyp list \<Rightarrow> bool"
@@ -181,14 +181,19 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
       "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) (RNormal \<omega>');   
-       \<omega>2 = update_mp_total_full \<omega>' ( (get_mp_total_full \<omega>')( (pred_id,vs) :=  padd (m (pred_id, vs)) q)) \<rbrakk> \<Longrightarrow> 
-       fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>2)"
+       \<omega>0 = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = get_total_full \<omega> \<rparr>;
+       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_prat q) pred_body) \<omega>0 (RNormal \<omega>1);
+       \<omega>' = \<lparr> get_store_total = get_store_total \<omega>, 
+              get_trace_total = get_trace_total \<omega>,
+              get_total_full = update_mp_loc_total (get_total_full \<omega>1) (pred_id,vs) (padd (get_mp_total (get_total_full \<omega>1) (pred_id, vs)) q)
+             \<rparr> \<rbrakk> \<Longrightarrow> 
+       fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>')"
   | FoldRelFailure:
        "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
-       red_exhale ctxt R (update_store_total \<omega> (nth_option vs)) (syntactic_mult (Rep_prat q) pred_body) (update_store_total \<omega> (nth_option vs)) RFailure \<rbrakk> \<Longrightarrow> 
+       \<omega>0 = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = get_total_full \<omega> \<rparr>;
+       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_prat q) pred_body) \<omega>0 RFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
@@ -219,7 +224,7 @@ definition reset_state_after_call :: "var list \<Rightarrow> 'a val list \<Right
          get_total_full = get_total_full \<omega> \<rparr>"
 
 inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow> 'a full_total_state  \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
-  for ctxt :: "'a total_context" and R :: "('a full_total_state \<Rightarrow> bool)" and \<Lambda> :: "type_context"  where
+  for ctxt :: "'a total_context" and R :: "('a full_total_state \<Rightarrow> bool)" where
 \<comment>\<open>Atomic statements\<close>
    RedSkip: "red_stmt_total ctxt R \<Lambda> Skip \<omega> (RNormal \<omega>)" 
 | RedInhale: 
@@ -342,9 +347,9 @@ always has at least one failure transition. This is in-sync with the recent Carb
 
 \<comment>\<open>Composite statements\<close>
 | RedScope: \<comment>\<open>TODO: lift to sets of types\<close>
-    "\<lbrakk>  v \<in> set_from_type (absval_interp_total ctxt) \<tau>;
-       red_stmt_total ctxt R \<Lambda> scopeBody (shift_and_add_state_total \<omega> v) res;
-       res_unshift = map_stmt_result_total (unshift_state_total 0) res \<rbrakk> \<Longrightarrow>
+    "\<lbrakk>  get_type (absval_interp_total ctxt) v = \<tau>;
+       red_stmt_total ctxt R (shift_and_add \<Lambda> \<tau>) scopeBody (shift_and_add_state_total \<omega> v) res;
+       res_unshift = map_stmt_result_total (unshift_state_total 1) res \<rbrakk> \<Longrightarrow>
 
       red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
  | RedIfTrue: 

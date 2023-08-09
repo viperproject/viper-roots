@@ -1,5 +1,7 @@
+section \<open>Utility functions and lemmas that are independent from Viper and Boogie\<close>
+
 theory TotalUtil
-imports Viper.ValueAndBasicState Viper.DeBruijn Viper.ViperUtil HOL.Real "HOL-Library.Multiset"
+imports HOL.Real "HOL-Library.Multiset"
 begin
 
 fun map_result_2 :: "('a \<Rightarrow> ('a set) option) \<Rightarrow> ('a set) option \<Rightarrow> ('a set) option"
@@ -11,11 +13,6 @@ fun map_option_2 :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a opt
   where 
     "map_option_2 f y None = y"
   | "map_option_2 f _ (Some x) = f x"
-
-fun get_address_opt :: "'a val \<Rightarrow> address option"
-  where 
-    "get_address_opt (VRef (Address a)) = Some a"
-  | "get_address_opt _ = None"
 
 primrec option_fold :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a option \<Rightarrow> 'b"
   where 
@@ -97,15 +94,6 @@ lemma list_all2_revD:
   using assms
   by simp
 
-text \<open>Some helper definitions for trivial Viper programs\<close>
-
-fun f_None :: "'a \<Rightarrow> 'b option"
-  where "f_None _ = None"
-
-definition Pr_trivial :: ViperLang.program
-  where 
-    "Pr_trivial \<equiv> \<lparr> methods = f_None, predicates = f_None, funs = f_None, declared_fields = f_None, domains = 0 \<rparr>"
-
 subsection \<open>\<open>if_Some\<close>\<close>
 
 text \<open>interface for \<open>if_Some\<close> was initially defined by Benjamin Bonneau\<close>
@@ -182,29 +170,7 @@ lemma[fundef_cong]:
   "x = y \<Longrightarrow> (\<And>z. y = Some z \<Longrightarrow> P z = Q z) \<Longrightarrow> if_Some P x = if_Some Q y"
   by (cases y; simp)
 
-subsection \<open>Positive rationals (TODO: move to Viper theory?)\<close>
 
-lemma prat_non_negative: "\<And>q. Rep_prat q \<ge> 0"
-  by (transfer) simp
-
-lemma padd_aux:
-  assumes "p_rat \<ge> 0" and
-          "q_real = real_of_rat (Rep_prat q)"
-        shows "q_real + real_of_rat p_rat = real_of_rat (Rep_prat (padd q (Abs_prat p_rat)))"
-  using assms 
-  by (simp add: Abs_prat_inverse of_rat_add plus_prat.rep_eq)
-
-lemma psub_aux:
-  assumes "p_rat \<ge> 0" and
-          "real_of_rat p_rat \<le> q_real" and
-          "q_real = real_of_rat (Rep_prat q)"
-        shows "q_real - real_of_rat p_rat = real_of_rat (Rep_prat (q - (Abs_prat p_rat)))"
-  using assms
-  apply (subst \<open>q_real = _\<close>)
-  apply (unfold minus_prat_def)
-  apply (simp add: Abs_prat_inverse of_rat_diff)
-  using add.group_left_neutral add_le_imp_le_diff leD leI of_rat_add of_rat_diff of_rat_less  padd_aux 
-  by (metis add_0 zero_prat.rep_eq)  
   
 subsection \<open>uncurry\<close>
 
@@ -213,16 +179,6 @@ fun uncurry :: "('a \<Rightarrow> 'b \<Rightarrow> 'c) \<Rightarrow> 'a \<times>
 
 lemma uncurry_case_prod: "uncurry = case_prod"
   by fastforce
-
-subsection \<open>Positive rationals\<close>
-
-lemma prat_positive_transfer:
-  assumes "real_of_rat (Rep_prat qpos) = r" and
-          "pgt qpos pnone"
-        shows "r > 0"
-  using assms
-  apply transfer
-  by simp
 
 subsection \<open>Disjoint lists\<close>
 
@@ -657,6 +613,75 @@ qed
 
 subsection \<open>Maps\<close>
 
+lemma map_upds_dom:
+  assumes "length xs = length ys"
+  shows "dom (m(xs [\<mapsto>] ys)) = dom m \<union> (set xs)"
+  using assms
+  by auto
+
+lemma map_upds_ran_distinct:
+  assumes "distinct xs" and "length xs = length ys"
+  shows "ran [xs [\<mapsto>] ys] = set ys"  
+  using assms 
+  unfolding map_upds_def
+  by (metis distinct_rev empty_map_add length_rev ran_map_of_zip set_rev zip_rev)
+
+lemma map_upds_Cons_lookup_tail:
+  assumes "a \<in> set xs" and "length xs = length ys"
+  shows "(m (x # xs [\<mapsto>] y # ys)) a = (m (xs [\<mapsto>] ys)) a"
+proof -
+  have "(m (x # xs [\<mapsto>] y # ys)) a = (m(x \<mapsto> y, xs [\<mapsto>] ys)) a"
+    by simp
+  also have "... = (m (xs [\<mapsto>] ys)) a"
+    using assms
+    by (metis fun_upd_other map_upd_upds_conv_if nat_le_linear take_all)
+  finally show ?thesis
+    by simp
+qed
+
+lemma map_upds_upt_ran: "\<And> xs. length xs = j-i \<Longrightarrow> ran [[i..<j] [\<mapsto>] xs] = set xs"
+  by (simp add: map_upds_ran_distinct)
+
+lemma map_upds_lookup_element:
+  assumes "x \<in> set xs" 
+      and "length xs = length ys"
+    shows "\<exists>i. i < length xs \<and> x = xs ! i \<and> (m(xs [\<mapsto>] ys)) x = Some (ys ! i)"
+  using assms
+proof (induction xs arbitrary: ys)
+  case Nil
+  then show ?case by simp \<comment>\<open>contradiction\<close>
+next
+  case (Cons a xs)
+  from Cons obtain y ys' where "ys = y#ys'" 
+    by (metis in_set_conv_nth list.set_cases)
+  with Cons have "length xs = length ys'"
+    by simp
+
+  show ?case
+  proof (cases "x \<in> set xs")
+    case True    
+    hence Eq: "(m(a # xs [\<mapsto>] ys)) x = (m(xs [\<mapsto>] ys')) x"
+      using \<open>ys = _\<close> map_upds_Cons_lookup_tail Cons
+      by fastforce     
+    from Cons.IH[OF \<open>x \<in> set xs\<close> \<open>length xs = length ys'\<close>] \<open>ys = _\<close>
+    obtain i where *: "i < length xs \<and> x = xs ! i \<and> (m(xs [\<mapsto>] ys')) x = Some (ys' ! i)"
+      by blast
+
+    show ?thesis
+      apply (rule exI[where ?x="Suc i"])
+      using * Eq \<open>ys = y # ys'\<close> 
+      by auto
+  next
+    case False
+    hence "x = a \<and> (m ((a # xs) [\<mapsto>] (y#ys'))) x = Some y"
+      using \<open>x \<in> set (a#xs)\<close>
+      by simp
+    then show ?thesis 
+      using \<open>ys = _\<close>
+      by fastforce            
+  qed    
+qed
+
 lemma map_add_le_dom_disjoint: 
   assumes "dom m1 \<inter> dom m3 = {}" and
           "m2 \<subseteq>\<^sub>m m3" 
@@ -913,121 +938,5 @@ proof clarify
     using assms
     by (metis distinct_helper map_of_SomeD strictly_ordered_list_distinct)
 qed
-
-subsection \<open>Recursive predicates on assertions\<close>
-
-subsubsection \<open>General predicates\<close>
-
-fun pure_exp_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \<Rightarrow> bool" and
-    pure_exp_pred :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \<Rightarrow> bool"
-    where
-  "pure_exp_pred p e \<longleftrightarrow> (p e \<and> pure_exp_pred_rec p e)"
-| "pure_exp_pred_rec p (Var x) \<longleftrightarrow> True"
-| "pure_exp_pred_rec p (ELit lit) \<longleftrightarrow> True"
-| "pure_exp_pred_rec p (Unop uop e) \<longleftrightarrow> pure_exp_pred p e"
-| "pure_exp_pred_rec p (Binop e1 bop e2) \<longleftrightarrow> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
-| "pure_exp_pred_rec p (CondExp cond e1 e2) \<longleftrightarrow> pure_exp_pred p cond \<and> pure_exp_pred p e1 \<and> pure_exp_pred p e2"
-| "pure_exp_pred_rec p (FieldAcc e f) \<longleftrightarrow> pure_exp_pred p e"
-| "pure_exp_pred_rec p (Old lbl e) \<longleftrightarrow> pure_exp_pred p e"
-| "pure_exp_pred_rec p (Perm e f) \<longleftrightarrow> pure_exp_pred p e"
-| "pure_exp_pred_rec p (PermPred pname es) \<longleftrightarrow> list_all (pure_exp_pred p) es"
-| "pure_exp_pred_rec p (FunApp f es) \<longleftrightarrow> list_all (pure_exp_pred p) es"
-| "pure_exp_pred_rec p Result \<longleftrightarrow> True"
-| "pure_exp_pred_rec p (Unfolding pname es e) \<longleftrightarrow> list_all (pure_exp_pred p) es \<and> pure_exp_pred p e"
-| "pure_exp_pred_rec p (pure_exp.Let e e_body) \<longleftrightarrow> pure_exp_pred p e \<and> pure_exp_pred p e_body"
-| "pure_exp_pred_rec p (PExists ty e) \<longleftrightarrow> pure_exp_pred p e"
-| "pure_exp_pred_rec p (PForall ty e) \<longleftrightarrow> pure_exp_pred p e"
-
-fun
-  atomic_assert_pred :: "(pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool" and
-  atomic_assert_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool"
-  where 
-  "atomic_assert_pred p_atm p_e A_atm \<longleftrightarrow> p_atm A_atm \<and> atomic_assert_pred_rec p_e A_atm"
-| "atomic_assert_pred_rec p_e (Pure e) \<longleftrightarrow> pure_exp_pred p_e e"
-| "atomic_assert_pred_rec p_e (Acc e f Wildcard) \<longleftrightarrow> pure_exp_pred p_e e"
-| "atomic_assert_pred_rec p_e (Acc e1 f (PureExp e2)) \<longleftrightarrow> pure_exp_pred p_e e1 \<and> pure_exp_pred p_e e2"
-| "atomic_assert_pred_rec p_e (AccPredicate pname es Wildcard) \<longleftrightarrow> list_all (pure_exp_pred p_e) es"
-| "atomic_assert_pred_rec p_e (AccPredicate pname es (PureExp e2)) \<longleftrightarrow> (list_all (pure_exp_pred p_e) es) \<and> pure_exp_pred p_e e2"
-
-fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> bool" and
-    assert_pred_rec :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow>  bool"
-  where 
-  "assert_pred p_assert p_atm p_e A \<longleftrightarrow> p_assert A \<and> assert_pred_rec p_assert p_atm p_e A"
-| "assert_pred_rec p_assert p_atm p_e (Atomic A_atm) \<longleftrightarrow> atomic_assert_pred p_atm p_e A_atm"
-| "assert_pred_rec p_assert p_atm p_e (Imp e A) \<longleftrightarrow> pure_exp_pred p_e e \<and> assert_pred p_assert p_atm p_e A"
-| "assert_pred_rec p_assert p_atm p_e (A && B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
-| "assert_pred_rec p_assert p_atm p_e (ImpureAnd A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
-| "assert_pred_rec p_assert p_atm p_e (ImpureOr A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
-| "assert_pred_rec p_assert p_atm p_e (ForAll _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
-| "assert_pred_rec p_assert p_atm p_e (Exists _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
-| "assert_pred_rec p_assert p_atm p_e (Wand A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
-
-
-subsubsection \<open>Common instantiations\<close>
-
-text \<open>No permission introspection\<close>
-
-fun no_perm_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
-  where 
-    "no_perm_pure_exp_no_rec (Perm e f) = False"
-  | "no_perm_pure_exp_no_rec (PermPred e f) = False"
-  | "no_perm_pure_exp_no_rec _ = True"
-
-abbreviation no_perm_pure_exp
-  where "no_perm_pure_exp \<equiv> pure_exp_pred no_perm_pure_exp_no_rec"
-
-abbreviation no_perm_assertion
-  where "no_perm_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
-
-fun no_unfolding_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
-  where 
-    "no_unfolding_pure_exp_no_rec (Unfolding p es e) = False"
-  | "no_unfolding_pure_exp_no_rec _ = True"
-
-abbreviation no_unfolding_pure_exp
-  where "no_unfolding_pure_exp \<equiv> pure_exp_pred no_unfolding_pure_exp_no_rec"
-
-abbreviation no_unfolding_assertion
-  where "no_unfolding_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
-
-subsection \<open>Free variables\<close>
-
-fun free_var_pure_exp :: "pure_exp \<Rightarrow> var set"
-  where
-  "free_var_pure_exp (Var x) = {x}"
-| "free_var_pure_exp (ELit lit) = {}"
-| "free_var_pure_exp Result = {}"
-| "free_var_pure_exp (Unop uop e) = free_var_pure_exp e"
-| "free_var_pure_exp (Binop e1 bop e2) = free_var_pure_exp e1 \<union> free_var_pure_exp e2"
-| "free_var_pure_exp (CondExp cond e1 e2) = free_var_pure_exp cond \<union> free_var_pure_exp e1 \<union> free_var_pure_exp e2"
-| "free_var_pure_exp (FieldAcc e f) = free_var_pure_exp e"
-| "free_var_pure_exp (Old lbl e) = free_var_pure_exp e"
-| "free_var_pure_exp (Perm e f) = free_var_pure_exp e"
-| "free_var_pure_exp (PermPred pname es) = \<Union> (set (map free_var_pure_exp es))"
-| "free_var_pure_exp (FunApp f es) = \<Union> (set (map free_var_pure_exp es))"
-| "free_var_pure_exp (Unfolding pname es e) = \<Union> (set (map free_var_pure_exp es)) \<union> free_var_pure_exp e"
-| "free_var_pure_exp (pure_exp.Let e e_body) = free_var_pure_exp e \<union> (shift_down_set (free_var_pure_exp e_body))" 
-| "free_var_pure_exp (PExists ty e) = shift_down_set (free_var_pure_exp e)"
-| "free_var_pure_exp (PForall ty e) = shift_down_set (free_var_pure_exp e)"
-
-fun
-  free_var_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> var set" where  
-  "free_var_atomic_assert (Pure e) = free_var_pure_exp e"
-| "free_var_atomic_assert (Acc e f Wildcard) = free_var_pure_exp e"
-| "free_var_atomic_assert (Acc e1 f (PureExp e2)) = free_var_pure_exp e1 \<union> free_var_pure_exp e2"
-| "free_var_atomic_assert (AccPredicate pname es Wildcard) = \<Union> (set (map free_var_pure_exp es))"
-| "free_var_atomic_assert (AccPredicate pname es (PureExp e2)) = \<Union> (set (map free_var_pure_exp es)) \<union> free_var_pure_exp e2"
-
-fun free_var_assertion :: "assertion \<Rightarrow> var set"  where  
-  "free_var_assertion (Atomic atm) = free_var_atomic_assert atm"
-| "free_var_assertion (Imp e A) = free_var_pure_exp e \<union> free_var_assertion A"
-| "free_var_assertion (A && B) = free_var_assertion A \<union> free_var_assertion B"
-| "free_var_assertion (ImpureAnd A B) = free_var_assertion A \<union> free_var_assertion B"
-| "free_var_assertion (ImpureOr A B) = free_var_assertion A \<union> free_var_assertion B"
-| "free_var_assertion (ForAll _ A) = free_var_assertion A"
-| "free_var_assertion (Exists _ A) = free_var_assertion A"
-| "free_var_assertion (Wand A B) = free_var_assertion A \<union> free_var_assertion B"
-
-
 
 end

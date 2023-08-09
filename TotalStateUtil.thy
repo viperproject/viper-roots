@@ -1,7 +1,7 @@
 section \<open>Helper lemmas, instantiations, definitions for the total state\<close>
 
 theory TotalStateUtil
-imports Viper.SepAlgebra TotalUtil TotalViperState Viper.DeBruijn
+imports Viper.SepAlgebra TotalViperUtil TotalViperState Viper.DeBruijn
 begin
 
 subsection \<open>update_store_total\<close>
@@ -122,7 +122,7 @@ fun shift_and_add_state_total :: "'a full_total_state \<Rightarrow> 'a val \<Rig
 
 fun unshift_state_total :: "nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state"
   where
-   "unshift_state_total n \<omega> = update_store_total \<omega> (unshift n (get_store_total \<omega>))"         
+   "unshift_state_total n \<omega> = update_store_total \<omega> (unshift_2 n (get_store_total \<omega>))"         
 
 subsection \<open>Well-typed states\<close>
 

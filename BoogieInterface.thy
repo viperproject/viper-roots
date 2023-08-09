@@ -207,35 +207,6 @@ shows "red_ast_bpl P ctxt ((BigBlock name (Havoc x # Assume e # cs) str tr, cont
 
 subsection \<open>map_upds\<close>
 
-lemma map_upds_dom:
-  assumes "length xs = length ys"
-  shows "dom (m(xs [\<mapsto>] ys)) = dom m \<union> (set xs)"
-  using assms
-  by auto
-
-lemma map_upds_ran_distinct:
-  assumes "distinct xs" and "length xs = length ys"
-  shows "ran [xs [\<mapsto>] ys] = set ys"  
-  using assms 
-  unfolding map_upds_def
-  by (metis distinct_rev empty_map_add length_rev ran_map_of_zip set_rev zip_rev)
-
-lemma map_upds_Cons_lookup_tail:
-  assumes "a \<in> set xs" and "length xs = length ys"
-  shows "[x # xs [\<mapsto>] y # ys] a = [xs [\<mapsto>] ys] a"
-proof -
-  have "[x#xs [\<mapsto>] y#ys] a = (Map.empty(x \<mapsto> y, xs [\<mapsto>] ys)) a"
-    by simp
-  also have "... = [xs [\<mapsto>] ys] a"
-    using assms
-    by (metis Un_iff domIff dom_map_upds fun_upd_other map_upd_upds_conv_if map_upds_dom)
-  finally show ?thesis
-    by simp
-qed
-
-lemma map_upds_upt_ran: "\<And> xs. length xs = j-i \<Longrightarrow> ran [[i..<j] [\<mapsto>] xs] = set xs"
-  by (simp add: map_upds_ran_distinct)
-
 subsection \<open>Lifting from single elements to lists of elements\<close>
 
 definition update_var_list 

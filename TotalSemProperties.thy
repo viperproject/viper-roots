@@ -53,6 +53,73 @@ proof -
   qed
 qed  
 
+subsection \<open>Well-typed store\<close>
+
+lemma vpr_store_well_typed_map_upds:
+  assumes StoreWellTy: "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> \<sigma>"
+      and RetsTy1: "vals_well_typed (absval_interp_total ctxt_vpr) v_rets ts"
+      and RetsTy2: "list_all2 (\<lambda>y t. y = Some t) (map \<Lambda> ys) ts"
+    shows "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (map_upds \<sigma> ys v_rets)"
+  unfolding vpr_store_well_typed_def
+proof (rule allI |rule impI)+
+  fix y t
+  assume "\<Lambda> y = Some t"
+
+  have LengthEq: "length ys = length v_rets"
+    using RetsTy1 RetsTy2
+    unfolding vals_well_typed_def
+    by (metis length_map list_all2_lengthD)
+
+  let ?A = "absval_interp_total ctxt_vpr"
+  show "map_option (get_type (absval_interp_total ctxt_vpr)) ((\<sigma>(ys [\<mapsto>] v_rets)) y) = Some t" (is "?lhs = _")
+  proof (cases "y \<in> set ys")
+    case True
+    from this obtain i where *: "i < length ys \<and> y = ys ! i \<and> (\<sigma>(ys [\<mapsto>] v_rets)) y = Some (v_rets ! i)"
+      using map_upds_lookup_element LengthEq
+      by meson
+    hence **: "?lhs = Some ((get_type ?A) (v_rets ! i))"
+      by blast
+
+    from * \<open>\<Lambda> y = Some t\<close> have "t = ts ! i"
+      using RetsTy2
+      by (simp add: list_all2_conv_all_nth)
+
+    hence "(get_type ?A) (v_rets ! i) = t"
+      using RetsTy1 * LengthEq
+      unfolding vals_well_typed_def
+      by force
+
+    then show ?thesis 
+      using **
+      by blast
+  next
+    case False
+    hence "?lhs = map_option (get_type (absval_interp_total ctxt_vpr)) (\<sigma> y)"
+      by simp
+    also have "... = Some t"
+      using StoreWellTy \<open>\<Lambda> y = Some t\<close>
+      unfolding vpr_store_well_typed_def
+      by blast
+    finally show ?thesis
+      by blast
+  qed
+qed
+
+lemma vpr_store_well_typed_shift:
+  assumes "vpr_store_well_typed A \<Lambda> \<sigma>"
+      and "get_type A v = \<tau>"
+    shows "vpr_store_well_typed A (shift_and_add \<Lambda> \<tau>) (shift_and_add \<sigma> v)"
+  using assms
+  unfolding vpr_store_well_typed_def shift_and_add_def
+  by simp
+
+lemma vpr_store_well_typed_unshift:
+  assumes "vpr_store_well_typed A (shift_and_add \<Lambda> \<tau>) \<sigma>"
+  shows "vpr_store_well_typed A \<Lambda> (unshift_2 1 \<sigma>)"
+  using assms
+  unfolding vpr_store_well_typed_def shift_and_add_def unshift_2_def
+  by simp 
+
 subsection \<open>Expression evaluation\<close>
 
 lemma red_exp_unop_sub_failure:
@@ -2139,6 +2206,136 @@ next
   case (ExhImpFailure e \<omega> A)
   then show ?case by simp \<comment>\<open>contradiction\<close>
 qed
+
+subsection \<open>Reduction of statements\<close>
+
+lemma fold_rel_normal_only_changes_mask:
+  assumes "fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>')"
+  shows "get_store_total \<omega>' = get_store_total \<omega> \<and>
+         get_trace_total \<omega>' = get_trace_total \<omega> \<and>
+         get_h_total_full \<omega>' = get_h_total_full \<omega>"
+  using assms
+proof cases
+  case (FoldRelNormal pred_decl pred_body \<omega>'' m)  
+  then show ?thesis     
+    using exhale_only_changes_total_state_aux
+    unfolding \<open>\<omega>' = _\<close>
+    by fastforce    
+qed
+
+lemma red_stmt_preserves_well_typed_store:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res"
+      and "res = RNormal \<omega>'"
+      and "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (get_store_total \<omega>)"
+    shows "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (get_store_total \<omega>')"
+  using assms
+proof (induction arbitrary: \<omega>')
+  case (RedSkip \<Lambda> \<omega>)
+  then show ?case by simp
+next
+  case (RedInhale A \<omega> res \<Lambda>)
+  then show ?case 
+    by (metis inhale_only_changes_mask(3))
+next
+  case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
+  then show ?case 
+    by (metis exhale_only_changes_total_state_aux exhale_state_same_store stmt_result_total.inject)
+next
+  case (RedHavoc \<Lambda> x ty v \<omega>)
+  then show ?case 
+    unfolding vpr_store_well_typed_def
+    by auto
+next
+  case (RedLocalAssign \<omega> e v \<Lambda> x ty)
+  then show ?case 
+    unfolding vpr_store_well_typed_def
+    by auto
+next
+  case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
+  obtain \<omega>pre where "resPre = RNormal \<omega>pre"
+    using \<open>resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre\<close> \<open>res = _\<close>
+    by (cases res; cases resPre; auto)
+
+  with RedMethodCall have ResMap: "res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost"
+    by blast
+
+  with \<open>res = RNormal \<omega>'\<close> obtain \<omega>post where "resPost = RNormal \<omega>post"
+    by (auto elim: map_stmt_result_total.elims)
+
+  with \<open>res = RNormal \<omega>'\<close> ResMap have "\<omega>' = (reset_state_after_call ys v_rets \<omega> \<omega>post)"
+    by simp
+
+  moreover have "vpr_store_well_typed (absval_interp_total ctxt_vpr) \<Lambda> (map_upds (get_store_total \<omega>) ys v_rets)"
+    using RedMethodCall vpr_store_well_typed_def vpr_store_well_typed_map_upds
+    by fast
+  ultimately show ?case
+    by (simp add: reset_state_after_call_def) 
+next
+  case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res)
+  hence "\<omega>' \<in> W'"
+    using th_result_rel_normal by blast
+  then show ?case 
+    using \<open>W' = _\<close> RedUnfold.prems(2) full_total_state.cases_scheme mem_Collect_eq
+    by fastforce
+next
+  case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>' \<Lambda>)
+  then show ?case by auto    
+next
+  case (RedFold \<omega> e_args v_args e_p v_p pred_id res \<Lambda>)
+  then show ?case 
+    using fold_rel_normal_only_changes_mask
+    by metis
+next
+  case (RedFoldWildcard \<omega> e_args v_args pred_id p res \<Lambda>)
+  then show ?case 
+  using fold_rel_normal_only_changes_mask
+  by metis
+next
+  case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
+  from this obtain \<omega>s where "res = RNormal \<omega>s"
+    by (metis map_stmt_result_total.elims)
+
+  with RedScope have "\<omega>' = unshift_state_total 1 \<omega>s"
+    by simp
+
+  have "vpr_store_well_typed (absval_interp_total ctxt_vpr) (shift_and_add \<Lambda> \<tau>) (get_store_total \<omega>s)"
+  proof (rule RedScope.IH[OF \<open>res = RNormal \<omega>s\<close>])
+    show "vpr_store_well_typed (absval_interp_total ctxt_vpr) (shift_and_add \<Lambda> \<tau>) (get_store_total (shift_and_add_state_total \<omega> v))"
+      using RedScope vpr_store_well_typed_shift
+      by fastforce
+  qed
+      
+  then show ?case 
+    unfolding \<open>\<omega>' = _\<close>
+    using vpr_store_well_typed_unshift
+    by auto 
+next
+  case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
+  then show ?case by blast
+next
+  case (RedIfFalse \<omega> e_b \<Lambda> s_els res s_thn)
+  then show ?case by blast
+next
+  case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
+  then show ?case by blast
+next
+  case (RedSeqFailure \<Lambda> s1 \<omega> s2)
+  then show ?case by blast
+qed (auto)
+
+lemma red_stmt_preserves_labels:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res" 
+      and "res = RNormal \<omega>'"
+      and "get_trace_total \<omega> lbl = Some \<phi>"
+    shows "get_trace_total \<omega>' lbl = Some \<phi>"
+  sorry
+
+lemma red_stmt_preserves_unmodified_variables:
+  assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res"
+      and "res = RNormal \<omega>'"
+      and "x \<notin> modif stmt"
+    shows "get_store_total \<omega> x = get_store_total \<omega>' x"
+  sorry
 
 subsection \<open>Temp\<close>
 
