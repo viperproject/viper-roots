@@ -426,6 +426,7 @@ definition post_framing_rel
                                total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1) \<longrightarrow>
                                post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
                    )"
+
 definition method_rel
   where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
@@ -440,7 +441,7 @@ definition method_rel
                        \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
                          stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>    
                           \<comment>\<open>because framedness of the postcondition was checked above, we may use it here.
-                             TODO: could make sense to abstract the \<^term>\<open>framing_exh\<close> away via a paremeter\<close>                   
+                             TODO: could make sense to abstract \<^const>\<open>framing_exh\<close> away via a parameter\<close>                   
                          stmt_rel (\<lambda> \<omega> ns. R1 \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>) 
                                   R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post
                       )

@@ -32,6 +32,9 @@ text \<open>The following records tracks options controlling whether certain par
 record state_rel_options = 
   consistent_state_rel_opt :: bool
 
+definition default_state_rel_options :: state_rel_options
+  where "default_state_rel_options \<equiv> \<lparr> consistent_state_rel_opt = True \<rparr>"
+
 text \<open>The following record abstracts over elements in the Boogie encoding that are used to represent
 Viper counterparts.\<close>
 

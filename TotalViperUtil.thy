@@ -9,6 +9,9 @@ fun get_address_opt :: "'a val \<Rightarrow> address option"
     "get_address_opt (VRef (Address a)) = Some a"
   | "get_address_opt _ = None"
 
+fun f_None :: "'a \<Rightarrow> 'b option"
+  where "f_None _ = None"
+
 subsection \<open>Positive rationals (TODO: move to Viper theory?)\<close>
 
 lemma prat_non_negative: "\<And>q. Rep_prat q \<ge> 0"
