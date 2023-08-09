@@ -1307,9 +1307,9 @@ proof (rule allI | rule impI)+
 
   assume TraceOldLabel: "trace old_label = Some \<phi>'"
   
-  let ?trace' = "trace (old_label \<mapsto> \<phi>')"
+  let ?trace_\<omega> = "trace (old_label \<mapsto> \<phi>)"
   let ?\<omega>' = "\<lparr>get_store_total = \<sigma>, get_trace_total = trace, get_total_full = mh\<rparr>"
-  let ?\<omega> = "\<lparr>get_store_total = \<sigma>, get_trace_total = ?trace', get_total_full = mh\<rparr>"
+  let ?\<omega> = "\<lparr>get_store_total = \<sigma>, get_trace_total = ?trace_\<omega>, get_total_full = mh\<rparr>"
   have Leq: "?\<omega> \<le> ?\<omega>'"
     using \<open>\<phi> \<le> \<phi>'\<close> TraceOldLabel
     unfolding less_eq_full_total_state_ext_def
@@ -1321,10 +1321,7 @@ proof (rule allI | rule impI)+
   moreover from this have "assertion_framing_state ctxt StateCons A ?\<omega>"
     using assms Leq assertion_framing_state_mono TraceOldLabel
     unfolding vpr_postcondition_framed_def
-    \<comment>\<open>Important to look at this step next\<close>
-   
-    
- (*   by (simp add: vpr_postcondition_framed_def)*)
+    by auto   
 
   thus "assertion_framing_state ctxt StateCons A ?\<omega>'"
     using assertion_framing_state_mono Leq assms
