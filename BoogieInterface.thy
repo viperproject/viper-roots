@@ -1,5 +1,5 @@
 theory BoogieInterface
-imports Boogie_Lang.Ast
+imports Boogie_Lang.Ast TotalUtil
 begin
 
 subsection \<open>Expressions\<close>
@@ -126,6 +126,36 @@ lemma red_ast_bpl_if_nondet_else:
   by simp
 
 subsection \<open>Reducing Boogie programs while preserving a property\<close>
+
+subsection \<open>red_ast_bpl_rel\<close>
+
+definition red_ast_bpl_rel 
+  where "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1 \<equiv>
+          \<forall> \<omega> ns. R0 \<omega> ns \<longrightarrow> (\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns')"
+
+lemma red_ast_bpl_rel_reflexive:
+  shows "red_ast_bpl_rel R R P ctxt \<gamma> \<gamma>"  
+  using red_ast_bpl_refl
+  unfolding red_ast_bpl_rel_def
+  by blast  
+
+lemma red_ast_bpl_rel_transitive:
+  assumes "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+      and "red_ast_bpl_rel R1 R2 P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R2 P ctxt \<gamma>0 \<gamma>2"
+  using assms red_ast_bpl_transitive
+  unfolding red_ast_bpl_rel_def
+  by blast
+
+lemma red_ast_bpl_rel_one_simple_cmd:
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow>
+                \<exists>ns'. ( (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), rtype_interp ctxt \<turnstile> \<langle>c, Normal ns\<rangle> \<rightarrow> (Normal ns')) \<and>
+                R1 \<omega> ns'"
+  shows "red_ast_bpl_rel R0 R1 P ctxt (BigBlock name (c#cs) str tr, cont) (BigBlock name cs str tr, cont)"
+  using assms
+  unfolding red_ast_bpl_rel_def red_ast_bpl_def
+  by blast
+
 
 lemma red_ast_bpl_propagate_rel:
   assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and

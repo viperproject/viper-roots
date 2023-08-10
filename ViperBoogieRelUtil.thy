@@ -983,7 +983,26 @@ proof -
   thus ?thesis
     using RedBpl1 RedBpl2 red_ast_bpl_transitive state_rel_enable_consistency Consistent
     by blast
-qed    
+qed
+
+subsubsection \<open>Instantiating the output relation\<close>
+
+text \<open>The following lemmas are useful for constraining the output relation, if the output relation is a
+      schematic variable in the goal.\<close>
+
+lemma red_ast_bpl_rel_inst_state_rel_same:
+  assumes "red_ast_bpl_rel R0 R0 P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R0 P ctxt \<gamma>1 \<gamma>2"
+  using assms
+  by blast 
+
+lemma red_ast_bpl_rel_inst_state_rel_conjunct2:
+  assumes "\<And> \<omega> ns. R0 \<omega> ns = (Q \<omega> \<and> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns)"
+      and "R1 = state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt"
+      and "red_ast_bpl_rel R0 (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>1 \<gamma>2"
+  using assms
+  by blast  
 
          
 end

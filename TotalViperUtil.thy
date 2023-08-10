@@ -44,6 +44,26 @@ lemma prat_positive_transfer:
   apply transfer
   by simp
 
+lemma psub_smaller:
+  assumes "pgte p q"
+  shows "pgte p (p - q)"
+  unfolding minus_prat_def
+proof -
+  from assms have DiffNonNegative: "Rep_prat p - Rep_prat q \<ge> 0"
+    by (transfer) simp
+
+  have "Rep_prat p \<ge> Rep_prat p - Rep_prat q"
+    by (transfer) simp
+  
+
+  hence "(Rep_prat p) \<ge> Rep_prat (Abs_prat (Rep_prat p - Rep_prat q))"
+    using Abs_prat_inverse DiffNonNegative
+    by fastforce
+    
+  thus "pgte p (Abs_prat (Rep_prat p - Rep_prat q))"    
+    by (simp add: pgte.rep_eq)
+qed
+
 subsection \<open>Recursive predicates on assertions\<close>
 
 subsubsection \<open>General predicates\<close>

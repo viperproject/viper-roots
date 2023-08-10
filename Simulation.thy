@@ -89,6 +89,8 @@ shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   unfolding rel_general_def rel_ext_def
   by auto
 
+subsection \<open>Rule of consequence\<close>
+
 lemma rel_general_conseq:
 assumes Rel: "rel_general R0' R1' Success' Fail' P ctxt \<gamma> \<gamma>'" and
         Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns" and
@@ -124,15 +126,17 @@ lemma rel_general_conseq_fail:
 subsection \<open>Propagation rules\<close>
 
 lemma rel_propagate_pre:
-  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
-          "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
-        shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"  
+  assumes \<comment>\<open>"\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and\<close>
+          "red_ast_bpl_rel (\<lambda> \<omega> ns. ((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns) R1 P ctxt \<gamma>0 \<gamma>1"
+      and "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"  
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
 
   with \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
     "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    unfolding red_ast_bpl_rel_def
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
@@ -144,6 +148,7 @@ next
 
   with \<open>R0 \<omega> ns\<close> and assms(1) obtain ns1 where
     "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    unfolding red_ast_bpl_rel_def
     by blast
 
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>0, Normal ns) c'"
@@ -153,16 +158,16 @@ qed
 
 text \<open>Same as rel_propagate_pre but where \<^prop>\<open>R1 = R2\<close>\<close>
 lemma rel_propagate_pre_2: 
-  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
-          "rel_general R1 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
-   shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2" 
+  assumes "red_ast_bpl_rel (\<lambda> \<omega> ns. ((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns) R1 P ctxt \<gamma>0 \<gamma>1"
+      and "rel_general R1 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
   using assms rel_propagate_pre
   by blast
 
 lemma rel_propagate_post:
-  assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1" and
-          "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
-        shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1"
+      and "red_ast_bpl_rel R1 R2 P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and
@@ -174,6 +179,7 @@ proof (rule rel_intro)
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
     using assms(2)
+    unfolding red_ast_bpl_rel_def
     by (metis (no_types, opaque_lifting) red_ast_bpl_transitive)
 next
   fix \<omega> ns
@@ -185,9 +191,9 @@ next
 qed
 
 lemma rel_propagate_post_2:
-  assumes "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>1" and
-          "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R0 \<omega> ns'"
-        shows "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  assumes "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>1"
+      and    "red_ast_bpl_rel R0 R0 P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R0 Success Fail P ctxt \<gamma>0 \<gamma>2"
   using assms rel_propagate_post
   by blast
 
@@ -195,15 +201,16 @@ text \<open>If failure is infeasible, then we can assume success when propagatin
 
 lemma rel_propagate_pre_success:
   assumes NoFailure: "\<And> \<omega>. \<not> Fail \<omega>"
-          "\<And> \<omega> \<omega>' ns. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
-          "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
-        shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
+      and "red_ast_bpl_rel (\<lambda> \<omega> ns. (\<exists>\<omega>'. Success \<omega> \<omega>') \<and> R0 \<omega> ns) R1 P ctxt \<gamma>0 \<gamma>1"
+      and    "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R0 \<omega> ns" and "Success \<omega> \<omega>'"
 
   with assms(2) obtain ns1 where
     "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1)" and "R1 \<omega> ns1"
+    unfolding red_ast_bpl_rel_def
     by blast
 
   thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega>' ns'"
@@ -213,23 +220,23 @@ qed (simp add: NoFailure)
 
 lemma rel_propagate_pre_success_2:
   assumes NoFailure: "\<And> \<omega>. \<not> Fail \<omega>"
-          "\<And> \<omega> \<omega>' ns. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R0 \<omega> ns'" and
-          "rel_general R0 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
-        shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
+      and "red_ast_bpl_rel (\<lambda> \<omega> ns. (\<exists>\<omega>'. Success \<omega> \<omega>') \<and> R0 \<omega> ns) R0 P ctxt \<gamma>0 \<gamma>1"
+      and "rel_general R0 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
   apply (rule rel_propagate_pre_success)
   using assms
   by auto
 
 lemma assert_single_step_rel:
-  assumes SuccessCond: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> cond \<omega>" and
-          FailCond: "\<And>\<omega>. Fail \<omega> \<Longrightarrow> \<not>cond \<omega>" and
-          RedBpl: "\<And>\<omega> ns. R \<omega> ns \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (cond \<omega>))"
-shows "rel_general R R
-     Success
-     Fail
-     P ctxt
-     (BigBlock name (cmd.Assert e_bpl # cs) s tr, cont)
-     (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
+  assumes SuccessCond: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> cond \<omega>"
+      and FailCond: "\<And>\<omega>. Fail \<omega> \<Longrightarrow> \<not>cond \<omega>"
+      and RedBpl: "\<And>\<omega> ns. R \<omega> ns \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (cond \<omega>))"
+    shows "rel_general R R
+                       Success
+                       Fail
+                       P ctxt
+                       (BigBlock name (cmd.Assert e_bpl # cs) s tr, cont)
+                       (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" and "Success \<omega> \<omega>'"
@@ -302,9 +309,9 @@ lemma rel_propagate_pre_assume:
   assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV True)" and
                      "rel_general R0 R1 Success Fail P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
   shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Lang.Assume e_bpl)#cs) str tr, cont) \<gamma>'"
-proof (rule rel_propagate_pre[OF _ assms(2)])
+proof (rule rel_propagate_pre[OF _ assms(2)], unfold red_ast_bpl_rel_def, (rule allI | rule impI)+)
   fix \<omega> ns
-  assume local_assms: "R0 \<omega> ns" "(\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>"
+  assume local_assms: "((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns"
   hence "red_expr_bpl ctxt e_bpl ns (BoolV True)"
     using RedExpBpl
     by blast
@@ -488,15 +495,13 @@ lemma rel_general_cond_2:
   done
   
 lemma rel_general_if_2:
-  assumes  "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))" and
-           "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> b \<omega>) R_thn Success Fail P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
-           "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
-                                     (thn_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)" and
-           "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
+  assumes "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))"
+      and "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> b \<omega>) R_thn Success Fail P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+      and "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
+                                     (thn_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
+      and "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
   shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
   oops
-
-subsection \<open>Misc rules\<close>
 
 
 end

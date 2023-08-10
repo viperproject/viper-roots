@@ -66,21 +66,23 @@ lemma stmt_rel_failure_elim:
   unfolding stmt_rel_def rel_general_def
   by blast
 
+subsection \<open>Propagation experiments\<close>
+
+
+
+
 subsection \<open>Propagation rules\<close>
 
 lemma stmt_rel_propagate:
-          \<comment>\<open>We could weaken this assumption by adding that success or failure must occur, but until
-            now we have not required this.\<close>
-  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and
-          "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
-        shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"  
-  using assms
-  unfolding stmt_rel_def
-  using rel_propagate_pre
+  assumes "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+      and "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
+    shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+  using assms rel_propagate_pre
+  unfolding red_ast_bpl_rel_def stmt_rel_def 
   by metis
 
 lemma stmt_rel_propagate_same_rel:
-  assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'" and
+  assumes "red_ast_bpl_rel R R P ctxt \<gamma>0 \<gamma>1" and
           "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
         shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
   using stmt_rel_propagate assms
@@ -88,7 +90,7 @@ lemma stmt_rel_propagate_same_rel:
 
 lemma stmt_rel_propagate_2:
   assumes "stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
-          "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
+          "red_ast_bpl_rel R1 R2 P ctxt \<gamma>1 \<gamma>2"
   shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
   using assms
   unfolding stmt_rel_def
@@ -97,7 +99,7 @@ lemma stmt_rel_propagate_2:
   
 lemma stmt_rel_propagate_2_same_rel:
   assumes "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
-          "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
+          "red_ast_bpl_rel R R P ctxt \<gamma>1 \<gamma>2"
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
   using assms stmt_rel_propagate_2
   by blast
@@ -549,21 +551,24 @@ lemma exhale_stmt_rel:
           \<comment>\<open>Since the well-definedness must be differentiated from the evaluation state during the exhale,
             there is potentially a step in the Boogie program that sets this differentiation up resulting a new
             relation that tracks both states (where in the beginning both states are the same)\<close>
-      and R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'"                
+      \<comment>\<open>and R_to_Rexh: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> Rexh \<omega> \<omega> ns'" \<close>
+      and R_to_Rexh: "red_ast_bpl_rel (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns) (uncurry Rexh) P ctxt \<gamma> \<gamma>1"
       and ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
           \<comment>\<open>At the end of the exhale we require the Boogie program to establish the output relation on the 
              evaluation state\<close>
-      and Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"
+      \<comment>\<open>and Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"\<close>
+      and Rexh_to_R: "red_ast_bpl_rel (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and ExhaleState: "\<And> \<omega> \<omega>' ns. R_out \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
-        shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+    shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" 
   with R_to_Rexh obtain ns1 where Red1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "Rexh \<omega> \<omega> ns1"
-    by blast
-
+    unfolding red_ast_bpl_rel_def
+    by auto
+    
   assume RedExhale: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> (RNormal \<omega>')"
   hence "StateCons \<omega>'"
     using Consistent[OF \<open>R \<omega> ns\<close>] WfConsistency total_consistency_red_stmt_preserve
@@ -576,20 +581,25 @@ proof (rule stmt_rel_intro)
       "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)" and "Rexh \<omega> \<omega>_exh ns2"
       using red_ast_bpl_transitive[OF Red1] InvHolds[OF \<open>R \<omega> ns\<close>]
       by blast
-    with Rexh_to_R obtain ns3 where 
-     "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and "R_out \<omega>_exh ns3"
+    moreover from Rexh_to_R \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
+      "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3)" and "R_out \<omega>_exh ns3"
+      unfolding red_ast_bpl_rel_def
+      by force
+    ultimately have
+     "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)"
       using red_ast_bpl_transitive
       by blast
-    with ExhaleState RedExhale \<open>StateCons \<omega>'\<close>
+    with ExhaleState RedExhale \<open>StateCons \<omega>'\<close> \<open>R_out \<omega>_exh ns3\<close>
     show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
       using red_ast_bpl_transitive
-      by blast
+      by blast      
   qed
 next
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" 
   with R_to_Rexh obtain ns1 where Red1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "Rexh \<omega> \<omega> ns1"
-    by blast
+    unfolding red_ast_bpl_rel_def
+    by auto
 
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale A) \<omega> RFailure"
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
@@ -607,31 +617,44 @@ text \<open>The following theorem is the same as exhale_stmt_rel except that Rex
 
 lemma exhale_stmt_rel_inst:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
-      and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')"            
-      and "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"      
+      \<comment>\<open>and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')"\<close>
+      and R_to_Rexh: "red_ast_bpl_rel R (state_rel_def_same Pr StateCons TyRep Tr' AuxPred' ctxt) P ctxt \<gamma> \<gamma>1"
+      and ExhRel: "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      and "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
-                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"
+      (*and "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
+                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"*)
+      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R_out (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and "\<And> \<omega> \<omega>' ns. R_out \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
-  using assms
-  by (rule exhale_stmt_rel)
+proof (rule exhale_stmt_rel[OF WfConsistency])
+  show "red_ast_bpl_rel (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns) (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) P ctxt \<gamma> \<gamma>1"
+    using R_to_Rexh
+    unfolding red_ast_bpl_rel_def
+    by simp
+next
+  show "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+    by (rule ExhRel) 
+next
+  show "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) (\<lambda>\<omega>. R_out (snd \<omega>)) P ctxt \<gamma>2 \<gamma>3"
+    using Rexh_to_Rout
+    unfolding red_ast_bpl_rel_def
+    by blast    
+qed (insert assms, auto) 
 
 lemma exhale_stmt_rel_inst_2:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
-      and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns') \<and> (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega> \<omega> ns')"            
+      and R_to_Rexh: "red_ast_bpl_rel R (state_rel_def_same Pr StateCons TyRep Tr' AuxPred' ctxt) P ctxt \<gamma> \<gamma>1"
       and "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      and "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
-                      \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R \<omega> ns'"
+      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
     shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms
-  by (rule exhale_stmt_rel)
+  by (rule exhale_stmt_rel_inst)
 
 lemma exhale_stmt_rel_finish:
   assumes StateRel: "state_rel_def_same Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and

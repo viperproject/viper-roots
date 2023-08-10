@@ -51,6 +51,14 @@ fun unfold_bigblock_in_goal_aux ctxt (t,i) =
          $ (Const (@{const_name Product_Type.Pair}, _) $ program_point $ _)
          $ _ (* end config *) =>
             unfold_bigblock_in_program_point ctxt (program_point, i)
+  | Const (@{const_name "red_ast_bpl_rel"}, _) 
+         $ _ (* input relation *)
+         $ _ (* output relation *)
+         $ _ (* AST *)
+         $ _ (* econtext_bpl *)
+         $ program_point
+         $ _ (* end config *) =>
+            unfold_bigblock_in_program_point ctxt (program_point, i)
   | Const (@{const_name "is_empty_bigblock"}, _) $ bigblock =>
       unfold_bigblock_atomic ctxt bigblock
   | _ => (writeln(Syntax.string_of_term ctxt t); all_tac)

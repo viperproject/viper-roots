@@ -94,20 +94,31 @@ lemma is_assertion_red_invariant_inh:
 subsection \<open>Propagation rules\<close>
 
 lemma inhale_propagate_pre:
-  assumes PropagateBpl: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q assertion_vpr \<omega> \<Longrightarrow>
-               \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R \<omega> ns'"
+  assumes PropagateBpl:"red_ast_bpl_rel (\<lambda> \<omega> ns. Q assertion_vpr \<omega> \<and> R \<omega> ns) R P ctxt \<gamma>0 \<gamma>1"
       and InhRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
   shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"   
   unfolding inhale_rel_def
   apply (rule rel_propagate_pre[OF _ InhRel[simplified inhale_rel_def]])
-  by (fastforce intro: PropagateBpl)
+  using PropagateBpl
+  unfolding red_ast_bpl_rel_def
+  by blast  
+
+lemma inhale_propagate_pre_no_inv:
+  assumes PropagateBpl:"red_ast_bpl_rel R R P ctxt \<gamma>0 \<gamma>1"
+      and InhRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
+  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"   
+  unfolding inhale_rel_def
+  apply (rule rel_propagate_pre[OF _ InhRel[simplified inhale_rel_def]])
+  using PropagateBpl
+  unfolding red_ast_bpl_rel_def
+  by blast
 
 lemma inhale_propagate_post:
   assumes "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1" 
-      and "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega> ns'"
-  shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+      and "red_ast_bpl_rel R R P ctxt \<gamma>1 \<gamma>2"
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   using assms rel_propagate_post
-  unfolding inhale_rel_def
+  unfolding inhale_rel_def 
   by blast
 
 subsection \<open>Structural rules\<close>
