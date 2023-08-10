@@ -24,6 +24,10 @@ lemma total_consistencyI:
   unfolding wf_total_consistency_def
   by blast
 
+lemma wf_total_consistency_trivial: "wf_total_consistency ctxt (\<lambda>_.True) (\<lambda>_.True)"
+  unfolding wf_total_consistency_def mono_prop_downward_def
+  by blast
+
 lemma total_consistency_red_stmt_preserve:
   assumes "wf_total_consistency ctxt R Rt" 
       and "R \<omega>"

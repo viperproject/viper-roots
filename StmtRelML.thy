@@ -33,7 +33,7 @@ ML \<open>
 
  fun stmt_rel_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
-       SeqnHint [] => resolve_tac ctxt [@{thm stmt_rel_skip}]
+       SeqnHint [] => (Rmsg' "Skip" (resolve_tac ctxt [@{thm stmt_rel_skip}]) ctxt)
     |  SeqnHint [_] => error "SeqnHint with single node appears"
     |  SeqnHint (h::hs) => stmt_rel_tac_seq ctxt info (h::hs)
     | _ => stmt_rel_single_stmt_tac ctxt info stmt_rel_hint
@@ -50,7 +50,7 @@ and
    | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) hint_hd =
     (* Each statement associated with a hint is translated by the actual encoding followed by 
        \<open>assume state(Heap, Mask)\<close>. This is why we apply a propagation rule first. *)
-    resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}] THEN'
+    (Rmsg' "stmt_rel_propagate_2_init" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'
     (
       case hint_hd of
         AtomicHint a => (#atomic_rel_tac info) ctxt (#inhale_rel_info info) (#exhale_rel_info info) (#basic_stmt_rel_info info) a
@@ -220,7 +220,7 @@ ML \<open>
     end
 
   fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
-    (#setup_well_def_state_tac hint) (#basic_info info) ctxt THEN'
+    (Rmsg' "setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
     exhale_finish_tac ctxt (#basic_info info) hint
@@ -234,8 +234,7 @@ ML \<open>
         (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
      | ExhaleHint exh_complete_hint =>
-        (Rmsg' "AtomicExh1" (resolve_tac ctxt @{thms exhale_stmt_rel_inst}) ctxt) THEN'
-      (*  setup_well_def_state_tac basic_info (#lookup_ty_mask_def_thm exh_complete_hint) (#lookup_ty_heap_def_thm exh_complete_hint) ctxt THEN'*)
+        (Rmsg' "AtomicExh1" (resolve_tac ctxt [@{thm exhale_stmt_rel_inst} OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | MethodCallHint => K all_tac (* TODO *)
     )

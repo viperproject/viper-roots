@@ -94,6 +94,7 @@ fun unfold_bigblock_in_rel_general ctxt =
   (* TODO rename *)
   type basic_stmt_rel_info = {
       ctxt_wf_thm: thm,
+      consistency_wf_thm: thm,
       tr_def_thm: thm,
       vpr_program_ctxt_eq_thm: thm,
       var_rel_tac: (Proof.context -> int -> tactic),
@@ -150,11 +151,13 @@ fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_ne
   (Rmsg' (errorMsgPrefix^"DefVarAuxVarDisj") ((#aux_var_disj_tac basic_stmt_rel_info) ctxt) ctxt)
 
 fun upd_mask_def_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =
-  (Rmsg' "UpdMaskDefVar1" (resolve_tac ctxt @{thms mask_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
+  (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
+  (Rmsg' "UpdMaskDefVar2" (resolve_tac ctxt @{thms mask_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
   (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdMask" ctxt)
 
 fun upd_heap_def_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt  =
-  (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms heap_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
+  (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
+  (Rmsg' "UpdHeapDefVar2" (resolve_tac ctxt @{thms heap_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
   (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdHeap" ctxt)
 
 
@@ -163,21 +166,23 @@ fun setup_well_def_state_mask_heap_tac (basic_stmt_rel_info : basic_stmt_rel_inf
   (upd_mask_def_var_tac lookup_ty_mask_var_thm basic_stmt_rel_info ctxt) THEN'
   (upd_heap_def_var_tac lookup_ty_heap_var_thm basic_stmt_rel_info ctxt)
 
+fun EVERY'_red_ast_bpl_rel_transitive _ [] = K all_tac
+|   EVERY'_red_ast_bpl_rel_transitive ctxt (tac :: tacs) = 
+      resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN'
+      tac ctxt THEN'               
+      EVERY'_red_ast_bpl_rel_transitive ctxt tacs
 
-fun EVERY'_red_ast_bpl_transitive _ [] = K all_tac
-|   EVERY'_red_ast_bpl_transitive ctxt [tac] = tac ctxt
-|   EVERY'_red_ast_bpl_transitive ctxt (tac :: tacs) = 
-      resolve_tac ctxt @{thms red_ast_bpl_propagate_transitive} THEN'
-      tac ctxt THEN'
-      EVERY'_red_ast_bpl_transitive ctxt tacs
+fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs = 
+    EVERY'_red_ast_bpl_rel_transitive ctxt tacs THEN'
+    resolve_tac ctxt @{thms red_ast_bpl_rel_refl}
+      
 
-val h = fn basic_stmt_rel_info => fn lookup_ty_mask_var_thm => fn lookup_ty_heap_var_thm => fn ctxt =>
- EVERY'_red_ast_bpl_transitive ctxt [upd_mask_def_var_tac lookup_ty_mask_var_thm basic_stmt_rel_info, upd_heap_def_var_tac lookup_ty_heap_var_thm basic_stmt_rel_info]
 
 (* tactic for introducing temporary perm variable *)
+
 fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm eval_vpr_perm_tac =
   (Rmsg' "store perm 1" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
-  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+  (Rmsg' "store perm 2" ((simp_tac_with_thms [] ctxt THEN' (blast_tac ctxt ORELSE' (K all_tac))) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm eval vpr perm" (eval_vpr_perm_tac ctxt) ctxt) THEN'
   (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
