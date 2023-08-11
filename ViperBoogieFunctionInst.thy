@@ -562,8 +562,8 @@ lemma ctxt_wf_fun_interp:
 
 lemma assume_state_normal:
   assumes CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
-          FieldTr: "field_translation Tr = F" and
           StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and 
+          FieldTr: "field_translation Tr = F" and
           Heq: "heap_var Tr = h" and
           Meq: "mask_var Tr = m" and
           StateName: "FunMap FGoodState = state_name"

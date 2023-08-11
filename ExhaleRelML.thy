@@ -16,6 +16,7 @@ ML \<open>
 
   type 'a exhale_rel_complete_hint = {
      setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
+     exhale_stmt_rel_thm: thm, (* chooses the invariant instantiation *)
      lookup_decl_exhale_heap: thm,
      exhale_rel_hint: 'a exhale_rel_hint 
   }
@@ -24,35 +25,39 @@ ML \<open>
 
   type 'a exhale_rel_info = {
     basic_info: basic_stmt_rel_info,
-    atomic_exhale_rel_tac: 'a atomic_exhale_rel_tac
+    atomic_exhale_rel_tac: 'a atomic_exhale_rel_tac,
+    is_exh_rel_inv_thm: thm (* states that the invariant is an exhale relation invariant *)
   }
 
   fun exhale_rel_aux_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_hint) =
     case hint of
       StarExhHint (left_hint, right_hint) => 
-        (Rmsg' "ExhaleRel Star" (resolve_tac ctxt [@{thm exhale_rel_star}]) ctxt) THEN' 
+        (Rmsg' "ExhaleRel Star" (resolve_tac ctxt [@{thm exhale_rel_star_2}]) ctxt) THEN'
+        (Rmsg' "ExhaleRel Star exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN' 
         (exhale_rel_aux_tac ctxt info left_hint |> SOLVED') THEN'
         (exhale_rel_aux_tac ctxt info right_hint |> SOLVED')
     | ImpExhHint (exp_wf_rel_info, exp_rel_info, right_hint) => 
+         (Rmsg' "ExhaleRel Imp" (resolve_tac ctxt [@{thm exhale_rel_imp_2}]) ctxt) THEN'
+         (Rmsg' "ExhaleRel Star exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN' 
          (
-           (Rmsg' "ImpExh 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
-           (Rmsg' "ImpExh wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
-           (Rmsg' "ImpExh 2" ((progress_tac ctxt) |> SOLVED') ctxt)
+           (Rmsg' "ExhaleRel Imp 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
+           (Rmsg' "ExhaleRel Imp wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
+           (Rmsg' "ExhaleRel Imp 2" ((progress_tac ctxt) |> SOLVED') ctxt)
          ) THEN'
-          (Rmsg' "ImpExh empty else" (* empty else block *)                
+          (Rmsg' "ExhaleRel Imp empty else" (* empty else block *)                
                  ((unfold_bigblock_in_goal ctxt) THEN'
                  (assm_full_simp_solved_tac ctxt))
               ctxt)  THEN'
          (
-           (Rmsg' "ImpExh cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+           (Rmsg' "ExhaleRel Imp cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
          ) THEN'
          (
           (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
              variable for the recursive call to exhale_rel_tac *)
            simplify_continuation ctxt THEN'
-           (Rmsg' "ImpExh 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
+           (Rmsg' "ExhaleRel Imp 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
            (exhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
-           (Rmsg' "ImpExh 4" (progress_tac ctxt) ctxt)
+           (Rmsg' "ExhaleRel Imp 4" (progress_tac ctxt) ctxt)
          )
     | AtomicExhHint atomicHint => (#atomic_exhale_rel_tac info) ctxt (#basic_info info) atomicHint
     | NoExhHint => K all_tac
@@ -98,7 +103,7 @@ ML \<open>
 
       (* then branch *)
       (Rmsg' "Prove Sufficient Perm - Simplify Continuation" (simplify_continuation ctxt) ctxt) THEN'
-      (Rmsg' "Prove Sufficient Perm - Unfold Big Blocks" (unfold_bigblock_in_rel_general ctxt) ctxt) THEN'
+      (Rmsg' "Prove Sufficient Perm - Unfold and Progress Big Blocks" (unfold_bigblock_in_rel_general ctxt THEN' progress_rel_tac ctxt) ctxt) THEN'
       (* apply post propagation here, since will need to progress from empty block to the continuation *)
       (Rmsg' "Prove Sufficient Perm - Propagate Post" (resolve_tac ctxt @{thms rel_propagate_post_2}) ctxt) THEN'
         (Rmsg' "Prove Sufficient Perm - Propagate Pre Assert" (resolve_tac ctxt @{thms rel_propagate_pre_assert_2}) ctxt) THEN'
@@ -117,13 +122,13 @@ ML \<open>
                       simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
                       fastforce_tac ctxt @{thms of_rat_less_eq} THEN'
                       assm_full_simp_solved_tac ctxt) ctxt) THEN'
-       (Rmsg' "Prove Sufficient Perm - Progress from then-branch" (progress_tac ctxt) ctxt) THEN'
+       (Rmsg' "Prove Sufficient Perm - Progress from then-branch" (progress_rel_tac ctxt) ctxt) THEN'
 
        (* else branch *)
        (Rmsg' "Prove Sufficient Perm - Else Branch"
               (EVERY' [simplify_continuation ctxt,
-                       resolve_tac ctxt @{thms rel_propagate_pre_2},
-                       progress_tac ctxt,
+                       resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel},
+                       progress_rel_tac ctxt,
                        resolve_tac ctxt @{thms rel_general_success_refl},
                        simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt,
                        fastforce_tac ctxt @{thms prat_non_negative},
@@ -131,10 +136,11 @@ ML \<open>
 
   fun upd_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
     (Rmsg' "UpdExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc_upd_rel}) ctxt) THEN'
-    (Rmsg' "UpdExhField StateRel" (blast_tac ctxt) ctxt) THEN'
+    (Rmsg' "UpdExhField StateRel" (blast_tac ctxt) ctxt) THEN'    
    (* old version: (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN' *)
     (Rmsg' "UpdExhField Dom AuxPred" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField Wf TyRepr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
+    (Rmsg' "UpdExhField Wf Total Consistency" (resolve_tac ctxt [#consistency_wf_thm info]) ctxt) THEN'
     (Rmsg' "UpdExhField MaskDef Different" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField TyInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField MaskUpdateWf" (resolve_tac ctxt [@{thm mask_update_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'

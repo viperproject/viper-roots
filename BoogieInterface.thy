@@ -133,7 +133,37 @@ definition red_ast_bpl_rel
   where "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1 \<equiv>
           \<forall> \<omega> ns. R0 \<omega> ns \<longrightarrow> (\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns')"
 
-lemma red_ast_bpl_rel_reflexive:
+lemma red_ast_bpl_relI:
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'"
+  shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+  using assms
+  unfolding red_ast_bpl_rel_def
+  by blast
+
+lemma red_ast_bpl_rel_weaken_input: 
+  assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns"
+      and "red_ast_bpl_rel R0' R1 P ctxt \<gamma>0 \<gamma>1"
+  shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+  using assms
+  unfolding red_ast_bpl_rel_def
+  by blast
+
+lemma red_ast_bpl_rel_strengthen_output:
+  assumes "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+      and "red_ast_bpl_rel R0 R1' P ctxt \<gamma>0 \<gamma>1"
+    shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+  using assms
+  unfolding red_ast_bpl_rel_def
+  by blast  
+
+lemma red_ast_bpl_rel_input_implies_output:
+  assumes "\<And>\<omega> ns. R1 \<omega> ns \<Longrightarrow> R2 \<omega> ns"
+  shows "red_ast_bpl_rel R1 R2 P ctxt \<gamma> \<gamma>"  
+  using assms red_ast_bpl_refl
+  unfolding red_ast_bpl_rel_def 
+  by blast
+
+lemma red_ast_bpl_rel_refl:
   shows "red_ast_bpl_rel R R P ctxt \<gamma> \<gamma>"  
   using red_ast_bpl_refl
   unfolding red_ast_bpl_rel_def
@@ -156,6 +186,9 @@ lemma red_ast_bpl_rel_one_simple_cmd:
   unfolding red_ast_bpl_rel_def red_ast_bpl_def
   by blast
 
+lemma red_ast_bpl_rel_empty_block: "red_ast_bpl_rel R R P ctxt (BigBlock name [] None None, KSeq b cont) (b, cont)"
+  unfolding red_ast_bpl_rel_def red_ast_bpl_def
+  by (fastforce intro: RedSkip)  
 
 lemma red_ast_bpl_propagate_rel:
   assumes "red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>1, Normal ns1)" and

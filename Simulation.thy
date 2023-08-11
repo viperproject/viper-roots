@@ -164,6 +164,14 @@ lemma rel_propagate_pre_2:
   using assms rel_propagate_pre
   by blast
 
+lemma rel_propagate_pre_2_only_state_rel: 
+  assumes "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+      and "rel_general R1 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  using assms rel_propagate_pre 
+  unfolding red_ast_bpl_rel_def
+  by metis  
+
 lemma rel_propagate_post:
   assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1"
       and "red_ast_bpl_rel R1 R2 P ctxt \<gamma>1 \<gamma>2"

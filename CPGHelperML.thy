@@ -86,10 +86,15 @@ fun progress_tac ctxt =
     resolve_tac ctxt [@{thm red_ast_bpl_refl}]) THEN'
    assm_full_simp_solved_tac ctxt
 
-(* unfolds the active big block (as described above) for a rel_general goal *)
-fun unfold_bigblock_in_rel_general ctxt =
-  (resolve_tac ctxt @{thms rel_propagate_pre_2} THEN' progress_tac ctxt)
+(* progress_rel_tac is analogous to progress_tac except that the goal is expressed via \<open>red_ast_bpl_rel\<close> *)
+fun progress_rel_tac ctxt = 
+   (unfold_bigblock_in_goal ctxt) THEN'
+   (resolve_tac ctxt [@{thm red_ast_bpl_rel_empty_block}] ORELSE'
+    resolve_tac ctxt [@{thm red_ast_bpl_rel_refl}])
 
+(* unfolds the active big block (as described above) for a rel_general goal *)
+fun unfold_bigblock_in_rel_general ctxt = resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}
+                                 
 (* general information for tactics *)
   (* TODO rename *)
   type basic_stmt_rel_info = {

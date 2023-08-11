@@ -989,7 +989,7 @@ proof -
     by blast
 qed
 
-subsubsection \<open>Instantiating the output relation\<close>
+subsection \<open>Instantiating the output relation\<close>
 
 text \<open>The following lemmas are useful for constraining the output relation, if the output relation is a
       schematic variable in the goal.\<close>
@@ -1008,5 +1008,10 @@ lemma red_ast_bpl_rel_inst_state_rel_conjunct2:
   using assms
   by blast  
 
+subsection \<open>Monotoncity\<close>
+
+lemma true_mono_prop_downward: "mono_prop_downward (\<lambda>_. True)"
+  unfolding mono_prop_downward_def
+  by blast
          
 end

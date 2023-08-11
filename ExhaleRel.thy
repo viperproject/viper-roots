@@ -85,6 +85,15 @@ lemma is_exh_rel_invariant_intro:
 
 subsubsection \<open>Invariant instantiations\<close> 
 
+text \<open>trivial invariant instantiation\<close>
+
+lemma true_is_assertion_red_invariant_exh:
+  shows "is_exh_rel_invariant ctxt_vpr (\<lambda>_.True) (\<lambda>_. True) (\<lambda>_. True) (\<lambda>_ _ _. True)"
+  unfolding is_exh_rel_invariant_def
+  by blast
+
+text \<open>framing_exh instantiation\<close>
+
 definition framing_exh 
   where "framing_exh ctxt_vpr StateCons A \<omega>def \<omega> \<equiv>
            StateCons \<omega>def \<and> 
@@ -262,7 +271,7 @@ next
     using AssertionFraming \<open>\<omega>def \<succeq> \<omega>sum\<close> \<open>\<omega>inh \<oplus> \<omega> = Some \<omega>sum\<close>
     unfolding framing_exh_def
      by blast
-qed
+ qed
     
 subsection \<open>Propagation rules\<close>
 

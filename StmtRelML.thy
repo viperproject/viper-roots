@@ -88,7 +88,7 @@ and
         such as when inhaling the precondition).
        It might be better to control this via hints, because this tactic may reduce a good state
        assumption that should not be reduced at this point. *)
-    (Rmsg' "Progress Good State" ((progress_assume_good_state_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_tac ctxt)) ctxt)
+    (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_tac ctxt)) ctxt)
 \<close>
 
 ML \<open>
@@ -106,7 +106,6 @@ ML \<open>
   | InhaleHint of (atomic_inhale_rel_hint inhale_rel_hint)
   | ExhaleHint of (atomic_exhale_rel_hint exhale_rel_complete_hint)
   | MethodCallHint
-
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)
@@ -192,13 +191,12 @@ ML \<open>
     | _ => error "field assign rel tac only handles field assignment"
     )
 
-  fun exhale_revert_state_relation ctxt (basic_info: basic_stmt_rel_info) =
-    revcut_tac @{thm state_rel_set_def_to_eval} THEN'
-    (assm_full_simp_solved_tac ctxt) THEN'
-    (resolve_tac ctxt @{thms exI}) THEN'
-    (resolve_tac ctxt @{thms conjI}) THEN'
-    (resolve_tac ctxt @{thms red_ast_bpl_refl}) THEN'
-    (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt)
+  fun exhale_revert_state_relation ctxt (basic_info: basic_stmt_rel_info) = 
+    resolve_tac ctxt @{thms red_ast_bpl_rel_weaken_input} THEN'
+    resolve_tac ctxt @{thms state_rel_set_def_to_eval} THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN'
+    assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt
                                                                                    
   fun exhale_finish_tac ctxt (basic_info: basic_stmt_rel_info) (hint: 'a exhale_rel_complete_hint) =
     let val tr_thm = #tr_def_thm basic_info in
@@ -211,10 +209,11 @@ ML \<open>
       (Rmsg' "exhale finish WellDefSame" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish StateCons" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish ElemExhaleState" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def}, #lookup_decl_exhale_heap hint] ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def},  #lookup_decl_exhale_heap hint] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish ExhaleHeapFresh" (#aux_var_disj_tac basic_info ctxt) ctxt)
 
     end
@@ -224,7 +223,7 @@ ML \<open>
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
     exhale_finish_tac ctxt (#basic_info info) hint
-
+                 
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
         AssignHint (exp_wf_rel_info, exp_rel_info, lookup_bpl_target_thm) => 
@@ -234,7 +233,9 @@ ML \<open>
         (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
      | ExhaleHint exh_complete_hint =>
-        (Rmsg' "AtomicExh1" (resolve_tac ctxt [@{thm exhale_stmt_rel_inst} OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
+        (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
+        (Rmsg' "AtomicExh2 Consistency" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "AtomicExh3 Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | MethodCallHint => K all_tac (* TODO *)
     )
