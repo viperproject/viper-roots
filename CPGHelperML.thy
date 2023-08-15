@@ -100,6 +100,7 @@ fun unfold_bigblock_in_rel_general ctxt = resolve_tac ctxt @{thms rel_propagate_
   type basic_stmt_rel_info = {
       ctxt_wf_thm: thm,
       consistency_wf_thm: thm,
+      consistency_down_mono_thm: thm,
       tr_def_thm: thm,
       vpr_program_ctxt_eq_thm: thm,
       var_rel_tac: (Proof.context -> int -> tactic),
@@ -149,10 +150,10 @@ fun prove_red_expr_bpl_tac ctxt =
     ]
 
 fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm errorMsgPrefix ctxt =
-  (Rmsg' (errorMsgPrefix^"DefVar2") (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-  (Rmsg' (errorMsgPrefix^"DefVar3") (assm_full_simp_solved_with_thms_tac [lookup_ty_new_var_thm, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
-  (Rmsg' (errorMsgPrefix^"DefVar4") (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
-  (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
+  (Rmsg' (errorMsgPrefix^"DefVar3") (blast_tac ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar4") (assm_full_simp_solved_with_thms_tac [lookup_ty_new_var_thm, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar6") (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
   (Rmsg' (errorMsgPrefix^"DefVarAuxVarDisj") ((#aux_var_disj_tac basic_stmt_rel_info) ctxt) ctxt)
 
 fun upd_mask_def_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =

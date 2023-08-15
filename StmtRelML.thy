@@ -50,7 +50,7 @@ and
    | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) hint_hd =
     (* Each statement associated with a hint is translated by the actual encoding followed by 
        \<open>assume state(Heap, Mask)\<close>. This is why we apply a propagation rule first. *)
-    (Rmsg' "stmt_rel_propagate_2_init" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'
+    (Rmsg' "stmt_rel_propagate_2_init" (resolve_tac ctxt [@{thm stmt_rel_propagate_3}]) ctxt) THEN'
     (
       case hint_hd of
         AtomicHint a => (#atomic_rel_tac info) ctxt (#inhale_rel_info info) (#exhale_rel_info info) (#basic_stmt_rel_info info) a
@@ -88,7 +88,7 @@ and
         such as when inhaling the precondition).
        It might be better to control this via hints, because this tactic may reduce a good state
        assumption that should not be reduced at this point. *)
-    (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_tac ctxt)) ctxt)
+     (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_rel_tac ctxt)) ctxt)
 \<close>
 
 ML \<open>
@@ -234,7 +234,7 @@ ML \<open>
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
      | ExhaleHint exh_complete_hint =>
         (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
-        (Rmsg' "AtomicExh2 Consistency" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "AtomicExh2 Consistency" (fastforce_tac ctxt []) ctxt) THEN'
         (Rmsg' "AtomicExh3 Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | MethodCallHint => K all_tac (* TODO *)

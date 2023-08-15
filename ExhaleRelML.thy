@@ -21,12 +21,16 @@ ML \<open>
      exhale_rel_hint: 'a exhale_rel_hint 
   }
 
-  type 'a atomic_exhale_rel_tac = (Proof.context -> basic_stmt_rel_info -> 'a -> int -> tactic)
+  type 'a atomic_exhale_rel_tac = (Proof.context -> basic_stmt_rel_info -> (Proof.context -> basic_stmt_rel_info -> int -> tactic) option -> 'a -> int -> tactic)
 
   type 'a exhale_rel_info = {
     basic_info: basic_stmt_rel_info,
     atomic_exhale_rel_tac: 'a atomic_exhale_rel_tac,
-    is_exh_rel_inv_thm: thm (* states that the invariant is an exhale relation invariant *)
+     (* states that the invariant is an exhale relation invariant *)
+    is_exh_rel_inv_thm: thm,
+    (* if set, then it is a tactic that justifies the well-definedness simulation on a list of expressions
+       without needing to perform well-definedness checks *)
+    no_def_checks_tac_opt: (Proof.context -> basic_stmt_rel_info -> int -> tactic) option 
   }
 
   fun exhale_rel_aux_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_hint) =
@@ -34,6 +38,7 @@ ML \<open>
       StarExhHint (left_hint, right_hint) => 
         (Rmsg' "ExhaleRel Star" (resolve_tac ctxt [@{thm exhale_rel_star_2}]) ctxt) THEN'
         (Rmsg' "ExhaleRel Star exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN' 
+        (Rmsg' "ExhaleRel Star cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (exhale_rel_aux_tac ctxt info left_hint |> SOLVED') THEN'
         (exhale_rel_aux_tac ctxt info right_hint |> SOLVED')
     | ImpExhHint (exp_wf_rel_info, exp_rel_info, right_hint) => 
@@ -59,7 +64,7 @@ ML \<open>
            (exhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
            (Rmsg' "ExhaleRel Imp 4" (progress_tac ctxt) ctxt)
          )
-    | AtomicExhHint atomicHint => (#atomic_exhale_rel_tac info) ctxt (#basic_info info) atomicHint
+    | AtomicExhHint atomicHint => (#atomic_exhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
     | NoExhHint => K all_tac
 \<close>
 
@@ -75,6 +80,15 @@ ML \<open>
        thm * (* auxiliary variable lookup var ty theorem *)
        thm *  (* auxiliary variable lookup var from state relation theorem *)
        thm (* expression relation permission access theorem *)
+
+  fun exh_no_def_checks_tac ctxt (info: basic_stmt_rel_info) : int -> tactic  =
+    resolve_tac ctxt [ @{thm framing_exhI_exprs_wf_rel} OF [ #consistency_down_mono_thm info ] ] THEN'
+    blast_tac ctxt THEN' (* framing_exh *)
+    assm_full_simp_solved_tac ctxt THEN'  (* subexpression equality *)
+    assm_full_simp_solved_tac ctxt THEN'  (* subexpression constraint *)
+    assm_full_simp_solved_tac ctxt  (* assertion constraint *)
+
+  val test : Proof.context -> basic_stmt_rel_info -> int -> tactic = exh_no_def_checks_tac    
 
   fun store_temporary_perm_exh_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm =
     store_temporary_perm_tac 
@@ -151,13 +165,13 @@ ML \<open>
     (Rmsg' "UpdExhField FieldRel" ((#field_rel_single_tac info) ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField RcvRel" (exp_rel_tac exp_rel_info ctxt) ctxt)
 
-  fun atomic_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) exh_field_acc_hint =
+  fun atomic_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) (no_def_checks_tac_opt: (Proof.context -> basic_stmt_rel_info -> int -> tactic) option) exh_field_acc_hint =
     case exh_field_acc_hint of
       FieldAccExhHint (exp_wf_rel_info, exp_rel_info, lookup_aux_var_ty_thm, lookup_aux_var_state_rel_thm, exp_rel_perm_access_thm) =>
         (Rmsg' "ExhField 1" (resolve_tac ctxt @{thms exhale_field_acc_rel}) ctxt) THEN'
-          (Rmsg' "ExhField wf rcv" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
-          (Rmsg' "ExhField wf perm" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
-  
+          (*(Rmsg' "ExhField wf rcv" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
+          (Rmsg' "ExhField wf perm" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'*)
+          (Rmsg' "ExhField wf subexpressions" (exps_wf_rel_tac info exp_wf_rel_info exp_rel_info ctxt no_def_checks_tac_opt 2) ctxt) THEN'   
           (Rmsg' "ExhField 2 propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2}) ctxt) THEN'
           (Rmsg' "ExhField 3 propagate" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
           (store_temporary_perm_exh_tac ctxt info exp_rel_info lookup_aux_var_ty_thm) THEN'
@@ -166,11 +180,11 @@ ML \<open>
           (upd_exhale_field_acc_tac ctxt info exp_rel_info)
     | _ => error("only support FieldAccExhHint")
   
-  fun atomic_exhale_rel_inst_tac ctxt (info: basic_stmt_rel_info) atomic_exh_hint = 
+  fun atomic_exhale_rel_inst_tac ctxt (info: basic_stmt_rel_info) (no_def_checks_tac_opt: (Proof.context -> basic_stmt_rel_info -> int -> tactic) option) atomic_exh_hint = 
     case atomic_exh_hint of
       PureExpExhHint _ => error ("do not support pure exhale")
     | FieldAccExhHint _ => 
-         atomic_exhale_field_acc_tac ctxt info atomic_exh_hint
+         atomic_exhale_field_acc_tac ctxt info no_def_checks_tac_opt atomic_exh_hint
 
 \<close>
 

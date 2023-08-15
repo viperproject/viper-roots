@@ -91,6 +91,20 @@ lemma is_assertion_red_invariant_inh:
   "is_inh_rel_invariant ctxt_vpr StateCons (assertion_framing_state ctxt_vpr StateCons)"
   by (blast intro: is_inh_rel_invariant_intro dest: assertion_framing_star assertion_framing_imp)
 
+lemma assertion_framing_state_inh_exprs_wf_rel:
+  assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"
+      and StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
+                                         assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>"      
+      and "es = sub_expressions_atomic A"
+    shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+proof (rule assertion_framing_exprs_wf_rel_inh_well_def_same[OF _ \<open>es = _\<close>])
+  fix \<omega>def \<omega> ns
+  assume "R \<omega>def \<omega> ns"
+  thus "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and> \<omega> = \<omega>def"
+    using StateRel
+    by blast
+qed
+
 subsection \<open>Propagation rules\<close>
 
 lemma inhale_propagate_pre:

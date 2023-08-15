@@ -1099,6 +1099,20 @@ proof -
   by simp
 qed
 
+subsection \<open>Monotonicity relationship\<close>
+
+text \<open>The following lemma shows for \<^typ>\<open>'a full_total_state\<close> that downwards monotonicity w.r.t. 
+the order type class is at least as strong as downwards monotoncity w.r.t. order defined via the pcm
+addition. The converse is not true, because the order type class instantiation is a larger relation
+(since traces need not be equal as opposed to the pcm addition case where traces must be equal).\<close>
+
+lemma mono_prop_downward_ord_implies_mono_prop_downward:
+  assumes "mono_prop_downward_ord (StateCons :: 'a full_total_state \<Rightarrow> bool)"
+  shows "mono_prop_downward StateCons"
+  using assms full_total_state_succ_implies_gte
+  unfolding mono_prop_downward_ord_def mono_prop_downward_def
+  by blast
+
 subsection \<open>valid mask (TODO: move to ViperLang?)\<close>
 
 abbreviation valid_heap_mask :: "mask \<Rightarrow> bool"

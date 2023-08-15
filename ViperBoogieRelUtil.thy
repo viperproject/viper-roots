@@ -1013,5 +1013,9 @@ subsection \<open>Monotoncity\<close>
 lemma true_mono_prop_downward: "mono_prop_downward (\<lambda>_. True)"
   unfolding mono_prop_downward_def
   by blast
+
+lemma true_mono_prop_downward_ord: "mono_prop_downward_ord (\<lambda>_. True)"
+  unfolding mono_prop_downward_ord_def
+  by blast
          
 end

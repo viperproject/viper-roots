@@ -96,6 +96,15 @@ lemma stmt_rel_propagate_2:
   unfolding stmt_rel_def
   using rel_propagate_post
   by blast
+
+lemma stmt_rel_propagate_3:
+  assumes "stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
+          "red_ast_bpl_rel R1 R1 P ctxt \<gamma>1 \<gamma>2"
+  shows "stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+  using assms
+  unfolding stmt_rel_def
+  using rel_propagate_post
+  by blast
   
 lemma stmt_rel_propagate_2_same_rel:
   assumes "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>1" and
@@ -650,6 +659,22 @@ next
     by blast    
 qed (insert assms, auto) 
 
+text \<open>The output relation could be strengthened here, but this lemma is still useful in cases where the output relation
+is irrelevant (such as when exhaling the postcondition, since there is no code after that)\<close>
+
+lemma exhale_true_stmt_rel:
+  shows "stmt_rel R (\<lambda>_ _. True) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale (Atomic (Pure (ELit (ViperLang.LBool True))))) \<gamma> \<gamma>"
+  apply (rule stmt_rel_intro)
+  using red_ast_bpl_refl
+   apply blast
+  apply (erule RedExhale_case)
+    apply simp
+  apply (erule ExhPure_case)
+  by (auto elim: red_pure_exp_total_elims exh_if_total.elims)
+
+text \<open>The following lemma and the next one must have the same number and kind of premises, since currently a single 
+      tactic deals with the premises.\<close>
+
 lemma exhale_stmt_rel_inst_no_inv:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
@@ -665,17 +690,17 @@ lemma exhale_stmt_rel_inst_no_inv:
 
 lemma exhale_stmt_rel_inst_framing_inv:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
+      and StateRelAndConsistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<and> StateCons \<omega>"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons A \<omega> \<omega>"
       and R_to_Rexh: "red_ast_bpl_rel R (state_rel_def_same Pr StateCons TyRep Tr' AuxPred' ctxt) P ctxt \<gamma> \<gamma>1"
-      and "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) (framing_exh ctxt_vpr StateCons) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
-      and "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
-                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+      and ExhRel: "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) (framing_exh ctxt_vpr StateCons) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns.  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
+      and "\<And> \<omega> \<omega>' ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
+                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and>  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ns'"
+    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+  apply (rule exhale_stmt_rel_inst[OF WfConsistency _ _ R_to_Rexh ExhRel Rexh_to_Rout])
   using assms
-  by (rule exhale_stmt_rel_inst)
-
+  by auto
 
 lemma exhale_stmt_rel_finish:
   assumes StateRel: "state_rel_def_same Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred ctxt \<omega> ns" and
@@ -1134,7 +1159,7 @@ lemma method_call_stmt_rel:
                               no_unfolding_assertion (method_decl.pre mdecl) \<and>
                               no_unfolding_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es"
-      and ConsistencyDownwardMono: "\<And>\<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+      and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
       and "rtype_interp ctxt = []"
       and DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr"
@@ -2056,9 +2081,8 @@ proof (rule stmt_rel_intro_2)
               by fastforce
           qed
           moreover have "mono_prop_downward StateCons"
-            using ConsistencyDownwardMono
-            unfolding mono_prop_downward_def            
-            using full_total_state_succ_implies_gte by auto
+            using ConsistencyDownwardMono mono_prop_downward_ord_implies_mono_prop_downward 
+            by auto
           ultimately show ?thesis
             using exhale_inhale_normal MethodSpecSubset \<open>mdecl = _\<close>
             by blast

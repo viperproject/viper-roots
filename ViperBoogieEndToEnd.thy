@@ -575,7 +575,7 @@ lemma end_to_end_stmt_rel_2:
              we can then instantiate the Boogie type interpretation with \<^term>\<open>vbpl_absval_ty TyRep\<close>.\<close>
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
-      and StateConsAntiMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+      and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and ProgMethod: "methods (program_total ctxt_vpr) mname = Some mdecl"
       and VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
       and VprNoPermUnfoldingPre: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl)"
@@ -780,7 +780,7 @@ proof (rule allI | rule impI)+
             apply (rule is_empty_total_full_less_eq[OF is_empty_empty_full_total_state])
             by (simp_all add: empty_full_total_state_def)
 
-          with inhale_no_perm_downwards_mono(3) StateConsAntiMono  RedInhPost 
+          with inhale_no_perm_downwards_mono(3) ConsistencyDownwardMono  RedInhPost 
           have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
             using is_empty_empty_full_total_state \<open>res = _\<close>  VprNoPermUnfoldingPost
             by blast

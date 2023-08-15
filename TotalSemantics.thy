@@ -121,6 +121,15 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 
+lemma ExhPure_case: 
+  assumes "red_exhale ctxt R \<omega>0 (Atomic (Pure e)) \<omega> res"
+      and "\<And>b. ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<Longrightarrow> res = (exh_if_total b \<omega>) \<Longrightarrow> P"
+      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P"
+    shows "P"
+  using assms 
+  by (cases) (auto elim: red_pure_exp_total_elims)
+ 
+
 (* old version with predicate heap
 definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
   where "havoc_undef_locs hh hp mh mp = 

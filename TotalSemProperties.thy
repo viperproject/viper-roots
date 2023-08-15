@@ -653,7 +653,7 @@ proof
 qed
 
 lemma inhale_no_perm_downwards_mono:
-  assumes ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> R \<omega>' \<Longrightarrow> R \<omega>"
+  assumes ConsistencyDownwardMono: "mono_prop_downward_ord R"
   shows "ctxt, R, \<omega>_def1 \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow> 
         no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<Longrightarrow>
         \<omega>2 \<le> \<omega>1 \<Longrightarrow> 
@@ -1047,7 +1047,7 @@ next
               using InhAcc \<open>\<omega>' \<in> W'\<close>
               by presburger
             from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single R \<omega>2 (the_address r, f) (Some (Abs_prat p))"
-              using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_leq ConsistencyDownwardMono
+              using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
               by blast
             have "red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal \<omega>'')"
               apply (rule red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.InhAcc)
@@ -1130,7 +1130,7 @@ next
             using InhAccPred \<open>\<omega>' \<in> W'\<close>
             by presburger
           from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single_pred R \<omega>2 (pred_id, v_args) (Some (Abs_prat p))"
-            using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_pred_leq ConsistencyDownwardMono
+            using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_pred_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
             by metis
           have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 (RNormal \<omega>'')"
             apply (rule TotalExpressions.InhAccPred[OF ArgsSuccess PermSuccess])
@@ -1169,7 +1169,7 @@ next
 
 
       from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single R \<omega>2 (the_address r, f) None"
-        using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_leq ConsistencyDownwardMono
+        using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
         by metis
       have "red_inhale ctxt R (Atomic (Acc e_r f Wildcard)) \<omega>2 (RNormal \<omega>'')"
         apply (rule TotalExpressions.InhAccWildcard)
@@ -1228,7 +1228,7 @@ next
         using InhAccPredWildcard \<open>\<omega>' \<in> W'\<close>
         by presburger
       from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single_pred R \<omega>2 (pred_id, v_args) None"
-        using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_pred_leq ConsistencyDownwardMono
+        using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_pred_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
         by metis
       have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>2 (RNormal \<omega>'')"
         apply (rule TotalExpressions.InhAccPredWildcard[OF ArgsSuccess])
@@ -1353,20 +1353,20 @@ next
 qed (rule HOL.TrueI)+
 
 lemma assertion_framing_state_mono:
-assumes "assertion_framing_state ctxt StateCons A \<omega>"
-    and "\<omega>' \<ge> \<omega>"
-    and "no_perm_assertion A \<and> no_unfolding_assertion A"
-    and ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
+  assumes "mono_prop_downward_ord StateCons"
+      and "assertion_framing_state ctxt StateCons A \<omega>"
+      and "\<omega>' \<ge> \<omega>"
+      and "no_perm_assertion A \<and> no_unfolding_assertion A"
   shows "assertion_framing_state ctxt StateCons A \<omega>'"
   using assms inhale_no_perm_downwards_mono(3)
   unfolding assertion_framing_state_def
   by blast  
 
 lemma vpr_postcondition_framed_mono:
-  assumes "vpr_postcondition_framed ctxt StateCons A \<phi> \<sigma>" 
+  assumes "mono_prop_downward_ord StateCons"
+      and "vpr_postcondition_framed ctxt StateCons A \<phi> \<sigma>" 
       and "\<phi> \<le> \<phi>'"
       and "no_perm_assertion A \<and> no_unfolding_assertion A"
-      and ConsistencyDownwardMono: "\<And> \<omega> \<omega>'. \<omega> \<le> \<omega>' \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> StateCons \<omega>"
     shows "vpr_postcondition_framed ctxt StateCons A \<phi>' \<sigma>" 
   unfolding vpr_postcondition_framed_def
 proof (rule allI | rule impI)+

@@ -137,17 +137,42 @@ ML \<open>
          (Rmsg' "Wf Rcv Field Access" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN'  (* receiver *)
          (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
        )
+
+   fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 
+     (if k <= 0 then
+        resolve_tac ctxt [@{thm HOL.refl}]
+      else 
+        resolve_tac ctxt [@{thm exI}] THEN'
+        resolve_tac ctxt [@{thm conjI}] THEN'
+        exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt THEN'
+        exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt (k-1)
+      )
+
+   (* The following tactic proves the well-definedness of a list of expressions. 
+      The argument k should be provided the number of expressions in the list.
+      If the option argument is NONE, then well-definedness checks are performed in the Boogie encoding
+      and otherwise well-definedness checks are omitted in which case the option argument must provide
+      a tactic to deal with that case. *)
+
+   fun exps_wf_rel_tac _ exp_wf_rel_info exp_rel_info ctxt NONE k =   
+       resolve_tac ctxt [@{thm exprs_wf_rel_alt_implies_exprs_wf_rel}] THEN'
+       simp_only_tac @{thms exprs_wf_rel_alt.simps} ctxt THEN'        
+       exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k
+     | exps_wf_rel_tac basic_info _ _ ctxt (SOME no_checks_tac) _ =
+       no_checks_tac ctxt basic_info
+
 \<close>
 
 ML \<open>
   fun field_access_wf_rel_tac_aux init_tac lookup_mask_var_tac field_rel_single_tac ty_args_eq_tac (exp_rel_info : exp_rel_info) ctxt =
-    (Rmsg' "Wf Field Access 1" init_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 2" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 3" (exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 4" assm_full_simp_solved_tac ctxt) THEN'
-    (Rmsg' "Wf Field Access 5" lookup_mask_var_tac ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 6" field_rel_single_tac ctxt |> SOLVED') THEN'
-    (Rmsg' "Wf Field Access 10" ty_args_eq_tac ctxt |> SOLVED')
+    (Rmsg' "Wf Field Access 1 (init)" init_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 2 (empty rtype)" assm_full_simp_solved_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 3 (state rel)" assm_full_simp_solved_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 4 (rcv rel)" (exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
+    (Rmsg' "Wf Field Access 5 (has perm fun lookup)" assm_full_simp_solved_tac ctxt) THEN'
+    (Rmsg' "Wf Field Access 6 (mask var)" lookup_mask_var_tac ctxt |> SOLVED') THEN'
+    (Rmsg' "Wf Field Access 7 (field rel single)" field_rel_single_tac ctxt |> SOLVED') THEN'
+    (Rmsg' "Wf Field Access 8 (type params)" ty_args_eq_tac ctxt |> SOLVED')
 
 \<close>
 

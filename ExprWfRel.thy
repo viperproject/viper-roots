@@ -132,6 +132,17 @@ lemma wf_rel_normal_elim:
 
 lemma exprs_wf_rel_normal_elim:
   assumes 
+       "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
+       "R \<omega>def \<omega> ns"
+       "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some vs)"
+  shows
+        "\<exists> ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
+  using assms
+  unfolding exprs_wf_rel_def wf_rel_def
+  by blast
+
+lemma exprs_wf_rel_alt_normal_elim:
+  assumes 
        "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
        "R \<omega>def \<omega> ns"
        "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some vs)"
@@ -177,8 +188,19 @@ lemma wf_rel_failure_elim:
   using assms
   unfolding wf_rel_def
   by blast
-  
+
 lemma exprs_wf_rel_failure_elim:
+  assumes 
+       "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
+       "R \<omega>def \<omega> ns"
+       "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+  shows
+       "\<exists> c. red_ast_bpl P ctxt (\<gamma>, Normal ns) c \<and> snd c = Failure"
+  using assms
+  unfolding exprs_wf_rel_def wf_rel_def
+  by blast
+  
+lemma exprs_wf_rel_alt_failure_elim:
   assumes 
        "exprs_wf_rel_alt R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'" and
        "R \<omega>def \<omega> ns"
@@ -225,8 +247,8 @@ lemma exprs_wf_rel_alt_implies_exprs_wf_rel:
   shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>'"
   unfolding exprs_wf_rel_def
   apply (rule wf_rel_intro)
-   apply (blast intro: exprs_wf_rel_normal_elim[OF assms])
-  by (blast intro: exprs_wf_rel_failure_elim[OF assms])
+   apply (blast intro: exprs_wf_rel_alt_normal_elim[OF assms])
+  by (blast intro: exprs_wf_rel_alt_failure_elim[OF assms])
 
 lemma expr_wf_rel_intro:
   assumes
@@ -264,6 +286,11 @@ qed (insert assms, fastforce)
 lemma wf_rel_no_failure_refl: "wf_rel R R IsNormal (\<lambda>_ _. False) P ctxt \<gamma> \<gamma>" 
   unfolding wf_rel_def red_ast_bpl_def
   by blast
+
+lemma exprs_wf_rel_Nil: "exprs_wf_rel R ctxt_vpr StateCons P ctxt [] \<gamma> \<gamma>"
+  unfolding exprs_wf_rel_def 
+  apply (rule wf_rel_intro)
+  by (auto intro: red_ast_bpl_refl dest: red_exp_list_failure_Nil)
 
 subsection \<open>Rules to derive semantic well-definedness relation\<close>
 
@@ -664,16 +691,23 @@ lemma unfolding_wf_rel:
 
 subsubsection \<open>Well-definedness for free if expressions are subexpressions of a framed assertion\<close>
 
-lemma assertion_framing_expr_wf_rel_inh:
+lemma assertion_framing_exprs_wf_rel_inh:
   assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
                assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
                get_store_total \<omega> = get_store_total \<omega>def \<and> 
                get_trace_total \<omega> = get_trace_total \<omega>def \<and>
-               get_h_total_full \<omega> = get_h_total_full \<omega>def" and
-          ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es" and
-          "es = sub_expressions_atomic A" and
-          "es \<noteq> []"
-        shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+               get_h_total_full \<omega> = get_h_total_full \<omega>def"
+      and "es = sub_expressions_atomic A"
+      and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
+    shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+proof (cases "es = []")
+  case True
+  then show ?thesis 
+    using exprs_wf_rel_Nil
+    by blast
+next
+  case False
+  show ?thesis 
   unfolding exprs_wf_rel_def
 proof (rule wf_rel_intro)
   fix contra
@@ -692,7 +726,7 @@ proof (rule wf_rel_intro)
     using red_pure_exp_only_differ_on_mask(2) ExprConstraint
     by blast
   hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
-    using assms InhSubAtomicFailure
+    using assms \<open>es \<noteq> []\<close> InhSubAtomicFailure
     by blast
 
   moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
@@ -704,7 +738,49 @@ proof (rule wf_rel_intro)
 
   thus contra
     by blast
-qed (blast intro: red_ast_bpl_refl)
+   qed (blast intro: red_ast_bpl_refl)
+qed
+
+lemma assertion_framing_exprs_wf_rel_inh_well_def_same:
+  assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
+               assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+               \<omega> = \<omega>def"
+      and "es = sub_expressions_atomic A"
+    shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+proof (cases "es = []")
+  case True
+  then show ?thesis 
+    using exprs_wf_rel_Nil
+    by blast
+next
+  case False
+  show ?thesis 
+  unfolding exprs_wf_rel_def
+  proof (rule wf_rel_intro)
+    fix contra
+    fix \<omega>def \<omega> ns
+    assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
+  
+    from \<open>R \<omega>def \<omega> ns\<close> have
+      AssertionFramed: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and "\<omega> = \<omega>def"
+      using assms
+      by auto
+  
+    hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
+      using assms \<open>es \<noteq> []\<close> InhSubAtomicFailure RedExps
+      by blast
+  
+    moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
+      using assms
+      by blast
+    ultimately have False
+      unfolding assertion_framing_state_def
+      by blast
+  
+    thus contra
+      by blast
+  qed (blast intro: red_ast_bpl_refl)
+qed
 
 subsection \<open>Connecting semantic well-definedness relation with concrete Boogie statements\<close>
 
@@ -1218,11 +1294,11 @@ lemma syn_field_access_valid_wf_rel:
   assumes 
          CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
          TyRepWf: "wf_ty_repr_bpl TyRep" and
+         EmptyRunTypeContext: "rtype_interp ctxt = []" and
          StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
          ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
          FunMap:   "FunMap FHasPerm = has_perm_name" and
          MaskExp:  "e_m_bpl = Lang.Var (mask_var_def Tr)" and
-         EmptyRunTypeContext: "rtype_interp ctxt = []" and
          FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
        TypeParams: "ts = [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
    shows "wf_rel_fieldacc get_valid_locs R R ctxt_vpr StateCons P ctxt e f 

@@ -94,6 +94,13 @@ lemma list_all2_revD:
   using assms
   by simp
 
+subsection \<open>Monotonicity on the order type class\<close>
+
+text \<open>The following monotonicity definition uses the ordering for types \<^typ>\<open>'a :: ord\<close>.\<close>
+
+definition mono_prop_downward_ord
+  where "mono_prop_downward_ord P \<equiv> \<forall> y x. (y \<ge> x \<and> P y) \<longrightarrow> P x"
+
 subsection \<open>\<open>if_Some\<close>\<close>
 
 text \<open>interface for \<open>if_Some\<close> was initially defined by Benjamin Bonneau\<close>

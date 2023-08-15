@@ -272,7 +272,54 @@ next
     unfolding framing_exh_def
      by blast
  qed
-    
+
+
+ text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> can be used to omit well-definedness checks
+       on direct subexpressions of an assertion\<close>
+
+lemma framing_exhI_exprs_wf_rel:
+  assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"
+      and "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons (Atomic A) \<omega>def \<omega>"      
+      and "es = sub_expressions_atomic A"
+      and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
+      and AssertionConstraint: "no_perm_assertion (Atomic A) \<and> no_unfolding_assertion (Atomic A)"
+    shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+proof (rule assertion_framing_exprs_wf_rel_inh)
+  fix \<omega>def \<omega> ns
+  assume "R \<omega>def \<omega> ns"
+  hence FramingExh: "framing_exh ctxt_vpr StateCons (Atomic A) \<omega>def \<omega>"
+    using assms
+    by simp
+
+  from this obtain \<omega>_inh \<omega>_sum where 
+      StateConstraint: "\<omega>_inh \<oplus> \<omega> = Some \<omega>_sum \<and> \<omega>def \<succeq> \<omega>_sum"
+  and FramingStateInh: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>_inh"
+    unfolding framing_exh_def
+    by blast
+
+  hence "\<omega>def \<succeq> \<omega>_inh" 
+    by (metis greater_def succ_trans)
+  hence "\<omega>def \<ge> \<omega>_inh"
+    using full_total_state_succ_implies_gte
+    by blast
+
+  from StateConstraint have "\<omega>def \<succeq> \<omega>"
+    by (metis greater_equiv succ_trans)
+
+  show "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+       get_store_total \<omega> = get_store_total \<omega>def \<and> get_trace_total \<omega> = get_trace_total \<omega>def \<and> get_h_total_full \<omega> = get_h_total_full \<omega>def"
+    (is "?Goal1 \<and> ?Goal2")
+  proof (rule conjI)
+     show ?Goal1
+      using assertion_framing_state_mono[OF ConsistencyDownwardsMono FramingStateInh] AssertionConstraint \<open>\<omega>def \<ge> \<omega>_inh\<close> 
+      by blast
+  next
+    show ?Goal2
+      using full_total_state_greater_only_mask_changed[OF \<open>\<omega>def \<succeq> \<omega>\<close>]
+      by simp
+  qed
+qed (insert assms, simp_all)
+
 subsection \<open>Propagation rules\<close>
 
 lemma exhale_rel_propagate_pre:
@@ -476,23 +523,20 @@ lemma exhale_acc_normal_red_exhale:
   by presburger
 
 lemma exhale_field_acc_rel:
-  assumes 
-    WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
-    WfPerm: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and
-    CorrectPermRel:  
+  assumes WfSubexp:  "exprs_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt [e_rcv_vpr, e_p] \<gamma> \<gamma>2"
+      and CorrectPermRel:  
             "\<And>r p. rel_general (uncurry R) (R' r p)
                   (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. \<omega>0_\<omega> = \<omega>0_\<omega>' \<and> 
                                   exhale_field_acc_rel_assms ctxt_vpr StateCons e_rcv_vpr f e_p r p (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)  \<and>
                                   exhale_field_acc_rel_perm_success ctxt_vpr StateCons (snd \<omega>0_\<omega>) r p f)
                   (\<lambda> \<omega>0_\<omega>. exhale_field_acc_rel_assms ctxt_vpr StateCons e_rcv_vpr f e_p r p (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) \<and>
                            \<not> exhale_field_acc_rel_perm_success ctxt_vpr StateCons  (snd \<omega>0_\<omega>) r p f)
-                  P ctxt \<gamma>2 \<gamma>3" and
-    
-    UpdExhRel: "\<And>r p. rel_general (R' r p) (uncurry R) \<comment>\<open>Here, the simulation needs to revert back to R\<close>
+                  P ctxt \<gamma>2 \<gamma>3"    
+      and UpdExhRel: "\<And>r p. rel_general (R' r p) (uncurry R) \<comment>\<open>Here, the simulation needs to revert back to R\<close>
                       (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. fst \<omega>0_\<omega> = fst \<omega>0_\<omega>' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) (snd \<omega>0_\<omega>'))
                       (\<lambda>_. False) 
                       P ctxt \<gamma>3 \<gamma>'"
-  shows "exhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
+    shows "exhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
 proof (rule exhale_rel_intro_2)
   fix \<omega>0 \<omega> ns res
   assume R0:"R \<omega>0 \<omega> ns" and "Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>0 \<omega>"
@@ -501,11 +545,10 @@ proof (rule exhale_rel_intro_2)
   thus "rel_vpr_aux (R \<omega>0) P ctxt \<gamma> \<gamma>' ns res"
   proof cases
     case (ExhAcc mh r p a)
-    from this obtain ns1 where R1: "R \<omega>0 \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF WfRcv] R0 \<open>Q _ \<omega>0 \<omega>\<close>
-      by blast
-    with ExhAcc obtain ns2 where "R \<omega>0 \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
-      using wf_rel_normal_elim[OF WfPerm] R1 \<open>Q _ \<omega>0 \<omega>\<close> red_ast_bpl_transitive
+    hence "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>0) [e_rcv_vpr, e_p] \<omega> (Some [VRef r, VPerm p])"
+      by (fastforce intro: red_exp_inhale_unfold_intros)
+    from this obtain ns2 where "R \<omega>0 \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+      using exprs_wf_rel_normal_elim[OF WfSubexp] R0 \<open>Q _ \<omega>0 \<omega>\<close>
       by blast
 
     hence R2_conv:"uncurry R (\<omega>0, \<omega>) ns2"
@@ -553,28 +596,10 @@ proof (rule exhale_rel_intro_2)
     qed
   next
     case SubAtomicFailure
-    hence SubexpFailCases: 
-          "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
-           (\<exists>v. ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> 
-                ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure)"
-      by (auto elim: red_exp_list_failure_elim)
-
-    show ?thesis
-    proof (rule rel_vpr_aux_intro)
-      show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
-      proof (cases "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
-        case True
-        then show ?thesis 
-          using wf_rel_failure_elim[OF WfRcv] \<open>R \<omega>0 \<omega> ns\<close> \<open>Q _ \<omega>0 \<omega>\<close>
-          by blast          
-      next
-        case False
-        then show ?thesis 
-          using wf_rel_normal_elim[OF WfRcv] \<open>R \<omega>0 \<omega> ns\<close> \<open>Q _ \<omega>0 \<omega>\<close>
-                wf_rel_failure_elim[OF WfPerm] SubexpFailCases red_ast_bpl_transitive
-          by blast
-      qed
-    qed (simp add: \<open>res = _\<close>)
+    thus ?thesis
+      unfolding rel_vpr_aux_def
+      using exprs_wf_rel_failure_elim[OF WfSubexp] R0 \<open>Q _ \<omega>0 \<omega>\<close>
+      by simp
   qed
 qed
   
@@ -696,5 +721,22 @@ next
     using wf_total_consistency_trace_mono_downwardD[OF WfConsistency] mono_prop_downwardD 
     by blast
 qed (auto)
+
+subsection \<open>Misc\<close>
+
+lemma exhale_rel_refl:
+  assumes "\<And> \<omega>0 \<omega> res. red_exhale ctxt_vpr StateCons \<omega>0 A \<omega> res \<Longrightarrow> (res \<noteq> RFailure \<and> (\<forall> \<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>)) "
+  shows "exhale_rel R Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>"
+  apply (rule exhale_rel_intro)
+  using red_ast_bpl_refl assms
+  by blast+
+  
+lemma exhale_rel_true: "exhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure (ELit (ViperLang.LBool True)))) \<gamma> \<gamma>"
+proof (rule exhale_rel_refl)
+  fix \<omega>0 \<omega> res
+  assume "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Pure (ELit (ViperLang.lit.LBool True)))) \<omega> res"
+  thus "res \<noteq> RFailure \<and> (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>)"
+    by (cases) (auto elim: red_pure_exp_total_elims)
+qed
 
 end
