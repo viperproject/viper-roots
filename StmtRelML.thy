@@ -103,7 +103,7 @@ ML \<open>
        exp_wf_rel_info * (* well-definedness rhs *)
        exp_rel_info * (* receiver *)
        exp_rel_info   (* rhs *)
-  | InhaleHint of (atomic_inhale_rel_hint inhale_rel_hint)
+  | InhaleHint of (atomic_inhale_rel_hint inhale_rel_complete_hint)
   | ExhaleHint of (atomic_exhale_rel_hint exhale_rel_complete_hint)
   | MethodCallHint
 
@@ -229,7 +229,7 @@ ML \<open>
         AssignHint (exp_wf_rel_info, exp_rel_info, lookup_bpl_target_thm) => 
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
      |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
-     | InhaleHint inh_rel_hint => 
+     | InhaleHint inh_complete_hint => 
         (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info inh_rel_hint)
      | ExhaleHint exh_complete_hint =>

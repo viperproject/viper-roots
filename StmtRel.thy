@@ -544,9 +544,9 @@ qed (insert assms, auto)
 subsection \<open>Inhale statement relation\<close>
 
 lemma inhale_stmt_rel:
-  assumes InhRel: "inhale_rel R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'" and \<comment>\<open>TODO: this first premise won't work, because there is no information on R'\<close>
-          R_to_R': "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R' \<omega> ns" and
-          InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega>" 
+  assumes R_to_R': "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R' \<omega> ns"
+      and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega>" 
+      and InhRel: "inhale_rel R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
   shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
   apply (rule stmt_rel_intro)
   using inhale_rel_normal_elim[OF InhRel R_to_R'] inhale_rel_failure_elim[OF InhRel R_to_R'] InvHolds
@@ -558,6 +558,14 @@ lemma inhale_stmt_rel_no_inv:
   apply (rule stmt_rel_intro)
   using inhale_rel_normal_elim[OF InhRel] inhale_rel_failure_elim[OF InhRel] 
   by (auto elim: RedInhale_case)
+
+lemma inhale_stmt_rel_inv_inst:
+  assumes R_to_R': "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> assertion_framing_state ctxt_vpr StateCons A \<omega>" 
+      and InhRel: "inhale_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (assertion_framing_state ctxt_vpr StateCons) ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
+    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
+  using assms
+  by (rule inhale_stmt_rel) simp_all
 
 subsection \<open>Exhale statement relation\<close>
 
@@ -573,7 +581,6 @@ lemma exhale_stmt_rel:
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
           \<comment>\<open>At the end of the exhale we require the Boogie program to establish the output relation on the 
              evaluation state\<close>
-      \<comment>\<open>and Rexh_to_R: "\<And> \<omega>def \<omega> ns. Rexh \<omega>def \<omega> ns \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"\<close>
       and Rexh_to_R: "red_ast_bpl_rel (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and ExhaleState: "\<And> \<omega> \<omega>' ns. R_out \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
                                  \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
@@ -1150,6 +1157,7 @@ subsubsection \<open>Main Lemma\<close>
 
 lemma method_call_stmt_rel:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and "Pr = program_total ctxt_vpr"
           \<comment>\<open>We need to require state consistency, otherwise framing_exh cannot be established.\<close>
       and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
@@ -1159,7 +1167,6 @@ lemma method_call_stmt_rel:
                               no_unfolding_assertion (method_decl.pre mdecl) \<and>
                               no_unfolding_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es"
-      and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
       and "rtype_interp ctxt = []"
       and DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr"

@@ -87,7 +87,15 @@ lemma is_inh_rel_invariant_intro:
 
 subsubsection \<open>Invariant instantiations\<close>
 
-lemma is_assertion_red_invariant_inh:
+text \<open>trivial invariant instantiation\<close>
+
+lemma true_is_inh_rel_invariant: "is_inh_rel_invariant ctxt_vpr StateCons (\<lambda>_ _. True)"
+  unfolding is_inh_rel_invariant_def
+  by simp
+
+text \<open>\<^const>\<open>assertion_framing_state\<close> invariant instantiation\<close>
+
+lemma assertion_framing_is_inh_rel_invariant:
   "is_inh_rel_invariant ctxt_vpr StateCons (assertion_framing_state ctxt_vpr StateCons)"
   by (blast intro: is_inh_rel_invariant_intro dest: assertion_framing_star assertion_framing_imp)
 
@@ -249,16 +257,13 @@ lemma inhale_acc_normal_premise_red_inhale:
   by meson
 
 lemma inhale_field_acc_rel:
-  assumes 
-    WfRcv: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>) 
-                        ctxt_vpr StateCons P ctxt e_rcv_vpr \<gamma> \<gamma>1" and
-    WfPerm: "expr_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>)
-                        ctxt_vpr StateCons P ctxt e_p \<gamma>1 \<gamma>2" and 
-    PosPermRel:  "\<And>p. rel_general R (R' p)
+  assumes WfSubexp: "exprs_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega> ns \<and> \<omega>def = \<omega> \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>) 
+                        ctxt_vpr StateCons P ctxt [e_rcv_vpr, e_p] \<gamma> \<gamma>2"
+      and PosPermRel: "\<And>p. rel_general R (R' p)
                   (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>' \<and> (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p \<ge> 0))
                   (\<lambda> \<omega>. (ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VPerm p)) \<and> p < 0))
-                  P ctxt \<gamma>2 \<gamma>3" and
-     UpdInhRel: "\<And>p r. rel_general (R' p) R \<comment>\<open>Here, the simulation needs to revert back to R\<close>
+                  P ctxt \<gamma>2 \<gamma>3"
+      and UpdInhRel: "\<And>p r. rel_general (R' p) R \<comment>\<open>Here, the simulation needs to revert back to R\<close>
                   (inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r)
                   (\<lambda> \<omega>. False) P ctxt \<gamma>3 \<gamma>'" 
   shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
@@ -272,15 +277,11 @@ proof (rule inhale_rel_intro_2)
   thus "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
   proof (cases)
     case (InhAcc r p W')
-    from this obtain ns1 where Rext1: "state_rel_ext R \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF WfRcv] Rext0 \<open>Q _ \<omega>\<close>
+    hence "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>) [e_rcv_vpr, e_p] \<omega> (Some [VRef r, VPerm p])"
+      by (fastforce intro: red_exp_inhale_unfold_intros)
+    from this obtain ns2 where "R \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+      using InhAcc exprs_wf_rel_normal_elim[OF WfSubexp] Rext0 \<open>Q _ \<omega>\<close>
       by blast
-    moreover obtain ns2 where "state_rel_ext R \<omega> \<omega> ns2" and  "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)"
-      using InhAcc wf_rel_normal_elim[OF WfPerm] Rext1 \<open>Q _ \<omega>\<close>
-      by blast
-    ultimately have "R \<omega> ns2" and Red2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
-      using red_ast_bpl_transitive
-      by blast+
 
     show ?thesis
     proof (rule rel_vpr_aux_intro)
@@ -314,35 +315,12 @@ proof (rule inhale_rel_intro_2)
         using rel_failure_elim[OF PosPermRel \<open>R \<omega> ns2\<close>] Red2 red_ast_bpl_transitive
         by blast
     qed
-  next 
-    case InhSubAtomicFailure
-    from this consider 
-          (RcvFail) "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure" |
-          (RcvNormal) "\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr;\<omega>\<rangle> [\<Down>]\<^sub>t (Val v) \<and> 
-                           ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-      by (auto elim: red_exp_list_failure_elim)  
+  next
+    case InhSubAtomicFailure 
     thus ?thesis
-    proof (cases)
-      case RcvFail
-      then show ?thesis 
-        using  \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close> wf_rel_failure_elim[OF WfRcv]        
-        unfolding \<open>res = _\<close>
-        by (auto intro!: rel_vpr_aux_intro)
-    next
-      case RcvNormal
-      with wf_rel_normal_elim[OF WfRcv] \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close>
-      obtain ns' where "R \<omega> ns'" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns')"
-        by blast
-
-      moreover from RcvNormal wf_rel_failure_elim[OF WfPerm] \<open>R \<omega> ns'\<close> \<open>Q _ \<omega>\<close> obtain c' where
-        "red_ast_bpl P ctxt (\<gamma>1, Normal ns') c' \<and> snd c' = Failure"
-        by blast
-
-      ultimately show ?thesis 
-        using red_ast_bpl_transitive
-        unfolding rel_vpr_aux_def \<open>res = _\<close>
-        by blast        
-    qed
+      unfolding rel_vpr_aux_def
+      using exprs_wf_rel_failure_elim[OF WfSubexp] \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close>
+      by simp
   qed
 qed
 
