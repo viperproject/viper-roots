@@ -161,6 +161,16 @@ ML \<open>
      | exps_wf_rel_tac basic_info _ _ ctxt (SOME no_checks_tac) _ =
        no_checks_tac ctxt basic_info
 
+   (* The following tactic proves the well-definedness of a single expression. The option tactic
+      is the same as for exps_wf_rel_tac and thus deals with the well-definedness of a list of expressions
+      (hence the tactic below converts the goal into a goal for a singleton expression in the case when
+       the option tactic is used). *)
+   fun exp_wf_rel_tac _ exp_wf_rel_info exp_rel_info ctxt NONE =
+       exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt
+     | exp_wf_rel_tac basic_info _ _ ctxt (SOME no_checks_tac) =
+       resolve_tac ctxt [@{thm exprs_wf_rel_singletonD}] THEN'
+       no_checks_tac ctxt basic_info
+
 \<close>
 
 ML \<open>

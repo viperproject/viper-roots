@@ -81,6 +81,14 @@ lemma stmt_rel_propagate:
   unfolding red_ast_bpl_rel_def stmt_rel_def 
   by metis
 
+lemma stmt_rel_propagate_pre_2:
+  assumes "red_ast_bpl_rel R0 R0 P ctxt \<gamma>0 \<gamma>1"
+      and "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"
+    shows "stmt_rel R0 R2 ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>0 \<gamma>2"
+  using assms rel_propagate_pre
+  unfolding red_ast_bpl_rel_def stmt_rel_def 
+  by metis
+
 lemma stmt_rel_propagate_same_rel:
   assumes "red_ast_bpl_rel R R P ctxt \<gamma>0 \<gamma>1" and
           "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt stmt_vpr \<gamma>1 \<gamma>2"

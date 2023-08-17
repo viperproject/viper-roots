@@ -8,14 +8,15 @@ val Rmsg' = run_and_print_if_fail_2_tac'
 
 fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
 
-fun unfold_bigblock_atomic ctxt bigblock =
+fun unfold_bigblock_atomic (ctxt : Proof.context) (bigblock : term) : (int -> tactic) =
   case bigblock of
     Const (bigblock_name, _) =>
     ( let val thm = Proof_Context.get_thms ctxt (bigblock_name ^ "_def")
-      in
-         Local_Defs.unfold_tac ctxt thm
+      in         
+         simp_only_tac thm ctxt
+         (*(K (unfold_tac ctxt thm))*) (* unfold_tac has an effect on all subgoals, which we avoid, since it makes tactics less robust *)
       end )
-  | _ => all_tac
+  | _ => K all_tac
 
 fun is_empty_bigblock bigblock =
   case bigblock of 
@@ -34,10 +35,10 @@ fun unfold_bigblock_in_program_point ctxt (program_point, _) =
            (case cont of (* if the current big block is empty, we unfold the next big block *)
               Const (@{const_name KSeq}, _) $ bigblock_in_cont $ _ => 
                 unfold_bigblock_atomic ctxt bigblock_in_cont
-            | _ => all_tac)
+            | _ => K all_tac)
         else
           unfold_bigblock_atomic ctxt bigblock        
-     | _ => all_tac   
+     | _ => K all_tac   
 
 (* input term t should not have any metaimplications or metaquantifications *)
 fun unfold_bigblock_in_goal_aux ctxt (t,i) =
@@ -61,7 +62,7 @@ fun unfold_bigblock_in_goal_aux ctxt (t,i) =
             unfold_bigblock_in_program_point ctxt (program_point, i)
   | Const (@{const_name "is_empty_bigblock"}, _) $ bigblock =>
       unfold_bigblock_atomic ctxt bigblock
-  | _ => (writeln(Syntax.string_of_term ctxt t); all_tac)
+  | _ => (writeln(Syntax.string_of_term ctxt t); K all_tac)
   
 
 (* The following tactic unfolds in certain contexts the currently active bigblock or the next 
@@ -70,7 +71,7 @@ The goal is to make sure that after this tactic the (bigblock, continuation) con
 a form where bigblock is unfolded and not empty. The nonemptiness guarantee relies on the assumption
  that an empty bigblock is not succeeded by another empty bigblock. *)
 fun unfold_bigblock_in_goal ctxt =
-  SUBGOAL (fn (t,i) => unfold_bigblock_in_goal_aux ctxt (Logic.strip_assums_concl t, i))
+  SUBGOAL (fn (t,i) => unfold_bigblock_in_goal_aux ctxt (Logic.strip_assums_concl t, i) i)
 
   (* progress_tac tries to solve a goal of the form 
          \<open>\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'\<close>
@@ -91,6 +92,18 @@ fun progress_rel_tac ctxt =
    (unfold_bigblock_in_goal ctxt) THEN'
    (resolve_tac ctxt [@{thm red_ast_bpl_rel_empty_block}] ORELSE'
     resolve_tac ctxt [@{thm red_ast_bpl_rel_refl}])
+
+fun progress_rel_tac_2 tac ctxt = 
+   (unfold_bigblock_in_goal ctxt) THEN'
+   (tac ctxt) THEN'
+   (resolve_tac ctxt [@{thm red_ast_bpl_rel_empty_block}] ORELSE'
+    resolve_tac ctxt [@{thm red_ast_bpl_rel_refl}])
+
+(* progress_rel_general_tac is analogous to progress_rel_tac except that the goal is expressed via \<open>rel_general\<close> *)
+
+fun progress_rel_general_tac ctxt =
+   (resolve_tac ctxt @{thms rel_propagate_pre_3_only_state_rel}) THEN'
+   (progress_rel_tac ctxt)
 
 (* unfolds the active big block (as described above) for a rel_general goal *)
 fun unfold_bigblock_in_rel_general ctxt = resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}
@@ -187,13 +200,13 @@ fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs =
 (* tactic for introducing temporary perm variable *)
 
 fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm eval_vpr_perm_tac =
-  (Rmsg' "store perm 1" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
-  (Rmsg' "store perm 2" ((simp_tac_with_thms [] ctxt THEN' (blast_tac ctxt ORELSE' (K all_tac))) |> SOLVED') ctxt) THEN'
+  (Rmsg' "store perm init" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
+  (Rmsg' "store perm state rel" ((simp_tac_with_thms [] ctxt THEN' (blast_tac ctxt ORELSE' (K all_tac))) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm eval vpr perm" (eval_vpr_perm_tac ctxt) ctxt) THEN'
   (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm lookup" (assm_full_simp_solved_with_thms_tac [lookup_aux_var_ty_thm] ctxt) ctxt) THEN'
-  (Rmsg' "store perm 2" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+  (Rmsg' "store perm type interp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
   (Rmsg' "store perm empty rtype_interp" (assm_full_simp_solved_tac ctxt) ctxt)
 
 \<close>
@@ -217,6 +230,12 @@ fun intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_thm =
   revcut_tac lookup_aux_var_thm THEN'
   fastforce_tac ctxt [] THEN'    
   assm_full_simp_solved_tac ctxt
+
+fun intro_fact_rcv_lookup_reduction ctxt exp_rel_info exp_rel_ref_access_thm vpr_rcv_red_tac =
+  (Rmsg' "intro rcv lookup red 1" (revcut_tac exp_rel_ref_access_thm) ctxt) THEN'
+  (Rmsg' "intro rcv lookup red 2" (blast_tac ctxt) ctxt) THEN'
+  (Rmsg' "intro rcv lookup red 3" (vpr_rcv_red_tac ctxt |> SOLVED') ctxt) THEN'
+  (Rmsg' "intro rcv lookup red 4" (exp_rel_tac exp_rel_info ctxt) ctxt)
 
 (* the Viper field name must be instantiated in exp_rel_perm_access_thm *)
 fun intro_fact_mask_lookup_reduction ctxt (info: basic_stmt_rel_info) exp_rel_info exp_rel_perm_access_thm vpr_rcv_red_tac =

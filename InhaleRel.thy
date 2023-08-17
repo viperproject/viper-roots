@@ -100,8 +100,7 @@ lemma assertion_framing_is_inh_rel_invariant:
   by (blast intro: is_inh_rel_invariant_intro dest: assertion_framing_star assertion_framing_imp)
 
 lemma assertion_framing_state_inh_exprs_wf_rel:
-  assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"
-      and StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
+  assumes StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
                                          assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>"      
       and "es = sub_expressions_atomic A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
@@ -242,6 +241,18 @@ definition inhale_acc_normal_premise
        (p > 0 \<longrightarrow> r \<noteq> Null) \<and>
        (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
        (W' \<noteq> {} \<and> \<omega>' \<in> W'))" 
+
+lemma inhale_field_acc_rel_assm_perm_eval:
+  assumes "inhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega> \<omega>'"
+  shows "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+  using assms
+  by (simp add: inhale_acc_normal_premise_def)
+
+lemma inhale_field_acc_rel_assm_ref_eval:
+  assumes "inhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega> \<omega>'"
+  shows "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+  using assms
+  by (simp add: inhale_acc_normal_premise_def)
 
 lemma inhale_acc_normal_premise_red_inhale:
   assumes "inhale_acc_normal_premise ctxt StateCons e_r f e_p p r \<omega> \<omega>'"

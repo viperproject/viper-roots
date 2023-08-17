@@ -172,6 +172,14 @@ lemma rel_propagate_pre_2_only_state_rel:
   unfolding red_ast_bpl_rel_def
   by metis  
 
+lemma rel_propagate_pre_3_only_state_rel: 
+  assumes "red_ast_bpl_rel R0 R0 P ctxt \<gamma>0 \<gamma>1"
+      and "rel_general R0 R1 Success Fail P ctxt \<gamma>1 \<gamma>2"
+    shows "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>2"
+  using assms rel_propagate_pre 
+  unfolding red_ast_bpl_rel_def
+  by metis
+
 lemma rel_propagate_post:
   assumes "rel_general R0 R1 Success Fail P ctxt \<gamma>0 \<gamma>1"
       and "red_ast_bpl_rel R1 R2 P ctxt \<gamma>1 \<gamma>2"
@@ -206,6 +214,8 @@ lemma rel_propagate_post_2:
   by blast
 
 text \<open>If failure is infeasible, then we can assume success when propagating\<close>
+
+text \<open>\<close>
 
 lemma rel_propagate_pre_success:
   assumes NoFailure: "\<And> \<omega>. \<not> Fail \<omega>"
@@ -314,7 +324,7 @@ lemma rel_propagate_pre_assert_2:
   by blast
 
 lemma rel_propagate_pre_assume:
-  assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV True)" and
+  assumes RedExpBpl: "\<And> \<omega> ns \<omega>'. R0 \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>)) \<and> b \<omega>" and
                      "rel_general R0 R1 Success Fail P ctxt (BigBlock name cs str tr, cont) \<gamma>'"
   shows "rel_general R0 R1 Success Fail P ctxt (BigBlock name ((Lang.Assume e_bpl)#cs) str tr, cont) \<gamma>'"
 proof (rule rel_propagate_pre[OF _ assms(2)], unfold red_ast_bpl_rel_def, (rule allI | rule impI)+)
@@ -322,11 +332,11 @@ proof (rule rel_propagate_pre[OF _ assms(2)], unfold red_ast_bpl_rel_def, (rule 
   assume local_assms: "((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns"
   hence "red_expr_bpl ctxt e_bpl ns (BoolV True)"
     using RedExpBpl
-    by blast
+    by (metis (full_types))
   thus "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Lang.Assume e_bpl # cs) str tr, cont), Normal ns)
               ((BigBlock name cs str tr, cont), Normal ns') \<and>
              R0 \<omega> ns'"
-    using red_ast_bpl_one_assume[OF RedExpBpl] local_assms
+    using red_ast_bpl_one_assume RedExpBpl local_assms
     by metis
 qed
 

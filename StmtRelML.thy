@@ -31,6 +31,12 @@ ML \<open>
     exhale_rel_info: 'e exhale_rel_info
   }
 
+ (* tactic to unfold current bigblock (or progress empty bigblock) for a stmt_rel goal, 
+    see comment for progress_rel_tac *)
+ fun progress_stmt_rel_tac ctxt =
+   resolve_tac ctxt @{thms stmt_rel_propagate_pre_2} THEN'
+   progress_rel_tac ctxt
+
  fun stmt_rel_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
        SeqnHint [] => (Rmsg' "Skip" (resolve_tac ctxt [@{thm stmt_rel_skip}]) ctxt)
@@ -219,6 +225,7 @@ ML \<open>
     end
 
   fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
+    (Rmsg' "stmt rel exhale progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_rel_tac ctxt)) ctxt) THEN'
     (Rmsg' "setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
@@ -230,8 +237,8 @@ ML \<open>
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
      |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
      | InhaleHint inh_complete_hint => 
-        (Rmsg' "AtomicInh1" (resolve_tac ctxt @{thms inhale_stmt_rel}) ctxt) THEN'
-        (inhale_rel_tac ctxt inhale_info inh_rel_hint)
+        (Rmsg' "AtomicInh1" (resolve_tac ctxt [#inhale_stmt_rel_thm inh_complete_hint]) ctxt) THEN'
+        (inhale_rel_tac ctxt inhale_info (#inhale_rel_hint inh_complete_hint))
      | ExhaleHint exh_complete_hint =>
         (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
         (Rmsg' "AtomicExh2 Consistency" (fastforce_tac ctxt []) ctxt) THEN'
@@ -239,6 +246,7 @@ ML \<open>
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | MethodCallHint => K all_tac (* TODO *)
     )
+
 \<close>
 
 end

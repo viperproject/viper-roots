@@ -4,11 +4,13 @@ begin
 
 ML \<open>
 
+fun print_and_fail_tac msg ctxt = ((print_tac ctxt msg) THEN no_tac)
+
 fun run_and_print_if_fail_tac' msg tac ctxt =
-    (tac ctxt) ORELSE' (K ((print_tac ctxt msg) THEN no_tac))
+    (tac ctxt) ORELSE' (K (print_and_fail_tac msg ctxt))
 
 fun run_and_print_if_fail_2_tac' msg tac ctxt =
-    tac ORELSE' (K ((print_tac ctxt msg) THEN no_tac))
+    tac ORELSE' (K (print_and_fail_tac msg ctxt))
 
 fun print_then_run_tac msg ctxt = K (print_tac ctxt msg)
 

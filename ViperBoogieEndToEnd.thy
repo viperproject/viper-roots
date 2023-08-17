@@ -449,28 +449,31 @@ definition method_rel
           )"
 
 lemma post_framing_rel_aux:
-  assumes
-          WfTyRep: "wf_ty_repr_bpl TyRep" and
-          WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
-          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
-                      "domain_type TyRep = absval_interp_total ctxt_vpr" and
-                      "Pr = program_total ctxt_vpr" and
-          LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)" and
-          LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
-          ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var" and
-          Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
+  assumes WfTyRep: "wf_ty_repr_bpl TyRep" 
+      and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and "domain_type TyRep = absval_interp_total ctxt_vpr"
+      and "Pr = program_total ctxt_vpr"
+      and LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)"
+      and LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
+      and ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var"
+      and Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
                               {mask_var Tr, mask_var_def Tr} \<union>
                               (ran (var_translation Tr)) \<union>
                               (ran (field_translation Tr)) \<union>
                               (range (const_repr Tr)) \<union>
-                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}") and
-                "hvar' \<noteq> mvar'" and
-          PropagateBpl: "\<And> \<omega>0 ns. (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns \<Longrightarrow>
+                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}")
+      and "hvar' \<noteq> mvar'"
+     (* and PropagateBpl: "\<And> \<omega>0 ns. (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns \<Longrightarrow>
                             \<exists>ns'. red_ast_bpl proc_body_bpl ctxt 
                                     (\<gamma>Pre, Normal ns)
                                     ((BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont), Normal ns') \<and>
-                               (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns'" and
-          PostInhRel: 
+                               (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega>0 ns'"*)
+      and PropagateBpl: "red_ast_bpl_rel (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) 
+                                         (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) proc_body_bpl ctxt 
+                                         \<gamma>Pre 
+                                         (BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont)"
+      and PostInhRel: 
              "stmt_rel (state_rel_well_def_same ctxt Pr StateCons TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred)
                        R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt
                        (Inhale (method_decl.post mdecl))
@@ -493,7 +496,8 @@ proof (rule allI | rule impI)+
                               (\<gamma>Pre, Normal ns)
                               ((BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont), Normal ns1)" and
     R1: "?R Tr \<omega>0 ns1"
-    by blast
+    unfolding red_ast_bpl_rel_def
+    by blast    
 
   have *: "\<And>\<omega>0 \<omega> ns hvar' hvar. state_rel Pr StateCons TyRep ((disable_consistent_state_rel_opt Tr)\<lparr>heap_var := hvar, heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega>0 \<omega> ns \<Longrightarrow> 
                     red_expr_bpl ctxt (Var zero_mask_var) ns (AbsV (AMask zero_mask_bpl))"
@@ -529,6 +533,12 @@ proof (rule allI | rule impI)+
     apply (rule PostInhRel)
     done
 qed
+
+lemma post_framing_rel_framing_trivial:
+  assumes "method_decl.post mdecl = (Atomic (Pure (ELit (ViperLang.LBool True))))"
+  shows "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R \<gamma>Pre"
+  unfolding post_framing_rel_def post_framing_rel_aux_def
+  by (metis assms inhale_rel_true inhale_stmt_rel_no_inv red_ast_bpl_refl)
 
 definition vpr_method_correct_total_partial :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_partial ctxt StateCons mdecl \<equiv>

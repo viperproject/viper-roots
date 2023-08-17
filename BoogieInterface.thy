@@ -216,6 +216,20 @@ lemma red_ast_bpl_propagate_transitive:
         shows "\<exists>ns2. red_ast_bpl P ctxt (\<gamma>0, Normal ns0) (\<gamma>2, Normal ns2) \<and> Q2 ns2"
   using assms red_ast_bpl_transitive by blast
 
+lemma red_ast_bpl_rel_if_nondet_then:
+  shows "red_ast_bpl_rel R R P ctxt (if_bigblock name None (thn_hd # thn_tl) els, KSeq next cont) 
+                                      (thn_hd, convert_list_to_cont thn_tl (KSeq next cont))"
+  unfolding red_ast_bpl_rel_def
+  using red_ast_bpl_if_nondet_then
+  by blast
+
+lemma red_ast_bpl_rel_if_nondet_else:
+  shows "red_ast_bpl_rel R R P ctxt (if_bigblock name None thn (els_hd # els_tl), KSeq next cont) 
+                            (els_hd, convert_list_to_cont els_tl (KSeq next cont))"
+  unfolding red_ast_bpl_rel_def
+  using red_ast_bpl_if_nondet_else
+  by blast
+
 subsection \<open>Single step lemmas for concrete simple commands\<close>
 
 lemma red_ast_bpl_one_assert:

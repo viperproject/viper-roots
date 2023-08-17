@@ -22,8 +22,6 @@ subsection\<open>General auxiliary definitions\<close>
 
 datatype 'a stmt_result_total = RMagic | RFailure | RNormal "'a full_total_state"
 
-text \<open>\<^typ>\<open>'a stmt_result_total\<close> expresses the possible states for statements.\<close>
-
 fun map_stmt_result_total :: "('a full_total_state \<Rightarrow> 'b full_total_state) \<Rightarrow> 'a stmt_result_total \<Rightarrow> 'b stmt_result_total"
   where
     "map_stmt_result_total f (RNormal \<omega>) = (RNormal (f \<omega>))"
@@ -56,6 +54,9 @@ lemma th_result_rel_normal:
   shows "a \<and> b \<and> \<omega> \<in> W"
   using assms
   by (cases) auto
+
+text \<open>\<^typ>\<open>'a stmt_result_total\<close> expresses the possible states for statements. \<close>
+
 
 lemma th_result_rel_failure: 
   assumes "th_result_rel False b W res"

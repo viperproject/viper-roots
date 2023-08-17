@@ -782,6 +782,29 @@ next
   qed (blast intro: red_ast_bpl_refl)
 qed
 
+lemma exprs_wf_rel_singletonD:
+  assumes "exprs_wf_rel R ctxt_vpr StateCons P ctxt [e] \<gamma> \<gamma>"
+  shows "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>"
+proof (rule expr_wf_rel_intro)
+  fix v \<omega>def \<omega> ns
+  assume "R \<omega>def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+  hence "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) [e] \<omega> (Some [v])"
+    by (auto intro: red_exp_inhale_unfold_intros)
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R \<omega>def \<omega> ns'"
+    using assms exprs_wf_rel_normal_elim \<open>R _ _ _\<close>
+    by blast
+next
+  fix v \<omega>def \<omega> ns
+  assume "R \<omega>def \<omega> ns" and "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t v" and "v = VFailure"
+  hence "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) [e] \<omega> None"
+    by (auto intro: red_exp_inhale_unfold_intros)
+
+  thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+    using assms exprs_wf_rel_failure_elim \<open>R _ _ _\<close>
+    by blast
+qed
+
 subsection \<open>Connecting semantic well-definedness relation with concrete Boogie statements\<close>
 
 lemma wf_rel_bop_op_trivial: 
