@@ -26,6 +26,9 @@ fun revcut_tac rule i = resolve0_tac [revcut_rl] i THEN resolve0_tac [rule] i
 
 fun force_tac_with_simps ctxt thms = Clasimp.force_tac (add_simps thms ctxt)
 
+fun fast_force_tac_with_elims_simps ctxt elim_thms simp_thms = 
+           Clasimp.fast_force_tac (add_simps simp_thms (ctxt addEs elim_thms) )
+
 fun TRY_TAC' tac = tac ORELSE' (K all_tac)
 
 \<close>

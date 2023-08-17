@@ -104,9 +104,6 @@ fun progress_rel_tac_2 tac ctxt =
 fun progress_rel_general_tac ctxt =
    (resolve_tac ctxt @{thms rel_propagate_pre_3_only_state_rel}) THEN'
    (progress_rel_tac ctxt)
-
-(* unfolds the active big block (as described above) for a rel_general goal *)
-fun unfold_bigblock_in_rel_general ctxt = resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}
                                  
 (* general information for tactics *)
   (* TODO rename *)
@@ -226,6 +223,7 @@ fun intro_fact_lookup_null_const_tac ctxt tr_def_thm =
   assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
 
 (* lookup_aux_var_thm should already instantiate the auxiliary variable *)
+
 fun intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_thm = 
   revcut_tac lookup_aux_var_thm THEN'
   fastforce_tac ctxt [] THEN'    
@@ -238,6 +236,7 @@ fun intro_fact_rcv_lookup_reduction ctxt exp_rel_info exp_rel_ref_access_thm vpr
   (Rmsg' "intro rcv lookup red 4" (exp_rel_tac exp_rel_info ctxt) ctxt)
 
 (* the Viper field name must be instantiated in exp_rel_perm_access_thm *)
+
 fun intro_fact_mask_lookup_reduction ctxt (info: basic_stmt_rel_info) exp_rel_info exp_rel_perm_access_thm vpr_rcv_red_tac =
   (Rmsg' "intro mask lookup red 1" (revcut_tac exp_rel_perm_access_thm) ctxt) THEN'
   (Rmsg' "intro mask lookup red 2" (resolve_tac ctxt @{thms mask_read_wf_concrete} THEN'

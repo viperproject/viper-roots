@@ -109,7 +109,8 @@ ML \<open>
       (Rmsg' "Inh Prove Perm Nonnegative - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Success Condition" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Finalize 1" (resolve_tac ctxt @{thms rel_general_success_refl}) ctxt) THEN'
-      (Rmsg' "Inh Prove Perm Nonnegative - Finalize 2" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+       (* We add RedLit_case to deal with the case when the permission is a literal *)
+      (Rmsg' "Inh Prove Perm Nonnegative - Finalize 2" (fast_force_tac (ctxt addEs @{thms TotalExpressions.RedLit_case})) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Finalize 3" (assm_full_simp_solved_tac ctxt) ctxt)
 
 (* old version
@@ -131,7 +132,8 @@ ML \<open>
                      intro_fact_rcv_lookup_reduction ctxt exp_rel_info @{thm exp_rel_ref_access} 
                                  (fn ctxt => resolve_tac ctxt @{thms inhale_field_acc_rel_assm_ref_eval} THEN' blast_tac ctxt)]) ctxt) THEN'
    (Rmsg' "Inh Assume Rcv Non-Null - Synthesize Assume Condition" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
-   (Rmsg' "Inh Assume Rcv Non-Null - Prove Assume Condition Holds" (assm_full_simp_solved_with_thms_tac @{thms inhale_acc_normal_premise_def} ctxt) ctxt)
+   (* We add RedLit_case to deal with the case when the permission is a literal *)
+   (Rmsg' "Inh Assume Rcv Non-Null - Prove Assume Condition Holds" (fast_force_tac (add_simps @{thms inhale_acc_normal_premise_def} (ctxt addEs @{thms TotalExpressions.RedLit_case}) )) ctxt)
 
   fun inhale_rel_field_acc_upd_rel_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
     (Rmsg' "inh field acc upd 0" (resolve_tac ctxt @{thms inhale_rel_field_acc_upd_rel}) ctxt) THEN'

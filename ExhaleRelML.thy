@@ -112,10 +112,9 @@ ML \<open>
             (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thm info),
             intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_state_rel_thm]) ctxt) THEN'
       (Rmsg' "Exh Prove Sufficient Perm - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
-
       (* then branch *)
       (Rmsg' "Exh Prove Sufficient Perm - Simplify Continuation" (simplify_continuation ctxt) ctxt) THEN'
-      (Rmsg' "Exh Prove Sufficient Perm - Unfold and Progress Big Blocks" (unfold_bigblock_in_rel_general ctxt THEN' progress_rel_tac ctxt) ctxt) THEN'
+      (Rmsg' "Exh Prove Sufficient Perm - Unfold and Progress Big Blocks" (progress_rel_general_tac ctxt) ctxt) THEN'
       (* apply post propagation here, since will need to progress from empty block to the continuation *)
       (Rmsg' "Exh Prove Sufficient Perm - Propagate Post" (resolve_tac ctxt @{thms rel_propagate_post_2}) ctxt) THEN'
         (Rmsg' "Exh Prove Sufficient Perm - Propagate Pre Assert" (resolve_tac ctxt @{thms rel_propagate_pre_assert_2}) ctxt) THEN'
@@ -125,14 +124,15 @@ ML \<open>
                                                           (fn ctxt => resolve_tac ctxt @{thms exhale_field_acc_rel_assms_ref_eval} THEN'
                                                                       fastforce_tac ctxt [])
                         ]) ctxt) THEN'
-          (Rmsg' "Exh Prove Sufficient Perm - Red Assert" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
+          (Rmsg' "Exh Prove Sufficient Perm - Red Assert" (prove_red_expr_bpl_tac ctxt |> SOLVED') ctxt) THEN'
           (Rmsg' "Exh Prove Sufficient Perm - Success Condition" 
-                     (simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
-                      fastforce_tac ctxt @{thms of_rat_less_eq}) ctxt) THEN'
+                      (simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
+                       fastforce_tac ctxt @{thms of_rat_less_eq}) ctxt) THEN'
           (Rmsg' "Exh Prove Sufficient Perm - Finish Then Branch"
                      (resolve_tac ctxt @{thms rel_general_success_refl} THEN'
-                      simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt THEN'
-                      fastforce_tac ctxt @{thms of_rat_less_eq} THEN'
+                      simp_only_tac @{thms exhale_field_acc_rel_perm_success_def exhale_field_acc_rel_assms_def} ctxt THEN'
+                      (* We add RedLit_case to deal with the case when the permission is a literal *)
+                      fast_force_tac_with_elims_simps ctxt @{thms TotalExpressions.RedLit_case} @{thms of_rat_less_eq} THEN'
                       assm_full_simp_solved_tac ctxt) ctxt) THEN'
        (Rmsg' "Exh Prove Sufficient Perm - Progress from then-branch" (progress_rel_tac ctxt) ctxt) THEN'
 
