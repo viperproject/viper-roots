@@ -535,6 +535,54 @@ next
     by auto
 qed
 
+subsection \<open>Pure expression rule\<close>
+
+lemma inhale_pure_exp_rel:
+  assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>) ctxt_vpr StateCons P ctxt e_vpr
+            \<gamma>
+            (BigBlock name (Assume e_bpl # cs) None None, cont)" 
+          (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt e_vpr _ ?\<gamma>2")
+      and ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt e_vpr e_bpl"
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs None None, cont)"
+proof (rule inhale_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>" and RedInh: "red_inhale ctxt_vpr StateCons (Atomic (Pure e_vpr)) \<omega> (RNormal \<omega>')"
+
+  from this have RedExp: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)" and "\<omega>' = \<omega>"
+    by (auto elim: InhPure_case split: if_split_asm)
+
+  with \<open>R \<omega> ns\<close> \<open>Q _ _\<close> obtain ns' where RedBplWf1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>2, Normal ns')" and "R \<omega> ns'"
+    using assms wf_rel_normal_elim[OF Wf]
+    by blast
+
+  with RedExp ExpRel have "red_expr_bpl ctxt e_bpl ns' (val_rel_vpr_bpl (VBool True))"
+    using exp_rel_vpr_bpl_elim_2
+    by fast   
+
+  hence "red_expr_bpl ctxt e_bpl ns' (BoolV True)"
+    by simp
+
+  hence "red_ast_bpl P ctxt (?\<gamma>2, Normal ns') ((BigBlock name cs None None, cont), Normal ns')"
+    by (simp add: red_ast_bpl_one_assume)
+    
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs None None, cont), Normal ns') \<and> R \<omega>' ns'"
+    using \<open>\<omega>' = \<omega>\<close> red_ast_bpl_transitive RedBplWf1 \<open>R \<omega> ns'\<close>
+    by blast
+next
+  fix \<omega> ns
+  assume "R \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>" and RedInh: "red_inhale ctxt_vpr StateCons (Atomic (Pure e_vpr)) \<omega> RFailure"
+
+  hence "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>) [e_vpr] \<omega> None"
+    by (auto elim: InhPure_case red_pure_exp_total_elims split: if_split_asm)
+
+  hence "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+    by (auto elim: red_pure_exp_total_elims)
+
+  with \<open>R \<omega> ns\<close> \<open>Q _ _\<close> show " \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+    using assms wf_rel_failure_elim[OF Wf]
+    by blast
+qed
+
 subsection \<open>Misc\<close>
 
 lemma inhale_rel_refl:
