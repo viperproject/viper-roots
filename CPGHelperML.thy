@@ -87,23 +87,29 @@ fun progress_tac ctxt =
     resolve_tac ctxt [@{thm red_ast_bpl_refl}]) THEN'
    assm_full_simp_solved_tac ctxt
 
-(* progress_rel_tac is analogous to progress_tac except that the goal is expressed via \<open>red_ast_bpl_rel\<close> *)
-fun progress_rel_tac ctxt = 
+(* progress_red_bpl_rel_tac is analogous to progress_tac except that the goal is expressed via \<open>red_ast_bpl_rel\<close> *)
+fun progress_red_bpl_rel_tac ctxt = 
    (unfold_bigblock_in_goal ctxt) THEN'
    (resolve_tac ctxt [@{thm red_ast_bpl_rel_empty_block}] ORELSE'
     resolve_tac ctxt [@{thm red_ast_bpl_rel_refl}])
 
-fun progress_rel_tac_2 tac ctxt = 
+fun progress_red_bpl_rel_tac_2 tac ctxt = 
    (unfold_bigblock_in_goal ctxt) THEN'
    (tac ctxt) THEN'
-   (resolve_tac ctxt [@{thm red_ast_bpl_rel_empty_block}] ORELSE'
-    resolve_tac ctxt [@{thm red_ast_bpl_rel_refl}])
+   (resolve_tac ctxt @{thms red_ast_bpl_rel_empty_block} ORELSE'
+    resolve_tac ctxt @{thms red_ast_bpl_rel_refl})
 
-(* progress_rel_general_tac is analogous to progress_rel_tac except that the goal is expressed via \<open>rel_general\<close> *)
+(* rewrite_red_bpl_rel_tac rewrites a goal \<open>red_ast_bpl_rel\<close> such that the current big block is unfolded
+   (or if it is empty it is progressed to the next one)  *)
+fun rewrite_red_bpl_rel_tac ctxt =
+  (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive_2}) THEN'
+  (progress_red_bpl_rel_tac ctxt)
 
-fun progress_rel_general_tac ctxt =
+(* rewrite_rel_general_tac is analogous to rewrite_red_bpl_rel_tac except it deals with \<open>rel_general\<close>
+   goals instead of \<open>red_ast_bpl_rel\<close> goals *)
+fun rewrite_rel_general_tac ctxt =
    (resolve_tac ctxt @{thms rel_propagate_pre_3_only_state_rel}) THEN'
-   (progress_rel_tac ctxt)
+   (progress_red_bpl_rel_tac ctxt)
                                  
 (* general information for tactics *)
   (* TODO rename *)
@@ -194,7 +200,8 @@ fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs =
       
 
 
-(* tactic for introducing temporary perm variable *)
+(* tactic for introducing temporary perm variable,
+   assumes that the current big block is unfolded *)
 
 fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm eval_vpr_perm_tac =
   (Rmsg' "store perm init" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'

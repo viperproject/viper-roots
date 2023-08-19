@@ -60,7 +60,7 @@ ML \<open>
            simplify_continuation ctxt THEN'
            (Rmsg' "InhaleRel 3" (resolve_tac ctxt [@{thm inhale_propagate_post}]) ctxt) THEN'           
            (inhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
-           (Rmsg' "InhaleRel 4" (progress_rel_tac ctxt) ctxt)
+           (Rmsg' "InhaleRel 4" (progress_red_bpl_rel_tac ctxt) ctxt)
          )
     | AtomicInhHint atomicHint => (#atomic_inhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
     | NoInhHint => K all_tac
@@ -71,7 +71,8 @@ ML \<open>
    (let val basic_info = #basic_info info in
      (Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
      inhale_rel_aux_tac ctxt info hint THEN'
-     (Rmsg' "InhaleRel Good State" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
+     (Rmsg' "InhaleRel Good State" (rewrite_red_bpl_rel_tac ctxt THEN'
+                                    progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
     end)
 
 \<close>
@@ -157,7 +158,7 @@ ML \<open>
           (*(Rmsg' "InhField wf rcv" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
           (Rmsg' "InhField wf perm" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'*)
           (Rmsg' "ExhField wf subexpressions" (exps_wf_rel_tac info exp_wf_rel_info exp_rel_info ctxt no_def_checks_tac_opt 2) ctxt) THEN'
-  
+          (Rmsg' "InhField unfold current bigblock" (rewrite_rel_general_tac ctxt) ctxt) THEN'     
           (Rmsg' "InhField 2 propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2}) ctxt) THEN'
             (Rmsg' "InhField 2b red_ast_bpl_relI" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
             (store_temporary_inh_perm_tac ctxt info exp_rel_info lookup_aux_var_ty_thm) THEN'
@@ -168,11 +169,16 @@ ML \<open>
   
   fun atomic_inhale_rel_inst_tac ctxt (info: basic_stmt_rel_info) (no_def_checks_tac_opt: (Proof.context -> basic_stmt_rel_info -> int -> tactic) option) atomic_inh_hint = 
     case atomic_inh_hint of
-      PureExpInhHint _ => error ("do not support pure inhale")
+      PureExpInhHint (exp_wf_rel_info, exp_rel_info) => 
+         (Rmsg' "InhPure exp init" (resolve_tac ctxt @{thms inhale_pure_exp_rel}) ctxt) THEN'
+         (Rmsg' "InhPure wf extend" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
+         (Rmsg' "InhPure wf" (exp_wf_rel_tac info exp_wf_rel_info exp_rel_info ctxt no_def_checks_tac_opt |> SOLVED') ctxt) THEN'
+         (Rmsg' "InhPure progress after wf" (progress_tac ctxt) ctxt) THEN' 
+         (Rmsg' "InhPure exp rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
     | FieldAccInhHint _ => 
-         (resolve_tac ctxt @{thms inhale_propagate_post}) THEN'
+         (Rmsg' "InhField acc propagate" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
          atomic_inhale_field_acc_tac ctxt info no_def_checks_tac_opt atomic_inh_hint THEN'
-         progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm info) (#tr_def_thm info)
+         (Rmsg' "InhField acc good state" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm info) (#tr_def_thm info)) ctxt)
 
 \<close>
 

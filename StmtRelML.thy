@@ -32,10 +32,10 @@ ML \<open>
   }
 
  (* tactic to unfold current bigblock (or progress empty bigblock) for a stmt_rel goal, 
-    see comment for progress_rel_tac *)
+    see comment for progress_red_bpl_rel_tac *)
  fun progress_stmt_rel_tac ctxt =
    resolve_tac ctxt @{thms stmt_rel_propagate_pre_2} THEN'
-   progress_rel_tac ctxt
+   progress_red_bpl_rel_tac ctxt
 
  fun stmt_rel_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
@@ -94,7 +94,7 @@ and
         such as when inhaling the precondition).
        It might be better to control this via hints, because this tactic may reduce a good state
        assumption that should not be reduced at this point. *)
-     (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_rel_tac ctxt)) ctxt)
+     (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_red_bpl_rel_tac ctxt)) ctxt)
 \<close>
 
 ML \<open>
@@ -225,7 +225,7 @@ ML \<open>
     end
 
   fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
-    (Rmsg' "stmt rel exhale progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_rel_tac ctxt)) ctxt) THEN'
+    (Rmsg' "stmt rel exhale progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
     (Rmsg' "setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'

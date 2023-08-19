@@ -25,7 +25,7 @@ ML \<open>
          (* One_nat_def is applied as a hack to match 1 and Suc 0.
            It would be good to solve this problem more generally such that there cannot be such
            mismatches at this point *)
-         progress_rel_tac_2 (fn ctxt => simp_only_tac @{thms One_nat_def} ctxt) ctxt THEN'
+         progress_red_bpl_rel_tac_2 (fn ctxt => simp_only_tac @{thms One_nat_def} ctxt) ctxt THEN'
          simplify_continuation ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Propagate 2" (resolve_tac ctxt @{thms stmt_rel_propagate_same_rel}) ctxt) THEN'
     (Rmsg' "Post Framing Init - Assume Good State" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)

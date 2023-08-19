@@ -46,7 +46,7 @@ ML \<open>
          (Rmsg' "ExhaleRel Star exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN' 
          (
            (Rmsg' "ExhaleRel Imp 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
-           (Rmsg' "ExhaleRel Imp wf cond" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') ctxt) THEN'
+           (Rmsg' "ExhaleRel Imp wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
            (Rmsg' "ExhaleRel Imp 2" ((progress_tac ctxt) |> SOLVED') ctxt)
          ) THEN'
           (Rmsg' "ExhaleRel Imp empty else" (* empty else block *)                
@@ -114,7 +114,7 @@ ML \<open>
       (Rmsg' "Exh Prove Sufficient Perm - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
       (* then branch *)
       (Rmsg' "Exh Prove Sufficient Perm - Simplify Continuation" (simplify_continuation ctxt) ctxt) THEN'
-      (Rmsg' "Exh Prove Sufficient Perm - Unfold and Progress Big Blocks" (progress_rel_general_tac ctxt) ctxt) THEN'
+      (Rmsg' "Exh Prove Sufficient Perm - Unfold and Progress Big Blocks" (rewrite_rel_general_tac ctxt) ctxt) THEN'
       (* apply post propagation here, since will need to progress from empty block to the continuation *)
       (Rmsg' "Exh Prove Sufficient Perm - Propagate Post" (resolve_tac ctxt @{thms rel_propagate_post_2}) ctxt) THEN'
         (Rmsg' "Exh Prove Sufficient Perm - Propagate Pre Assert" (resolve_tac ctxt @{thms rel_propagate_pre_assert_2}) ctxt) THEN'
@@ -134,20 +134,20 @@ ML \<open>
                       (* We add RedLit_case to deal with the case when the permission is a literal *)
                       fast_force_tac_with_elims_simps ctxt @{thms TotalExpressions.RedLit_case} @{thms of_rat_less_eq} THEN'
                       assm_full_simp_solved_tac ctxt) ctxt) THEN'
-       (Rmsg' "Exh Prove Sufficient Perm - Progress from then-branch" (progress_rel_tac ctxt) ctxt) THEN'
+       (Rmsg' "Exh Prove Sufficient Perm - Progress from then-branch" (progress_red_bpl_rel_tac ctxt) ctxt) THEN'
 
        (* else branch *)
        (Rmsg' "Exh Prove Sufficient Perm - Else Branch"
               (EVERY' [simplify_continuation ctxt,
                        resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel},
-                       progress_rel_tac ctxt,
+                       progress_red_bpl_rel_tac ctxt,
                        resolve_tac ctxt @{thms rel_general_success_refl},
                        simp_only_tac @{thms exhale_field_acc_rel_perm_success_def} ctxt,
                        fastforce_tac ctxt @{thms prat_non_negative},
                        assm_full_simp_solved_tac ctxt]) ctxt) 
 
   fun upd_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =    
-    (Rmsg' "UpdExhField Init Progress" (progress_rel_general_tac ctxt) ctxt) THEN'
+    (Rmsg' "UpdExhField Init Progress" (rewrite_rel_general_tac ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc_upd_rel}) ctxt) THEN'
     (Rmsg' "UpdExhField StateRel" (blast_tac ctxt) ctxt) THEN'    
    (* old version: (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN' *)

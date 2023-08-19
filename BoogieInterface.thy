@@ -127,8 +127,6 @@ lemma red_ast_bpl_if_nondet_else:
 
 subsection \<open>Reducing Boogie programs while preserving a property\<close>
 
-subsection \<open>red_ast_bpl_rel\<close>
-
 definition red_ast_bpl_rel 
   where "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1 \<equiv>
           \<forall> \<omega> ns. R0 \<omega> ns \<longrightarrow> (\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns')"
@@ -175,6 +173,13 @@ lemma red_ast_bpl_rel_transitive:
     shows "red_ast_bpl_rel R0 R2 P ctxt \<gamma>0 \<gamma>2"
   using assms red_ast_bpl_transitive
   unfolding red_ast_bpl_rel_def
+  by blast
+
+lemma red_ast_bpl_rel_transitive_2:
+  assumes "red_ast_bpl_rel R0 R0 P ctxt \<gamma>0 \<gamma>1"
+      and "red_ast_bpl_rel R0 R1 P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>2"
+  using assms red_ast_bpl_rel_transitive
   by blast
 
 lemma red_ast_bpl_rel_one_simple_cmd:
