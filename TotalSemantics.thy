@@ -124,7 +124,7 @@ inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 lemma ExhPure_case: 
   assumes "red_exhale ctxt R \<omega>0 (Atomic (Pure e)) \<omega> res"
       and "\<And>b. ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<Longrightarrow> res = (exh_if_total b \<omega>) \<Longrightarrow> P"
-      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> P"
+      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow> res = RFailure \<Longrightarrow> P"
     shows "P"
   using assms 
   by (cases) (auto elim: red_pure_exp_total_elims)

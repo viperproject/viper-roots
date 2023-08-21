@@ -182,6 +182,13 @@ lemma red_ast_bpl_rel_transitive_2:
   using assms red_ast_bpl_rel_transitive
   by blast
 
+lemma red_ast_bpl_rel_transitive_3:
+  assumes "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+      and "red_ast_bpl_rel R1 R1 P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>2"
+  using assms red_ast_bpl_rel_transitive
+  by blast
+
 lemma red_ast_bpl_rel_one_simple_cmd:
   assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow>
                 \<exists>ns'. ( (type_interp ctxt), ([] :: ast proc_context), (var_context ctxt), (fun_interp ctxt), rtype_interp ctxt \<turnstile> \<langle>c, Normal ns\<rangle> \<rightarrow> (Normal ns')) \<and>

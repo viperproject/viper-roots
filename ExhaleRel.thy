@@ -18,9 +18,11 @@ definition exhale_rel ::
 
 lemma exhale_rel_intro:
   assumes "\<And> \<omega>0 \<omega> \<omega>' ns. R \<omega>0 \<omega> ns \<Longrightarrow>
+                      Q assertion_vpr \<omega>0 \<omega> \<Longrightarrow>
                       red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr \<omega> (RNormal \<omega>') \<Longrightarrow>
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>0 \<omega>' ns'" and
           "\<And> \<omega>0 \<omega> ns. R \<omega>0 \<omega> ns \<Longrightarrow>
+                      Q assertion_vpr \<omega>0 \<omega> \<Longrightarrow>
                       red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr \<omega> RFailure \<Longrightarrow>
                       \<exists>\<gamma>'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Failure)"
   shows "exhale_rel R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
@@ -522,7 +524,7 @@ lemma exhale_acc_normal_red_exhale:
    apply (metis Abs_prat_inverse mem_Collect_eq pgte.rep_eq)
   by presburger
 
-lemma exhale_field_acc_rel:
+lemma exhale_rel_field_acc:
   assumes WfSubexp:  "exprs_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt [e_rcv_vpr, e_p] \<gamma> \<gamma>2"
       and CorrectPermRel:  
             "\<And>r p. rel_general (uncurry R) (R' r p)
@@ -721,6 +723,74 @@ next
     using wf_total_consistency_trace_mono_downwardD[OF WfConsistency] mono_prop_downwardD 
     by blast
 qed (auto)
+
+subsection \<open>Pure expression rule\<close>
+
+lemma exhale_rel_pure:
+  assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_vpr 
+           \<gamma> (BigBlock name (Assert e_bpl#cs) str tr, cont)" 
+          (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt e_vpr \<gamma> ?\<gamma>1")
+      and ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
+    shows "exhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs str tr, cont)"
+proof (rule exhale_rel_intro)
+  fix \<omega>0 \<omega> \<omega>' ns
+  assume "R \<omega>0 \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>0 \<omega>" and
+         RedExh: "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Pure e_vpr)) \<omega> (RNormal \<omega>')"
+
+  from this have RedExpVpr: "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+   by (metis (full_types) ExhPure_case exh_if_total.elims stmt_result_total.distinct(5))
+
+  moreover from RedExh have "\<omega>' = \<omega>"
+    using  exh_if_total_normal_2
+    by (metis ExhPure_case stmt_result_total.distinct(5))
+
+  ultimately obtain ns1 where RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
+    using wf_rel_normal_elim[OF Wf] \<open>R _ _ ns\<close> \<open>Q _ _ _\<close>
+    by blast
+
+  from ExpRel RedExpVpr have "red_expr_bpl ctxt e_bpl ns1 (val_rel_vpr_bpl (VBool True))"
+    using \<open>R _ _ ns1\<close> 
+    by (meson exp_rel_vpr_bpl_elim)
+
+  hence "red_ast_bpl P ctxt (?\<gamma>1, Normal ns1) ((BigBlock name cs str tr, cont), Normal ns1)"
+    by (simp add: red_ast_bpl_one_assert)
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>0 \<omega>' ns'"
+    using RedBpl1 red_ast_bpl_transitive \<open>R _ _ ns1\<close> \<open>\<omega>' = \<omega>\<close>
+    by blast
+next
+  fix \<omega>0 \<omega> ns
+  assume "R \<omega>0 \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>0 \<omega>" and 
+         "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Pure e_vpr)) \<omega> RFailure"
+
+  from this consider
+                 (Subfailure) "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+                 | (RedExpVpr) "ctxt_vpr, StateCons, Some \<omega>0 \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    by (metis (full_types) ExhPure_case exh_if_total_failure)
+
+  thus "\<exists>\<gamma>'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Failure)"
+  proof (cases)
+    case Subfailure
+    then show ?thesis 
+      using wf_rel_failure_elim[OF Wf] \<open>R _ _ ns\<close> \<open>Q _ _ _\<close>
+      by simp
+  next
+    case RedExpVpr
+    from this obtain ns1 where RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
+      using wf_rel_normal_elim[OF Wf] \<open>R _ _ ns\<close> \<open>Q _ _ _\<close>
+      by blast
+
+    with ExpRel RedExpVpr have "red_expr_bpl ctxt e_bpl ns1 (val_rel_vpr_bpl (VBool False))"
+      by (meson exp_rel_vpr_bpl_elim)
+
+    hence "red_ast_bpl P ctxt (?\<gamma>1, Normal ns1) ((BigBlock name cs str tr, cont), Failure)"
+      by (simp add: red_ast_bpl_one_assert)
+
+    then show ?thesis 
+      using RedBpl1 red_ast_bpl_transitive
+      by blast
+  qed
+qed
 
 subsection \<open>Misc\<close>
 
