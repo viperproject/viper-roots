@@ -540,10 +540,10 @@ subsection \<open>Pure expression rule\<close>
 lemma inhale_pure_exp_rel:
   assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>) ctxt_vpr StateCons P ctxt e_vpr
             \<gamma>
-            (BigBlock name (Assume e_bpl # cs) None None, cont)" 
+            (BigBlock name (Assume e_bpl # cs) str tr, cont)" 
           (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt e_vpr _ ?\<gamma>2")
       and ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt e_vpr e_bpl"
-    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs None None, cont)"
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs str tr, cont)"
 proof (rule inhale_rel_intro)
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>" and RedInh: "red_inhale ctxt_vpr StateCons (Atomic (Pure e_vpr)) \<omega> (RNormal \<omega>')"
@@ -562,10 +562,10 @@ proof (rule inhale_rel_intro)
   hence "red_expr_bpl ctxt e_bpl ns' (BoolV True)"
     by simp
 
-  hence "red_ast_bpl P ctxt (?\<gamma>2, Normal ns') ((BigBlock name cs None None, cont), Normal ns')"
+  hence "red_ast_bpl P ctxt (?\<gamma>2, Normal ns') ((BigBlock name cs str tr, cont), Normal ns')"
     by (simp add: red_ast_bpl_one_assume)
     
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs None None, cont), Normal ns') \<and> R \<omega>' ns'"
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>' ns'"
     using \<open>\<omega>' = \<omega>\<close> red_ast_bpl_transitive RedBplWf1 \<open>R \<omega> ns'\<close>
     by blast
 next
