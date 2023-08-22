@@ -31,6 +31,13 @@ fun fast_force_tac_with_elims_simps ctxt elim_thms simp_thms =
 
 fun TRY_TAC' tac = tac ORELSE' (K all_tac)
 
+type method_data =
+     { method_arg_thm : thm,
+       method_rets_thm : thm,
+       method_pre_thm : thm,
+       method_post_thm : thm,
+       method_lookup_thm : thm }
+
 \<close>
 
 end

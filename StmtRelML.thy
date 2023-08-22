@@ -111,7 +111,13 @@ ML \<open>
        exp_rel_info   (* rhs *)
   | InhaleHint of (atomic_inhale_rel_hint inhale_rel_complete_hint)
   | ExhaleHint of (atomic_exhale_rel_hint exhale_rel_complete_hint)
-  | MethodCallHint
+  | MethodCallHint of 
+       string * (* callee name *)
+       thm list * (* Boogie return variable lookup decl theorem *)
+       (atomic_inhale_rel_hint inhale_rel_info) *
+       (atomic_exhale_rel_hint exhale_rel_info) *
+       (atomic_exhale_rel_hint exhale_rel_complete_hint) * (* exhale pre *)
+       (atomic_inhale_rel_hint inhale_rel_complete_hint)   (* inhale post *)
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)
@@ -240,14 +246,48 @@ ML \<open>
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
      |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
      | InhaleHint inh_complete_hint => 
-        (Rmsg' "AtomicInh1" (resolve_tac ctxt [#inhale_stmt_rel_thm inh_complete_hint]) ctxt) THEN'
+        (Rmsg' "AtomincInh Start" (resolve_tac ctxt [#inhale_stmt_rel_thm inh_complete_hint]) ctxt) THEN'
+        (Rmsg' "AtomincInh StateRel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "AtomincInh Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info (#inhale_rel_hint inh_complete_hint))
      | ExhaleHint exh_complete_hint =>
         (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
         (Rmsg' "AtomicExh2 Consistency" (fastforce_tac ctxt []) ctxt) THEN'
         (Rmsg' "AtomicExh3 Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
-     | MethodCallHint => K all_tac (* TODO *)
+     | MethodCallHint (callee_name, rets_lookup_decl_thms, inhale_info_call, exhale_info_call, exh_pre_complete_hint, inh_post_complete_hint) => 
+        let val callee_data = Symtab.lookup (#method_data_table basic_info) callee_name |> Option.valOf in
+        (Rmsg' "MethodCall Start" (resolve_tac ctxt [@{thm method_call_stmt_rel} OF [#consistency_wf_thm basic_info, #consistency_down_mono_thm basic_info]]) ctxt) THEN'
+        (Rmsg' "MethodCall Program Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ConsistencyEnabled" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info, @{thm default_state_rel_options_def}] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall MdeclSome" (assm_full_simp_solved_with_thms_tac [#method_lookup_thm callee_data] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall MethodSpecsFramed" (EVERY' [eresolve_tac ctxt @{thms vpr_method_spec_correct_total_from_all}, 
+                                                  resolve_tac ctxt [#method_lookup_thm callee_data]]) ctxt) THEN'
+        (Rmsg' "MethodCall MethodSpecSubset" (assm_full_simp_solved_with_thms_tac [#method_pre_thm callee_data, #method_post_thm callee_data] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall OnlyArgsInPre" (assm_full_simp_solved_with_thms_tac [#method_pre_thm callee_data] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Empty Rinterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall DomainTyRep" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall TyInterpBplEq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall StateRelConcrete" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ArgsAreVars" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ArgsVarsEq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ArgsSubsetVarTranslation" (#var_rel_tac basic_info ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall XsBplEq" (#var_rel_tac basic_info ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall RetsSubsetVarTranslation" (#var_rel_tac basic_info ctxt) ctxt) THEN' 
+        (Rmsg' "MethodCall YsBplEq" (#var_rel_tac basic_info ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ArgsAndRetsDisjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Distinct Args" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Distinct Rets" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall LookupDeclRetsBpl" (assm_full_simp_solved_with_thms_tac ([#method_rets_thm callee_data, @{thm ty_repr_basic_def}]@rets_lookup_decl_thms)  ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Var Translation Pre Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Exhale Pre" ( simp_only_tac [#method_pre_thm callee_data] ctxt THEN'
+                                         atomic_rel_inst_tac ctxt inhale_info_call exhale_info_call basic_info (ExhaleHint exh_pre_complete_hint)) ctxt) THEN'
+        (Rmsg' "MethodCall Havoc Rets Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Var Translation Post Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Inhale Post" (simp_only_tac [#method_post_thm callee_data] ctxt THEN'
+                                        atomic_rel_inst_tac ctxt inhale_info_call exhale_info_call basic_info (InhaleHint inh_post_complete_hint)) ctxt)
+
+       end
     )
 
 \<close>

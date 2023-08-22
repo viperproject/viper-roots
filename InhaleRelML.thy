@@ -138,8 +138,8 @@ ML \<open>
 
   fun inhale_rel_field_acc_upd_rel_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =
     (Rmsg' "inh field acc upd 0" (resolve_tac ctxt @{thms inhale_rel_field_acc_upd_rel}) ctxt) THEN'
-    (Rmsg' "inh field acc upd 1" (assume_tac ctxt) ctxt) THEN'
-    (Rmsg' "inh field acc upd aux var disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "inh field acc upd 1" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
+    (Rmsg' "inh field acc upd aux var disjoint" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd wf ty repr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
     (Rmsg' "inh field acc upd def mask and eval mask same" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd ty interp eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'

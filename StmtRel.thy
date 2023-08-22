@@ -560,15 +560,18 @@ lemma inhale_stmt_rel:
   using inhale_rel_normal_elim[OF InhRel R_to_R'] inhale_rel_failure_elim[OF InhRel R_to_R'] InvHolds
   by (auto elim: RedInhale_case)
 
+text \<open>The following two lemmas should have the same number of premises such that the same tactic applies.\<close>
 lemma inhale_stmt_rel_no_inv:
-  assumes InhRel: "inhale_rel R (\<lambda>_ _. True) ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
+  assumes True \<comment>\<open>to have some number of premises as framing inv case\<close>
+      and True \<comment>\<open>to have some number of premises as framing inv case\<close>
+      and InhRel: "inhale_rel R (\<lambda>_ _. True) ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
   apply (rule stmt_rel_intro)
   using inhale_rel_normal_elim[OF InhRel] inhale_rel_failure_elim[OF InhRel] 
   by (auto elim: RedInhale_case)
 
-lemma inhale_stmt_rel_inv_inst:
-  assumes R_to_R': "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+lemma inhale_stmt_rel_inst_framing_inv:
+  assumes StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> assertion_framing_state ctxt_vpr StateCons A \<omega>" 
       and InhRel: "inhale_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (assertion_framing_state ctxt_vpr StateCons) ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
     shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Inhale A) \<gamma> \<gamma>'"
@@ -1169,13 +1172,13 @@ lemma method_call_stmt_rel:
       and "Pr = program_total ctxt_vpr"
           \<comment>\<open>We need to require state consistency, otherwise framing_exh cannot be established.\<close>
       and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
+      and MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
       and MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
       and MethodSpecSubset:  "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
                               no_perm_assertion (method_decl.post mdecl) \<and> 
                               no_unfolding_assertion (method_decl.pre mdecl) \<and>
                               no_unfolding_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es"
-      and MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
       and "rtype_interp ctxt = []"
       and DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr"
       and TyInterpBplEq:   "type_interp ctxt = vbpl_absval_ty TyRep"
@@ -1209,8 +1212,7 @@ lemma method_call_stmt_rel:
                                  framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> \<omega>)
                               (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                              (Exhale (method_decl.pre mdecl)) \<gamma> \<gamma>pre"
-      and "\<gamma>pre = (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
+                              (Exhale (method_decl.pre mdecl)) \<gamma> (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
       and "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix"
       and "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))"
       and InhalePostRel: 
@@ -1236,7 +1238,6 @@ proof (rule stmt_rel_intro_2)
     unfolding wf_total_consistency_def
     by blast
     
-
   have "es = map pure_exp.Var xs"
   proof (rule nth_equalityI)
     show "length es = length (map pure_exp.Var xs)"
@@ -1644,9 +1645,10 @@ proof (rule stmt_rel_intro_2)
         by (blast intro: rel_vpr_aux_intro)                  
     next
       case (RNormal \<omega>pre)
-      with RedMethodCall \<open>mdecl = _\<close>
+      let ?\<gamma>pre = "(BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
+      from RNormal RedMethodCall \<open>mdecl = _\<close>
       obtain nspre where
-        RedBplPre: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>pre, Normal nspre)" and
+        RedBplPre: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>pre, Normal nspre)" and
         "?RCall \<omega>pre nspre"
         using stmt_rel_normal_elim[OF ExhalePreRelInst RCallPre]
         by blast
@@ -1703,8 +1705,8 @@ proof (rule stmt_rel_intro_2)
        qed
 
       have
-        RedBplHavoc: "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) ((BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre), Normal ?nshavoc)"
-        unfolding \<open>\<gamma>pre = _\<close> \<open>cs_pre = _\<close>
+        RedBplHavoc: "red_ast_bpl P ctxt (?\<gamma>pre, Normal nspre) ((BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre), Normal ?nshavoc)"
+        unfolding \<open>cs_pre = _\<close>
       proof (rule red_ast_bpl_havoc_list, simp add: \<open>rtype_interp ctxt = _\<close>)   
         show "list_all2 (\<lambda>x v. lookup_var_decl (var_context ctxt) x = Some (type_of_val (type_interp ctxt) v, None)) ys_bpl (map val_rel_vpr_bpl v_rets)"
           using YsBplCorrectTypes
@@ -2155,7 +2157,7 @@ proof (rule stmt_rel_intro_2)
         case RFailure
           with RedInh stmt_rel_failure_elim[OF InhalePostRelInst RCallPostConj] \<open>mdecl = _\<close>
           obtain c where 
-              "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) c" and
+              "red_ast_bpl P ctxt (?\<gamma>pre, Normal nspre) c" and
               "snd c = Failure"
             using RedBplHavoc red_ast_bpl_transitive
             by blast
@@ -2168,7 +2170,7 @@ proof (rule stmt_rel_intro_2)
         case (RNormal \<omega>post)
           with RedInh stmt_rel_normal_elim[OF InhalePostRelInst RCallPostConj] \<open>mdecl = _\<close>
           obtain nspost where 
-              "red_ast_bpl P ctxt (\<gamma>pre, Normal nspre) (\<gamma>', Normal nspost)" and
+              "red_ast_bpl P ctxt (?\<gamma>pre, Normal nspre) (\<gamma>', Normal nspost)" and
               "?RCallPost \<omega>post nspost"
             using RedBplHavoc red_ast_bpl_transitive
             by blast

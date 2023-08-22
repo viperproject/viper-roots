@@ -112,12 +112,14 @@ fun rewrite_rel_general_tac ctxt =
    (progress_red_bpl_rel_tac ctxt)
                                  
 (* general information for tactics *)
+
   (* TODO rename *)
   type basic_stmt_rel_info = {
       ctxt_wf_thm: thm,
       consistency_wf_thm: thm,
       consistency_down_mono_thm: thm,
       tr_def_thm: thm,
+      method_data_table: method_data Symtab.table,
       vpr_program_ctxt_eq_thm: thm,
       var_rel_tac: (Proof.context -> int -> tactic),
       var_context_vpr_tac: (Proof.context -> int -> tactic),
@@ -199,13 +201,15 @@ fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs =
     resolve_tac ctxt @{thms red_ast_bpl_rel_refl}
       
 
+fun simp_then_if_not_solved_blast_tac ctxt = 
+  (simp_tac_with_thms [] ctxt |> SOLVED') ORELSE' (simp_tac_with_thms [] ctxt THEN' blast_tac ctxt)
 
 (* tactic for introducing temporary perm variable,
    assumes that the current big block is unfolded *)
 
 fun store_temporary_perm_tac ctxt (info: basic_stmt_rel_info) exp_rel_info lookup_aux_var_ty_thm eval_vpr_perm_tac =
   (Rmsg' "store perm init" (resolve_tac ctxt @{thms store_temporary_perm_rel}) ctxt) THEN'
-  (Rmsg' "store perm state rel" ((simp_tac_with_thms [] ctxt THEN' (blast_tac ctxt ORELSE' (K all_tac))) |> SOLVED') ctxt) THEN'
+  (Rmsg' "store perm state rel" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
   (Rmsg' "store perm eval vpr perm" (eval_vpr_perm_tac ctxt) ctxt) THEN'
   (Rmsg' "store perm rel perm" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
   (Rmsg' "store perm disjointness" ((#aux_var_disj_tac info ctxt) |> SOLVED') ctxt) THEN'
