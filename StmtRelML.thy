@@ -71,16 +71,16 @@ and
              (Rmsg' "If cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
            ) THEN'
            (
-            (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
-               variable for the recursive call to stmt_rel_tac *)
+            (* Apply propagation rule here, so that target program point in stmt_rel is a schematic 
+               variable for the recursive call to stmt_rel_tac (important, since then it is fine 
+               to progress to an empty block essentially consuming all big blocks, instead of
+               having to progress to the big block after the if-statement). Same for else-branch. *)
              simplify_continuation ctxt THEN'
              (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
              (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
              (Rmsg' "If4" (progress_red_bpl_rel_tac ctxt) ctxt)
            ) THEN'
            (
-            (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
-               variable for the recursive call to stmt_rel_tac *)
             simplify_continuation ctxt THEN'
             (Rmsg' "If5" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
             (stmt_rel_tac ctxt info els_hint |> SOLVED') THEN'
