@@ -76,7 +76,7 @@ and
              simplify_continuation ctxt THEN'
              (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
              (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
-             (Rmsg' "If4" (progress_tac ctxt) ctxt)
+             (Rmsg' "If4" (progress_red_bpl_rel_tac ctxt) ctxt)
            ) THEN'
            (
             (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
@@ -84,8 +84,9 @@ and
             simplify_continuation ctxt THEN'
             (Rmsg' "If5" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
             (stmt_rel_tac ctxt info els_hint |> SOLVED') THEN'
-            (Rmsg' "If6" (progress_tac ctxt) ctxt)
-           )
+            (Rmsg' "If6" (progress_red_bpl_rel_tac ctxt) ctxt)
+           ) THEN'
+           (rewrite_red_bpl_rel_tac ctxt) (*rewrite here to make sure good state can be progressed after *)
       | _ => error "unsupported hint in stmt_rel_single_stmt_tac"
     ) THEN'
     (* Now reduce \<open>assume state(Heap, Mask)\<close> or otherwise progress without executing a Boogie command
