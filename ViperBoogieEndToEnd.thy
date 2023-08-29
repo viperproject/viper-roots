@@ -597,7 +597,6 @@ lemma end_to_end_stmt_rel_2:
           \<comment>\<open>The Viper encoding does not use Boogie procedure preconditions\<close>
       and ProcPresEmpty: "proc_pres proc_bpl = []"
       and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
-      and "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"
       and VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
@@ -896,8 +895,6 @@ proof (rule allI | rule impI)+
               have SpecCorrectMdecl: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
                 unfolding vpr_all_method_spec_correct_total_def
                 by blast
-
-              thm \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close>
 
               let ?\<omega>_store_body = "(\<omega> \<lparr> get_store_total := get_store_total \<omega>body \<rparr>)"
               have StoresAgreeOnArgs: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> get_store_total \<omega> x = get_store_total ?\<omega>_store_body x" (is "\<And>x. ?A x \<Longrightarrow> ?B x")
@@ -1461,52 +1458,40 @@ lemma field_tr_prop_fst: "\<forall>f_vpr_ty_vpr f_vpr_f_bpl. field_tr_prop T glo
   by (simp add: field_tr_prop_def)
 
 definition var_rel_prop
-  where "var_rel_prop T local_decls ty_vpr var_vpr_var_bpl \<equiv> 
+  where "var_rel_prop T local_decls ty_vpr var_vpr \<equiv> 
           \<exists>ty_bpl. vpr_to_bpl_ty T ty_vpr = Some ty_bpl \<and>
-                   lookup_vdecls_ty local_decls (snd var_vpr_var_bpl) = Some ty_bpl"
+                   lookup_vdecls_ty local_decls var_vpr = Some ty_bpl"
 
 lemma var_rel_prop_aux:
-  assumes WellTy: "vpr_store_well_typed A \<Lambda> \<sigma>" and 
-          "\<Lambda> = map_of var_ty_list" and
-          "vs = map snd var_ty_list" and
-          "domain_type T = A" and
-          ListAll2: "list_all2 (var_rel_prop T local_decls) vs var_rel_list" and
-          VarRelFst: "map fst var_rel_list = upt 0 (length vs)" and
-          LookupVarRel: "map_of var_rel_list x_vpr = Some x_bpl"
+  assumes WellTy: "vpr_store_well_typed A \<Lambda> \<sigma>" 
+      and "domain_type T = A"
+      and ListAll: "list_all (\<lambda>var_vpr_var_bpl. \<exists>t. \<Lambda> (fst var_vpr_var_bpl) = Some t \<and> var_rel_prop T local_decls t (snd var_vpr_var_bpl)) var_rel_list"
+      and LookupVarRel: "map_of var_rel_list x_vpr = Some x_bpl"
   shows "\<exists>v_vpr. \<sigma> x_vpr = Some v_vpr \<and> 
                                       (\<exists>t. lookup_vdecls_ty local_decls x_bpl = Some t \<and>
                                            type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t)"
-  oops
-(*
 proof -
   from LookupVarRel obtain i
     where  "i < length var_rel_list" and
            "var_rel_list ! i = (x_vpr, x_bpl)"
     by (meson in_set_conv_nth map_of_SomeD)
 
-  with ListAll2 have Prop: "var_rel_prop T local_decls (vs ! i) (x_vpr, x_bpl)"
-    by (metis list_all2_nthD2)
+  with ListAll 
+  obtain t where "\<Lambda> x_vpr = Some t" and
+           Prop: "var_rel_prop T local_decls t x_bpl"
+    by (auto simp: list_all_length)
 
-  from ListAll2 have "length vs = length var_rel_list"
-    using list_all2_lengthD
+  from this obtain v_vpr where "\<sigma> x_vpr = Some v_vpr \<and> get_type A v_vpr = t"
+    using WellTy
+    unfolding vpr_store_well_typed_def
     by blast
 
-  with VarRelFst \<open>var_rel_list ! i = _\<close> \<open>i < _\<close> have "i = x_vpr"
-    by (metis add_0 fst_conv nth_map nth_upt)
-
-  from WellTy obtain v_vpr where "\<sigma> i = Some v_vpr" and "get_type A v_vpr = vs ! i"
-    using \<open>i < _\<close> \<open>length vs = _\<close> assms
-    unfolding vpr_store_well_typed_def
-    
-
   thus ?thesis
-    using vpr_to_bpl_val_type \<open>domain_type _  = _\<close> \<open>i = _\<close>
-     Prop 
+    using Prop \<open>domain_type T = A\<close> vpr_to_bpl_val_type
     unfolding var_rel_prop_def
-    by fastforce
+    by blast
 qed
-*)
- 
+    
 lemma boogie_const_rel_aux:
   assumes ConstTy: "\<And>c. lookup_vdecls_ty (fst \<Lambda>) (const_repr Tr c) = Some (boogie_const_ty T c)" and
           GlobalsLocalsDisj: "set (map fst (fst \<Lambda>)) \<inter> set (map fst (snd \<Lambda>)) = {}" and
