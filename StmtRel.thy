@@ -785,9 +785,9 @@ proof -
                 "\<forall> loc_bpl. loc_bpl \<notin> (vpr_heap_locations_bpl (program_total ctxt_vpr) (field_translation Tr) ) \<longrightarrow> 
                                                      hb'' loc_bpl = hb loc_bpl"
     using heap_rel_stable_2_well_typed[OF * ** HeapVarWellTy]
-    by blast    
+    by blast   
 
-  have IdOnKnownCond: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb'' (r, NormalField f t)"
+  have IdOnKnownCondNormalField: "\<forall>r f t. 0 < mb (r, NormalField f t) \<longrightarrow> hb (r, NormalField f t) = hb'' (r, NormalField f t)"
   proof clarify
     fix r f t 
     assume PermPos: "0 < mb (r, (NormalField f t))"    
@@ -827,6 +827,28 @@ proof -
       thus "hb (r, NormalField f t) = hb'' (r, NormalField f t)"
         using NewHeapProperty ProgramTotal
         by simp 
+    qed
+  qed
+
+  have IdOnKnownCond: "\<forall>r f. 0 < mb (r, f) \<longrightarrow> hb (r, f) = hb'' (r, f)"
+  proof clarify
+    fix r f t 
+    assume PermPos: "0 < mb (r, f)"
+
+    show "hb (r, f) = hb'' (r, f)"
+    proof (cases "is_NormalField f")
+      case True
+      then show ?thesis 
+        using IdOnKnownCondNormalField PermPos
+        by (metis is_NormalField_def)
+    next
+      case False
+      hence "(r,f) \<notin> vpr_heap_locations_bpl (program_total ctxt_vpr) (field_translation Tr)"
+        unfolding vpr_heap_locations_bpl_def
+        by force
+      thus ?thesis
+        using NewHeapProperty PermPos
+        by auto
     qed
   qed
 

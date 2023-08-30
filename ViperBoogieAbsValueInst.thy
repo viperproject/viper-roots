@@ -20,7 +20,7 @@ type_synonym bpl_ty = Lang.ty
 subsection \<open>Abstract values instantiation\<close>
 
 \<comment>\<open>implementation detail\<close>
-datatype 'a vb_field = 
+datatype (discs_sels) 'a vb_field = 
      NormalField vname vpr_ty
    | PredSnapshotField "'a predicate_loc" 
    | PredKnownFoldedField "'a predicate_loc"
@@ -593,6 +593,15 @@ next
     using \<open>t = _\<close> \<open>v = _\<close>
     by auto
 qed
+
+fun is_bounded_field_bpl :: "'a vb_field \<Rightarrow> bool"
+  where 
+    "is_bounded_field_bpl (PredSnapshotField _) = False"
+  | "is_bounded_field_bpl _ = True"
+
+text \<open>\<^const>\<open>is_bounded_field_bpl\<close> states for which fields the permission mask must be bounded (i.e., have at most 1 permission).
+      In the currently supported fields, only predicate snapshot fields (which are used to track predicate permissions)
+      are unbounded.\<close>
 
 subsection \<open>Inversion lemmas\<close>
 

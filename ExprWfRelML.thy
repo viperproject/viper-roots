@@ -85,8 +85,8 @@ ML \<open>
       assm_full_simp_solved_tac ctxt, (* bop *)
       
       bop_wf_rel_div_mod exp_rel_info ctxt |> SOLVED'
-   ]      
-  
+   ]            
+ 
   fun exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt = 
      FIRST_AND_THEN' [
        resolve_tac ctxt [@{thm var_expr_wf_rel}], (* var *)

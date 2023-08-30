@@ -1965,4 +1965,23 @@ proof -
     by simp
 qed
 
+lemma expr_sat_rewrite: "\<lbrakk>A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool b); b\<rbrakk> \<Longrightarrow> A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool True)"
+  using vc_to_expr
+  by simp
+
+lemma heap_upd_ty_preserved_2:
+  assumes OldHeap: "type_of_vbpl_val T (AbsV (AHeap hb)) = TConSingle (THeapId T)"  and
+        (* FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t])" and *)
+         FieldTy2: "type_of_vbpl_val T (AbsV (AField xb)) = TCon (TFieldId T) [\<tau>, \<tau>']" and
+         NewVal: "type_of_vbpl_val T v = \<tau>'"
+       shows "type_of_vbpl_val T (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle (THeapId T)"
+  sorry
+
+lemma heap_upd_ty_preserved_2_basic:
+  assumes OldHeap: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap hb)) = TConSingle ''HeapType''"  and
+         FieldTy2: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AField xb)) = TCon ''Field'' [\<tau>, \<tau>']" and
+         NewVal: "type_of_vbpl_val (ty_repr_basic A) v = \<tau>'"
+       shows "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle ''HeapType''"
+  sorry
+
 end

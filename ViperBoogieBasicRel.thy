@@ -206,14 +206,16 @@ definition mask_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharp
     (\<forall> l field_ty_vpr field_bpl. declared_fields Pr (snd l) = Some field_ty_vpr \<longrightarrow>
                       tr_field (snd l) = Some field_bpl \<longrightarrow>
                       mb (Address (fst l), NormalField field_bpl field_ty_vpr) = real_of_rat (Rep_prat (m l)))
- \<and>  (\<forall>f t. mb (Null, NormalField f t) = 0)"
+ \<and>  (\<forall>f t. mb (Null, NormalField f t) = 0)
+ \<and>  (\<forall>r f. mb (r,f) \<ge> 0 \<and> (is_bounded_field_bpl f \<longrightarrow> mb (r,f) \<le> 1))" 
 
 lemma mask_rel_intro:
   assumes "\<And>l field_ty_vpr field_bpl. 
              declared_fields Pr (snd l) = Some field_ty_vpr \<Longrightarrow>
              tr_field (snd l) = Some field_bpl \<Longrightarrow> 
              mb (Address (fst l), NormalField field_bpl field_ty_vpr) = real_of_rat (Rep_prat (m l))" and
-          "\<And> f t. mb (Null, NormalField f t) = 0"
+          "\<And> f t. mb (Null, NormalField f t) = 0" and
+          "\<And>r f. mb (r,f) \<ge> 0 \<and> (is_bounded_field_bpl f \<longrightarrow> mb (r,f) \<le> 1)"
   shows "mask_rel Pr tr_field m mb"
   using assms
   unfolding mask_rel_def 
@@ -2415,7 +2417,7 @@ next
   have "mask_rel Pr (field_translation Tr) (get_mh_total_full ?\<omega>') ?mb'"
     unfolding mask_rel_def
    
-  proof (rule conjI, (rule allI | rule impI)+)
+  proof (intro conjI, (rule allI | rule impI)+)
     fix l::heap_loc
     fix field_ty_vpr field_bpl
     assume FieldLookup2: "declared_fields Pr (snd l) = Some field_ty_vpr"
@@ -2451,6 +2453,27 @@ next
       using MaskRel0
       unfolding mask_rel_def
       by auto
+  next
+    show "\<forall>r f. 0 \<le> ?mb' (r, f) \<and>
+          (is_bounded_field_bpl f \<longrightarrow> ?mb' (r, f) \<le> 1)" (is "\<forall>r f. ?MaskBplGoal r f")
+    proof (rule allI)+
+      fix r f
+      show "?MaskBplGoal r f"
+      proof (cases "(r,f) = (Address addr, NormalField f_bpl ty_vpr)")
+        case True
+        then show ?thesis 
+          using \<open>pgte pwrite p\<close> one_prat.rep_eq pgte.rep_eq prat_non_negative
+          unfolding mask_bpl_upd_normal_field_def
+          by auto
+      next
+        case False
+        then show ?thesis 
+          unfolding mask_bpl_upd_normal_field_def
+          using MaskRel0
+          unfolding mask_rel_def
+          by auto
+      qed
+    qed
   qed
 
   thus "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (mask_var Tr) ?\<omega>' ?ns'"

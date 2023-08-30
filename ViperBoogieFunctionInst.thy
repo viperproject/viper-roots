@@ -12,7 +12,7 @@ begin
 subsection \<open>General\<close>
 
 datatype fun_enum_bpl = 
-     FGoodState
+       FGoodState
      | FGoodMask
      | FReadHeap
      | FUpdateHeap
@@ -22,6 +22,8 @@ datatype fun_enum_bpl =
      | FUpdateKnownFoldedMask
      | FHasPerm
      | FIdenticalOnKnownLocs
+     | FIsPredicateField
+     | FIsWandField
 
 text \<open>\<^typ>\<open>fun_enum_bpl\<close> enumerates the functions required for the encoding\<close>
 
@@ -191,7 +193,6 @@ fun select_heap :: "'a ty_repr_bpl \<Rightarrow> 'a sem_fun_bpl"
            ([t1, t2], [AbsV (AHeap h), AbsV (ARef r), AbsV (AField f)]) \<Rightarrow> 
                 Some (select_heap_aux T t2 h r f)
          | _ \<Rightarrow> None)"
-
 
 lemma select_heap_aux_well_typed:
   assumes WfTyRepr: "wf_ty_repr_bpl T" and
@@ -456,14 +457,14 @@ lemma store_knownfolded_mask_fun_interp_single_wf:
   apply (rule fun_interp_single_wf_intro)
   by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 lit_inversion_type_of_val split: val.split vbpl_absval.split)
 
-subsubsection \<open>Identical on known locations\<close>
+subsection \<open>Identical on known locations\<close>
 
 fun identical_on_known_locs ::  "'a sem_fun_bpl"
   where 
     "identical_on_known_locs ts vs = 
       (case (ts, vs) of 
          ([], [AbsV (AHeap h), AbsV (AHeap h_exhale), AbsV (AMask m)]) \<Rightarrow>
-           Some (BoolV (\<forall>r f t. m (r, NormalField f t) > 0 \<longrightarrow> h (r, NormalField f t) = h_exhale (r, NormalField f t)))
+           Some (BoolV (\<forall>r f. m (r, f) > 0 \<longrightarrow> h (r, f) = h_exhale (r, f)))
        | _ \<Rightarrow> None)"
 
 lemma identical_on_known_locs_fun_interp_single_wf:
@@ -474,6 +475,20 @@ lemma identical_on_known_locs_fun_interp_single_wf:
               identical_on_known_locs"
   apply (rule fun_interp_single_wf_intro)
   by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] split: val.split vbpl_absval.split)
+
+subsection \<open>IsPredicateField and IsWandField\<close>
+
+fun is_predicate_field :: "'a sem_fun_bpl"
+  where "is_predicate_field ts vs =
+          (case (ts, vs) of 
+             ([t1,t2], [AbsV (AField f)]) \<Rightarrow> Some (BoolV (is_PredSnapshotField f))
+           | _ \<Rightarrow> None)"
+
+fun is_wand_field :: "'a sem_fun_bpl"
+  where "is_wand_field ts vs =
+          (case (ts, vs) of 
+             ([t1,t2], [AbsV (AField f)]) \<Rightarrow> Some (BoolV False) \<comment>\<open>always false, since wands are currently not supported\<close>
+           | _ \<Rightarrow> None)"
 
 subsection \<open>Global function map\<close>
 
@@ -625,7 +640,7 @@ lemma red_ast_bpl_identical_on_known_locs:
           HeapTy: "vbpl_absval_ty_opt TyRep (AHeap h) = Some ((THeapId TyRep) ,[])" and
           NewHeapTy: "vbpl_absval_ty_opt TyRep (AHeap h_new) = Some ((THeapId TyRep) ,[])" and
           MaskTy: "vbpl_absval_ty_opt TyRep (AMask m) = Some ((TMaskId TyRep), [])" and
-          IdenticalOnKnownCond: "(\<forall>r f t. m (r, NormalField f t) > 0 \<longrightarrow> h (r, NormalField f t) = h_new (r, NormalField f t))"
+          IdenticalOnKnownCond: "(\<forall>r f. m (r, f) > 0 \<longrightarrow> h (r, f) = h_new (r, f))"
         shows "red_ast_bpl P ctxt 
                                    ((BigBlock name (Havoc hvar_exh # 
                                                     Assume (FunExp id_on_known_locs_name [] [Var hvar, Var hvar_exh, Var mvar]) #                                                    
