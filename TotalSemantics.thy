@@ -408,13 +408,7 @@ lemmas red_stmt_total_inversion_thms =
    RedExhaleNormal_case
    RedExhaleFailure_case
 
-subsection \<open>Correctness\<close>
-
-\<comment> \<open>
-definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp list \<Rightarrow> 'a store \<Rightarrow> bool"
-  where "vpr_store_well_typed A vs \<sigma> \<equiv> \<forall>i. 0 \<le> i \<and> i < length vs \<longrightarrow> 
-                         map_option (\<lambda>v. get_type A v) (\<sigma> i) = Some (vs ! i)"
-\<close>
+subsection \<open>Correctness of Viper methods\<close>
 
 definition vpr_store_well_typed :: "('a \<Rightarrow> abs_type) \<Rightarrow> type_context \<Rightarrow> 'a store \<Rightarrow> bool"
   where "vpr_store_well_typed A \<Lambda> \<sigma> \<equiv> \<forall>x t. \<Lambda> x = Some t \<longrightarrow> map_option (\<lambda>v. get_type A v) (\<sigma> x) = Some t"
@@ -486,8 +480,18 @@ definition vpr_method_body_correct :: "'a total_context \<Rightarrow> ('a full_t
                           )\<close>
                 "
 
-definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
-  "vpr_method_correct_total_2 ctxt R mdecl \<equiv>
+
+definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total ctxt R mdecl \<equiv>
+         vpr_method_correct_total_aux ctxt R mdecl 
+          (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
+                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
+                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
+          )
+       "
+
+definition vpr_method_correct_total_expanded :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_total_expanded ctxt R mdecl \<equiv>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
             vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ method_decl.rets mdecl)) (get_store_total \<omega>) \<longrightarrow>
             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<longrightarrow>
@@ -503,18 +507,17 @@ definition vpr_method_correct_total_2 :: "'a total_context \<Rightarrow> ('a ful
             )
          )"
 
-definition vpr_method_correct_total_2_new :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
-  "vpr_method_correct_total_2_new ctxt R mdecl \<equiv>
-         vpr_method_correct_total_aux ctxt R mdecl 
-          (\<lambda>ctxt R mdecl \<omega>pre \<omega>. 
-                vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
-                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_method_body_correct ctxt R mdecl \<omega>pre)
-          )
-       "
+text \<open>\<^const>\<open>vpr_method_correct_total\<close> specifies when a Viper method is correct. The definition
+      uses \<^const>\<open>vpr_method_correct_total_aux\<close>.  \<^const>\<open>vpr_method_correct_total_aux\<close>  allows one
+      to obtain variations of method correctness (for example, to just specify that the specifications
+      are framed as shown below). \<^const>\<open>vpr_method_correct_total_expanded\<close> a version of the Viper
+      method correctness where  \<^const>\<open>vpr_method_correct_total_aux\<close> is expanded. The lemma below
+      confirms that the version defined via  \<^const>\<open>vpr_method_correct_total_aux\<close> and the
+      expanded version are equivalent.\<close>
 
 lemma vpr_method_correct_total_2_new_equiv:
-  "vpr_method_correct_total_2 ctxt R mdecl = vpr_method_correct_total_2_new ctxt R mdecl"
-  unfolding vpr_method_correct_total_2_def vpr_method_correct_total_2_new_def vpr_method_correct_total_aux_def
+  "vpr_method_correct_total ctxt R mdecl = vpr_method_correct_total_expanded ctxt R mdecl"
+  unfolding vpr_method_correct_total_def vpr_method_correct_total_expanded_def vpr_method_correct_total_aux_def
   by blast
 
 definition vpr_method_spec_correct_total :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
