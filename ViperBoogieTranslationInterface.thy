@@ -209,37 +209,6 @@ proof clarify
     by (cases x; cases y; simp)
 qed
 
-(* potentially useful to prove injectivity:
-lemma "card {''readHeap'', ''updHeap'', ''readMask'', ''updMask'', ''state'', ''HasDirectPerm'', ''IdenticalOnKnownLocations''} = 7"
-  by simp
-*)
-
-method ctxt_wf_fun_tac for f :: fun_enum_bpl = (unfold ctxt_wf_def, erule allE[where ?x=f], simp)
-
-(* TODO
-lemma ctxt_wf_read_heap:
-   "ctxt_wf ctxt ty_repr F \<Longrightarrow> fun_interp ctxt (F FReadHeap) = Some (select_heap ty_repr)"
-  by (ctxt_wf_fun_tac FReadHeap)
-
-lemma ctxt_wf_read_mask:
-   "ctxt_wf ctxt ty_repr F \<Longrightarrow> fun_interp ctxt (F FReadMask) = Some (select_mask ty_repr)"
-  by (ctxt_wf_fun_tac FReadMask)
-*)
-
-(*
-lemma tr_wf_concrete: 
-  assumes CtxtWf: "ctxt_wf ctxt ty_repr F"
-  shows "tr_wf Pr \<Delta> ctxt ty_repr (tr_vpr_bpl_example F)"
-  unfolding tr_wf_def tr_vpr_bpl_example_def
-  apply (intro conjI)
-    apply (simp add: fun_interp_rel_def)  
-   apply (simp, rule heap_read_wf_concrete)
-   apply (rule ctxt_wf_read_heap[OF CtxtWf])
-   apply (simp, rule mask_read_wf_concrete)
-  apply (rule ctxt_wf_read_mask[OF CtxtWf])
-  done
-*)
-
 subsection \<open>Boogie Type representation instantiation\<close>
 
 fun tcon_enum_to_id :: "tcon_enum \<Rightarrow> tcon_id"
@@ -272,48 +241,80 @@ lemma wf_ty_repr_basic: "wf_ty_repr_bpl (ty_repr_basic A)"
   unfolding wf_ty_repr_bpl_def ty_repr_basic_def
   by (simp_all add: inj_tcon_enum_to_id)
 
+subsection \<open>Helper inversion lemmas\<close>
+
+text \<open>Here, we prove inversion lemmas on \<^const>\<open>type_of_vbpl_val\<close> in terms of specific equalities,
+      where the type representation is instantiated to \<^const>\<open>ty_repr_basic\<close>.
+      General versions of inversion lemmas are already proved in a different theory via implications. 
+      For some generated proofs, it is useful to phrase the inversion as an equality (where one direction is trivial)
+      and where the type representation is instantiated.
+\<close>
+
 lemma type_interp_rel_wf_vbpl_basic: "type_interp_rel_wf A_vpr (vbpl_absval_ty (ty_repr_basic A_vpr)) (ty_repr_basic A_vpr)"
   unfolding ty_repr_basic_def
   by (simp add: type_interp_rel_wf_vbpl_no_domains)
 
-lemma mask_inversion_type_of_vbpl_val_concrete_2: 
-   "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''MaskType'' = (\<exists>m. v = AbsV (AMask m) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''MaskType'')"
-  sorry
-
-lemma heap_inversion_type_of_vbpl_val_concrete:
- "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''HeapType'' = (\<exists>h. v = AbsV (AHeap h) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''HeapType'')"
-  sorry
+lemma mask_inversion_eq_type_of_vbpl_val:
+  assumes "wf_ty_repr_bpl TyRep"
+  shows "type_of_vbpl_val TyRep v = TConSingle (TMaskId TyRep) = (\<exists>m. v = AbsV (AMask m) \<and> (id type_of_vbpl_val) TyRep v = TConSingle (TMaskId TyRep))"
+  using mask_inversion_type_of_vbpl_val[OF assms]
+  by auto
   
-lemma ref_inversion_type_of_vbpl_val_concrete:
-  assumes RefTy: "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Ref'' []"
-  shows "\<exists>r. v = AbsV (ARef r)"
-  sorry
+lemma mask_inversion_eq_type_of_vbpl_val_concrete: 
+  "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''MaskType'' = (\<exists>m. v = AbsV (AMask m) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''MaskType'')"
+  using mask_inversion_eq_type_of_vbpl_val[OF wf_ty_repr_basic] 
+  by (auto simp: ty_repr_basic_def)
 
-lemma ref_inversion_type_of_vbpl_val_concrete_2:
+lemma heap_inversion_eq_type_of_vbpl_val:
+  assumes "wf_ty_repr_bpl TyRep"
+  shows "type_of_vbpl_val TyRep v = TConSingle (THeapId TyRep) = (\<exists>h. v = AbsV (AHeap h) \<and> (id type_of_vbpl_val) TyRep v = TConSingle (THeapId TyRep))"
+  using heap_inversion_type_of_vbpl_val[OF assms]  
+  by auto
+
+lemma heap_inversion_eq_type_of_vbpl_val_concrete:
+  "type_of_vbpl_val (ty_repr_basic A) v = TConSingle ''HeapType'' = (\<exists>h. v = AbsV (AHeap h) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TConSingle ''HeapType'')"
+  using heap_inversion_eq_type_of_vbpl_val[OF wf_ty_repr_basic]
+  by (auto simp: ty_repr_basic_def)
+
+lemma ref_inversion_eq_type_of_vbpl_val:
+  assumes "wf_ty_repr_bpl TyRep"
+  shows "type_of_vbpl_val TyRep v = TConSingle (TRefId TyRep) = (\<exists>r. v = AbsV (ARef r) \<and> (id type_of_vbpl_val) TyRep v = TConSingle (TRefId TyRep))"
+  using ref_inversion_type_of_vbpl_val[OF assms]
+  by auto
+
+lemma ref_inversion_eq_type_of_vbpl_val_concrete:
   "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Ref'' [] = (\<exists>r. v = AbsV (ARef r) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TCon ''Ref'' [])"
-  sorry
+  using ref_inversion_eq_type_of_vbpl_val[OF wf_ty_repr_basic]
+  by (auto simp add: ty_repr_basic_def)
 
-lemma field_inversion_type_of_vbpl_val_2_concrete:
-  assumes "type_of_vbpl_val (ty_repr_basic A) v = TCon ''Field'' [t1, t2]"
-  shows "\<exists>f. v = AbsV (AField f)"
-  sorry
+lemma field_inversion_eq_type_of_vbpl_val:
+  assumes "wf_ty_repr_bpl TyRep"
+  shows "type_of_vbpl_val TyRep v = TCon (TFieldId TyRep) [t1,t2] = (\<exists>f. v = AbsV (AField f) \<and> (id type_of_vbpl_val) TyRep v = TCon (TFieldId TyRep) [t1,t2])"
+  using field_inversion_type_of_vbpl_val_2[OF assms]
+  by auto
 
-lemma field_inversion_type_of_vbpl_val_2_concrete_2:
-  "(type_of_vbpl_val (ty_repr_basic A) v = TCon ''Field'' [t1, t2]) = (\<exists>f. v = AbsV (AField f) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TCon ''Field'' [t1, t2])"
-  sorry
+lemma field_inversion_eq_type_of_vbpl_val_concrete:
+  "(type_of_vbpl_val (ty_repr_basic A) v = TCon ''Field'' [t1, t2]) = (\<exists>f. v = AbsV (AField f) \<and> (id type_of_vbpl_val) (ty_repr_basic A) v = TCon ''Field'' [t1, t2])" 
+proof -
+  have *: "TFieldId (ty_repr_basic A) = ''Field''"
+    by (simp add: ty_repr_basic_def)
+
+  show ?thesis
+    using field_inversion_eq_type_of_vbpl_val[where ?TyRep = "ty_repr_basic A", OF wf_ty_repr_basic]    
+    unfolding *
+    by blast
+qed    
 
 lemma realv_inversion_type_of_vbpl_val:
   "type_of_val A v = TPrim TReal = (\<exists>i. v = RealV i \<and> (id type_of_val) A v = TPrim TReal)"
-  sorry
+  using VCExprHelper.treal_realv
+  by auto
 
 lemmas inversion_type_of_vbpl_val_equalities =
- heap_inversion_type_of_vbpl_val_concrete
- mask_inversion_type_of_vbpl_val_concrete_2
- ref_inversion_type_of_vbpl_val_concrete
- ref_inversion_type_of_vbpl_val_concrete_2
- field_inversion_type_of_vbpl_val_2_concrete_2
-
-term id
+ heap_inversion_eq_type_of_vbpl_val_concrete
+ mask_inversion_eq_type_of_vbpl_val_concrete
+ ref_inversion_eq_type_of_vbpl_val_concrete
+ field_inversion_eq_type_of_vbpl_val_concrete
 
 subsection \<open>Helper definitions\<close>
 

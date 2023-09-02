@@ -599,6 +599,9 @@ fun is_bounded_field_bpl :: "'a vb_field \<Rightarrow> bool"
     "is_bounded_field_bpl (PredSnapshotField _) = False"
   | "is_bounded_field_bpl _ = True"
 
+lemma non_pred_is_bounded_field_bpl: "\<not> is_PredSnapshotField f \<Longrightarrow> is_bounded_field_bpl f"
+  by (cases f) auto
+
 text \<open>\<^const>\<open>is_bounded_field_bpl\<close> states for which fields the permission mask must be bounded (i.e., have at most 1 permission).
       In the currently supported fields, only predicate snapshot fields (which are used to track predicate permissions)
       are unbounded.\<close>

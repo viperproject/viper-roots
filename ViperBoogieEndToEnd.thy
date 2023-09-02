@@ -1965,23 +1965,40 @@ proof -
     by simp
 qed
 
-lemma expr_sat_rewrite: "\<lbrakk>A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool b); b\<rbrakk> \<Longrightarrow> A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool True)"
-  using vc_to_expr
+lemma expr_sat_rewrite: "\<lbrakk>A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool b); b\<rbrakk> \<Longrightarrow> A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e,ns\<rangle> \<Down> LitV (LBool True)"  
   by simp
 
 lemma heap_upd_ty_preserved_2:
-  assumes OldHeap: "type_of_vbpl_val T (AbsV (AHeap hb)) = TConSingle (THeapId T)"  and
-        (* FieldTy: "field_ty_fun_opt T f = Some (TFieldId T, [fieldKind, t])" and *)
-         FieldTy2: "type_of_vbpl_val T (AbsV (AField xb)) = TCon (TFieldId T) [\<tau>, \<tau>']" and
-         NewVal: "type_of_vbpl_val T v = \<tau>'"
-       shows "type_of_vbpl_val T (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle (THeapId T)"
-  sorry
+  assumes Wf: "wf_ty_repr_bpl T"
+      and OldHeap: "type_of_vbpl_val T (AbsV (AHeap hb)) = TConSingle (THeapId T)"
+      and FieldTy2: "type_of_vbpl_val T (AbsV (AField f)) = TCon (TFieldId T) [\<tau>, \<tau>']"
+      and NewVal: "type_of_vbpl_val T v = \<tau>'"
+    shows "type_of_vbpl_val T (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle (THeapId T)" (is "?lhs = ?rhs")
+proof -
+  have "THeapId T \<noteq> TDummyId T"
+    using tdummyid_fresh[OF Wf]
+    by (metis UnI1 range_eqI)
+
+  with type_of_val_not_dummy[OF OldHeap]
+  have "(vbpl_absval_ty_opt T ((AHeap hb))) = Some (THeapId T, [])"
+    by simp
+
+  moreover from type_of_val_not_dummy[OF FieldTy2] 
+  have "field_ty_fun_opt T f = Some (TFieldId T, [\<tau>, \<tau>'])"
+    by simp
+    
+  ultimately show ?thesis
+    using heap_upd_ty_preserved NewVal
+    by (metis OldHeap type_of_val.simps(2) vbpl_absval_ty.simps)
+qed   
 
 lemma heap_upd_ty_preserved_2_basic:
-  assumes OldHeap: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap hb)) = TConSingle ''HeapType''"  and
-         FieldTy2: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AField xb)) = TCon ''Field'' [\<tau>, \<tau>']" and
-         NewVal: "type_of_vbpl_val (ty_repr_basic A) v = \<tau>'"
-       shows "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle ''HeapType''"
-  sorry
+  assumes OldHeap: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap hb)) = TConSingle ''HeapType''"
+      and FieldTy2: "type_of_vbpl_val (ty_repr_basic A) (AbsV (AField f)) = TCon ''Field'' [\<tau>, \<tau>']"
+      and  NewVal: "type_of_vbpl_val (ty_repr_basic A) v = \<tau>'"
+    shows "type_of_vbpl_val (ty_repr_basic A) (AbsV (AHeap (hb ((r,f) \<mapsto> v)))) = TConSingle ''HeapType''"
+  using heap_upd_ty_preserved_2[OF wf_ty_repr_basic]
+  unfolding ty_repr_basic_def
+  by (metis FieldTy2 NewVal OldHeap tcon_enum_to_id.simps(2) tcon_enum_to_id.simps(3) ty_repr_basic_def ty_repr_bpl.select_convs(1))
 
 end
