@@ -10,7 +10,9 @@ fun run_and_print_if_fail_tac' msg tac ctxt =
     (tac ctxt) ORELSE' (K (print_and_fail_tac msg ctxt))
 
 fun run_and_print_if_fail_2_tac' msg tac ctxt =
-    tac ORELSE' (K (print_and_fail_tac msg ctxt))
+   (* tac ORELSE' (K (print_and_fail_tac msg ctxt)): this version is slower, because it prints all subgoals
+      and it does not terminate the execution (as opposed to the current solution that raises an exception) *)
+   tac ORELSE' (SUBGOAL (fn (t,_) => raise TERM (msg,[t])))
 
 fun print_then_run_tac msg ctxt = K (print_tac ctxt msg)
 
