@@ -32,6 +32,14 @@ ML \<open>
 
 \<close>
 
+method fun_interp_wf_aux_tac for fid :: fun_enum_bpl uses  fun_wf_thm  = 
+      ((rule exI, rule conjI),
+      (rule fun_interp_vpr_bpl_concrete_lookup[OF fun_repr_concrete_inj, where ?fid=fid]),
+      simp,
+      (simp del: fun_interp_single_wf.simps fun_interp_single_wf_2.simps),
+      (rule lift_fun_decl_fun_interp_single_wf_eq[OF _ fun_wf_thm[OF wf_ty_repr_basic]]),
+      (simp add: ty_repr_basic_def))
+
 lemmas axioms_sat_proof_del = vbpl_absval_ty.simps type_of_val.simps full_ext_env.simps
 
 method simplify_bound_var_tac = 
@@ -56,9 +64,6 @@ ML \<open>
     fun_interp_inst_def_thm: thm
   }
 
-  val Rmsg' = run_and_print_if_fail_2_tac' 
-
-
   fun extract_fun_enum_bpl t =
     case t of 
       @{term "Trueprop"} $ t' => extract_fun_enum_bpl t'
@@ -78,19 +83,22 @@ ML \<open>
        resolve_tac ctxt @{thms RedVar},
        resolve_tac ctxt @{thms RedBVar},
        resolve_tac ctxt @{thms RedBinOp},
-
        resolve_tac ctxt @{thms RedFunOp},
        resolve_tac ctxt @{thms RedLit},
+       resolve_tac ctxt @{thms RedUnOp},
        Rmsg' "Unexpected case" (K no_tac) ctxt
     ] [
       (* Var *)
       (#lookup_const_tac axiom_tac_data |> SOLVED'), 
+
       (* BVar *)
        Rmsg' "RedBVar simp" (assm_full_simp_solved_tac ctxt) ctxt,
+   
       (* BinOp *)
        (fn i => fn st => axiom_aux_tac ctxt lookup_const_thms del_thms axiom_tac_data i st) THEN'
        (fn i => fn st => axiom_aux_tac ctxt lookup_const_thms del_thms axiom_tac_data i st) THEN'
        Rmsg' "RedBinOp simp" (assm_full_simp_solved_tac ctxt) ctxt,
+
       (* FunOp *)
        (Rmsg' "RedFunOp init"
          (simp_only_tac [#fun_interp_inst_def_thm axiom_tac_data] ctxt THEN'
@@ -103,8 +111,14 @@ ML \<open>
        (Rmsg' "RedFunOp finish"
              (SUBGOAL (fn (t,i) => (#finterp_eval_tac axiom_tac_data) ctxt (extract_fun_enum_bpl (Logic.strip_assums_concl t)) i) 
                                             |> SOLVED') ctxt),
+
        (* Lit *)
        K all_tac,
+
+       (* UnOp *)
+       (fn i => fn st => axiom_aux_tac ctxt lookup_const_thms del_thms axiom_tac_data i st) THEN'
+       Rmsg' "ReUnOp simp" (assm_full_simp_solved_tac ctxt) ctxt,
+
        (* unexpected case *)
        K no_tac
      ]
@@ -124,11 +138,11 @@ and axiom_aux_list_tac ctxt lookup_const_thms del_thms (axiom_tac_data : axiom_t
 fun finterp_eval_concrete_tac del_thms ctxt t = 
   case t of
     Const (@{const_name FReadHeap}, _) => 
-     asm_full_simp_tac (del_simps  (@{thm fun_upd_apply}::del_thms) (add_simps @{thms lift_fun_bpl_def heap_upd_ty_preserved_2_basic} ctxt))  THEN'
+     asm_full_simp_tac (del_simps  (@{thm fun_upd_apply}::del_thms) (add_simps @{thms lift_fun_bpl_def heap_upd_ty_preserved_2_basic} ctxt)) THEN'
      asm_full_simp_tac (del_simps (@{thm fun_upd_apply}::del_thms) (add_simps @{thms ty_repr_basic_def} ctxt))
   | Const (@{const_name FReadMask}, _) =>
-     asm_full_simp_tac (del_simps del_thms (add_simps @{thms lift_fun_bpl_def ty_repr_basic_def} ctxt)) THEN'
-     asm_full_simp_tac ctxt
+     asm_full_simp_tac (del_simps (@{thm fun_upd_apply}::del_thms) (add_simps @{thms lift_fun_bpl_def} ctxt)) THEN'
+     asm_full_simp_tac (del_simps @{thms fun_upd_apply} (add_simps @{thms ty_repr_basic_def} ctxt))
   | _ =>      
      asm_full_simp_tac (del_simps del_thms (add_simps @{thms lift_fun_bpl_def ty_repr_basic_def} ctxt))   
 

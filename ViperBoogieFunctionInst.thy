@@ -159,7 +159,7 @@ fun good_mask :: "'a sem_fun_bpl"
     "good_mask ts vs =
       (case (ts, vs) of 
            ([], [AbsV (AMask m)]) \<Rightarrow> 
-             Some (BoolV ((\<forall> loc. m loc \<ge> 0) \<and> (\<forall> r f t. m (r, (NormalField f t)) \<le> 1)))
+             Some (BoolV (\<forall>r f. m (r,f) \<ge> 0 \<and> (is_bounded_field_bpl f \<longrightarrow> m (r,f) \<le> 1)))
         | _ \<Rightarrow> None)"
 
 lemma good_mask_fun_interp_single_wf:
@@ -484,11 +484,23 @@ fun is_predicate_field :: "'a sem_fun_bpl"
              ([t1,t2], [AbsV (AField f)]) \<Rightarrow> Some (BoolV (is_PredSnapshotField f))
            | _ \<Rightarrow> None)"
 
+lemma is_predicate_field_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (2,[TCon (TFieldId T) [(TVar 0),(TVar 1)]],(TPrim TBool)) is_predicate_field"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 lit_inversion_type_of_val split: val.split vbpl_absval.split)
+
 fun is_wand_field :: "'a sem_fun_bpl"
   where "is_wand_field ts vs =
           (case (ts, vs) of 
              ([t1,t2], [AbsV (AField f)]) \<Rightarrow> Some (BoolV False) \<comment>\<open>always false, since wands are currently not supported\<close>
            | _ \<Rightarrow> None)"
+
+lemma is_wand_field_fun_interp_single_wf:
+  assumes WfTyRepr: "wf_ty_repr_bpl T"
+  shows "fun_interp_single_wf (vbpl_absval_ty T) (2,[TCon (TFieldId T) [(TVar 0),(TVar 1)]],(TPrim TBool)) is_wand_field"
+  apply (rule fun_interp_single_wf_intro)
+  by (clarsimp dest!: all_inversion_type_of_vbpl_val[OF WfTyRepr] deconstruct_list_length_2 lit_inversion_type_of_val split: val.split vbpl_absval.split)
 
 subsection \<open>Global function map\<close>
 
@@ -518,6 +530,10 @@ fun fun_interp_vpr_bpl_aux :: "ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<
        (has_perm_in_mask, (2,[TConSingle (TMaskId T), TConSingle (TRefId T), (TCon (TFieldId T) [(TVar 0),(TVar 1)])], (TPrim TBool)))"
   | "fun_interp_vpr_bpl_aux Pr T F FIdenticalOnKnownLocs =
        (identical_on_known_locs, (0,[TConSingle (THeapId T), TConSingle (THeapId T), TConSingle (TMaskId T)], (TPrim TBool)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FIsPredicateField =
+       (is_predicate_field, (2, [TCon (TFieldId T) [(TVar 0),(TVar 1)]], (TPrim TBool)))"
+  | "fun_interp_vpr_bpl_aux Pr T F FIsWandField =
+       (is_wand_field, (2, [TCon (TFieldId T) [(TVar 0),(TVar 1)]], (TPrim TBool)))"
 
 fun fun_interp_vpr_bpl :: " ViperLang.program \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> 
                                 fun_enum_bpl \<Rightarrow> 'a sem_fun_bpl"
