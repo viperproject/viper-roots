@@ -10,8 +10,9 @@ fun run_and_print_if_fail_tac' msg tac ctxt =
     (tac ctxt) ORELSE' (K (print_and_fail_tac msg ctxt))
 
 fun run_and_print_if_fail_2_tac' msg tac ctxt =
-   (* tac ORELSE' (K (print_and_fail_tac msg ctxt)): this version is slower, because it prints all subgoals
-      and it does not terminate the execution (as opposed to the current solution that raises an exception) *)
+   (* tac ORELSE' (K (print_and_fail_tac msg ctxt)): the version using print_tac is slower, 
+      because it prints all subgoals and it does not terminate the execution 
+      (as opposed to the current solution that raises an exception) *)
    tac ORELSE' (SUBGOAL (fn (t,_) => raise TERM (msg,[t])))
 
 fun print_then_run_tac msg ctxt = K (print_tac ctxt msg)
@@ -42,6 +43,21 @@ type method_data =
        method_pre_thm : thm,
        method_post_thm : thm,
        method_lookup_thm : thm }
+
+(* TODO: move to HelperML.thy
+
+The following example illustrates the difference between \<open>FIRST'\<close> and \<open>FIRST_and_THEN'\<close>. For the a goal
+of the form "A \<longrightarrow> (B \<and> C)" the following tactic works
+  apply (tactic \<open>
+           FIRST' [resolve_tac @{context} @{thms impI} THEN' resolve_tac @{context} @{thms impI},
+                   resolve_tac @{context} @{thms impI} THEN' resolve_tac @{context} @{thms conjI}] 1\<close>)
+
+and the following tactic fails, since the first impI succeeds and thus forces another impI: 
+
+  apply (tactic \<open>FIRST_AND_THEN' 
+                    [resolve_tac @{context} @{thms impI}, resolve_tac @{context} @{thms impI}]
+                    [resolve_tac @{context} @{thms impI}, resolve_tac @{context} @{thms conjI}] 1\<close>)
+*)
 
 \<close>
 
