@@ -267,6 +267,7 @@ definition method_rel
                          correctness of the spec.
                          We need this left-hand side, because the Boogie encoding may rely on the correctness
                          of the specs.\<close> 
+                      method_decl.body mdecl \<noteq> None \<longrightarrow> \<comment>\<open>correctness of body is relevant only if the method has a body\<close>
                       vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
                       (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
                        \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
@@ -371,15 +372,15 @@ definition vpr_method_correct_total_partial :: "'a total_context \<Rightarrow> (
          vpr_method_correct_total_aux ctxt StateCons mdecl 
           (\<lambda>ctxt R mdecl \<omega>pre \<omega>.
                 vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and>
-                (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> 
-                         vpr_all_method_spec_correct_total ctxt StateCons (program_total ctxt) \<longrightarrow>
-                         vpr_method_body_correct ctxt R mdecl \<omega>pre)
+                (method_decl.body mdecl \<noteq> None \<longrightarrow> 
+                 vpr_all_method_spec_correct_total ctxt StateCons (program_total ctxt) \<longrightarrow>
+                 vpr_method_body_correct ctxt R mdecl \<omega>pre)
           )
        "
 
 lemma vpr_method_correct_total_from_partial:
-  assumes "\<And> m' mdecl' . methods (program_total ctxt) m' = Some mdecl' \<Longrightarrow> vpr_method_correct_total_partial ctxt StateCons mdecl'"
-      and "methods (program_total ctxt) m = Some mdecl"
+  assumes "methods (program_total ctxt) m = Some mdecl"
+      and "\<And> m' mdecl' . methods (program_total ctxt) m' = Some mdecl' \<Longrightarrow> vpr_method_correct_total_partial ctxt StateCons mdecl'"
     shows "vpr_method_correct_total ctxt StateCons mdecl"
 proof -
   have SpecsCorrect: "vpr_all_method_spec_correct_total ctxt StateCons (program_total ctxt)"
@@ -413,11 +414,12 @@ lemma end_to_end_vpr_method_correct_partial:
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
       and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and ProgMethod: "methods (program_total ctxt_vpr) mname = Some mdecl"
-      and VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
+      and VprMethodBody: "method_decl.body mdecl \<noteq> None \<Longrightarrow> method_decl.body mdecl = Some body_vpr"
       and VprNoPermUnfoldingSpec: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl) \<and>
                                    no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
-      and ArgsAndRetsUnmodified: "\<And>x. x < (length (method_decl.args mdecl) + length (method_decl.rets mdecl)) \<Longrightarrow> x \<notin> modif body_vpr"
+      and ArgsAndRetsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
+                                  (\<And>x. x < (length (method_decl.args mdecl) + length (method_decl.rets mdecl)) \<Longrightarrow> x \<notin> modif body_vpr)"
       and ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)"
 
           \<comment>\<open>The Viper encoding does not use Boogie procedure preconditions\<close>
@@ -456,13 +458,15 @@ proof (rule allI | rule impI)+
   from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
     PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 \<gamma>Pre" and
-    BodyRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
+    BodyRel: "method_decl.body mdecl \<noteq> None \<Longrightarrow>
+              vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
               stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
-    PostExhRel: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
+    PostExhRel: "method_decl.body mdecl \<noteq> None \<Longrightarrow>
+              vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
               stmt_rel ?R1Post Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
-    using VprMethodBodySome
-    by auto     
+    using VprMethodBody
+    by fastforce   
 
   text \<open>start actual proof\<close>
 
@@ -540,8 +544,8 @@ proof (rule allI | rule impI)+
        (\<forall>\<omega>pre.
            rpre = RNormal \<omega>pre \<longrightarrow>
            vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<and> 
-           (\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow>
-                    vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)
+           (method_decl.body mdecl \<noteq> None \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow>
+            vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre)
         )"
         (is "?Goal1 \<and> ?Goal2")
   proof (rule conjI)
@@ -641,18 +645,21 @@ proof (rule allI | rule impI)+
         qed
       qed
 
-      show "\<forall>mbody. method_decl.body mdecl = Some mbody \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
+      show "method_decl.body mdecl \<noteq> None \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
         unfolding vpr_method_body_correct_def
       proof (rule allI | rule impI | rule conjI)+
         let ?\<omega>pre' = "(update_trace_total \<omega>pre [old_label \<mapsto> get_total_full \<omega>pre])"
         let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
         let ?mbody = "(the (method_decl.body mdecl))"
-        fix mbody rpost
-        assume "method_decl.body mdecl = Some mbody"
+        fix rpost
+        assume "method_decl.body mdecl \<noteq> None"
            and SpecsCorrect: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"   
            and RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
                                (Seq ?mbody (Exhale (method_decl.post mdecl)))
                                ?\<omega>pre' rpost"
+
+        with VprMethodBody have VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
+          by fast
 
         \<comment>\<open>the following will have to be adjusted once we track old states\<close>
         have Rpre_old_upd:"?R (update_trace_total \<omega>pre ([old_label \<mapsto> get_total_full \<omega>pre])) nspre"
@@ -732,7 +739,7 @@ proof (rule allI | rule impI)+
                   using OnlyArgsInPre
                   by blast
                 hence "x \<notin> modif body_vpr"
-                  using ArgsAndRetsUnmodified
+                  using ArgsAndRetsUnmodified VprMethodBodySome
                   by simp
                 hence "get_store_total \<omega> x = get_store_total \<omega>body x"
                   using red_stmt_preserves_unmodified_variables VprMethodBodySome RedBodyVpr \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close>
@@ -792,7 +799,7 @@ proof (rule allI | rule impI)+
             with stmt_rel_failure_elim[OF PostExhRel]
             obtain c' where "snd c' = Failure" and 
                             "red_ast_bpl proc_body_bpl ctxt (\<gamma>Body, Normal nsbody) c'"
-              using Rbody FramingExhPost RedExhPost RedExhaleFailure SpecsCorrect 
+              using Rbody VprMethodBodySome FramingExhPost RedExhPost RedExhaleFailure SpecsCorrect 
               by blast
 
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
@@ -1345,6 +1352,11 @@ lemma boogie_const_rel_aux:
       by argo
   qed
 
+definition disj_vars_state_relation
+  where "disj_vars_state_relation Tr AuxPred =
+              disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
+                               ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
+
 lemma init_state_in_state_relation:
   assumes "is_empty_total_full \<omega>" and
           WfTyRepr: "wf_ty_repr_bpl T" and
@@ -1357,8 +1369,7 @@ lemma init_state_in_state_relation:
                   global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
                   local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
                   binder_state = Map.empty \<rparr>" and
-         Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
-                               ran (field_translation Tr), range (const_repr Tr), dom Map.empty]" and
+         Disj: "disj_vars_state_relation Tr Map.empty" and
          InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
 
           ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
@@ -1396,8 +1407,10 @@ proof -
     "binder_state ns = Map.empty"
     by simp_all
 
+  note DisjSimp = Disj[simplified disj_vars_state_relation_def]
+
   have "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (field_translation Tr), range (const_repr Tr)]"
-    by (rule disjoint_list_sublist[OF Disj]) fastforce    
+    by (rule disjoint_list_sublist[OF DisjSimp]) fastforce    
   hence DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
     by (rule disjoint_list_subset_list_all2) blast
 
@@ -1554,12 +1567,12 @@ proof -
   next  
     show "aux_vars_pred_sat (var_context ctxt) Map.empty ns"
       by (simp add: aux_vars_pred_sat_def)  
-  qed (insert assms, auto)
+  qed (insert assms DisjSimp, auto)
 qed
 
 subsection \<open>Misc\<close>
 
-lemma inter_aux:
+lemma inter_disjoint_intervals:
   assumes "\<forall>x \<in> A :: ('a :: linorder) set . x \<ge> a_min \<and> x \<le> a_max" and
           "\<forall>x \<in> B. x \<ge> b_min \<and> x \<le> b_max" and
           "a_min \<le> a_max \<and> b_min \<le> b_max \<and> (a_max < b_min \<or> b_max < a_min)"
@@ -1572,7 +1585,7 @@ method rename_case_simp_tac =
       case_tac j1,
       solves \<open>simp add: Set.Int_commute\<close>)
 
-lemma disj_helper:
+lemma disj_helper_tr_vpr_bpl:
   assumes "heap_var Tr \<noteq> mask_var Tr" and
           "{heap_var Tr, mask_var Tr} \<inter> ran (var_translation Tr) = {}" and
           "{heap_var Tr, mask_var Tr} \<inter> ran (field_translation Tr) = {}" and
@@ -1658,17 +1671,51 @@ proof clarify
   qed
 qed
 
-lemma disj_helper_2:
-  assumes 
-          "heap_var Tr = heap_var_def Tr" and
-          "mask_var Tr = mask_var_def Tr" and
-      "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
-                               ran (field_translation Tr), range (const_repr Tr)]"
+lemma disjoint_list_drop_last:
+  assumes "disjoint_list xs"
+     and "xs = xs'@[x]" \<comment>\<open>add as separate assumption such conclusion unifies with more goals\<close>
+   shows "disjoint_list xs'"
+  apply (rule disjoint_list_sublist[OF assms(1)])
+  using assms  
+  by force
 
-  shows "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
-                               ran (field_translation Tr), range (const_repr Tr), dom Map.empty]"
+lemma disjoint_list_drop_i:
+  assumes "disjoint_list (xs :: ('a set) list)"
+      and "i < length xs"
+      and "xs' = take i xs @ drop (i+1) xs"
+    shows "disjoint_list (xs' :: ('a set) list)"
+proof - 
+  from \<open>i < length xs\<close> 
+  have "xs = take i xs @ ((xs ! i) # drop (i+1) xs)"
+    by (simp add: id_take_nth_drop)
+
+  show ?thesis
+  apply (rule disjoint_list_sublist[OF assms(1)])
+    apply (subst \<open>xs = _\<close>)
+    apply (subst \<open>xs' = _\<close>)
+    by simp
+qed
+
+lemma disj_vars_state_relation_initialI:
+  assumes "heap_var Tr = heap_var_def Tr"
+      and "mask_var Tr = mask_var_def Tr"
+      and "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
+                               ran (field_translation Tr), range (const_repr Tr)]"
+    shows "disj_vars_state_relation Tr Map.empty"
+  unfolding disj_vars_state_relation_def
   using assms disjoint_list_append_empty
   by fastforce
+
+text \<open>helper tactic for proving disjointness of global Boogie variables\<close>
+
+method disjoint_globals_aux_tac uses disj_prop_aux =
+     (rule disjoint_list_subset_list_all2,
+      rule disjoint_list_drop_last, \<comment>\<open>drop auxiliary variables\<close>
+      rule disjoint_list_drop_i[where ?i=2, OF disj_prop_aux], \<comment>\<open>drop variable translation\<close>
+      simp,
+      simp,
+      simp,
+      simp)
 
 lemma initial_global_state_state_restriction:
   assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
