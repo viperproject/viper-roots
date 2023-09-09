@@ -1048,7 +1048,7 @@ qed
 
 definition initial_global_state 
   where "initial_global_state T vs Pr Tr \<omega> \<equiv> extend_named_state_var_context (vbpl_absval_ty T) vs (initial_global_state_aux Pr Tr \<omega>)"
-
+                                                                                                              
 lemma initial_global_state_aux_typ_wf:
   assumes 
           WfTyRepr: "wf_ty_repr_bpl T" and
@@ -1366,8 +1366,9 @@ definition disj_vars_state_relation
                                ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
 
 lemma init_state_in_state_relation:
-  assumes "is_empty_total_full \<omega>" and
-          WfTyRepr: "wf_ty_repr_bpl T" and
+  assumes  WfTyRepr: "wf_ty_repr_bpl T" and
+         Disj: "disj_vars_state_relation Tr Map.empty" and
+          "is_empty_total_full \<omega>" and
           ViperHeapWellTy: "total_heap_well_typed ((program_total ctxt_vpr)) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>)" and
           Consistent: "StateCons \<omega>" and
@@ -1377,7 +1378,6 @@ lemma init_state_in_state_relation:
                   global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
                   local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
                   binder_state = Map.empty \<rparr>" and
-         Disj: "disj_vars_state_relation Tr Map.empty" and
          InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
 
           ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
