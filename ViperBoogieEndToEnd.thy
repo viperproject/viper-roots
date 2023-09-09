@@ -413,6 +413,11 @@ lemma end_to_end_vpr_method_correct_partial:
           Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
       and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
+      and WfTyRep: "wf_ty_repr_bpl TyRep"
+      and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+
+\<comment>\<open> Viper properties\<close>
+      and DomainType: "domain_type TyRep = absval_interp_total ctxt_vpr"
       and ProgMethod: "methods (program_total ctxt_vpr) mname = Some mdecl"
       and VprMethodBody: "method_decl.body mdecl \<noteq> None \<Longrightarrow> method_decl.body mdecl = Some body_vpr"
       and VprNoPermUnfoldingSpec: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl) \<and>
@@ -420,11 +425,19 @@ lemma end_to_end_vpr_method_correct_partial:
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
       and ArgsAndRetsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
                                   (\<And>x. x < (length (method_decl.args mdecl) + length (method_decl.rets mdecl)) \<Longrightarrow> x \<notin> modif body_vpr)"
-      and ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)"
+      and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
 
+\<comment>\<open>Boogie properties\<close>
+      and FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)"
+      and TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep"  
+      and "rtype_interp ctxt = []"
+      and VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)"
           \<comment>\<open>The Viper encoding does not use Boogie procedure preconditions\<close>
       and ProcPresEmpty: "proc_pres proc_bpl = []"
-      and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
+      and ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0"
+      and ProcBodySome: "proc_body proc_bpl = Some (locals_bpl, proc_body_bpl)"
+
+\<comment>\<open>method rel\<close>
       and VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
@@ -432,13 +445,8 @@ lemma end_to_end_vpr_method_correct_partial:
                (convert_ast_to_program_point proc_body_bpl)" 
           (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0")
       and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
-      and TypeInterpEq: "type_interp ctxt = vbpl_absval_ty TyRep"  
-      and DomainType: "domain_type TyRep = absval_interp_total ctxt_vpr"
-      and ProcTyArgsEmpty: "proc_ty_args proc_bpl = 0" "rtype_interp ctxt = []"
-      and VarCtxtEq: "var_context ctxt = (constants @ global_vars, proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)"
-      and WfTyRep: "wf_ty_repr_bpl TyRep"
-      and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      and FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)"
+
+\<comment>\<open>construct initial state\<close>
       and InitialStateRel: "\<And> \<omega>.  
                        vpr_store_well_typed (absval_interp_total ctxt_vpr) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>) \<Longrightarrow>
                        total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>) \<Longrightarrow>
