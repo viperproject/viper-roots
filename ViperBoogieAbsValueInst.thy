@@ -319,12 +319,12 @@ termination
   by fastforce
 
 fun vbpl_absval_ty :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_absval \<Rightarrow> (tcon_id \<times> bpl_ty list)"
-  where
+  where                                                             
     "vbpl_absval_ty T a = option_fold id (TDummyId T, []) (vbpl_absval_ty_opt T a)"
 
 abbreviation type_of_vbpl_val :: "'a ty_repr_bpl \<Rightarrow> 'a vbpl_val \<Rightarrow> bpl_ty"
   where "type_of_vbpl_val T \<equiv> type_of_val (vbpl_absval_ty T)"
-
+                                                
 lemma type_of_vbpl_val_case_of:
   shows "(case v of LitV lit \<Rightarrow> TPrim (type_of_lit lit) | 
                         AbsV absv \<Rightarrow> (tcon_to_bplty \<circ> option_fold id (TDummyId T, [])) (vbpl_absval_ty_opt T absv)) =
@@ -506,7 +506,14 @@ lemma field_ty_fun_opt_tcon:
   shows "fst res = TFieldId TyRep"
   using assms
   by (rule field_ty_fun_opt.elims)
-     (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)     
+     (simp_all add: map_option_case vpr_to_bpl_ty_closed split: option.split_asm split: if_split_asm)
+
+lemma ty_bpl_normal_field:
+  assumes "vpr_to_bpl_ty T vty = Some bty"
+  shows "type_of_vbpl_val T (AbsV (AField (NormalField f vty))) =
+                       TCon (TFieldId T) [TConSingle (TNormalFieldId T), bty]"
+  using assms
+  by simp
 
 definition heap_bpl_upd_normal_field :: "'a heap_repr \<Rightarrow> ref \<Rightarrow> vname \<Rightarrow> vtyp \<Rightarrow> 'a vbpl_val \<Rightarrow> 'a heap_repr"
   where "heap_bpl_upd_normal_field h r f vpr_ty v \<equiv> h((r, NormalField f vpr_ty) \<mapsto> v)"

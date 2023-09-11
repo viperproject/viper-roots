@@ -1360,10 +1360,57 @@ lemma boogie_const_rel_aux:
       by argo
   qed
 
+lemma field_rel_aux:
+assumes FieldTrTy: "\<And>f_vpr t_vpr. 
+                              declared_fields Pr f_vpr = Some t_vpr \<Longrightarrow>
+                            \<exists> f_bpl.  
+                               field_translation Tr f_vpr = Some f_bpl \<and>
+                               field_tr_prop T (fst \<Lambda>) (f_vpr, t_vpr) (f_vpr, f_bpl)"
+    and GlobalsLocalsDisj: "set (map fst (fst \<Lambda>)) \<inter> set (map fst (snd \<Lambda>)) = {}"
+    and DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
+    and InitGlobalState: "\<And>x. x \<in> ran (field_translation Tr) \<Longrightarrow> global_state ns x = initial_global_state T (fst \<Lambda>) Pr Tr \<omega> x"
+    and InjFieldTr: "inj_on (field_translation Tr) (dom (field_translation Tr))"
+  shows "field_rel Pr \<Lambda> (field_translation Tr) ns"
+    unfolding field_rel_def
+  proof (rule conjI[OF InjFieldTr], (rule allI | rule impI)+)
+    fix f_vpr t_vpr
+    assume FieldLookup: "declared_fields Pr f_vpr = Some t_vpr"
+    with FieldTrTy obtain f_bpl t_bpl
+      where FieldTr: "field_translation Tr f_vpr = Some f_bpl" and
+                     "vpr_to_bpl_ty T t_vpr = Some t_bpl" and
+            FieldGlobal:  "lookup_vdecls_ty (fst \<Lambda>) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])"
+      unfolding field_tr_prop_def
+      by fastforce
+
+    hence "f_bpl \<in> ran (field_translation Tr)"
+      unfolding ran_def
+      by blast
+
+    from FieldGlobal GlobalsLocalsDisj have 
+      "lookup_var \<Lambda> ns f_bpl = global_state ns f_bpl"
+      by (metis lookup_var_global_disj lookup_vdecls_ty_map_of prod.exhaust_sel)
+    
+    moreover from initial_global_state_aux_field_2[OF DisjAux InjFieldTr FieldTr FieldLookup, where ?\<omega>=\<omega>]
+    have "global_state ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))"
+      using InitGlobalState \<open>f_bpl \<in> _\<close>
+      by (simp add: initial_global_state_def)
+    
+    ultimately show "has_Some (\<lambda>f_bpl. lookup_var \<Lambda> ns f_bpl = Some (AbsV (AField (NormalField f_bpl t_vpr)))) (field_translation Tr f_vpr)"
+      using FieldTr
+      by simp
+  qed
+
 definition disj_vars_state_relation
   where "disj_vars_state_relation Tr AuxPred =
               disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
                                ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
+
+definition field_tr_prop_full
+  where "field_tr_prop_full Pr global_vdecls TyRep FieldTr \<equiv> \<forall>f_vpr t_vpr. 
+                          declared_fields Pr f_vpr = Some t_vpr \<longrightarrow>
+                          (\<exists> f_bpl.  
+                           FieldTr f_vpr = Some f_bpl \<and>
+                           field_tr_prop TyRep global_vdecls (f_vpr, t_vpr) (f_vpr, f_bpl))"
 
 lemma init_state_in_state_relation:
   assumes  WfTyRepr: "wf_ty_repr_bpl T" and
@@ -1390,11 +1437,12 @@ lemma init_state_in_state_relation:
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
           InjConstRepr: "inj (const_repr Tr)" and
-          FieldTrTy: "\<And>f_vpr t_vpr. 
+          FieldTrTy: (*"\<And>f_vpr t_vpr. 
                           declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr \<Longrightarrow>
                         \<exists> f_bpl.  
                            field_translation Tr f_vpr = Some f_bpl \<and>
-                           field_tr_prop T (fst (var_context ctxt)) (f_vpr, t_vpr) (f_vpr, f_bpl)" and
+                           field_tr_prop T (fst (var_context ctxt)) (f_vpr, t_vpr) (f_vpr, f_bpl)" and*)
+                     "field_tr_prop_full (program_total ctxt_vpr) (fst (var_context ctxt)) T (field_translation Tr)" and
           HeapTy: "lookup_vdecls_ty (fst (var_context ctxt)) (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty (fst (var_context ctxt)) (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<And>c. lookup_vdecls_ty (fst (var_context ctxt)) (const_repr Tr c) = Some (boogie_const_ty T c)" and
@@ -1525,7 +1573,7 @@ proof -
         where FieldTr: "field_translation Tr f_vpr = Some f_bpl" and
                        "vpr_to_bpl_ty T t_vpr = Some t_bpl" and
               FieldGlobal:  "lookup_vdecls_ty (fst (var_context ctxt)) f_bpl = Some (TCon (TFieldId T) [TConSingle (TNormalFieldId T), t_bpl])"
-        unfolding field_tr_prop_def
+        unfolding field_tr_prop_full_def field_tr_prop_def
         by fastforce
 
       from FieldGlobal GlobalsLocalsDisj have 
@@ -1562,7 +1610,7 @@ proof -
         using ViperHeapWellTy DomainTy
          apply simp
         using FieldTrTy
-        unfolding field_tr_prop_def
+        unfolding field_tr_prop_full_def field_tr_prop_def
         by simp
     
       thus "state_typ_wf (type_interp ctxt) [] (old_global_state ns) (fst (var_context ctxt))"
@@ -1820,11 +1868,14 @@ qed
 lemma boogie_axioms_state_restriction_aux:
   assumes "gs = initial_global_state T (constants@globals) Pr Tr \<omega>" and
           "C = const_repr Tr" and
-         ConstTy: "\<And>c. lookup_vdecls_ty constants (const_repr Tr c) = Some (boogie_const_ty T c)" and          
+         ConstTy: "\<And>c. lookup_vdecls_ty constants (const_repr Tr c) = Some (boogie_const_ty T c)" and 
+         FieldProp: "field_tr_prop_full Pr constants T (field_translation Tr)" and
           Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and          
           InjConstRepr: "inj (const_repr Tr)" and
+          InjFieldTr: "inj_on (field_translation Tr) (dom (field_translation Tr))" and
           ConstantsRange:"set (map fst constants) = range (const_repr Tr) \<union> ran (field_translation Tr)" and 
-         AxiomsSatGeneral: "\<And> ns. boogie_const_rel C (constants, []) ns \<Longrightarrow>  \<comment>\<open>TODO: need to add field_rel\<close>
+         AxiomsSatGeneral: "\<And> ns. boogie_const_rel C (constants, []) ns \<Longrightarrow>  
+                                  field_rel Pr (constants, []) (field_translation Tr) ns \<Longrightarrow>
                                   axioms_sat A (constants, []) \<Gamma> ns axioms"
   shows "axioms_sat A (constants, []) \<Gamma> (global_to_nstate (state_restriction gs constants)) axioms"
 proof -
@@ -1838,10 +1889,21 @@ proof -
      apply (simp del: extend_named_state_var_context.simps)
      apply (rule initial_global_state_state_restriction[OF Disj ConstantsRange])
      apply simp
-    apply (rule InjConstRepr)
-    done
+    by (rule InjConstRepr)
 
-  thus ?thesis
+  moreover have "field_rel Pr (constants, []) (field_translation Tr) ?ns"
+    apply (rule field_rel_aux)
+    using FieldProp
+    apply (fastforce simp: field_tr_prop_full_def)
+        apply simp
+       apply (rule Disj)
+     apply (subst \<open>gs = _\<close> )
+     apply (simp del: extend_named_state_var_context.simps)
+     apply (rule initial_global_state_state_restriction[OF Disj ConstantsRange])
+     apply simp
+    by (rule InjFieldTr)
+
+  ultimately show ?thesis
     using AxiomsSatGeneral \<open>C = _\<close>
     by simp
 qed

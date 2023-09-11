@@ -403,4 +403,15 @@ lemmas lookup_boogie_const_concrete_lemmas =
   lookup_known_folded_zero_mask_const
   lookup_empty_frame_const
 
+subsubsection \<open>Boogie field lookups\<close>
+
+lemma lookup_field_rel:
+  assumes "field_rel Pr \<Lambda> FieldTr ns"
+      and "FieldTr f = Some f_bpl"
+      and "declared_fields Pr f = Some t"
+    shows "lookup_var \<Lambda> ns f_bpl = Some (AbsV (AField (NormalField f_bpl t)))"
+  using assms
+  unfolding field_rel_def
+  by fastforce
+
 end
