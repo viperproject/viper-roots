@@ -326,12 +326,12 @@ be more robust to changes in the verifier\<close>
 
 fun const_repr_basic :: "boogie_const \<Rightarrow> vname"
   where 
-    "const_repr_basic CNoPerm = 3"
-  | "const_repr_basic CWritePerm = 4"
+    "const_repr_basic CNoPerm = 2"
+  | "const_repr_basic CWritePerm = 3"
   | "const_repr_basic CNull = 0"
   | "const_repr_basic CZeroMask = 1"
-  | "const_repr_basic CKnownFoldedZeroMask = 2"
-  | "const_repr_basic CEmptyFrame = 5"
+\<comment>\<open>  | "const_repr_basic CKnownFoldedZeroMask = 2"
+  | "const_repr_basic CEmptyFrame = 5"\<close>
 
 lemma inj_const_repr_basic: "inj const_repr_basic"
   unfolding inj_def
@@ -340,12 +340,12 @@ lemma inj_const_repr_basic: "inj const_repr_basic"
   apply (rename_tac c1 c2)
   by (case_tac c1; case_tac c2; simp)
 
-lemma const_repr_basic_bound: "const_repr_basic c = x \<Longrightarrow> x \<le> 5"
+lemma const_repr_basic_bound: "const_repr_basic c = x \<Longrightarrow> x \<le> 3"
   by (cases c) auto
 
-lemma range_const_repr_basic: "range (const_repr_basic) = {0,1,2,3,4,5}"
+lemma range_const_repr_basic: "range (const_repr_basic) = {0,1,2,3}"
 proof -   
-  have "UNIV = {CNoPerm, CWritePerm, CNull, CZeroMask, CKnownFoldedZeroMask, CEmptyFrame}"
+  have "UNIV = {CNoPerm, CWritePerm, CNull, CZeroMask}"
     apply standard
      apply standard
      apply (case_tac x; simp)
@@ -359,7 +359,7 @@ proof -
     by blast
 qed
 
-lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<ge> 0 \<and> x \<le> 5"
+lemma const_repr_basic_bound_2: "\<forall>x \<in> range const_repr_basic. x \<ge> 0 \<and> x \<le> 3"
   using const_repr_basic_bound
   by fastforce  
 
@@ -367,12 +367,12 @@ subsubsection \<open> \<^const>\<open>const_repr_basic\<close> helper lemmas \<c
 
 lemma lookup_no_perm_const: 
   assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
-  shows "lookup_var \<Lambda> ns 3 = Some (boogie_const_val CNoPerm)"
+  shows "lookup_var \<Lambda> ns 2 = Some (boogie_const_val CNoPerm)"
   by (rule boogie_const_rel_lookup_2[OF assms]) auto
 
 lemma lookup_write_perm_const: 
   assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
-  shows "lookup_var \<Lambda> ns 4 = Some (boogie_const_val CWritePerm)"
+  shows "lookup_var \<Lambda> ns 3 = Some (boogie_const_val CWritePerm)"
   by (rule boogie_const_rel_lookup_2[OF assms]) auto
 
 lemma lookup_null_const:
@@ -385,23 +385,11 @@ lemma lookup_zero_mask_const:
   shows "lookup_var \<Lambda> ns 1 = Some (boogie_const_val CZeroMask)"
   by (rule boogie_const_rel_lookup_2[OF assms]) auto
 
-lemma lookup_known_folded_zero_mask_const: 
-  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
-  shows "lookup_var \<Lambda> ns 2 = Some (boogie_const_val CKnownFoldedZeroMask)"
-  by (rule boogie_const_rel_lookup_2[OF assms]) auto
-
-lemma lookup_empty_frame_const: 
-  assumes "boogie_const_rel const_repr_basic \<Lambda> ns"
-  shows "lookup_var \<Lambda> ns 5 = Some (boogie_const_val CEmptyFrame)"
-  by (rule boogie_const_rel_lookup_2[OF assms]) auto
-
 lemmas lookup_boogie_const_concrete_lemmas =
   lookup_no_perm_const
   lookup_write_perm_const
   lookup_null_const
   lookup_zero_mask_const
-  lookup_known_folded_zero_mask_const
-  lookup_empty_frame_const
 
 subsubsection \<open>Boogie field lookups\<close>
 
