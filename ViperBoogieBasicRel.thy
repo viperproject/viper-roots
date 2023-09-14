@@ -512,45 +512,6 @@ lemma store_rel_var_tr_inj:
   using assms
   by (simp add: store_rel_def)
 
-lemma store_rel_update:
-  assumes 
-       StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns" and 
-       "v' = val_rel_vpr_bpl v" and
-       VarTrX: "var_tr x_vpr = Some x_bpl" and
-       TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
-              "type_of_val A v' = ty"
-   shows
-       "store_rel A \<Lambda> var_tr (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
-  unfolding store_rel_def
-proof (rule conjI, insert StoreRel, fastforce simp: store_rel_def, (rule allI | rule impI)+)
-  fix var_vpr var_bpl
-  assume VarTr: "var_tr var_vpr = Some var_bpl"
-  show "\<exists>val_vpr ty_bpl.          
-          get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some val_vpr \<and>
-          lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
-          lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
-          type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl"
-  proof (cases "var_vpr = x_vpr")
-    case True
-    show ?thesis 
-      using VarTrX VarTr TyBpl
-      by (fastforce simp: \<open>var_vpr = _\<close> \<open>v' = _\<close>  )
-  next
-    case False
-    hence "x_bpl \<noteq> var_bpl" using store_rel_var_tr_inj[OF StoreRel] VarTr VarTrX
-      by (metis domI inj_onD)
-    with \<open>var_vpr \<noteq> x_vpr\<close> VarTr StoreRel obtain v_vpr ty_bpl where 
-      "get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some v_vpr" and
-      "lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl v_vpr)"
-      "lookup_var_ty \<Lambda> var_bpl = Some ty_bpl" and
-      "type_of_val A (val_rel_vpr_bpl v_vpr) = ty_bpl"
-      unfolding store_rel_def
-      by fastforce      
-    then show ?thesis 
-      by simp      
-  qed
-qed
-
 definition field_rel :: "ViperLang.program \<Rightarrow> var_context \<Rightarrow> (field_ident \<rightharpoonup> Lang.vname) \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "field_rel Pr \<Lambda> fd_tr ns \<equiv> 
         (inj_on fd_tr (dom fd_tr)) \<and>
@@ -760,6 +721,183 @@ method disjoint_list_subset_tac uses DisjointListAssm  =
   simp,
   
   blast)
+
+subsection \<open>Store relationship properties\<close>
+
+definition store_var_rel_aux
+  where "store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl \<equiv>
+           (\<exists>val_vpr ty_bpl.
+                             (get_store_total \<omega> var_vpr) = Some val_vpr \<and>
+                              lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
+                              lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
+                              type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl )"
+
+
+lemma store_relI:
+  assumes "inj_on f (dom f)"
+          "\<And> var_vpr var_bpl. f var_vpr = Some var_bpl \<Longrightarrow>
+                        store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl"
+  shows "store_rel A \<Lambda> f \<omega> ns"
+  using assms
+  unfolding store_rel_def store_var_rel_aux_def
+  by blast
+
+lemma store_rel_add_new_var:
+  assumes StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns"
+      and "v' = val_rel_vpr_bpl v"
+      and "var_tr' = var_tr(x_vpr \<mapsto> x_bpl)"
+      and LookupVarTyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
+      and TypeOfValBpl: "type_of_val A v' = ty"
+      and "x_bpl \<notin> ran var_tr"
+    shows "store_rel A \<Lambda> var_tr' (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+proof (rule store_relI)
+  show "inj_on var_tr' (dom var_tr')"
+    unfolding inj_on_def
+  proof clarify
+    fix x0 x1 y0 y1
+    assume InjAssms: "var_tr' x0 = Some y0" "var_tr' x1 = Some y1" "var_tr' x0 = var_tr' x1"
+    thus "x0 = x1"
+    proof (cases "x_vpr \<notin> {x0,x1}")
+      case True
+      then show ?thesis 
+        using store_rel_var_tr_inj[OF StoreRel] InjAssms
+        unfolding \<open>var_tr' = _\<close>
+        by (simp add: domI inj_on_def)
+    next
+      case False
+      hence "y0 = x_bpl \<and> y1 = x_bpl"
+        using InjAssms
+        unfolding \<open>var_tr' = _\<close>
+        by auto
+      hence "x0 = x_vpr \<and> x1 = x_vpr"
+        using InjAssms \<open>x_bpl \<notin> ran var_tr\<close>
+        unfolding \<open>var_tr' = _\<close>
+        by (meson map_upd_Some_unfold ranI)
+      thus ?thesis
+        by simp
+    qed
+  qed
+next
+  fix var_vpr var_bpl
+  assume "var_tr' var_vpr = Some var_bpl"
+  let ?\<omega>' = "update_var_total \<omega> x_vpr v"
+  let ?ns' = "update_var \<Lambda> ns x_bpl v'"
+
+  show "store_var_rel_aux A \<Lambda> ?\<omega>' ?ns' var_vpr var_bpl"
+  proof (cases "var_vpr = x_vpr")
+    case True
+    moreover from this have "var_bpl = x_bpl"
+      using \<open>var_tr' var_vpr = Some var_bpl\<close>
+      unfolding \<open>var_tr' = _\<close>
+      by simp
+    ultimately show ?thesis
+      unfolding store_var_rel_aux_def
+      using LookupVarTyBpl TypeOfValBpl \<open>v' = _\<close>
+      by auto
+  next
+    case False
+    moreover from this have "var_bpl \<noteq> x_bpl"
+      using \<open>var_tr' var_vpr = Some var_bpl\<close>
+            assms ranI by force
+
+    moreover from \<open>var_vpr \<noteq> x_vpr\<close> have "var_tr var_vpr = Some var_bpl"
+      using \<open>var_tr' var_vpr = Some var_bpl\<close>
+      by (simp add: \<open>var_tr' = _\<close>)
+
+    ultimately show ?thesis 
+      unfolding store_var_rel_aux_def
+      using StoreRel[simplified store_rel_def] \<open>var_vpr \<noteq> x_vpr\<close>
+      by auto
+  qed
+qed
+
+lemma store_rel_update:
+  assumes 
+       StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns" and 
+       "v' = val_rel_vpr_bpl v" and
+       VarTrX: "var_tr x_vpr = Some x_bpl" and
+       TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
+              "type_of_val A v' = ty"
+   shows
+       "store_rel A \<Lambda> var_tr (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+  unfolding store_rel_def
+proof (rule conjI, insert StoreRel, fastforce simp: store_rel_def, (rule allI | rule impI)+)
+  fix var_vpr var_bpl
+  assume VarTr: "var_tr var_vpr = Some var_bpl"
+  show "\<exists>val_vpr ty_bpl.          
+          get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some val_vpr \<and>
+          lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
+          lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
+          type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl"
+  proof (cases "var_vpr = x_vpr")
+    case True
+    show ?thesis 
+      using VarTrX VarTr TyBpl
+      by (fastforce simp: \<open>var_vpr = _\<close> \<open>v' = _\<close>  )
+  next
+    case False
+    hence "x_bpl \<noteq> var_bpl" using store_rel_var_tr_inj[OF StoreRel] VarTr VarTrX
+      by (metis domI inj_onD)
+    with \<open>var_vpr \<noteq> x_vpr\<close> VarTr StoreRel obtain v_vpr ty_bpl where 
+      "get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some v_vpr" and
+      "lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl v_vpr)"
+      "lookup_var_ty \<Lambda> var_bpl = Some ty_bpl" and
+      "type_of_val A (val_rel_vpr_bpl v_vpr) = ty_bpl"
+      unfolding store_rel_def
+      by fastforce      
+    then show ?thesis 
+      by simp      
+  qed
+qed
+
+text \<open>The following lemma shows when the store relation is preserved if one renames or deletes
+      Viper variables. The function \<^term>\<open>f\<close> specifies whether a variable is renamed (i.e., if
+      \<^term>\<open>i\<close> is in the domain of \<^term>\<open>f\<close>, then \<^term>\<open>i\<close> is renamed to \<^term>\<open>the (f i)\<close> and otherwise 
+      the variable is deleted.\<close>
+
+lemma store_rel_update_vpr_rename_or_delete:
+  assumes StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns"   
+      and "inj_on f (dom f)"
+      and InsideDomEq: "\<And>i. i \<in> dom f \<Longrightarrow> var_tr' i = var_tr (the (f i))"
+      and OutsideDomEq: "\<And>i. i \<notin> dom f \<Longrightarrow> var_tr' i = None"
+      and InsideDomStore: "\<And>i y. f i = Some y \<Longrightarrow> y \<in> dom var_tr \<Longrightarrow> get_store_total \<omega>' i = get_store_total \<omega> (the (f i))"
+    shows "store_rel A \<Lambda> var_tr' \<omega>' ns"
+proof (rule store_relI)
+  show "inj_on var_tr' (dom var_tr')"
+    using assms
+    by (smt (verit) domIff inj_onD inj_onI option.expand store_rel_var_tr_inj)
+next
+  fix var_vpr var_bpl
+  assume "var_tr' var_vpr = Some var_bpl"
+
+  from this obtain var_vpr' where "f var_vpr = Some var_vpr'"
+    using InsideDomEq OutsideDomEq
+    by fastforce
+  from this have "var_tr var_vpr' = Some var_bpl"
+    using InsideDomEq \<open>var_tr' var_vpr = Some var_bpl\<close>
+    by fastforce        
+
+  thus "store_var_rel_aux A \<Lambda> \<omega>' ns var_vpr var_bpl "
+    unfolding store_var_rel_aux_def
+    using StoreRel[simplified store_rel_def] InsideDomStore \<open>f var_vpr = Some _\<close>
+    by (simp add: domI)
+qed  
+
+lemma store_rel_unshift:
+  assumes "store_rel A \<Lambda> var_tr \<omega> ns"
+  shows "store_rel A \<Lambda> (unshift_2 n var_tr) (unshift_state_total n \<omega>) ns"
+  apply (rule store_rel_update_vpr_rename_or_delete[where ?f = "\<lambda>x. Some (x+n)", OF assms])
+     apply (metis (mono_tags, lifting) add_right_cancel injD inj_Some inj_onI)
+  by (auto simp: unshift_2_def)
+
+lemma store_rel_shift:
+  assumes "store_rel A \<Lambda> var_tr \<omega> ns"
+  shows "store_rel A \<Lambda> (DeBruijn.shift n var_tr) (shift_state_total n \<omega>) ns"
+  apply (rule store_rel_update_vpr_rename_or_delete[where ?f = "\<lambda>x. if x < n then None else Some (x-n)", OF assms])
+     apply (fastforce simp: inj_on_def split: if_split_asm)
+    apply (fastforce simp: DeBruijn.shift_def split: if_split_asm)
+   apply (fastforce simp: DeBruijn.shift_def split: if_split_asm )
+  by (fastforce simp add: DeBruijn.shift_def split: if_split_asm)
 
 subsection \<open>State relationship properties\<close>
 

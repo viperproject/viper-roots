@@ -13,6 +13,8 @@ definition wf_total_consistency
                mono_prop_downward R \<and>
                (\<forall>\<omega>. is_empty_total_full \<omega> \<longrightarrow> R \<omega>) \<and>
                (\<forall>\<omega> \<omega>' \<Lambda> stmt. R \<omega> \<longrightarrow> red_stmt_total ctxt R \<Lambda> stmt \<omega> (RNormal \<omega>') \<longrightarrow> R \<omega>') \<and>
+               \<comment>\<open>The following statement ensures that states in the body of a scope preserve consistency.\<close>
+               (\<forall>\<omega> v. R \<omega> \<longrightarrow> R (shift_and_add_state_total \<omega> v)) \<and> 
                (\<forall>\<omega>. R \<omega> \<longleftrightarrow> (Rt (get_total_full \<omega>) \<and> (\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> Rt \<phi>)) )"
 
 lemma total_consistencyI:

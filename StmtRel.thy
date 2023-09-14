@@ -969,24 +969,6 @@ lemma map_le_ran:
   unfolding map_le_def ran_def
   by force
 
-definition store_var_rel_aux
-  where "store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl \<equiv>
-           (\<exists>val_vpr ty_bpl.
-                             (get_store_total \<omega> var_vpr) = Some val_vpr \<and>
-                              lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
-                              lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
-                              type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl )"
-
-
-lemma store_relI:
-  assumes "inj_on f (dom f)"
-          "\<And> var_vpr var_bpl. f var_vpr = Some var_bpl \<Longrightarrow>
-                        store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl"
-  shows "store_rel A \<Lambda> f \<omega> ns"
-  using assms
-  unfolding store_rel_def store_var_rel_aux_def
-  by blast
-
 lemma state_rel_var_translation_remove:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns" and
           MapLe: "f' \<subseteq>\<^sub>m var_translation Tr" and
@@ -2469,6 +2451,194 @@ proof (rule stmt_rel_intro_2)
   qed
 qed
 
+subsection \<open>Scoped variable\<close>
+
+lemma scoped_var_stmt_rel:
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and StateRelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and DomainTyRep: "domain_type TyRep = (absval_interp_total ctxt_vpr)"
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and RtypeInterpEmpty: "rtype_interp ctxt = []"      
+      and RedToHavocBpl: "red_ast_bpl_rel R R P ctxt \<gamma> (BigBlock name (Havoc x_bpl # cs) str tr, cont)" (is "red_ast_bpl_rel R R P ctxt \<gamma> ?\<gamma>_havoc")
+      and DisjBpl: "x_bpl \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
+                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred"
+      and VprToBplTy: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
+      and LookupDeclNewVarBpl: "lookup_var_decl (var_context ctxt) x_bpl = Some (\<tau>_bpl, None)"
+      and "var_tr' = shift_and_add (var_translation Tr) x_bpl"
+      and StmtRelBody:
+          "stmt_rel (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt) 
+                    (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt) 
+                    ctxt_vpr StateCons (shift_and_add \<Lambda>_vpr \<tau>_vpr) P ctxt s_body (BigBlock name cs str tr, cont) \<gamma>'"
+    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Scope [\<tau>_vpr] s_body) \<gamma> \<gamma>'"
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume "R \<omega> ns" and
+         RedStmtVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Scope [\<tau>_vpr] s_body) \<omega> res"    
+
+  from RedStmtVpr obtain res_body v where 
+        NewValTy: "get_type (absval_interp_total ctxt_vpr) v = \<tau>_vpr"
+    and RedBodyVpr: "red_stmt_total ctxt_vpr StateCons (shift_and_add \<Lambda>_vpr \<tau>_vpr) s_body (shift_and_add_state_total \<omega> v) res_body"
+    and ResEqUnshift: "res = map_stmt_result_total (unshift_state_total (Suc 0)) res_body"
+    by (auto elim: RedScope_case)
+
+  from \<open>R \<omega> ns\<close> RedToHavocBpl obtain ns' where 
+    RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>_havoc, Normal ns')" and "R \<omega> ns'"
+    unfolding red_ast_bpl_rel_def
+    by blast
+
+  let ?v_bpl = "val_rel_vpr_bpl v"
+  let ?\<omega>_v = "shift_and_add_state_total \<omega> v"
+  let ?ns'_v = "update_var (var_context ctxt) ns' x_bpl ?v_bpl"  
+  let ?R' = "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt"
+  let ?var_tr = "var_translation Tr"
+
+  from vpr_to_bpl_val_type NewValTy VprToBplTy DomainTyRep 
+  have TyBpl: "type_of_vbpl_val TyRep ?v_bpl = \<tau>_bpl"
+    by blast
+
+  have "red_ast_bpl P ctxt (?\<gamma>_havoc, Normal ns') ((BigBlock name cs str tr, cont), Normal ?ns'_v)"
+    apply (rule red_ast_bpl_one_havoc[OF LookupDeclNewVarBpl])
+    using TypeInterp TyBpl RtypeInterpEmpty
+     apply force
+    by simp
+  with RedBpl1 have RedAstBpl2: "red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ?ns'_v)"
+    using red_ast_bpl_transitive
+    by blast
+
+  note StateRel_ns' = StateRelImp[OF \<open>R \<omega> ns'\<close>]
+
+  from StateRel_ns'
+  have StateRelBody: "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt ?\<omega>_v ?ns'_v"
+  proof (rule state_rel_store_update, simp)
+    let ?\<omega>' = "shift_and_add_state_total \<omega> v"
+
+    from \<open>x_bpl \<notin> _\<close> have "x_bpl \<notin> ran ?var_tr"
+      by blast
+
+    show "store_rel (type_interp ctxt) (var_context ctxt) var_tr' ?\<omega>' ?ns'_v"
+      unfolding shift_1_shift_and_add_total shift_1_shift_and_add \<open>var_tr' = _\<close> 
+    proof (rule store_rel_add_new_var)
+      show "store_rel (type_interp ctxt) (var_context ctxt) (DeBruijn.shift 1 (var_translation Tr)) (shift_state_total 1 \<omega>) ns'"
+        apply (rule store_rel_shift)
+        by (rule state_rel_store_rel[OF StateRel_ns'])
+    next
+      show "lookup_var_ty (var_context ctxt) x_bpl = Some \<tau>_bpl"
+        using LookupDeclNewVarBpl
+        by (simp add: lookup_var_decl_ty_Some)
+    next
+      show "type_of_val (type_interp ctxt) (val_rel_vpr_bpl v) = \<tau>_bpl"
+        using TyBpl TypeInterp
+        by simp
+    next
+      show "x_bpl \<notin> ran (DeBruijn.shift 1 (var_translation Tr))"
+        using \<open>x_bpl \<notin> ran _\<close> ran_shift
+        by fast       
+    qed (insert DisjBpl, auto)
+
+    show "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr'\<rparr>)) \<Longrightarrow> StateCons (shift_and_add_state_total \<omega> v)"
+      using WfConsistency state_rel_consistent[OF StateRelImp[OF \<open>R \<omega> ns'\<close>]]
+      unfolding wf_total_consistency_def
+      by simp
+
+    show "\<And>x. x \<notin> ran var_tr' \<Longrightarrow>
+         lookup_var (var_context ctxt) ns' x = lookup_var (var_context ctxt) ?ns'_v x"
+        (is "\<And>x. _ \<Longrightarrow> ?Goal x")
+      unfolding \<open>var_tr' = _\<close> shift_and_add_def
+      by (metis fun_upd_same ranI update_var_other)
+
+    show "\<And>x. map_of (snd (var_context ctxt)) x \<noteq> None \<Longrightarrow> global_state ?ns'_v x = global_state ns' x"
+      by (metis LookupDeclNewVarBpl global_state_update_local global_state_update_other lookup_var_decl_local_2)
+
+    show "old_global_state ?ns'_v = old_global_state ns'"
+      using update_var_old_global_same by blast
+
+    show "binder_state ?ns'_v = Map.empty"
+      using state_rel_state_well_typed[OF StateRel_ns', simplified state_well_typed_def]
+      by (simp add: update_var_binder_same)
+
+    show "ran var_tr' \<inter> ({heap_var Tr, heap_var_def Tr} \<union> {mask_var Tr, mask_var_def Tr} \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred) = {}"
+    proof -
+      have "ran (shift_and_add (var_translation Tr) x_bpl) = ran (var_translation Tr) \<union> {x_bpl}"
+        using ran_shift_and_add
+        by metis
+      thus ?thesis
+        unfolding \<open>var_tr' = _\<close> 
+        using DisjBpl var_translation_disjoint[OF StateRel_ns']
+        by force
+    qed
+  qed (auto)
+
+  show "rel_vpr_aux ?R' P ctxt \<gamma> \<gamma>' ns res"
+  proof (rule rel_vpr_aux_intro)
+    \<comment>\<open>Normal case\<close>
+    fix \<omega>'
+    assume "res = RNormal \<omega>'"
+    with ResEqUnshift obtain \<omega>_body where 
+      "res_body = RNormal \<omega>_body"
+      "\<omega>' = unshift_state_total (Suc 0) \<omega>_body"
+      by (blast elim: map_stmt_result_total.elims)
+
+                        
+    with RedBodyVpr stmt_rel_normal_elim[OF StmtRelBody StateRelBody]
+    obtain ns_body where
+     "red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ?ns'_v) (\<gamma>', Normal ns_body)" and
+     StateRelBodyEnd: "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>var_translation := var_tr'\<rparr>) AuxPred ctxt \<omega>_body ns_body"
+      by blast
+ 
+    moreover have "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ns_body"
+    proof (rule state_rel_store_update[OF StateRelBodyEnd, where ?f = ?var_tr])
+      show "store_rel (type_interp ctxt) (var_context ctxt) ?var_tr \<omega>' ns_body"
+      proof -
+        have VarTrEq: "?var_tr = unshift_2 (Suc 0) var_tr'"
+          unfolding \<open>var_tr' = _\<close> 
+          using unshift_shift_and_add_id
+          by metis
+        show ?thesis
+          unfolding \<open>\<omega>' = _\<close> VarTrEq
+          apply (rule store_rel_unshift)
+          using state_rel_store_rel[OF StateRelBodyEnd]
+          by simp
+      qed
+
+      show "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'" (is "?ConsOpt \<Longrightarrow> _")
+      proof -
+        assume ?ConsOpt
+        hence "StateCons \<omega>"
+          using state_rel_consistent[OF StateRel_ns']
+          by simp
+        thus ?thesis
+          using WfConsistency RedStmtVpr \<open>res = RNormal \<omega>'\<close>
+          unfolding wf_total_consistency_def
+          by blast
+      qed
+
+      show "binder_state ns_body = Map.empty"
+        using state_rel_state_well_typed[OF StateRelBodyEnd, simplified state_well_typed_def]
+        by (simp add: update_var_binder_same)
+
+    qed (insert \<open>\<omega>' = _\<close>, insert var_translation_disjoint[OF StateRel_ns'],  auto)
+
+    ultimately show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> ?R' \<omega>' ns'"
+      using RedAstBpl2 red_ast_bpl_transitive
+      by blast
+  next
+    \<comment>\<open>Failure case\<close>
+    assume "res = RFailure"
+    with ResEqUnshift have "res_body = RFailure"
+      by (blast elim: map_stmt_result_total.elims)
+
+    with RedBodyVpr stmt_rel_failure_elim[OF StmtRelBody StateRelBody] 
+    obtain \<gamma>fail where
+      RedAstBplFail: "red_ast_bpl P ctxt ((BigBlock name cs str tr, cont), Normal ?ns'_v) (\<gamma>fail, Failure)"
+      by auto
+
+    show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+      apply (rule exI, rule conjI)
+       apply (rule red_ast_bpl_transitive[OF RedAstBpl2 RedAstBplFail])
+      by simp            
+  qed
+qed
+
 subsection \<open>Misc\<close>
 
 lemma exp_rel_true_imp_1:
@@ -2500,6 +2670,5 @@ proof (rule exp_rel_equiv_vpr[OF _ assms])
       by (simp add: \<open>v2 = v1\<close>)
   qed
 qed
-
     
 end

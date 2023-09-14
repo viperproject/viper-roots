@@ -122,7 +122,17 @@ fun shift_and_add_state_total :: "'a full_total_state \<Rightarrow> 'a val \<Rig
 
 fun unshift_state_total :: "nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state"
   where
-   "unshift_state_total n \<omega> = update_store_total \<omega> (unshift_2 n (get_store_total \<omega>))"         
+   "unshift_state_total n \<omega> = update_store_total \<omega> (unshift_2 n (get_store_total \<omega>))"  
+
+fun shift_state_total
+  where "shift_state_total n \<omega> = update_store_total \<omega> (DeBruijn.shift n (get_store_total \<omega>))"
+
+lemma shift_1_shift_and_add_total: 
+  "shift_and_add_state_total \<omega> y = update_var_total (shift_state_total 1 \<omega>) 0 y"
+  apply (simp add: shift_and_add_def)
+  apply (rule full_total_state.equality)
+  unfolding DeBruijn.shift_def
+  by auto
 
 subsection \<open>Well-typed states\<close>
 

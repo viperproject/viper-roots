@@ -396,6 +396,7 @@ inductive_cases RedInhale_case: "red_stmt_total ctxt R \<Lambda> (Inhale A) \<om
 inductive_cases RedExhale_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> res"
 inductive_cases RedExhaleNormal_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
 inductive_cases RedExhaleFailure_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
+inductive_cases RedScope_case: "red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
 
 lemmas red_stmt_total_inversion_thms =
    RedSkip_case
