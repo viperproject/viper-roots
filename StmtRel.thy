@@ -2455,15 +2455,15 @@ subsection \<open>Scoped variable\<close>
 
 lemma scoped_var_stmt_rel:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and StateRelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
       and DomainTyRep: "domain_type TyRep = (absval_interp_total ctxt_vpr)"
       and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
       and RtypeInterpEmpty: "rtype_interp ctxt = []"
-      and StateRelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
       and RedToHavocBpl: "red_ast_bpl_rel R R P ctxt \<gamma> (BigBlock name (Havoc x_bpl # cs) str tr, cont)" (is "red_ast_bpl_rel R R P ctxt \<gamma> ?\<gamma>_havoc")
       and DisjBpl: "x_bpl \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred"
-      and VprToBplTy: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
       and LookupDeclNewVarBpl: "lookup_var_decl (var_context ctxt) x_bpl = Some (\<tau>_bpl, None)"
+      and VprToBplTy: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
       and "var_tr' = shift_and_add (var_translation Tr) x_bpl"
       and StmtRelBody:
           "stmt_rel (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt) 
@@ -2644,6 +2644,10 @@ schematic_goal "?Tr =
              shift_and_add (var_translation (Tr \<lparr> var_translation := (shift_and_add Map.empty a) \<rparr> )) b\<rparr>"
   by simp
 
+schematic_goal
+  "?Tr = ((Tr \<lparr> var_translation := Tr1 \<rparr> )\<lparr> var_translation := Tr2 \<rparr> ) \<lparr> var_translation := Tr3 \<rparr>"
+  by simp
+
 text \<open>The following lemma is semantically equivalent to the previous one. This lemma phrases one the premises 
       in a way that allows natural simplification of the translation record term.\<close>
 
@@ -2656,8 +2660,8 @@ lemma scoped_var_stmt_rel_simplify_tr:
       and RedToHavocBpl: "red_ast_bpl_rel R R P ctxt \<gamma> (BigBlock name (Havoc x_bpl # cs) str tr, cont)" (is "red_ast_bpl_rel R R P ctxt \<gamma> ?\<gamma>_havoc")
       and DisjBpl: "x_bpl \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
                      ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred"
-      and VprToBplTy: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
       and LookupDeclNewVarBpl: "lookup_var_decl (var_context ctxt) x_bpl = Some (\<tau>_bpl, None)"
+      and VprToBplTy: "vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
  \<comment>\<open>The purpose of the following premise is to allow for simplification of the translation record term.
     This avoids unnecessary updates in the term (such as consescutive var_translation updates)\<close>
       and "Tr' = (Tr\<lparr> var_translation := shift_and_add (var_translation Tr) x_bpl \<rparr>)"
