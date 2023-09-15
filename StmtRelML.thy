@@ -14,6 +14,7 @@ ML \<open>
 
   datatype 'a stmt_rel_hint = 
     AtomicHint of 'a 
+  | ScopeHint of thm * ('a stmt_rel_hint) (* lookup decl theorem for scoped variable, and hint for body *)
   | SeqnHint of ('a stmt_rel_hint) list
   | IfHint of 
        exp_wf_rel_info *       
@@ -39,9 +40,25 @@ ML \<open>
 
  fun stmt_rel_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) (stmt_rel_hint: 'a stmt_rel_hint) =
     case stmt_rel_hint of 
-       SeqnHint [] => (Rmsg' "Skip" (resolve_tac ctxt [@{thm stmt_rel_skip}]) ctxt)
-    |  SeqnHint [_] => error "SeqnHint with single node appears"
-    |  SeqnHint (h::hs) => stmt_rel_tac_seq ctxt info (h::hs)
+      SeqnHint [] => (Rmsg' "Skip" (resolve_tac ctxt [@{thm stmt_rel_skip}]) ctxt)
+    | SeqnHint [_] => error "SeqnHint with single node appears"
+    | SeqnHint (h::hs) => stmt_rel_tac_seq ctxt info (h::hs)
+   (* scopes are handled here, because in the Scala AST they are bound to sequential composition
+      in particular, there is no "good state" assumption just for a scope (if scopes were instead handled
+      in stmt_rel_single_stmt_tac, then "good state" assumptions would be expected) *)
+    | ScopeHint (lookup_decl_thm, body_hint) =>
+       (Rmsg' "Scope init" (resolve_tac ctxt [@{thm scoped_var_stmt_rel_simplify_tr} OF [#consistency_wf_thm (#basic_stmt_rel_info info)]]) ctxt) THEN'
+       (Rmsg' "Scope domain type eq" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+       (Rmsg' "Scope type interp eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+       (Rmsg' "Scope empty rtype" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+       (Rmsg' "Scope state rel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+       (Rmsg' "Scope progress to havoc" (progress_red_bpl_rel_tac ctxt) ctxt) THEN'
+       (Rmsg' "Scope variable disjointness" (#aux_var_disj_tac (#basic_stmt_rel_info info) ctxt) ctxt) THEN'
+       (Rmsg' "Scope lookup var decl" (assm_full_simp_solved_with_thms_tac [lookup_decl_thm] ctxt) ctxt) THEN'
+       (Rmsg' "Scope vpr to bpl ty" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+       (* TODO: add var tr0 equality *)
+       (Rmsg' "Scope simplify translation record" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+       (stmt_rel_tac ctxt info body_hint |> SOLVED')
     | _ => stmt_rel_single_stmt_tac ctxt info stmt_rel_hint
 and
      stmt_rel_tac_seq _ _ [] = K all_tac
@@ -52,7 +69,7 @@ and
        stmt_rel_tac ctxt info h1 THEN'
        stmt_rel_tac_seq ctxt info (h2 :: hs)
 and 
-     stmt_rel_single_stmt_tac _ _ NoHint = K all_tac
+     stmt_rel_single_stmt_tac _ _ NoHint = K all_tac         
    | stmt_rel_single_stmt_tac ctxt (info: ('a, 'i, 'e) stmt_rel_info) hint_hd =
     (* Each statement associated with a hint is translated by the actual encoding followed by 
        \<open>assume state(Heap, Mask)\<close>. This is why we apply a propagation rule first. *)
@@ -76,6 +93,7 @@ and
                to progress to an empty block essentially consuming all big blocks, instead of
                having to progress to the big block after the if-statement). Same for else-branch. *)
              simplify_continuation ctxt THEN'
+             (K (print_tac ctxt "Debug")) THEN'
              (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
              (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
              (Rmsg' "If4" (progress_red_bpl_rel_tac ctxt) ctxt)
