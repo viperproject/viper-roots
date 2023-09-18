@@ -396,6 +396,8 @@ inductive_cases RedInhale_case: "red_stmt_total ctxt R \<Lambda> (Inhale A) \<om
 inductive_cases RedExhale_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> res"
 inductive_cases RedExhaleNormal_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
 inductive_cases RedExhaleFailure_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
+inductive_cases RedAssertNormal_case: "red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>')"
+inductive_cases RedAssertFailure_case: "red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
 inductive_cases RedScope_case: "red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
 
 lemmas red_stmt_total_inversion_thms =
@@ -408,6 +410,8 @@ lemmas red_stmt_total_inversion_thms =
    RedExhale_case
    RedExhaleNormal_case
    RedExhaleFailure_case
+   RedAssertNormal_case
+   RedAssertFailure_case
 
 subsection \<open>Correctness of Viper methods\<close>
 

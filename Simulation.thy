@@ -89,6 +89,9 @@ shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   unfolding rel_general_def rel_ext_def
   by auto
 
+abbreviation lift_rel
+  where "lift_rel R \<equiv> (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns)"
+
 subsection \<open>Rule of consequence\<close>
 
 lemma rel_general_conseq:
