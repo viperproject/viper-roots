@@ -67,30 +67,29 @@ lemma rel_failure_elim:
 
 subsection \<open>Conversions\<close>
 
-definition rel_ext 
-  where "rel_ext R \<equiv> (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"
+abbreviation uncurry_eq 
+  where "uncurry_eq R \<equiv> (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns)"
 
+lemma uncurry_eq_uncurry: "uncurry_eq R = uncurry (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"
+  by simp
 
 lemma rel_general_convert:
-assumes "rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)) (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns))
+assumes "rel_general (uncurry_eq R) (uncurry_eq R')
                      (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (snd \<omega>) (snd \<omega>'))
                      (\<lambda>\<omega>. fst \<omega> = snd \<omega> \<and> Fail (fst \<omega>))  P ctxt \<gamma> \<gamma>'"
 shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   using assms
-  unfolding rel_general_def rel_ext_def
+  unfolding rel_general_def
   by auto
 
 lemma rel_general_convert_2:
-assumes "rel_general (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)) (uncurry (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns))
+assumes "rel_general (uncurry_eq R) (uncurry_eq R')
                      (\<lambda>\<omega> \<omega>'. fst \<omega> = snd \<omega> \<and> fst \<omega>' = snd \<omega>' \<and> Success (snd \<omega>) (snd \<omega>'))
                      (\<lambda>\<omega>. fst \<omega> = snd \<omega> \<and> Fail (fst \<omega>))  P ctxt \<gamma> \<gamma>'"
 shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
   using assms
-  unfolding rel_general_def rel_ext_def
+  unfolding rel_general_def
   by auto
-
-abbreviation lift_rel
-  where "lift_rel R \<equiv> (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns)"
 
 subsection \<open>Rule of consequence\<close>
 

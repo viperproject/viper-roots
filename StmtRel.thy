@@ -586,7 +586,7 @@ lemma exhale_stmt_rel:
           \<comment>\<open>Since the well-definedness must be differentiated from the evaluation state during the exhale,
             there is potentially a step in the Boogie program that sets this differentiation up resulting a new
             relation that tracks both states (where in the beginning both states are the same)\<close>
-      and R_to_Rexh: "red_ast_bpl_rel (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns) (uncurry Rexh) P ctxt \<gamma> \<gamma>1"
+      and R_to_Rexh: "red_ast_bpl_rel (uncurry_eq R) (uncurry Rexh) P ctxt \<gamma> \<gamma>1"
       and ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
           \<comment>\<open>At the end of the exhale we require the Boogie program to establish the output relation on the 
@@ -663,7 +663,7 @@ lemma exhale_stmt_rel_inst:
                              \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule exhale_stmt_rel[OF WfConsistency])
-  show "red_ast_bpl_rel (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns) (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) P ctxt \<gamma> \<gamma>1"
+  show "red_ast_bpl_rel (uncurry_eq R) (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) P ctxt \<gamma> \<gamma>1"
     using R_to_Rexh
     unfolding red_ast_bpl_rel_def
     by simp
@@ -943,6 +943,101 @@ proof -
     using Red1 red_ast_bpl_transitive
     by blast
 qed
+
+subsection \<open>Assert statement relation\<close>
+
+definition pred_eq_mask
+  where "pred_eq_mask Pr FieldTr \<omega> v \<equiv> \<exists>mb. v = AbsV (AMask mb) \<and> mask_rel Pr FieldTr (get_mh_total_full \<omega>) mb"
+
+definition pred_eq_heap
+  where "pred_eq_heap Pr TyRep FieldTr \<omega> v \<equiv> \<exists>hb. vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[]) \<and>
+                                              heap_rel Pr FieldTr (get_hh_total_full \<omega>) hb"
+
+abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explicit to ensure that the Viper states have the same type\<close>
+ "program
+     \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
+        \<Rightarrow> 'a ty_repr_bpl
+           \<Rightarrow> tr_vpr_bpl
+              \<Rightarrow> (nat \<Rightarrow> ('a vbpl_absval Semantics.val \<Rightarrow> bool) option)
+                 \<Rightarrow> ('a vbpl_absval, 'b) econtext_bpl_general_scheme \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool"
+  where "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega> \<equiv> 
+        state_rel Pr StateCons TyRep Tr 
+                      (AuxPred(m \<mapsto> pred_eq_mask Pr (field_translation Tr) \<omega>)
+                              (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) \<omega>))  
+                       ctxt"
+
+lemma assert_stmt_rel:
+  assumes CaptureState: "red_ast_bpl_rel (uncurry_eq R) (\<lambda> \<omega> ns. (uncurry (RStore (snd \<omega>))) \<omega> ns) P ctxt \<gamma> \<gamma>1"
+      and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+      and ExhaleRel: "\<And>\<omega>0. exhale_rel (RStore \<omega>0) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and ResetState: "\<And> \<omega>0. rel_general (uncurry (RStore \<omega>0)) (uncurry_eq R) (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (\<omega>0,\<omega>0)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
+    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Assert A) \<gamma> \<gamma>'"
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume "R \<omega> ns" and RedStmt: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.Assert A) \<omega> res"
+
+  hence "uncurry_eq R (\<omega>,\<omega>) ns"
+    by simp
+
+  with CaptureState obtain ns1 where RedBplInit: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and RStoreInit: "(RStore \<omega>) \<omega> \<omega> ns1"
+    unfolding red_ast_bpl_rel_def
+    by auto
+    
+    
+  show "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
+  proof (rule rel_vpr_aux_intro)
+    fix \<omega>'
+    assume "res = RNormal \<omega>'"
+
+    with RedStmt obtain \<omega>_exh where RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> (RNormal \<omega>_exh)" and "\<omega> = \<omega>'"
+      by (auto elim: RedAssertNormal_case)
+
+
+    from this obtain ns_exh where RedBplExh: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns_exh)" and 
+                                  "(RStore \<omega>) \<omega> \<omega>_exh ns_exh" 
+      using exhale_rel_normal_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
+      by blast
+      
+    with rel_success_elim[OF ResetState]
+    obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
+      by fastforce
+
+    with RedBplInit RedBplExh
+    show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+      using \<open>\<omega> = \<omega>'\<close> red_ast_bpl_transitive
+      by blast
+  next
+    assume "res = RFailure"
+
+    with RedStmt have RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> RFailure"
+      by (auto elim: RedAssertFailure_case)
+
+    thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+      using exhale_rel_failure_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
+            RedBplInit red_ast_bpl_transitive
+      by (metis (no_types, opaque_lifting) snd_conv)
+  qed
+qed
+
+lemma assert_stmt_rel_inst:
+  assumes "m = mask_var Tr \<and> h = heap_var Tr"
+      and InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+      and CaptureState: "red_ast_bpl_rel (uncurry_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt))
+                           (\<lambda> \<omega> ns. (uncurry (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h (snd \<omega>))) \<omega> ns)
+                           P ctxt \<gamma> \<gamma>1"
+      and ExhaleRel: "\<And>\<omega>0. exhale_rel (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h \<omega>0) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and ResetState: "\<And> \<omega>0. rel_general (uncurry (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h \<omega>0))
+                                          (uncurry_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
+                                          (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (\<omega>0,\<omega>0)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
+    shows "stmt_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
+                    (ViperLang.Assert A) \<gamma> \<gamma>'"
+  apply (rule assert_stmt_rel[where ?RStore = "state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h", where ?Q=Q])
+     apply (rule CaptureState)
+    apply (rule InvHolds)
+    apply assumption
+   apply (rule ExhaleRel)
+  apply (rule ResetState)
+  done
 
 subsection \<open>Method call relation\<close> 
 
@@ -2705,102 +2800,6 @@ proof (rule exp_rel_equiv_vpr[OF _ assms])
       by (simp add: \<open>v2 = v1\<close>)
   qed
 qed
-
-subsection \<open>Assert statement relation\<close>
-
-definition pred_eq_mask
-  where "pred_eq_mask Pr FieldTr \<omega> v \<equiv> \<exists>mb. v = AbsV (AMask mb) \<and> mask_rel Pr FieldTr (get_mh_total_full \<omega>) mb"
-
-definition pred_eq_heap
-  where "pred_eq_heap Pr TyRep FieldTr \<omega> v \<equiv> \<exists>hb. vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[]) \<and>
-                                              heap_rel Pr FieldTr (get_hh_total_full \<omega>) hb"
-
-abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explicit to ensure that the Viper states have the same type\<close>
- "program
-     \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
-        \<Rightarrow> 'a ty_repr_bpl
-           \<Rightarrow> tr_vpr_bpl
-              \<Rightarrow> (nat \<Rightarrow> ('a vbpl_absval Semantics.val \<Rightarrow> bool) option)
-                 \<Rightarrow> ('a vbpl_absval, 'b) econtext_bpl_general_scheme \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool"
-  where "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega> \<equiv> 
-        state_rel Pr StateCons TyRep Tr 
-                      (AuxPred(m \<mapsto> pred_eq_mask Pr (field_translation Tr) \<omega>)
-                              (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) \<omega>))  
-                       ctxt"
-
-lemma assert_stmt_rel:
-  assumes CaptureState: "red_ast_bpl_rel (lift_rel R) (\<lambda> \<omega> ns. (uncurry (RStore (snd \<omega>))) \<omega> ns) P ctxt \<gamma> \<gamma>1"
-      and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      and ExhaleRel: "\<And>\<omega>0. exhale_rel (RStore \<omega>0) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and ResetState: "\<And> \<omega>0. rel_general (uncurry (RStore \<omega>0)) (lift_rel R) (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (\<omega>0,\<omega>0)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
-    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Assert A) \<gamma> \<gamma>'"
-proof (rule stmt_rel_intro_2)
-  fix \<omega> ns res
-  assume "R \<omega> ns" and RedStmt: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.Assert A) \<omega> res"
-
-  hence "lift_rel R (\<omega>,\<omega>) ns"
-    by simp
-
-  with CaptureState obtain ns1 where RedBplInit: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and RStoreInit: "(RStore \<omega>) \<omega> \<omega> ns1"
-    unfolding red_ast_bpl_rel_def
-    by auto
-    
-    
-  show "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
-  proof (rule rel_vpr_aux_intro)
-    fix \<omega>'
-    assume "res = RNormal \<omega>'"
-
-    with RedStmt obtain \<omega>_exh where RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> (RNormal \<omega>_exh)" and "\<omega> = \<omega>'"
-      by (auto elim: RedAssertNormal_case)
-
-
-    from this obtain ns_exh where RedBplExh: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns_exh)" and 
-                                  "(RStore \<omega>) \<omega> \<omega>_exh ns_exh" 
-      using exhale_rel_normal_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
-      by blast
-      
-    with rel_success_elim[OF ResetState]
-    obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
-      by fastforce
-
-    with RedBplInit RedBplExh
-    show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-      using \<open>\<omega> = \<omega>'\<close> red_ast_bpl_transitive
-      by blast
-  next
-    assume "res = RFailure"
-
-    with RedStmt have RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> RFailure"
-      by (auto elim: RedAssertFailure_case)
-
-    thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
-      using exhale_rel_failure_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
-            RedBplInit red_ast_bpl_transitive
-      by (metis (no_types, opaque_lifting) snd_conv)
-  qed
-qed
-
-lemma assert_stmt_rel_inst:
-  assumes "m = mask_var Tr \<and> h = heap_var Tr"
-      and InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-
-      and CaptureState: "red_ast_bpl_rel (lift_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt))
-                           (\<lambda> \<omega> ns. (uncurry (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h (snd \<omega>))) \<omega> ns)
-                           P ctxt \<gamma> \<gamma>1"
-      and ExhaleRel: "\<And>\<omega>0. exhale_rel (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h \<omega>0) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and ResetState: "\<And> \<omega>0. rel_general (uncurry (state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h \<omega>0))
-                                          (lift_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
-                                          (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (\<omega>0,\<omega>0)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
-    shows "stmt_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                    (ViperLang.Assert A) \<gamma> \<gamma>'"
-  apply (rule assert_stmt_rel[where ?RStore = "state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h", where ?Q=Q])
-     apply (rule CaptureState)
-    apply (rule InvHolds)
-    apply assumption
-   apply (rule ExhaleRel)
-  apply (rule ResetState)
-  done
 
 
 end

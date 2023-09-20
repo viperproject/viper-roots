@@ -357,7 +357,8 @@ shows "rel_general (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm 
      (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0) P ctxt
      (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
      (BigBlock name cs s tr, cont)" (is "rel_general ?R ?R ?Success ?Fail P ctxt ?\<gamma> ?\<gamma>'")
-  apply (rule rel_general_convert)
+  apply (rule rel_general_convert)  
+  apply (subst uncurry_eq_uncurry)+
   apply (rule pos_perm_rel_nontrivial)
      apply (rule \<open>zero_perm = _\<close>)
     apply simp  
