@@ -67,6 +67,9 @@ lemma rel_failure_elim:
 
 subsection \<open>Conversions\<close>
 
+abbreviation rel_ext_eq
+  where "rel_ext_eq R \<equiv> (\<lambda>\<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"
+
 abbreviation uncurry_eq 
   where "uncurry_eq R \<equiv> (\<lambda>\<omega> ns. fst \<omega> = snd \<omega> \<and> R (snd \<omega>) ns)"
 

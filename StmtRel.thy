@@ -145,15 +145,15 @@ lemma stmt_rel_if:
   assumes \<comment>\<open>When invoking the wf_rel tactic, apply one of the wf_rel extension lemmas such that the 
             wf_rel tactic itself need not guarantee progress to the if block\<close>
      ExpWfRel:          
-          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr StateCons P ctxt cond 
+          "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt cond 
            \<gamma>1
            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)" and
-     ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl" and
+     ExpRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt cond cond_bpl" and
      ThnRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_thn (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
      ElsRel: "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt s_els (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (If cond s_thn s_els) \<gamma>1 (next, cont)"
   using wf_rel_general_1[OF ExpWfRel] ThnRel ElsRel
-  unfolding stmt_rel_def
+  unfolding stmt_rel_def    
 proof (rule rel_general_cond)
   fix \<omega> \<omega>' ns
   assume "R \<omega> ns"
@@ -235,15 +235,15 @@ proof (cases rule: stmt_rel_intro)
       by auto
 
     from this obtain ns' where
-        R':"R3 \<omega> \<omega> ns'" and
+        R':"?R_ext \<omega> \<omega> ns'" and
         RedBplWf:"red_ast_bpl P ctxt (\<gamma>, Normal ns) ((?b, cont), Normal ns')"
-      using R R_def wf_rel_normal_elim[OF ExpWfRel]
+      using R wf_rel_normal_elim[OF ExpWfRel]
       by blast
 
     let ?v_bpl = "val_rel_vpr_bpl v"
     have RedEBpl:"red_expr_bpl ctxt e_bpl ns' ?v_bpl"
       apply (rule exp_rel_vpr_bpl_elim_2[OF ExpRel])
-      using R' RedEVpr R_def
+      using R' RedEVpr
       by fastforce
 
     have ValBplTy:"type_of_val (type_interp ctxt) ?v_bpl = instantiate [] ty_bpl"
@@ -261,19 +261,25 @@ proof (cases rule: stmt_rel_intro)
       using RedEBpl
       by auto
 
-    moreover have "R3 \<omega>' \<omega>' ?ns''" 
+    moreover have "?R_ext \<omega>' \<omega>' ?ns''" 
+    proof -
+      have "StateConsEnabled \<Longrightarrow> StateCons (update_var_total \<omega> x_vpr v)"
+        using RedVpr Consistent WfConsistency \<open>R \<omega> ns\<close> \<open>\<omega>' = _\<close> total_consistency_red_stmt_preserve 
+        by blast
+      thus ?thesis
       apply (subst \<open>\<omega>' = _\<close>)+
-      using R_def RAssign R' vTyVpr ValBplTy 
+      using RAssign R' vTyVpr ValBplTy 
       by auto
+    qed
 
     ultimately show ?thesis 
-      using RedBplWf R_def \<open>\<omega>' = _\<close> red_ast_bpl_def
+      using RedBplWf \<open>\<omega>' = _\<close> red_ast_bpl_def
       by (metis (mono_tags, lifting) rtranclp_trans)
   qed
 next
   \<comment>\<open>Failure case\<close>
   fix \<omega> ns 
-  assume "R2 \<omega> ns" and 
+  assume "R \<omega> ns" and 
          RedVpr:"red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (LocalAssign x_vpr e_vpr) \<omega> RFailure"
   
   from RedVpr show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
@@ -283,7 +289,7 @@ next
     by (fastforce elim: red_pure_exps_total_singleton)
 
   then show ?thesis 
-    using  R_def \<open>R2 \<omega> ns\<close> wf_rel_failure_elim[OF ExpWfRel]
+    using  \<open>R \<omega> ns\<close> wf_rel_failure_elim[OF ExpWfRel]
     by blast
   qed
 qed
@@ -333,9 +339,10 @@ lemma field_assign_rel:
          (BigBlock name cs str tr, cont)" 
 proof (rule stmt_rel_intro)
   let ?\<gamma>3="((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)"
+  let ?Rext = "rel_ext_eq R"
   fix \<omega> ns \<omega>'
   assume "R \<omega> ns"
-  hence "Rext \<omega> \<omega> ns" using Rext by simp
+  hence "?Rext \<omega> \<omega> ns" by simp
 
   assume RedStmt: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> (RNormal \<omega>')"
 
@@ -343,17 +350,16 @@ proof (rule stmt_rel_intro)
   proof cases
     case (RedFieldAssign addr v ty_vpr)
     from this obtain ns1 where
-      "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+      "?Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
+      using wf_rel_normal_elim[OF RcvWfRel \<open>?Rext \<omega> \<omega> ns\<close>]
       by auto
-    from this RedFieldAssign obtain ns2 where "Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+    from this RedFieldAssign obtain ns2 where "?Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
       using wf_rel_normal_elim[OF RhsWfRel] red_ast_bpl_transitive
       by blast
-    from this RedFieldAssign obtain ns3 where "Rext \<omega> \<omega> ns3" and RedNs3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>3, Normal ns3)" 
+    from this RedFieldAssign obtain ns3 where "?Rext \<omega> \<omega> ns3" and RedNs3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>3, Normal ns3)" 
       using wf_rel_normal_elim[OF WriteableLocRel] red_ast_bpl_transitive
       by blast
-    hence "R \<omega> ns3"
-      using Rext by simp
+    hence "R \<omega> ns3" by simp
 
     obtain f_bpl where
          "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
@@ -427,23 +433,25 @@ proof (rule stmt_rel_intro)
       using red_ast_bpl_transitive by blast      
   qed
 next
+  let ?Rext = "rel_ext_eq R"
+
   fix \<omega> ns 
   assume "R \<omega> ns"
-  hence "Rext \<omega> \<omega> ns" using Rext by simp
+  hence "?Rext \<omega> \<omega> ns" by simp
   assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (FieldAssign rcv_vpr f_vpr rhs_vpr) \<omega> RFailure"
   thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
   proof cases
     case (RedFieldAssignFailure r v)
     from this obtain ns1 where
-      "Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
-      using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+      "?Rext \<omega> \<omega> ns1" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)"
+      using wf_rel_normal_elim[OF RcvWfRel \<open>?Rext \<omega> \<omega> ns\<close>]
       by auto      
-    from this RedFieldAssignFailure obtain ns2 where "Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
+    from this RedFieldAssignFailure obtain ns2 where "?Rext \<omega> \<omega> ns2" and "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)"
       using wf_rel_normal_elim[OF RhsWfRel] red_ast_bpl_transitive
       by blast
 
     with RedFieldAssignFailure obtain \<gamma>' where "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Failure)"
-      using wf_rel_failure_elim[OF WriteableLocRel \<open>Rext \<omega> \<omega> ns2\<close>] red_ast_bpl_transitive
+      using wf_rel_failure_elim[OF WriteableLocRel \<open>?Rext \<omega> \<omega> ns2\<close>] red_ast_bpl_transitive
       by (metis (no_types, opaque_lifting) ref.exhaust ref.sel snd_conv surj_pair)
     thus ?thesis
       by (meson snd_conv)
@@ -455,7 +463,7 @@ next
     proof (cases  "ctxt_vpr, StateCons, (Some \<omega>) \<turnstile> \<langle>rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure")
       case True
       then show ?thesis 
-        using wf_rel_failure_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>]
+        using wf_rel_failure_elim[OF RcvWfRel \<open>?Rext \<omega> \<omega> ns\<close>]
         by blast
     next
       case False
@@ -464,7 +472,7 @@ next
         using RedSubExpFailureAux
         by (auto elim: red_pure_exp_total_elims)
       then show ?thesis 
-        using wf_rel_normal_elim[OF RcvWfRel \<open>Rext \<omega> \<omega> ns\<close>] wf_rel_failure_elim[OF RhsWfRel] red_ast_bpl_transitive
+        using wf_rel_normal_elim[OF RcvWfRel \<open>?Rext \<omega> \<omega> ns\<close>] wf_rel_failure_elim[OF RhsWfRel] red_ast_bpl_transitive
         by blast
     qed
   qed
@@ -481,17 +489,16 @@ lemma field_assign_rel_inst:
     HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
                "domain_type TyRep = absval_interp_total ctxt_vpr" and
                "type_interp ctxt = vbpl_absval_ty TyRep" and
-    Rext: "Rext = (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns)"  and
-    RcvWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
-    RhsWfRel: "expr_wf_rel Rext ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
-    WriteableLocRel: "wf_rel_fieldacc get_writeable_locs Rext Rext ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
+    RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
+    RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
+    WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
                  \<gamma>2 
                  ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
                    "h_bpl = heap_var Tr" and
     HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
-    RcvRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rcv_vpr rcv_bpl" and
+    RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl" and
     FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
-    RhsRel: "exp_rel_vpr_bpl Rext ctxt_vpr ctxt rhs_vpr rhs_bpl"
+    RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl"
   shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
          \<gamma>
          (BigBlock name cs str tr, cont)" 
