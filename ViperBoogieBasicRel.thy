@@ -1664,7 +1664,7 @@ lemmas state_rel_store_update = state_rel0_state_rel[OF state_rel0_store_update[
 lemma state_rel0_store_update_same_tr:
   assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
-     Consistent: "StateCons \<omega>'" and
+     Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
            "get_total_full \<omega> = get_total_full \<omega>'"  and
          (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
@@ -1682,29 +1682,29 @@ lemma state_rel0_store_update_same_tr:
 lemmas state_rel_store_update_same_tr = state_rel0_state_rel[OF state_rel0_store_update_same_tr[OF state_rel_state_rel0]]
 
 lemma state_rel_store_update_2:
-  assumes 
-         StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          WellDefSame: "\<omega>def = \<omega>" and
-         Consistent: "StateCons (update_var_total \<omega> x_vpr v)" and
-         VarCtxt: "\<Lambda> = var_context ctxt" and
-         VarTr: "var_translation Tr x_vpr = Some x_bpl" and
-         "v' = val_rel_vpr_bpl v" and
-      TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and WellDefSame: "\<omega>def = \<omega>"
+      and Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_var_total \<omega> x_vpr v)"
+      and  VarCtxt: "\<Lambda> = var_context ctxt"
+      and VarTr: "var_translation Tr x_vpr = Some x_bpl"
+      and "v' = val_rel_vpr_bpl v"
+      and TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
               "type_of_val (type_interp ctxt) v' = ty"
-            shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_var_total \<omega>def x_vpr v) (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
   apply (rule state_rel_store_update_same_tr[OF StateRel _ Consistent])
          apply (simp add: WellDefSame)
-        apply simp       
-       using VarCtxt VarTr ranI 
-      apply fastforce
-      using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
-     apply blast
-     apply (metis VarCtxt global_state_update_local global_state_update_other option.exhaust)
-    apply (simp add: update_var_old_global_same)
-   using state_rel0_state_well_typed[OF state_rel_state_rel0[OF StateRel]]
-   unfolding state_well_typed_def
-    apply (simp add: update_var_binder_same)   
-   done 
+        apply simp
+       apply simp
+      using VarCtxt VarTr ranI 
+     apply fastforce
+     using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
+    apply blast
+   apply (metis VarCtxt global_state_update_local global_state_update_other option.exhaust)
+   apply (simp add: update_var_old_global_same)
+ using state_rel0_state_well_typed[OF state_rel_state_rel0[OF StateRel]]
+ unfolding state_well_typed_def
+  apply (simp add: update_var_binder_same)   
+  done
 
 lemma state_rel_new_auxvar:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
