@@ -346,36 +346,37 @@ qed (insert assms, simp_all)
 subsection \<open>Field assignment relation\<close>
 
 lemma field_assign_rel:
-  assumes 
-    WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
-    Consistent: "StateConsEnabled \<Longrightarrow> (\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>)" and
-    HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
-               "domain_type TyRep = absval_interp_total ctxt_vpr" and
-               "type_interp ctxt = vbpl_absval_ty TyRep" and
-    RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
-    RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
-    WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and Consistent: "StateConsEnabled \<Longrightarrow> (\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>)"
+      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
+      and DomainTypeEq: "domain_type TyRep = absval_interp_total ctxt_vpr"
+      and "type_interp ctxt = vbpl_absval_ty TyRep"
+      and RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1"
+      and RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2"
+      and WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
                  \<gamma>2 
-                 ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
-    HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
-    RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl" and
-    FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
-    RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl" and
+                 ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" 
+      and HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl (Lang.Var f_bpl) rhs_bpl [\<tau>_field_bpl, \<tau>_bpl]"
+      and RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl"
+     \<comment>\<open> and FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl"\<close>
+      and DeclaredFieldsSome: "declared_fields (program_total ctxt_vpr) f_vpr = Some \<tau>_vpr \<and> vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
+      and HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
+      and RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl"
 
-    \<comment>\<open>Key field assignment property for R\<close>
-    RFieldAssign:  "\<And> \<omega> ns ty_vpr hb addr  f_bpl v . R \<omega> ns \<Longrightarrow>
-                     declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr \<Longrightarrow>
-                     field_translation Tr f_vpr = Some f_bpl \<Longrightarrow>
-                     vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>
+      \<comment>\<open>Key field assignment property for R\<close>
+      and RFieldAssign:  "\<And> \<omega> ns hb addr v . R \<omega> ns \<Longrightarrow>
+                     \<comment>\<open>declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr \<Longrightarrow>
+                     \<comment>\<open>field_translation Tr f_vpr = Some f_bpl \<Longrightarrow>\<close>
+                     vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>\<close>
                      \<comment>\<open>type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>\<close>
-                     get_type (domain_type TyRep) v = ty_vpr \<Longrightarrow>
+                     get_type (domain_type TyRep) v = \<tau>_vpr \<Longrightarrow>
                      (StateConsEnabled \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)) \<Longrightarrow>
                      (\<exists>hb f_bpl_val. 
-                       lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep)) \<and>
+                       \<comment>\<open>lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep)) \<and>\<close>
                        lookup_var (var_context ctxt) ns h_bpl = Some (AbsV (AHeap hb)) \<and>
                        vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
                        lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
-                       field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<and>
+                       field_ty_fun_opt TyRep f_bpl_val = Some (TFieldId TyRep, [\<tau>_field_bpl, \<tau>_bpl]) \<and>
                        vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, []) \<and>
                        R (update_hh_loc_total_full \<omega> (addr,f_vpr) v) 
                          (update_var (var_context ctxt) ns h_bpl
@@ -408,13 +409,9 @@ proof (rule stmt_rel_intro)
       by blast
     hence "R \<omega> ns3" by simp
 
-    obtain f_bpl where
-         "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-         "field_translation Tr f_vpr = Some f_bpl" and 
-         "e_f_bpl = Lang.Var f_bpl"
-      using FieldRelSingle \<open>declared_fields _ f_vpr = Some ty_vpr\<close>
-      unfolding field_rel_single_def
-      using has_SomeD by force      
+    have "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl"         
+      using \<open>declared_fields _ f_vpr = Some ty_vpr\<close> DeclaredFieldsSome
+      by simp
  
    moreover have NewValTypeBpl: "type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl"
      using vpr_to_bpl_val_type[OF \<open>get_type _ v = ty_vpr\<close> \<open>vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl\<close>]
@@ -425,20 +422,22 @@ proof (rule stmt_rel_intro)
      using total_consistency_red_stmt_preserve[OF WfConsistency] Consistent[OF _ \<open>R \<omega> ns\<close>]
      by simp
 
+   moreover from RedFieldAssign DomainTypeEq have "get_type (domain_type TyRep) v = \<tau>_vpr"
+     using DeclaredFieldsSome
+     by force
+
    ultimately obtain hb f_bpl_val
      where 
-           HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl  = Some (TConSingle (THeapId TyRep))" and
            LookupHeapVarBpl: "lookup_var (var_context ctxt) ns3  h_bpl = Some (AbsV (AHeap hb))" and
-           HeapWellTyBpl:       "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
+           HeapWellTyBpl: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
            HeapUpdWellTyBpl: "vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, [])" and
            LookupFieldVarBpl: "lookup_var (var_context ctxt) ns3 f_bpl = Some (AbsV (AField f_bpl_val))" and           
-           FieldTyBpl: "field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])" and
+           FieldTyBpl: "field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [\<tau>_field_bpl, \<tau>_bpl])" and
            "R \<omega>'
                    (update_var (var_context ctxt) ns3 h_bpl
                    (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
              )" (is "R _ ?ns_upd")
-     using RFieldAssign[OF \<open>R \<omega> ns3\<close> \<open>declared_fields _ f_vpr = Some ty_vpr\<close>] \<open>\<omega>' = _\<close>
-           \<open>get_type _ v = ty_vpr\<close> \<open>domain_type TyRep = _\<close>
+     using RFieldAssign[OF \<open>R \<omega> ns3\<close>] \<open>\<omega>' = _\<close>           
      by metis
 
    from RcvRel have RedRcvBpl: "red_expr_bpl ctxt rcv_bpl ns3 (AbsV (ARef (Address addr)))"
@@ -451,14 +450,14 @@ proof (rule stmt_rel_intro)
 
    from HeapUpdWf have 
       RedHeapUpdBpl:
-     "red_expr_bpl ctxt (heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl])
+     "red_expr_bpl ctxt (heap_upd_bpl (Lang.Var h_bpl) rcv_bpl (Lang.Var f_bpl) rhs_bpl [\<tau>_field_bpl, \<tau>_bpl])
                              ns3 (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))"
      apply (rule heap_update_wf_apply)
      using  Semantics.RedVar[OF LookupHeapVarBpl]
            apply simp
           apply (rule HeapWellTyBpl)
          apply (rule RedRcvBpl)
-     using \<open>e_f_bpl = _\<close> Semantics.RedVar[OF LookupFieldVarBpl]
+     using Semantics.RedVar[OF LookupFieldVarBpl]
         apply simp
        apply (rule FieldTyBpl)
       apply (rule RedRhsBpl)
@@ -527,34 +526,45 @@ qed
 text \<open>Version of generic field assignment relation rule where state relation is instantiated\<close>
 
 lemma field_assign_rel_inst:
-  assumes 
-    WfTyRep: "wf_ty_repr_bpl TyRep" and
-    WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and
-    RStateRel: "R = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt" and
-    HeapVarDefSame: "heap_var_def Tr = heap_var Tr" and
-    HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl" and
-               "domain_type TyRep = absval_interp_total ctxt_vpr" and
-               "type_interp ctxt = vbpl_absval_ty TyRep" and
-    RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1" and
-    RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2" and
-    WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
+  assumes WfTyRep: "wf_ty_repr_bpl TyRep"
+      and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and RStateRel: "R = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt"
+      and HeapVarDefSame: "heap_var_def Tr = heap_var Tr"
+      and HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
+      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
+      and "domain_type TyRep = absval_interp_total ctxt_vpr"
+      and "type_interp ctxt = vbpl_absval_ty TyRep"
+      and RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1"
+      and RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2"
+      and WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 
                  \<gamma>2 
-                 ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" and 
-                   "h_bpl = heap_var Tr" and
-    HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl e_f_bpl rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]" and    
-    RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl" and
-    FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
-    RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl"
-  shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
-         \<gamma>
-         (BigBlock name cs str tr, cont)" 
-proof (rule field_assign_rel[OF WfConsistency])
-  fix \<omega> ns ty_vpr hb addr  f_bpl v
+                 ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)"
+                   "h_bpl = heap_var Tr"
+      and HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl (Lang.Var f_bpl) rhs_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]"
+      and RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl"
+      and FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr (Lang.Var f_bpl) \<tau>_bpl"
+      and RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl"
+    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.FieldAssign rcv_vpr f_vpr rhs_vpr) 
+            \<gamma> (BigBlock name cs str tr, cont)"
+proof (rule field_assign_rel[OF WfConsistency, where ?\<tau>_vpr = "the (declared_fields (program_total ctxt_vpr) f_vpr)"])
+  let ?\<tau>_vpr = "the (declared_fields (program_total ctxt_vpr) f_vpr)"
+
+  from FieldRelSingle have
+          FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some ?\<tau>_vpr"
+      and TyTranslation: "vpr_to_bpl_ty TyRep ?\<tau>_vpr = Some \<tau>_bpl"
+      and FieldTranslation: "field_translation Tr f_vpr = Some f_bpl"
+    by (auto elim: field_rel_single_elim)
+
+  thus "declared_fields (program_total ctxt_vpr) f_vpr = Some ?\<tau>_vpr \<and> vpr_to_bpl_ty TyRep (the (declared_fields (program_total ctxt_vpr) f_vpr)) = Some \<tau>_bpl"
+    by simp
+
+  fix \<omega> ns hb addr v
   assume "R \<omega> ns" and
+ \<comment>\<open>
          FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr" and
          FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
-         TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and
-         NewValVprTy: "get_type (domain_type TyRep) v = ty_vpr" and
+         TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and \<close>
+         NewValVprTy: "get_type (domain_type TyRep) v = ?\<tau>_vpr" and
          ConsistentUpdState: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
 
   from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns"
@@ -569,7 +579,9 @@ proof (rule field_assign_rel[OF WfConsistency])
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          )"      
-  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation \<open>get_type (domain_type TyRep) v = ty_vpr\<close>]
+  thm state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation ]
+
+  from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation NewValVprTy]
   obtain hb f_bpl_val where
     "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))"
     "lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val))"
@@ -579,8 +591,7 @@ proof (rule field_assign_rel[OF WfConsistency])
     using HeapVarDefSame
     by fastforce
 
-  thus "(\<exists>hb f_bpl_val. lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and>
-                       lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
+  thus "(\<exists>hb f_bpl_val. lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
                        vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
                        lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
                        field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<and>
@@ -600,7 +611,7 @@ next
   thus "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>"
     using RStateRel state_rel_consistent
     by blast
-qed (insert assms, auto)
+qed (insert assms, simp_all)
 
 subsection \<open>Inhale statement relation\<close>
 
