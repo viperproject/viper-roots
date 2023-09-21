@@ -423,8 +423,8 @@ lemma end_to_end_vpr_method_correct_partial:
       and VprNoPermUnfoldingSpec: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl) \<and>
                                    no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
-      and ArgsAndRetsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
-                                  (\<And>x. x < (length (method_decl.args mdecl) + length (method_decl.rets mdecl)) \<Longrightarrow> x \<notin> modif body_vpr)"
+      and ArgsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
+                                  (\<And>x. x < length (method_decl.args mdecl) \<Longrightarrow> x \<notin> modif body_vpr)"
       and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
 
 \<comment>\<open>Boogie properties\<close>
@@ -747,7 +747,7 @@ proof (rule allI | rule impI)+
                   using OnlyArgsInPre
                   by blast
                 hence "x \<notin> modif body_vpr"
-                  using ArgsAndRetsUnmodified VprMethodBodySome
+                  using ArgsUnmodified VprMethodBodySome
                   by simp
                 hence "get_store_total \<omega> x = get_store_total \<omega>body x"
                   using red_stmt_preserves_unmodified_variables VprMethodBodySome RedBodyVpr \<open>get_store_total \<omega>pre = get_store_total \<omega>\<close>
