@@ -1452,9 +1452,9 @@ lemma syn_field_access_writeable_wf_rel:
   assumes 
          CtxtWf: "ctxt_wf Pr TyRep F FunMap ctxt" and
          TyRepWf: "wf_ty_repr_bpl TyRep" and
+         MaskReadWf: "mask_read_wf TyRep ctxt (mask_read Tr)" and
          StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr  AuxPred ctxt \<omega>def \<omega> ns" and
          MaskLookup: "mask_lookup = mask_read Tr e_m_bpl e_r_bpl e_f_bpl ts" and
-         MaskReadWf: "mask_read_wf TyRep ctxt (mask_read Tr)" and
          WritePermConst: "const_repr Tr CWritePerm = writePermConst" and
          ExpRel:   "exp_rel_vpr_bpl R ctxt_vpr ctxt e e_r_bpl" and
          MaskExp:  "e_m_bpl = Lang.Var (mask_var_def Tr)" and

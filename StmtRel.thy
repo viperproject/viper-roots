@@ -523,11 +523,11 @@ text \<open>Version of generic field assignment relation rule where state relati
 lemma field_assign_rel_inst:
   assumes WfTyRep: "wf_ty_repr_bpl TyRep"
       and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
       and RStateRel: "R = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt"
       and HeapVarDefSame: "heap_var_def Tr = heap_var Tr"
       and "domain_type TyRep = absval_interp_total ctxt_vpr"
       and "type_interp ctxt = vbpl_absval_ty TyRep"
+      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
       and RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1"
       and RhsWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rhs_vpr \<gamma>1 \<gamma>2"
       and WriteableLocRel: "wf_rel_fieldacc get_writeable_locs (rel_ext_eq R) (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr f_vpr 

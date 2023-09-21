@@ -93,7 +93,6 @@ and
                to progress to an empty block essentially consuming all big blocks, instead of
                having to progress to the big block after the if-statement). Same for else-branch. *)
              simplify_continuation ctxt THEN'
-             (K (print_tac ctxt "Debug")) THEN'
              (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
              (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
              (Rmsg' "If4" (progress_red_bpl_rel_tac ctxt) ctxt)
@@ -176,12 +175,9 @@ ML \<open>
      (Rmsg' "WfWriteableField1" (resolve_tac ctxt [@{thm syn_field_access_writeable_wf_rel} OF 
                                                      [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]
                                                   ]) ctxt) THEN'
+     (Rmsg' "WfWriteableField MaskRead Wf" (resolve_tac ctxt [@{thm mask_read_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
      (Rmsg' "WfWriteableField2" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField3" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info, @{thm read_mask_concrete_def}] ctxt) ctxt) THEN'
-     (Rmsg' "WfWriteableField4" (simp_tac_with_thms [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'     
-     (Rmsg' "WfWriteableField5" (resolve_tac ctxt [@{thm mask_read_wf_concrete} OF 
-                                                     [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]
-                                                  ]) ctxt) THEN'
      (Rmsg' "WfWriteableField6" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField7 (exp rel rcv)" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField8" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
@@ -191,14 +187,13 @@ ML \<open>
   fun field_assign_rel_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) atomic_hint =
     (case atomic_hint of 
        FieldAssignHint (rcv_wf_rel_info, rhs_wf_rel_info, rcv_exp_rel_info, rhs_exp_rel_info) =>
-       (Rmsg' "FieldAssign 1" (resolve_tac ctxt [@{thm field_assign_rel_inst[OF wf_ty_repr_basic]}]) ctxt) THEN'
+       (Rmsg' "FieldAssign 1" (resolve_tac ctxt [@{thm field_assign_rel_inst} OF [@{thm wf_ty_repr_basic}, #consistency_wf_thm basic_stmt_rel_info]]) ctxt) THEN'
        (Rmsg' "FieldAssign RStateRel" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign HeapVarDefSame" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign HeapUpdWf" (resolve_tac ctxt [@{thm heap_update_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]])
-                                         ctxt) THEN'
        (Rmsg' "FieldAssign DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign TypeInterp" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign Rext" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapUpdWf" (resolve_tac ctxt [@{thm heap_update_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]])
+                                         ctxt) THEN'
        (* TODO: need to use wf_rel_extend *)
        (Rmsg' "FieldAssign7 (Wf Rcv)" (exp_wf_rel_non_trivial_tac rcv_wf_rel_info rcv_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign8 (Wf Rhs)" (exp_wf_rel_non_trivial_tac rhs_wf_rel_info rhs_exp_rel_info ctxt) ctxt) THEN'
