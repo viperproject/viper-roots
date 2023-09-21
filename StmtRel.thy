@@ -357,28 +357,22 @@ lemma field_assign_rel:
                  \<gamma>2 
                  ((BigBlock name ((Lang.Assign h_bpl h_upd_bpl)#cs) str tr), cont)" 
       and HeapUpdateBpl: "h_upd_bpl = heap_upd_bpl (Lang.Var h_bpl) rcv_bpl (Lang.Var f_bpl) rhs_bpl [\<tau>_field_bpl, \<tau>_bpl]"
-      and RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl"
-     \<comment>\<open> and FieldRelSingle: "field_rel_single (program_total ctxt_vpr) TyRep Tr f_vpr e_f_bpl \<tau>_bpl"\<close>
       and DeclaredFieldsSome: "declared_fields (program_total ctxt_vpr) f_vpr = Some \<tau>_vpr \<and> vpr_to_bpl_ty TyRep \<tau>_vpr = Some \<tau>_bpl"
-      and HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
+      and RcvRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rcv_vpr rcv_bpl"
       and RhsRel: "exp_rel_vpr_bpl (rel_ext_eq R) ctxt_vpr ctxt rhs_vpr rhs_bpl"
 
       \<comment>\<open>Key field assignment property for R\<close>
       and RFieldAssign:  "\<And> \<omega> ns hb addr v . R \<omega> ns \<Longrightarrow>
-                     \<comment>\<open>declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr \<Longrightarrow>
-                     \<comment>\<open>field_translation Tr f_vpr = Some f_bpl \<Longrightarrow>\<close>
-                     vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl \<Longrightarrow>\<close>
-                     \<comment>\<open>type_of_vbpl_val TyRep (val_rel_vpr_bpl v) = \<tau>_bpl \<Longrightarrow>\<close>
                      get_type (domain_type TyRep) v = \<tau>_vpr \<Longrightarrow>
                      (StateConsEnabled \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)) \<Longrightarrow>
                      (\<exists>hb f_bpl_val. 
-                       \<comment>\<open>lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep)) \<and>\<close>
+                       lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep)) \<and>
                        lookup_var (var_context ctxt) ns h_bpl = Some (AbsV (AHeap hb)) \<and>
                        vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
                        lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
                        field_ty_fun_opt TyRep f_bpl_val = Some (TFieldId TyRep, [\<tau>_field_bpl, \<tau>_bpl]) \<and>
                        vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, []) \<and>
-                       R (update_hh_loc_total_full \<omega> (addr,f_vpr) v) 
+                       R (update_hh_loc_total_full \<omega> (addr,f_vpr) v)
                          (update_var (var_context ctxt) ns h_bpl
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          ))"
@@ -428,6 +422,7 @@ proof (rule stmt_rel_intro)
 
    ultimately obtain hb f_bpl_val
      where 
+           LookupTyHeapBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))" and
            LookupHeapVarBpl: "lookup_var (var_context ctxt) ns3  h_bpl = Some (AbsV (AHeap hb))" and
            HeapWellTyBpl: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
            HeapUpdWellTyBpl: "vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, [])" and
@@ -469,7 +464,7 @@ proof (rule stmt_rel_intro)
            ((BigBlock name cs str tr, cont), Normal ?ns_upd)"
      apply (rule red_ast_bpl_one_simple_cmd)
      apply (rule Semantics.RedAssign)
-       apply (fastforce intro!: HeapLookupTyBpl)
+       apply (fastforce intro!: LookupTyHeapBpl)
      using HeapUpdWellTyBpl \<open>type_interp ctxt = _\<close>
       apply simp
      by (fastforce intro: RedHeapUpdBpl simp: \<open>h_upd_bpl = _\<close>)
@@ -528,10 +523,9 @@ text \<open>Version of generic field assignment relation rule where state relati
 lemma field_assign_rel_inst:
   assumes WfTyRep: "wf_ty_repr_bpl TyRep"
       and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
       and RStateRel: "R = state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt"
       and HeapVarDefSame: "heap_var_def Tr = heap_var Tr"
-      and HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
-      and HeapUpdWf: "heap_update_wf TyRep ctxt heap_upd_bpl"
       and "domain_type TyRep = absval_interp_total ctxt_vpr"
       and "type_interp ctxt = vbpl_absval_ty TyRep"
       and RcvWfRel: "expr_wf_rel (rel_ext_eq R) ctxt_vpr StateCons P ctxt rcv_vpr \<gamma> \<gamma>1"
@@ -559,27 +553,17 @@ proof (rule field_assign_rel[OF WfConsistency, where ?\<tau>_vpr = "the (declare
     by simp
 
   fix \<omega> ns hb addr v
-  assume "R \<omega> ns" and
- \<comment>\<open>
-         FieldLookup: "declared_fields (program_total ctxt_vpr) f_vpr = Some ty_vpr" and
-         FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
-         TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some \<tau>_bpl" and \<close>
-         NewValVprTy: "get_type (domain_type TyRep) v = ?\<tau>_vpr" and
-         ConsistentUpdState: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
+  assume "R \<omega> ns"
+     and NewValVprTy: "get_type (domain_type TyRep) v = ?\<tau>_vpr"
+     and ConsistentUpdState: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
 
   from \<open>R \<omega> ns\<close> have StateRelInst: "state_rel_def_same (program_total ctxt_vpr) StateCons TyRep Tr AuxPred ctxt \<omega> ns"
     by (simp add: RStateRel)
-
-  have HeapLookupTyBpl: "lookup_var_ty (var_context ctxt) h_bpl = Some (TConSingle (THeapId TyRep))"
-    using state_rel0_heap_var_rel[OF state_rel_state_rel0[OF StateRelInst]] \<open>h_bpl = _\<close>
-    unfolding heap_var_rel_def
-    by blast
 
   let ?\<omega>' = "(update_hh_loc_total_full \<omega> (addr,f_vpr) v)"
   let ?ns' = "\<lambda>f_bpl_val. (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          )"      
-  thm state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation ]
 
   from state_rel_heap_update_2_ext[OF WfTyRep StateRelInst _ ConsistentUpdState ConsistentUpdState  FieldLookup FieldTranslation TyTranslation NewValVprTy]
   obtain hb f_bpl_val where
@@ -591,12 +575,13 @@ proof (rule field_assign_rel[OF WfConsistency, where ?\<tau>_vpr = "the (declare
     using HeapVarDefSame
     by fastforce
 
-  thus "(\<exists>hb f_bpl_val. lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
-                       vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
-                       lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
-                       field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<and>
-                       vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, []) \<and>
-                       R ?\<omega>' 
+  thus "(\<exists>hb f_bpl_val. lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep)) \<and> 
+                        lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and>
+                        vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
+                        lookup_var (var_context ctxt) ns f_bpl = Some (AbsV (AField f_bpl_val)) \<and>
+                        field_ty_fun_opt TyRep f_bpl_val = Some ((TFieldId TyRep), [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<and>
+                        vbpl_absval_ty_opt TyRep (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))) = Some (THeapId TyRep, []) \<and>
+                        R ?\<omega>' 
                          (update_var (var_context ctxt) ns (heap_var Tr) 
                                (AbsV (AHeap (hb( (Address addr,f_bpl_val) \<mapsto> (val_rel_vpr_bpl v) ))))
                          ))"
