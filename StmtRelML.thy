@@ -140,7 +140,7 @@ ML \<open>
 
   fun red_assign_tac ctxt (basic_stmt_rel_info : basic_stmt_rel_info) exp_wf_rel_info (exp_rel_info : exp_rel_info) lookup_bpl_target_thm =
     (* TODO     (Rmsg' "Assign1" (resolve_tac ctxt [@{thm assign_rel_simple[where ?Trep=ty_repr_basic]}]) ctxt) THEN' *)
-    (Rmsg' "Assign 1" (resolve_tac ctxt [@{thm assign_rel_simple}]) ctxt) THEN'
+    (Rmsg' "Assign 1" (resolve_tac ctxt [@{thm var_assign_rel}]) ctxt) THEN'
     (Rmsg' "Assign R_def" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
     (Rmsg' "Assign VprTy" ((#var_context_vpr_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
     (Rmsg' "Assign TyRelWf" (simp_only_tac [#type_interp_econtext basic_stmt_rel_info] ctxt THEN'
