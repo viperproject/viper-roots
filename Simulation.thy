@@ -131,8 +131,7 @@ lemma rel_general_conseq_fail:
 subsection \<open>Propagation rules\<close>
 
 lemma rel_propagate_pre:
-  assumes \<comment>\<open>"\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> (\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega> \<Longrightarrow> \<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns') \<and> R1 \<omega> ns'" and\<close>
-          "red_ast_bpl_rel (\<lambda> \<omega> ns. ((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns) R1 P ctxt \<gamma>0 \<gamma>1"
+  assumes "red_ast_bpl_rel (\<lambda> \<omega> ns. ((\<exists>\<omega>'. Success \<omega> \<omega>') \<or> Fail \<omega>) \<and> R0 \<omega> ns) R1 P ctxt \<gamma>0 \<gamma>1"
       and "rel_general R1 R2 Success Fail P ctxt \<gamma>1 \<gamma>2"
     shows "rel_general R0 R2 Success Fail P ctxt \<gamma>0 \<gamma>2"  
 proof (rule rel_intro)
@@ -504,7 +503,7 @@ lemma rel_general_cond_2:
            RelThn: "\<And> \<omega> \<omega>'. rel_general R1 R2 (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega>' \<and> b \<omega>) (\<lambda> \<omega>. Fail \<omega> \<and> b \<omega>) P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
            RelEls: "\<And> \<omega> \<omega>'. rel_general R1 R2 (\<lambda>\<omega> \<omega>'. Success \<omega> \<omega>' \<and> \<not> (b \<omega>)) (\<lambda> \<omega>. Fail \<omega> \<and> \<not>(b \<omega>)) P ctxt 
                                      (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
-  shows "rel_general R1 R2 Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) (next, cont)"
+  shows "rel_general R1 R2 Success Fail P ctxt (if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) (next, cont)"
   apply (rule rel_general_cond[where ?SuccessExp="\<lambda>\<omega> \<omega>'. \<omega> = \<omega>'" and ?FailExp="\<lambda>_. False"])
       apply (rule rel_general_success_refl)
        apply simp
@@ -523,7 +522,7 @@ lemma rel_general_if_2:
       and "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
                                      (thn_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
       and "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
-  shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
+  shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
   oops
 
 

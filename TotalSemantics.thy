@@ -146,38 +146,48 @@ which direct permission is held in \<^term>\<open>(mh,mp)\<close> or which is pa
 of a directly owned (w.r.t. \<^term>\<open>mp\<close>) predicate\<close>
 *)
 
-definition havoc_undef_locs :: "'a total_heap \<Rightarrow> mask \<Rightarrow> 'a total_heap set"
-  where "havoc_undef_locs hh mh = { hh' | hh'. (\<forall>lh. mh lh \<noteq> pnone \<longrightarrow> hh' lh = hh lh) }"
+definition havoc_locs_heap :: "'a total_heap \<Rightarrow> heap_loc set \<Rightarrow> 'a total_heap set"
+  where "havoc_locs_heap hh locs = { hh' | hh'. (\<forall>lh. lh \<notin> locs \<longrightarrow> hh' lh = hh lh) }"
 
-text\<open>\<^term>\<open>havoc_undef_locs hh mh\<close> denotes the set of heaps that coincide with \<^term>\<open>hh\<close> w.r.t.
-the permission masks \<^term>\<open>mh\<close>.\<close>
+lemma havoc_locs_heap_empty: "havoc_locs_heap hh {} = {hh}"
+  unfolding havoc_locs_heap_def
+  by blast
 
-definition exhale_state :: "'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state set"
-  where "exhale_state ctxt \<omega> mh = 
+text\<open>\<^term>\<open>havoc_locs_heap hh locs\<close> denotes the set of heaps that differ with \<^term>\<open>hh\<close> only on \<^term>\<open>locs\<close>\<close>
+
+definition havoc_locs_state :: "'a total_context \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc set \<Rightarrow> 'a full_total_state set"
+  where "havoc_locs_state ctxt \<omega> locs = 
     { update_hh_total_full \<omega> hh' | (\<omega>' :: 'a full_total_state) (hh' :: 'a total_heap). 
                                    total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh' \<and>
-                                   hh' \<in> havoc_undef_locs (get_hh_total_full \<omega>) mh}"
+                                   hh' \<in> havoc_locs_heap (get_hh_total_full \<omega>) locs}"
 
-lemma exhale_state_same_store: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
-  unfolding exhale_state_def
+lemma havoc_locs_state_empty:
+  assumes "\<omega>' \<in> havoc_locs_state ctxt \<omega> {}"
+  shows "\<omega> = \<omega>'"
+  using assms
+  unfolding havoc_locs_state_def
+  by (simp add: havoc_locs_heap_empty)  
+
+lemma havoc_locs_state_same_store: "\<omega>' \<in> havoc_locs_state ctxt \<omega> locs \<Longrightarrow> get_store_total \<omega>' = get_store_total \<omega>"
+  unfolding havoc_locs_state_def
   by force
 
-lemma exhale_state_same_trace: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
-  unfolding exhale_state_def
+lemma havoc_locs_state_same_trace: "\<omega>' \<in> havoc_locs_state ctxt \<omega> locs \<Longrightarrow> get_trace_total \<omega>' = get_trace_total \<omega>"
+  unfolding havoc_locs_state_def
   by force
 
-lemma exhale_state_same_mask: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
-  unfolding exhale_state_def
+lemma havoc_locs_state_same_mask: "\<omega>' \<in> havoc_locs_state ctxt \<omega> locs \<Longrightarrow> get_m_total_full \<omega>' = get_m_total_full \<omega>"
+  unfolding havoc_locs_state_def
   by force
 
-lemma exhale_state_well_typed_heap: "\<omega>' \<in> exhale_state ctxt \<omega> m \<Longrightarrow> 
+lemma havoc_locs_state_well_typed_heap: "\<omega>' \<in> havoc_locs_state ctxt \<omega> locs \<Longrightarrow> 
                                     total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>')"  
 proof -
-  assume "\<omega>' \<in> exhale_state ctxt \<omega> m"
+  assume "\<omega>' \<in> havoc_locs_state ctxt \<omega> locs"
 
   from this obtain hh' where "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'" and
                             "\<omega>' = update_hh_total_full \<omega> hh'"
-    unfolding exhale_state_def
+    unfolding havoc_locs_state_def
     by blast
 
   thus ?thesis
@@ -225,7 +235,6 @@ fun modif :: "stmt \<Rightarrow> var set" where
 | "modif (While b I s) = modif s"
 | "modif _ = {}"
 
-
 definition reset_state_after_call :: "var list \<Rightarrow> 'a val list \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow>'a full_total_state" where
   "reset_state_after_call targets vs \<omega>BeforeCall \<omega> = 
        \<lparr> get_store_total = (map_upds (get_store_total \<omega>BeforeCall) targets vs),
@@ -241,11 +250,12 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
     red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
 | RedExhale:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
-    \<comment>\<open>TODO: Here, we havoc all locations that for which there is no direct permission. This is sound but 
-      incomplete, because locations that are folded under a predicate need not be havoced. This should
-      be revisited.\<close>
-    \<comment>\<open>TODO: We should make sure that \<^term>\<open>R \<omega>'\<close> holds.\<close>
-    \<omega>' \<in> exhale_state ctxt \<omega>_exh (get_mh_total_full \<omega>_exh) \<rbrakk> \<Longrightarrow>
+    \<omega>' \<in> havoc_locs_state ctxt \<omega>_exh ({loc. get_mh_total_full \<omega> loc > 0 \<and> get_mh_total_full \<omega>_exh loc = 0})
+    \<comment>\<open>We havoc all locations \<^term>\<open>l\<close> for which both of the following conditions hold:
+        (1) there is no direct permission to \<^term>\<open>l\<close> after the exhale
+        (2) the exhale removed nonzero permission to \<^term>\<open>l\<close>\<close>
+    \<comment>\<open>If predicates are used, then this exhale semantics is sound but incomplete, because locations that are folded 
+      under a predicate need not be havoced. Moreover, for predicates, we might need to ensure that \<^term>\<open>R \<omega>'\<close> holds.\<close> \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
 | RedExhaleFailure:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>

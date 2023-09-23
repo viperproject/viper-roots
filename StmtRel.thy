@@ -640,9 +640,17 @@ lemma exhale_stmt_rel:
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
           \<comment>\<open>At the end of the exhale we require the Boogie program to establish the output relation on the 
              evaluation state\<close>
-      and Rexh_to_R: "red_ast_bpl_rel (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
+   \<comment>\<open>   and Rexh_to_R: "red_ast_bpl_rel (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and ExhaleState: "\<And> \<omega> \<omega>' ns. R_out \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
-                                 \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
+                                 \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'" \<close>
+
+      and UpdHavoc: "rel_general (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) 
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>fst \<omega>' = snd \<omega>' \<and> \<comment>\<open>well-definedness and evaluation state are the same after update\<close>\<close>
+                       \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+                       red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                       \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
   fix \<omega> ns \<omega>'
@@ -664,18 +672,16 @@ proof (rule stmt_rel_intro)
       "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>2, Normal ns2)" and "Rexh \<omega> \<omega>_exh ns2"
       using red_ast_bpl_transitive[OF Red1] InvHolds[OF \<open>R \<omega> ns\<close>]
       by blast
-    moreover from Rexh_to_R \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
+    moreover from rel_success_elim[OF UpdHavoc, where ?\<omega> = "(\<omega>,\<omega>_exh)" and ?\<omega>'="(\<omega>',\<omega>')"] RedExhale \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
+    \<comment>\<open>moreover from Rexh_to_R \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
       "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3)" and "R_out \<omega>_exh ns3"
       unfolding red_ast_bpl_rel_def
-      by force
-    ultimately have
-     "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)"
-      using red_ast_bpl_transitive
-      by blast
-    with ExhaleState RedExhale \<open>StateCons \<omega>'\<close> \<open>R_out \<omega>_exh ns3\<close>
-    show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
-      using red_ast_bpl_transitive
-      by blast      
+      by force\<close>
+      "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>', Normal ns3)" and "R_out \<omega>' ns3"
+      by auto     
+    ultimately show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
+    using red_ast_bpl_transitive
+    by blast
   qed
 next
   fix \<omega> ns \<omega>'
@@ -707,9 +713,16 @@ lemma exhale_stmt_rel_inst:
       and ExhRel: "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
       (*and "\<And> \<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) \<omega>def \<omega> ns \<Longrightarrow> 
                       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>2, Normal ns) (\<gamma>3, Normal ns') \<and> R_out \<omega> ns'"*)
-      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R_out (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
+      \<comment>\<open>and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R_out (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and "\<And> \<omega> \<omega>' ns. R_out \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
-                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
+                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"\<close>
+      and UpdHavoc: "rel_general (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) 
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>fst \<omega>' = snd \<omega>' \<and> \<comment>\<open>well-definedness and evaluation state are the same after update\<close>\<close>
+                       \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+                       red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                       \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule exhale_stmt_rel[OF WfConsistency])
   show "red_ast_bpl_rel (uncurry_eq R) (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) P ctxt \<gamma> \<gamma>1"
@@ -719,11 +732,12 @@ proof (rule exhale_stmt_rel[OF WfConsistency])
 next
   show "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
     by (rule ExhRel) 
+(*
 next
   show "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) (\<lambda>\<omega>. R_out (snd \<omega>)) P ctxt \<gamma>2 \<gamma>3"
     using Rexh_to_Rout
     unfolding red_ast_bpl_rel_def
-    by blast    
+    by blast    *)
 qed (insert assms, auto) 
 
 text \<open>The output relation could be strengthened here, but this lemma is still useful in cases where the output relation
@@ -748,9 +762,16 @@ lemma exhale_stmt_rel_inst_no_inv:
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> True" \<comment>\<open>not required, but makes proof generation uniform (same number of premises for each case)\<close>
       and R_to_Rexh: "red_ast_bpl_rel R (state_rel_def_same Pr StateCons TyRep Tr' AuxPred' ctxt) P ctxt \<gamma> \<gamma>1"
       and "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) (\<lambda>_ _ _. True) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
+    \<comment>\<open>  and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns. R (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
-                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'" \<close>
+      and UpdHavoc: "rel_general (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) (\<lambda>\<omega> ns. R (snd \<omega>) ns) 
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>fst \<omega>' = snd \<omega>' \<and> \<comment>\<open>well-definedness and evaluation state are the same after update\<close>\<close>
+                       \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+                       red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                       \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms
   by (rule exhale_stmt_rel_inst)
@@ -761,11 +782,19 @@ lemma exhale_stmt_rel_inst_framing_inv:
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons A \<omega> \<omega>"
       and R_to_Rexh: "red_ast_bpl_rel R (state_rel_def_same Pr StateCons TyRep Tr' AuxPred' ctxt) P ctxt \<gamma> \<gamma>1"
       and ExhRel: "exhale_rel (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt) (framing_exh ctxt_vpr StateCons) ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns.  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
+    \<comment>\<open>  and Rexh_to_Rout: "red_ast_bpl_rel (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt))  (\<lambda>\<omega>def_\<omega> ns.  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (snd \<omega>def_\<omega>) ns) P ctxt \<gamma>2 \<gamma>3"
       and "\<And> \<omega> \<omega>' ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> StateCons \<omega>' \<Longrightarrow> \<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>) \<Longrightarrow>
-                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and>  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ns'"
+                             \<exists>ns'. red_ast_bpl P ctxt (\<gamma>3, Normal ns) (\<gamma>', Normal ns') \<and>  state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ns'"\<close>
+
+      and UpdHavoc: "rel_general (uncurry (state_rel Pr StateCons TyRep Tr' AuxPred' ctxt)) (\<lambda>\<omega> ns. (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (snd \<omega>) ns) 
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>fst \<omega>' = snd \<omega>' \<and> \<comment>\<open>well-definedness and evaluation state are the same after update\<close>\<close>
+                       \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+                       red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                       \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
-  apply (rule exhale_stmt_rel_inst[OF WfConsistency _ _ R_to_Rexh ExhRel Rexh_to_Rout])
+  apply (rule exhale_stmt_rel_inst[OF WfConsistency _ _ R_to_Rexh ExhRel UpdHavoc])
   using assms
   by auto
 
@@ -779,7 +808,7 @@ lemma exhale_stmt_rel_finish:
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           "StateCons \<omega>'" and
-          "\<omega>' \<in> exhale_state ctxt_vpr \<omega> (get_mh_total_full \<omega>)" and
+          "\<omega>' \<in> havoc_locs_state ctxt_vpr \<omega> ({loc. get_mh_total_full \<omega>0 loc > 0 \<and> get_mh_total_full \<omega> loc = 0})" and
           "hvar = heap_var Tr" and
           "mvar = mask_var Tr" and
           LookupDeclExhaleHeap: "lookup_var_decl (var_context ctxt) hvar_exh = Some (TConSingle (THeapId TyRep), None)" and
@@ -817,7 +846,7 @@ proof -
 
   from this obtain hb' where *: "heap_rel (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>') hb'" and
                    **: "vbpl_absval_ty_opt TyRep (AHeap hb') = Some (THeapId TyRep, [])"
-    using  construct_bpl_heap_from_vpr_heap_correct[OF WfTyRepr exhale_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] DomainType]                
+    using  construct_bpl_heap_from_vpr_heap_correct[OF WfTyRepr havoc_locs_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] DomainType]                
     by blast
                                           
   \<comment>\<open>We derive a heap which coincides with \<^term>\<open>hb'\<close> on the locations related to Viper locations
@@ -864,7 +893,7 @@ proof -
 
       hence "get_hh_total_full \<omega> heap_loc = get_hh_total_full \<omega>' heap_loc"
         using \<open>\<omega>' \<in> _\<close> 
-        unfolding exhale_state_def havoc_undef_locs_def
+        unfolding havoc_locs_state_def havoc_locs_heap_def
         by fastforce
 
       then show ?thesis 
@@ -954,22 +983,22 @@ proof -
       by simp
   next
     show "get_store_total \<omega> = get_store_total \<omega>'"
-      using \<open>\<omega>' \<in> _\<close> exhale_state_same_store
+      using \<open>\<omega>' \<in> _\<close> havoc_locs_state_same_store
       by metis
   next
     show "get_m_total_full \<omega> = get_m_total_full \<omega>'"
-      using \<open>\<omega>' \<in> _\<close> exhale_state_same_mask
+      using \<open>\<omega>' \<in> _\<close> havoc_locs_state_same_mask
       by metis
   next
     show "get_trace_total \<omega> = get_trace_total \<omega>'"
-      using \<open>\<omega>' \<in> _\<close> exhale_state_same_trace
+      using \<open>\<omega>' \<in> _\<close> havoc_locs_state_same_trace
       by metis
   next
     show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) \<omega>' ?ns2"
       using ProgramTotal
       unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
-      using LookupHeapVarTy NewHeapWellTy NewHeapRel DomainType exhale_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] 
+      using LookupHeapVarTy NewHeapWellTy NewHeapRel DomainType havoc_locs_state_well_typed_heap[OF \<open>\<omega>' \<in> _\<close>] 
       by auto
   next
     fix x
@@ -992,6 +1021,29 @@ proof -
     using Red1 red_ast_bpl_transitive
     by blast
 qed
+
+lemma exhale_pure_stmt_rel_upd_havoc:
+  assumes "is_pure A"
+      and RelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R_out (snd \<omega>) ns"
+    shows "rel_general R (\<lambda>\<omega> ns. R_out (snd \<omega>) ns)
+                 (\<lambda>\<omega> \<omega>'. red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                         snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                  ) (\<lambda>_. False) P ctxt \<gamma> \<gamma>" (is "rel_general R _ ?Success ?Fail P ctxt \<gamma> \<gamma>")
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "?Success \<omega> \<omega>'"
+  hence "fst \<omega> = snd \<omega>"
+    using exhale_pure_normal_same \<open>is_pure A\<close>
+    by blast
+
+  with \<open>?Success \<omega> \<omega>'\<close> havoc_locs_state_empty
+  have "snd \<omega>' = snd \<omega>"
+    by (metis (mono_tags, lifting) Collect_empty_eq less_imp_neq)
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R_out (snd \<omega>') ns'"
+    using red_ast_bpl_refl \<open>R \<omega> ns\<close> RelImp
+    by metis        
+qed (simp)
 
 subsection \<open>Assert statement relation\<close>
 
@@ -1087,6 +1139,58 @@ lemma assert_stmt_rel_inst:
    apply (rule ExhaleRel)
   apply (rule ResetState)
   done
+
+lemma assert_stmt_rel_alt:
+  assumes CaptureState: "red_ast_bpl_rel (uncurry_eq R) (uncurry Rexh) P ctxt \<gamma> \<gamma>1"
+      and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+      and ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
+      and ResetState: "rel_general (uncurry Rexh) (uncurry_eq R) (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
+    shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Assert A) \<gamma> \<gamma>'"
+proof (rule stmt_rel_intro_2)
+  fix \<omega> ns res
+  assume "R \<omega> ns" and RedStmt: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (stmt.Assert A) \<omega> res"
+
+  hence "uncurry_eq R (\<omega>,\<omega>) ns"
+    by simp
+
+  with CaptureState obtain ns1 where RedBplInit: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and RStoreInit: "Rexh \<omega> \<omega> ns1"
+    unfolding red_ast_bpl_rel_def
+    by auto    
+    
+  show "rel_vpr_aux R P ctxt \<gamma> \<gamma>' ns res"
+  proof (rule rel_vpr_aux_intro)
+    fix \<omega>'
+    assume "res = RNormal \<omega>'"
+
+    with RedStmt obtain \<omega>_exh where RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> (RNormal \<omega>_exh)" and "\<omega> = \<omega>'"
+      by (auto elim: RedAssertNormal_case)
+
+
+    from this obtain ns_exh where RedBplExh: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns_exh)" and 
+                                  "Rexh \<omega> \<omega>_exh ns_exh" 
+      using exhale_rel_normal_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
+      by blast
+      
+    with rel_success_elim[OF ResetState]
+    obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
+      by fastforce
+
+    with RedBplInit RedBplExh
+    show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
+      using \<open>\<omega> = \<omega>'\<close> red_ast_bpl_transitive
+      by blast
+  next
+    assume "res = RFailure"
+
+    with RedStmt have RedExh: "red_exhale ctxt_vpr StateCons \<omega> A \<omega> RFailure"
+      by (auto elim: RedAssertFailure_case)
+
+    thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+      using exhale_rel_failure_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
+            RedBplInit red_ast_bpl_transitive
+      by (metis (no_types, opaque_lifting) snd_conv)
+  qed
+qed
 
 subsection \<open>Method call relation\<close> 
 

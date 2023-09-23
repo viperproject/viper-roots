@@ -1399,7 +1399,7 @@ subsection \<open>Exhale\<close>
 
 lemma exhale_only_changes_total_state_aux:
   assumes
-         "red_exhale ctxt R A \<omega>def \<omega> res" and "res = RNormal \<omega>'"
+         "red_exhale ctxt R \<omega>def A \<omega> res" and "res = RNormal \<omega>'"
   shows  "get_store_total \<omega>' = get_store_total \<omega> \<and>
           get_trace_total \<omega>' = get_trace_total \<omega> \<and>
           get_h_total_full \<omega>' = get_h_total_full \<omega>"
@@ -1449,8 +1449,8 @@ proof cases
   case (RedExhale \<omega>_exh)
   then show ?thesis 
     using exhale_only_changes_total_state_aux
-    unfolding exhale_state_def
-    by (metis exhale_state_same_store exhale_state_same_trace \<open>\<omega>' \<in> _\<close>)
+    unfolding havoc_locs_state_def
+    by (metis (mono_tags, lifting) havoc_locs_state_same_store havoc_locs_state_same_trace \<open>\<omega>' \<in> _\<close>)
 qed
 
 lemma mask_update_greater_aux:
@@ -1577,6 +1577,14 @@ next
   then show ?case
     by (simp add: succ_refl)
 qed (simp_all)
+
+lemma exhale_pure_normal_same:
+  assumes "red_exhale ctxt R \<omega>def A \<omega> res" 
+      and "res = RNormal \<omega>'"
+      and "is_pure A"
+    shows "\<omega> = \<omega>'"
+  using assms
+  by (induction) (auto elim: exh_if_total.elims)
 
 subsection \<open>Relationship inhale and exhale\<close>
 
@@ -2239,7 +2247,7 @@ next
 next
   case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
   then show ?case 
-    by (metis exhale_only_changes_total_state_aux exhale_state_same_store stmt_result_total.inject)
+    by (metis (no_types, lifting) exhale_only_changes_total_state_aux havoc_locs_state_same_store stmt_result_total.inject)
 next
   case (RedHavoc \<Lambda> x ty v \<omega>)
   then show ?case 
