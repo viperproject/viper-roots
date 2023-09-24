@@ -71,7 +71,7 @@ the failure execution.\<close>
 
 lemma rel_general_success_no_effect:
   assumes SuccessNoEffect: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
-      and RelFail: "rel_general R R2 Success' Fail P ctxt \<gamma> \<gamma>1" \<comment>\<open>\<^term>\<open>Success'\<close> can be anything\<close>
+      and RelFail: "rel_general R R2 Success' Fail P ctxt \<gamma> \<gamma>1"  \<comment>\<open>\<^term>\<open>R2\<close> and \<^term>\<open>Success'\<close> can be instantiated arbitrarily\<close>
       and RedBplSuccess: "red_ast_bpl_rel R R' P ctxt \<gamma> \<gamma>'"    
     shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
 proof (rule rel_intro)
