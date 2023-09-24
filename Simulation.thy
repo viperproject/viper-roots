@@ -40,13 +40,6 @@ lemma rel_intro:
   unfolding rel_general_def 
   by blast
 
-lemma rel_general_success_refl:
-  assumes "\<And> \<omega>. \<not> Fail \<omega>" and
-          "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
-        shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
-  using assms
-  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
-
 lemma rel_success_elim:
   assumes "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'" and
           "R \<omega> ns" and
@@ -64,6 +57,37 @@ lemma rel_failure_elim:
   using assms
   unfolding rel_general_def
   by blast
+
+lemma rel_general_success_refl:
+  assumes "\<And> \<omega>. \<not> Fail \<omega>"
+      and  "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
+    shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
+  using assms
+  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
+
+text \<open>The following lemma shows that if there is no Viper state change, then one can use 
+any Boogie execution from \<^term>\<open>\<gamma>\<close> to \<^term>\<open>\<gamma>'\<close>. Moreover, one can ignore \<^term>\<open>\<gamma>'\<close> when justifying
+the failure execution.\<close>
+
+lemma rel_general_success_no_effect:
+  assumes SuccessNoEffect: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
+      and RelFail: "rel_general R R2 Success' Fail P ctxt \<gamma> \<gamma>1" \<comment>\<open>\<^term>\<open>Success'\<close> can be anything\<close>
+      and RedBplSuccess: "red_ast_bpl_rel R R' P ctxt \<gamma> \<gamma>'"    
+    shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'"
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
+  thus " \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns'"
+    using RedBplSuccess SuccessNoEffect
+    unfolding red_ast_bpl_rel_def
+    by blast
+next
+  fix \<omega> ns
+  assume "R \<omega> ns" and "Fail \<omega>"
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
+    using RelFail
+    by (blast dest: rel_failure_elim)
+qed
 
 subsection \<open>Conversions\<close>
 
