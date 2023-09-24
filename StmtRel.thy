@@ -1144,7 +1144,16 @@ lemma assert_stmt_rel_alt:
   assumes CaptureState: "red_ast_bpl_rel (uncurry_eq R) (uncurry Rexh) P ctxt \<gamma> \<gamma>1"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
       and ExhaleRel: "exhale_rel Rexh Q ctxt_vpr StateCons P ctxt A \<gamma>1 \<gamma>2"
-      and ResetState: "rel_general (uncurry Rexh) (uncurry_eq R) (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
+   \<comment>\<open>The second disjunct makes explicit that since the assert has no effect on the Viper state,
+      the Boogie encoding can continue from any point that is reachable from \<^term>\<open>\<gamma>\<close>.
+      The first disjunct allows the Boogie encoding to reach \<^term>\<open>\<gamma>'\<close> from \<^term>\<open>\<gamma>2\<close> (i.e., the point
+      after the exhale) as long as the resulting Boogie state is in relation with the original Viper state
+      before the assert is executed. The first disjunct expresses the original Viper state
+      as the well-definedness state, which is correct since the exhale does not change the well-definedness
+      state.\<close>
+      and ResetState: "rel_general (uncurry Rexh) (uncurry_eq R) (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1)) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'
+                      \<or> red_ast_bpl_rel (uncurry_eq R) (uncurry_eq R) P ctxt \<gamma> \<gamma>'"
+                 (is "?ResetFromExhale \<or> ?ResetFromStart")
     shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Assert A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
@@ -1170,15 +1179,25 @@ proof (rule stmt_rel_intro_2)
                                   "Rexh \<omega> \<omega>_exh ns_exh" 
       using exhale_rel_normal_elim[OF ExhaleRel RStoreInit InvHolds[OF \<open>R \<omega> ns\<close>]]
       by blast
-      
-    with rel_success_elim[OF ResetState]
-    obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
-      by fastforce
 
-    with RedBplInit RedBplExh
+    from disjE[OF ResetState]
     show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
-      using \<open>\<omega> = \<omega>'\<close> red_ast_bpl_transitive
-      by blast
+    proof (cases)
+      case 1
+      with \<open>Rexh \<omega> \<omega>_exh ns_exh\<close> rel_success_elim[OF 1]
+      obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
+        by fastforce  
+      with RedBplInit RedBplExh
+      show ?thesis
+        using \<open>\<omega> = \<omega>'\<close> red_ast_bpl_transitive
+        by blast
+    next
+      case 2
+      with \<open>R \<omega> ns\<close> show ?thesis 
+        unfolding red_ast_bpl_rel_def
+        using \<open>\<omega> = \<omega>'\<close>
+        by force
+    qed      
   next
     assume "res = RFailure"
 
