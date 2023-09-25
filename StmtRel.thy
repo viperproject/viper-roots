@@ -639,7 +639,7 @@ lemma exhale_stmt_rel:
       \<comment>\<open>The following premise shows the advantage of allowing different input and output relations for
          \<^term>\<open>exhale_rel\<close>. It allows abstracting over any potential setup code that is required for 
          encoding an exhale. Note that if we only allowed the same input and output relation, then
-         one would need an additional premise that allows setting up state. This would not only add
+         one would need an additional premise that allows setting up the state. This would not only add
          clutter but also would reduce expressivity because the rule would force an encoding to
          always set up the state before continuing. As a result, one would not be able to, for example,
          justify the encoding \<open>if(*) { exhale A; assume false}\<close>.\<close>
@@ -656,7 +656,8 @@ lemma exhale_stmt_rel:
                        \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
                        red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
                        \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
-                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
+                       StateCons (snd \<omega>')
                 ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro)
@@ -680,12 +681,13 @@ proof (rule stmt_rel_intro)
       using InvHolds[OF \<open>R \<omega> ns\<close>]
       by blast
       
-    moreover from rel_success_elim[OF UpdHavoc, where ?\<omega> = "(\<omega>,\<omega>_exh)" and ?\<omega>'="(\<omega>',\<omega>')"] RedExhale \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
+    moreover from rel_success_elim[OF UpdHavoc, where ?\<omega> = "(\<omega>,\<omega>_exh)" and ?\<omega>'="(\<omega>',\<omega>')"] RedExhale \<open>Rexh \<omega> \<omega>_exh ns2\<close> \<open>StateCons \<omega>'\<close> 
+    obtain ns3 where
     \<comment>\<open>moreover from Rexh_to_R \<open>Rexh \<omega> \<omega>_exh ns2\<close> obtain ns3 where
       "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3)" and "R_out \<omega>_exh ns3"
       unfolding red_ast_bpl_rel_def
       by force\<close>
-      "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>', Normal ns3)" and "R_out \<omega>' ns3"
+      "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>', Normal ns3)" and "R_out \<omega>' ns3"      
       by auto     
     ultimately show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R_out \<omega>' ns'"
     using red_ast_bpl_transitive
@@ -726,7 +728,8 @@ lemma exhale_stmt_rel_inst:
                        \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
                        red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
                        \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
-                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
+                       StateCons (snd \<omega>')
                 ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
 proof (rule exhale_stmt_rel[OF WfConsistency])
@@ -771,7 +774,8 @@ lemma exhale_stmt_rel_inst_no_inv:
                        \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
                        red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
                        \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
-                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
+                       StateCons (snd \<omega>')
                 ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   using assms
@@ -792,7 +796,8 @@ lemma exhale_stmt_rel_inst_framing_inv:
                        \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
                        red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
                        \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
-                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
+                       StateCons (snd \<omega>')
                 ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
   apply (rule exhale_stmt_rel_inst[OF WfConsistency _ _ ExhRel UpdHavoc])
@@ -809,7 +814,7 @@ lemma exhale_stmt_rel_finish:
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           "StateCons \<omega>'" and
-          "\<omega>' \<in> havoc_locs_state ctxt_vpr \<omega> ({loc. get_mh_total_full \<omega>0 loc > 0 \<and> get_mh_total_full \<omega> loc = 0})" and
+          "\<omega>' \<in> havoc_locs_state ctxt_vpr \<omega> ({loc. get_mh_total_full (\<omega>0 ) loc > 0 \<and> get_mh_total_full \<omega> loc = 0})" and
           "hvar = heap_var Tr" and
           "mvar = mask_var Tr" and
           LookupDeclExhaleHeap: "lookup_var_decl (var_context ctxt) hvar_exh = Some (TConSingle (THeapId TyRep), None)" and
@@ -2707,6 +2712,8 @@ proof (rule stmt_rel_intro_2)
 qed
 
 subsection \<open>Scoped variable\<close>
+
+\<comment> \<open>TODO: general rule that is independent from \<^term>\<open>state_rel\<close>\<close>
 
 lemma scoped_var_stmt_rel:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"

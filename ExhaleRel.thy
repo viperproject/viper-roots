@@ -326,8 +326,8 @@ qed (insert assms, simp_all)
 subsection \<open>Propagation rules\<close>
 
 lemma exhale_rel_propagate_pre:
-  assumes PropagateBpl: "red_ast_bpl_rel  (uncurry (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q assertion_vpr \<omega>def \<omega>)) (uncurry R) P ctxt \<gamma>0 \<gamma>1"          
-      and ExhRel: "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
+  assumes PropagateBpl: "red_ast_bpl_rel  (uncurry (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q assertion_vpr \<omega>def \<omega>)) (uncurry R'') P ctxt \<gamma>0 \<gamma>1"          
+      and ExhRel: "exhale_rel R'' R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
     shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   unfolding exhale_rel_def
   apply (rule rel_propagate_pre[OF _ ExhRel[simplified exhale_rel_def]])  
@@ -335,24 +335,36 @@ lemma exhale_rel_propagate_pre:
   by (auto simp: red_ast_bpl_rel_def)
 
 lemma exhale_rel_propagate_pre_no_inv:
-  assumes PropagateBpl: "red_ast_bpl_rel (uncurry R) (uncurry R) P ctxt \<gamma>0 \<gamma>1" 
-      and ExhRel: "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
+  assumes PropagateBpl: "red_ast_bpl_rel (uncurry R) (uncurry R'') P ctxt \<gamma>0 \<gamma>1" 
+      and ExhRel: "exhale_rel R'' R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
     shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   unfolding exhale_rel_def
   apply (rule rel_propagate_pre[OF _ ExhRel[simplified exhale_rel_def]])  
   using PropagateBpl    
   by (auto simp: red_ast_bpl_rel_def)
 
+lemma exhale_rel_propagate_pre_no_inv_same_exh:
+  assumes PropagateBpl: "red_ast_bpl_rel (uncurry R) (uncurry R') P ctxt \<gamma>0 \<gamma>1" 
+      and ExhRel: "exhale_rel R' R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>1 \<gamma>2"
+    shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  using assms
+  by (rule exhale_rel_propagate_pre_no_inv)
+
 lemma exhale_rel_propagate_post:
-  assumes ExhRel: "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1"
-      and PropagateBpl: "red_ast_bpl_rel (uncurry R') (uncurry R') P ctxt \<gamma>1 \<gamma>2" \<comment>\<open>Note that do not get Q in the post state for free\<close>
-          (*"\<And> \<omega>0 \<omega> ns. R \<omega>0 \<omega> ns \<Longrightarrow> 
-                \<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns') \<and> R \<omega>0 \<omega> ns'"*)
+  assumes ExhRel: "exhale_rel R R'' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1"
+      and PropagateBpl: "red_ast_bpl_rel (uncurry R'') (uncurry R') P ctxt \<gamma>1 \<gamma>2" \<comment>\<open>Note that do not get Q in the post state for free\<close>
     shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
   unfolding exhale_rel_def
   apply (rule rel_propagate_post[OF ExhRel[simplified exhale_rel_def]])
   using PropagateBpl
-  by blast 
+  by blast
+
+lemma exhale_rel_propagate_posts_same_exh:
+  assumes ExhRel: "exhale_rel R R Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>1"
+      and PropagateBpl: "red_ast_bpl_rel (uncurry R) (uncurry R') P ctxt \<gamma>1 \<gamma>2" 
+    shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma>0 \<gamma>2"
+  using assms
+  by (rule exhale_rel_propagate_post)
 
 subsection \<open>Structural rules\<close>
 

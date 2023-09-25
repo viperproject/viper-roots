@@ -1121,6 +1121,14 @@ proof -
     by blast
 qed
 
+subsection \<open>Tracking the well-definedness state\<close>
+
+lemma state_rel_def_same_to_state_rel:
+  assumes "rel_ext_eq (state_rel_def_same vpr_prog StateCons TyRep Tr AuxPred ctxt) \<omega>def \<omega> ns"      
+  shows "state_rel vpr_prog StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  using assms
+  by simp
+
 subsection \<open>Instantiating the output relation\<close>
 
 text \<open>The following lemmas are useful for constraining the output relation, if the output relation is a

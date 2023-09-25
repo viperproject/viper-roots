@@ -4,7 +4,7 @@ begin
 
 ML \<open>
   val Rmsg' = run_and_print_if_fail_2_tac' 
-
+                  
   fun zero_mask_lookup_tac ctxt tr_def_thm =
     resolve_tac ctxt [@{thm boogie_const_rel_lookup_2[where ?const = CZeroMask]}] THEN'
     resolve_tac ctxt [@{thm state_rel_boogie_const_rel}] THEN'
@@ -226,7 +226,7 @@ ML \<open>
       (Rmsg' "exhale finish IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish StateCons" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish ElemExhaleState" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale finish ElemExhaleState" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale finish HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale finish LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def},  #lookup_decl_exhale_heap hint] ctxt) ctxt) THEN'
@@ -234,14 +234,18 @@ ML \<open>
 
     end
 
-  fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =
-    (Rmsg' "stmt rel exhale progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
+  fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =    
+    (Rmsg' "stmt rel exhale pre propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv_same_exh}) ctxt) THEN'
+    (Rmsg' "stmt rel exhale propagate progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
+    (Rmsg' "stmt rel exhale track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
+    (Rmsg' "stmt rel exhale havoc pre propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}) ctxt) THEN'
     (* apply transitive rule such to make sure that the active big block before exhale_finish_tac is unfolded *)
     (Rmsg' "stmt rel exhale red ast bpl transitive" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive_3}) ctxt) THEN'
       (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
       (Rmsg' "stmt rel exhale progress" (progress_red_bpl_rel_tac ctxt) ctxt) THEN'
+    (Rmsg' "stmt rel exhale havoc rel intro" (resolve_tac ctxt @{thms rel_intro_no_fail}) ctxt)THEN'
     exhale_finish_tac ctxt (#basic_info info) hint
                  
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 

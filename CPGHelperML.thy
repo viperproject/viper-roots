@@ -6,6 +6,9 @@ ML \<open>
 
 val Rmsg' = run_and_print_if_fail_2_tac' 
 
+fun simp_then_if_not_solved_blast_tac ctxt = 
+  (simp_tac_with_thms [] ctxt |> SOLVED') ORELSE' (simp_tac_with_thms [] ctxt THEN' blast_tac ctxt)
+
 fun simplify_continuation ctxt = simp_only_tac @{thms convert_list_to_cont.simps} ctxt
 
 fun unfold_bigblock_atomic (ctxt : Proof.context) (bigblock : term) : (int -> tactic) =
@@ -168,7 +171,7 @@ fun prove_red_expr_bpl_tac ctxt =
     ]
 
 fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm errorMsgPrefix ctxt =
-  (Rmsg' (errorMsgPrefix^"DefVar3") (blast_tac ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar3") (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
   (Rmsg' (errorMsgPrefix^"DefVar4") (assm_full_simp_solved_with_thms_tac [lookup_ty_new_var_thm, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
   (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
   (Rmsg' (errorMsgPrefix^"DefVar6") (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
@@ -198,11 +201,9 @@ fun EVERY'_red_ast_bpl_rel_transitive _ [] = K all_tac
 
 fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs = 
     EVERY'_red_ast_bpl_rel_transitive ctxt tacs THEN'
-    resolve_tac ctxt @{thms red_ast_bpl_rel_refl}
-      
-
-fun simp_then_if_not_solved_blast_tac ctxt = 
-  (simp_tac_with_thms [] ctxt |> SOLVED') ORELSE' (simp_tac_with_thms [] ctxt THEN' blast_tac ctxt)
+    (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN'
+      assm_full_simp_solved_tac ctxt
+    )
 
 (* tactic for introducing temporary perm variable,
    assumes that the current big block is unfolded *)

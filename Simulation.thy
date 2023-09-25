@@ -40,6 +40,17 @@ lemma rel_intro:
   unfolding rel_general_def 
   by blast
 
+lemma rel_intro_no_fail:
+  assumes 
+    "\<And>\<omega> ns \<omega>'. 
+            R \<omega> ns \<Longrightarrow> 
+            Success \<omega> \<omega>' \<Longrightarrow>
+            \<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns')"
+  shows "rel_general R R' Success (\<lambda>_. False) P ctxt \<gamma> \<gamma>'"
+  using assms
+  unfolding rel_general_def
+  by blast
+
 lemma rel_success_elim:
   assumes "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>'" and
           "R \<omega> ns" and
