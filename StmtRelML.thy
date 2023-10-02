@@ -214,25 +214,30 @@ ML \<open>
     resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN'
     assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt
                                                                                    
-  fun exhale_finish_tac ctxt (basic_info: basic_stmt_rel_info) (hint: 'a exhale_rel_complete_hint) =
+  fun exhale_havoc_tac ctxt (basic_info: basic_stmt_rel_info) (lookup_decl_exhale_heap_thm: thm) =
     let val tr_thm = #tr_def_thm basic_info in
-      (Rmsg' "exhale finish 1" (resolve_tac ctxt @{thms exhale_stmt_rel_finish}) ctxt) THEN'
-      (Rmsg' "exhale finish StateRel"  (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish CtxtWf"  (resolve_tac ctxt [#ctxt_wf_thm basic_info]) ctxt) THEN'
-      (Rmsg' "exhale finish WfTyRepr"  (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
-      (Rmsg' "exhale finish ProgramTotal" (resolve_tac ctxt [@{thm HOL.sym} OF [#vpr_program_ctxt_eq_thm basic_info]]) ctxt) THEN'
-      (Rmsg' "exhale finish DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish WellDefSame" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish StateCons" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish ElemExhaleState" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def},  #lookup_decl_exhale_heap hint] ctxt) ctxt) THEN'
-      (Rmsg' "exhale finish ExhaleHeapFresh" (#aux_var_disj_tac basic_info ctxt) ctxt)
-
+      (Rmsg' "exhale havoc 1" (resolve_tac ctxt @{thms exhale_stmt_rel_finish}) ctxt) THEN'
+      (Rmsg' "exhale havoc StateRel"  (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc CtxtWf"  (resolve_tac ctxt [#ctxt_wf_thm basic_info]) ctxt) THEN'
+      (Rmsg' "exhale havoc WfTyRepr"  (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
+      (Rmsg' "exhale havoc ProgramTotal" (resolve_tac ctxt [@{thm HOL.sym} OF [#vpr_program_ctxt_eq_thm basic_info]]) ctxt) THEN'
+      (Rmsg' "exhale havoc DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc WellDefSame" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc StateCons" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc ElemExhaleState" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def},  lookup_decl_exhale_heap_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc ExhaleHeapFresh" (#aux_var_disj_tac basic_info ctxt) ctxt)
     end
+
+  fun exhale_pure_no_havoc_tac ctxt =
+    (Rmsg' "exhale no havoc init" (resolve_tac ctxt @{thms exhale_pure_stmt_rel_upd_havoc}) ctxt) THEN'
+    (Rmsg' "exhale no havoc state rel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "exhale no havoc success cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "exhale no havoc pure assertion cond" (assm_full_simp_solved_tac ctxt) ctxt)
 
   fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =    
     (Rmsg' "stmt rel exhale pre propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv_same_exh}) ctxt) THEN'
@@ -245,8 +250,12 @@ ML \<open>
     (Rmsg' "stmt rel exhale red ast bpl transitive" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive_3}) ctxt) THEN'
       (Rmsg' "exhale revert state relation" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
       (Rmsg' "stmt rel exhale progress" (progress_red_bpl_rel_tac ctxt) ctxt) THEN'
-    (Rmsg' "stmt rel exhale havoc rel intro" (resolve_tac ctxt @{thms rel_intro_no_fail}) ctxt)THEN'
-    exhale_finish_tac ctxt (#basic_info info) hint
+    (case (#lookup_decl_exhale_heap hint) of
+         SOME lookup_decl_exhale_heap_thm =>  
+            (Rmsg' "stmt rel exhale havoc rel intro" (resolve_tac ctxt @{thms rel_intro_no_fail}) ctxt) THEN'
+            exhale_havoc_tac ctxt (#basic_info info) lookup_decl_exhale_heap_thm
+       | NONE => exhale_pure_no_havoc_tac ctxt
+    )
                  
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 

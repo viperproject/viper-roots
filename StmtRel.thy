@@ -980,20 +980,24 @@ proof -
 qed
 
 lemma exhale_pure_stmt_rel_upd_havoc:
-  assumes "is_pure A"
-      and RelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R_out (snd \<omega>) ns"
+  assumes RelImp: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R_out (snd \<omega>) ns"     
+      and SuccessImp:
+        "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> 
+                 red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and>
+                 snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})"
+      and "is_pure A"
     shows "rel_general R (\<lambda>\<omega> ns. R_out (snd \<omega>) ns)
-                 (\<lambda>\<omega> \<omega>'. red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
-                         snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0})
-                  ) (\<lambda>_. False) P ctxt \<gamma> \<gamma>" (is "rel_general R _ ?Success ?Fail P ctxt \<gamma> \<gamma>")
+                 Success (\<lambda>_. False) P ctxt \<gamma> \<gamma>"
 proof (rule rel_intro)
   fix \<omega> ns \<omega>'
-  assume "R \<omega> ns" and "?Success \<omega> \<omega>'"
+  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
+  note SuccessAux = SuccessImp[OF \<open>Success \<omega> \<omega>'\<close>]
+
   hence "fst \<omega> = snd \<omega>"
     using exhale_pure_normal_same \<open>is_pure A\<close>
     by blast
 
-  with \<open>?Success \<omega> \<omega>'\<close> havoc_locs_state_empty
+  with SuccessAux havoc_locs_state_empty
   have "snd \<omega>' = snd \<omega>"
     by (metis (mono_tags, lifting) Collect_empty_eq less_imp_neq)
 

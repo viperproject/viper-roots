@@ -16,8 +16,11 @@ ML \<open>
 
   type 'a exhale_rel_complete_hint = {
      setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
-     exhale_stmt_rel_thm: thm, (* chooses the invariant instantiation *)
-     lookup_decl_exhale_heap: thm,
+     (* chooses the invariant instantiation *)
+     exhale_stmt_rel_thm: thm, 
+     (* if defined, then this is the lookup decl theorem of the temporarily havoced heap, otherwise 
+        there is no havoc because the assertion is pure *)
+     lookup_decl_exhale_heap: thm option, 
      exhale_rel_hint: 'a exhale_rel_hint 
   }
 
