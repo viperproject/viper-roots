@@ -656,7 +656,7 @@ lemma state_rel_heap_pred_independent:
 
 
                
-subsection \<open>Introducing new Boogie variables for the evaluatoin and well-definedness state\<close>
+subsection \<open>Introducing new Boogie variables for the evaluation and well-definedness state\<close>
 
 subsubsection \<open>Evaluation state\<close>
 
@@ -664,11 +664,11 @@ text \<open>The premises of the following lemma should be in-sync with the analo
       If they are not in-sync, then need to change the corresponding tactics.\<close>
 
 lemma mask_eval_var_upd_red_ast_bpl_propagate:
-  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          LookupTyNewVar: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))" and
-          "mvar = mask_var Tr" and          
-          TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
-          VarFresh: "mvar' \<notin> ({heap_var Tr, heap_var_def Tr} \<union>
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and LookupTyNewVar: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
+      and  "mvar = mask_var Tr"      
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and VarFresh: "mvar' \<notin> ({heap_var Tr, heap_var_def Tr} \<union>
                       \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>mask_var Tr\<close>.
                          The proof was simpler when adding this constraint (because it allows one to do the proof
                          by first treating the new variable as a new auxiliary variable) \<close>
@@ -676,27 +676,31 @@ lemma mask_eval_var_upd_red_ast_bpl_propagate:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)" 
-        shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign mvar' (Var mvar)#cs) str tr, cont), Normal ns) 
-                                  ((BigBlock name cs str tr, cont), Normal ns') \<and>
-                     state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns'"
+                      dom AuxPred)"
+      and NewBoogieState: "ns' = update_var (var_context ctxt) ns mvar' (the (lookup_var (var_context ctxt) ns mvar))"
+    shows "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' (Var mvar)#cs) str tr, cont), Normal ns) 
+                              ((BigBlock name cs str tr, cont), Normal ns') \<and>
+           state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns'"
 proof -
   from state_rel_mask_var_rel[OF StateRel]
-  obtain mb where LookupVarOldVar: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+  obtain mb where LookupVarOldVar: "lookup_var (var_context ctxt) ns mvar = Some (AbsV (AMask mb))" and
                   MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
-    unfolding mask_var_rel_def
+    unfolding mask_var_rel_def \<open>mvar = _\<close>
     by blast
 
-  let ?ns' = "update_var (var_context ctxt) ns mvar' (AbsV (AMask mb))"
+  hence Eq: "ns' = update_var (var_context ctxt) ns mvar' (AbsV (AMask mb))"
+    by (simp add: NewBoogieState)
 
   have Red: "red_ast_bpl P ctxt ((BigBlock name (Assign mvar' (Var mvar)#cs) str tr, cont), Normal ns) 
-                                  ((BigBlock name cs str tr, cont), Normal ?ns')"
+                                  ((BigBlock name cs str tr, cont), Normal ns')"
+    unfolding Eq
     apply (rule red_ast_bpl_one_assign[OF LookupTyNewVar])
      apply (fastforce intro: RedVar LookupVarOldVar simp: \<open>mvar = _\<close>)
     apply (simp add: TypeInterp)
     done
 
-  have StateRel':"state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ?ns'"
+  have StateRel':"state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns'"
+    unfolding Eq
     apply (rule state_rel_independent_var[OF StateRel])
     using VarFresh
        apply blast
@@ -705,12 +709,12 @@ proof -
     by (simp add: TypeInterp)
 
 
-  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' \<omega> ?ns'"
-    unfolding mask_var_rel_def 
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' \<omega> ns'"
+    unfolding mask_var_rel_def Eq
     using LookupTyNewVar MaskRel
     by fastforce
 
-  have "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
+  have "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns'"        
     apply (rule state_rel_mask_var_update[OF StateRel' MaskVarRel'])
     using VarFresh
     by blast
@@ -1121,6 +1125,390 @@ proof -
     by blast
 qed
 
+subsection \<open>Tracking states in the auxiliary variables\<close>
+
+definition pred_eq_mask
+  where "pred_eq_mask Pr TyRep FieldTr ctxt m \<omega> v \<equiv> 
+            lookup_var_ty (var_context ctxt) m = Some (TConSingle (TMaskId TyRep)) \<and>
+            (\<exists>mb. v = AbsV (AMask mb) \<and> mask_rel Pr FieldTr (get_mh_total_full \<omega>) mb)"
+
+
+definition pred_eq_heap_aux
+  where "pred_eq_heap_aux Pr TyRep FieldTr \<omega> hb \<equiv>
+               vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[]) \<and>
+               heap_rel Pr FieldTr (get_hh_total_full \<omega>) hb"
+
+
+definition pred_eq_heap
+  where "pred_eq_heap Pr TyRep FieldTr ctxt h \<omega> v \<equiv> 
+           lookup_var_ty (var_context ctxt) h = Some (TConSingle (THeapId TyRep)) \<and>
+           (\<exists>hb. v = AbsV (AHeap hb) \<and>
+                                         pred_eq_heap_aux Pr TyRep FieldTr \<omega> hb) \<and>
+                                    total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
+
+abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explicit to ensure that the Viper states have the same type\<close>
+ "program
+     \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
+        \<Rightarrow> 'a ty_repr_bpl
+           \<Rightarrow> tr_vpr_bpl
+              \<Rightarrow> (nat \<Rightarrow> ('a vbpl_absval Semantics.val \<Rightarrow> bool) option)
+                 \<Rightarrow> ('a vbpl_absval, 'b) econtext_bpl_general_scheme \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool"
+  where "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega> \<equiv> 
+          state_rel Pr StateCons TyRep Tr 
+                        (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)
+                                (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>))  
+                         ctxt"
+
+lemma state_rel_capture_current_mask:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and LookupVarTy: "lookup_var_ty (var_context ctxt) m' = Some (TConSingle (TMaskId TyRep))"
+      and LookupMaskVarSame: "lookup_var (var_context ctxt) ns m' = lookup_var (var_context ctxt) ns (mask_var Tr)"
+      and "m' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
+          range (const_repr Tr) \<union>
+          dom AuxPred"
+      and FieldTr: "field_tr = field_translation Tr"
+    shows "state_rel Pr StateCons TyRep Tr (AuxPred(m' \<mapsto> pred_eq_mask Pr TyRep field_tr ctxt m' \<omega>)) ctxt \<omega>def \<omega> ns"
+proof -
+  from state_rel_mask_var_rel[OF StateRel] obtain mb where
+    MaskVarRel: "lookup_var (var_context ctxt) ns (mask_var Tr) = Some (AbsV (AMask mb)) \<and> 
+                 mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+    unfolding mask_var_rel_def
+    by blast
+
+  let ?ns' = "update_var (var_context ctxt) ns m' (AbsV (AMask mb))"
+
+  have "ns = ?ns'"
+    using LookupMaskVarSame
+    by (simp add: MaskVarRel update_var_same_state)
+
+  moreover have "state_rel Pr StateCons TyRep Tr (AuxPred(m' \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m' \<omega>)) ctxt \<omega>def \<omega> ?ns'"
+  proof (rule state_rel_new_auxvar[OF StateRel \<open>m' \<notin> _\<close>])
+    show "pred_eq_mask Pr TyRep (field_translation Tr) ctxt m' \<omega> (AbsV (AMask mb))"
+      unfolding pred_eq_mask_def
+      using MaskVarRel LookupVarTy
+      by simp
+  next 
+    show "lookup_var_ty (var_context ctxt) m' = Some (TConSingle (TMaskId TyRep))"
+      by (rule LookupVarTy)
+  qed (insert TypeInterp, simp_all)
+
+  ultimately show ?thesis
+    by (simp add: FieldTr)
+qed
+
+lemma state_rel_def_same_set_synchronize_mask_var:
+  assumes StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and Cases: "mvar' = mask_var Tr \<or> mvar' = mask_var_def Tr"
+    shows "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> mask_var := mvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt \<omega> ns"
+proof -  
+  show ?thesis
+  proof (cases rule: disjE[OF Cases])
+    case 1
+    have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> mask_var_def := mvar' \<rparr>) AuxPred ctxt \<omega> ns"
+      apply (rule state_rel_mask_var_def_update[OF StateRel])
+      using state_rel_mask_var_rel[OF StateRel] \<open>mvar' = _\<close>      
+       apply simp
+      using state_rel_mask_var_disjoint[OF StateRel, where ?mvar = mvar'] \<open>mvar' = _\<close>
+      by fast
+    then show ?thesis 
+      using \<open>mvar' = _\<close>
+      by simp
+  next
+    case 2
+    have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> mask_var := mvar' \<rparr>) AuxPred ctxt \<omega> ns"
+      apply (rule state_rel_mask_var_update[OF StateRel])
+      using state_rel_mask_var_def_rel[OF StateRel] \<open>mvar' = _\<close>
+       apply simp
+      using state_rel_mask_var_disjoint[OF StateRel, where ?mvar = mvar'] \<open>mvar' = _\<close>
+      by fast
+    then show ?thesis 
+      using \<open>mvar' = _\<close>
+      by simp
+  qed
+qed
+
+lemma state_rel_def_same_set_synchronize_heap_var:
+  assumes StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and Cases: "hvar' = heap_var Tr \<or> hvar' = heap_var_def Tr"
+    shows "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega> ns"
+proof -  
+  show ?thesis
+  proof (cases rule: disjE[OF Cases])
+    case 1
+    have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> heap_var_def := hvar' \<rparr>) AuxPred ctxt \<omega> ns"
+      apply (rule state_rel_heap_var_def_update[OF StateRel])
+      using state_rel_heap_var_rel[OF StateRel] \<open>hvar' = _\<close>      
+       apply simp
+      using state_rel_heap_var_disjoint[OF StateRel, where ?hvar = hvar'] \<open>hvar' = _\<close>
+      by fast
+    then show ?thesis 
+      using \<open>hvar' = _\<close>
+      by simp
+  next
+    case 2
+    have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> heap_var := hvar' \<rparr>) AuxPred ctxt \<omega> ns"
+      apply (rule state_rel_heap_var_update[OF StateRel])
+      using state_rel_heap_var_def_rel[OF StateRel] \<open>hvar' = _\<close>
+       apply simp
+      using state_rel_heap_var_disjoint[OF StateRel, where ?hvar = hvar'] \<open>hvar' = _\<close>
+      by fast
+    then show ?thesis 
+      using \<open>hvar' = _\<close>
+      by simp
+  qed
+qed
+
+lemma mask_eval_var_upd_red_ast_bpl_propagate_capture:
+  assumes StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and LookupTyNewVar: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
+      and  "mvar = mask_var Tr"      
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and VarFresh: "mvar' \<notin> ({heap_var Tr, heap_var_def Tr} \<union>
+                      \<comment>\<open>The theorem should also hold, if the new variable is not different from \<^term>\<open>mask_var Tr\<close>.
+                         The proof was simpler when adding this constraint (because it allows one to do the proof
+                         by first treating the new variable as a new auxiliary variable) \<close>
+                      {mask_var Tr, mask_var_def Tr} \<union>
+                      (ran (var_translation Tr)) \<union>
+                      (ran (field_translation Tr)) \<union>
+                      (range (const_repr Tr)) \<union>
+                      dom AuxPred)"
+    shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign mvar' (Var mvar)#cs) str tr, cont), Normal ns) 
+                              ((BigBlock name cs str tr, cont), Normal ns') \<and>
+           state_rel_def_same Pr StateCons TyRep (Tr\<lparr>mask_var := mvar', mask_var_def := mvar'\<rparr>) (AuxPred(mvar \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt mvar \<omega>)) ctxt \<omega> ns'"
+           (is "\<exists>ns'. ?GoalRed ns' \<and> ?GoalStateRel ns'")
+proof -
+  from state_rel_mask_var_rel[OF StateRel]
+  obtain mb where LookupVarOldVar: "lookup_var (var_context ctxt) ns mvar = Some (AbsV (AMask mb))" and
+                  MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
+    unfolding mask_var_rel_def \<open>mvar = _\<close>
+    by blast
+
+  let ?ns' = "update_var (var_context ctxt) ns mvar' (AbsV (AMask mb))"
+
+  have Red: "?GoalRed ?ns'"
+    apply (rule red_ast_bpl_one_assign[OF LookupTyNewVar])
+    apply (simp add: LookupVarOldVar red_expr_red_exprs.RedVar)
+    apply (simp add: TypeInterp)
+    done
+
+  have StateRel':"state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ?ns'"
+    apply (rule state_rel_independent_var[OF StateRel])
+    using VarFresh
+       apply blast
+      apply (simp add: TypeInterp)
+     apply (rule LookupTyNewVar)
+    by (simp add: TypeInterp)
+
+
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' \<omega> ?ns'"
+    unfolding mask_var_rel_def
+    using LookupTyNewVar MaskRel
+    by fastforce
+
+  have StateRelAux: "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega> ?ns'"        
+    apply (rule state_rel_mask_var_update[OF StateRel' MaskVarRel'])
+    using VarFresh
+    by blast
+
+  have StateRel': "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>mask_var := mvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt \<omega> ?ns'"
+    using state_rel_def_same_set_synchronize_mask_var[OF StateRelAux, where ?mvar' = mvar']
+    by simp
+
+  have "?GoalStateRel ?ns'"
+  proof (rule state_rel_capture_current_mask[OF StateRel'], simp_all)
+    show "lookup_var_ty (var_context ctxt) mvar = Some (TConSingle (TMaskId TyRep))"
+      using state_rel_mask_var_rel[OF StateRel, simplified mask_var_rel_def] \<open>mvar = _\<close>
+      by fast
+  qed (insert TypeInterp state_rel_mask_var_disjoint[OF StateRel, where ?mvar=mvar] \<open>mvar = _\<close> VarFresh LookupVarOldVar, simp_all)
+      
+  with \<open>?GoalRed ?ns'\<close> show ?thesis
+    by blast
+qed
+
+
+lemma state_rel_capture_current_heap:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and LookupVarTy: "lookup_var_ty (var_context ctxt) h' = Some (TConSingle (THeapId TyRep))"
+      and LookupHeapVarSame: "lookup_var (var_context ctxt) ns h' = lookup_var (var_context ctxt) ns (heap_var Tr)"
+      and "h' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
+          range (const_repr Tr) \<union>
+          dom AuxPred"
+      and FieldTr: "field_tr = field_translation Tr"
+    shows "state_rel Pr StateCons TyRep Tr (AuxPred(h' \<mapsto> pred_eq_heap Pr TyRep field_tr ctxt h' \<omega>)) ctxt \<omega>def \<omega> ns"
+proof -
+  from state_rel_heap_var_rel[OF StateRel] obtain hb where
+    HeapVarRel: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb)) \<and> 
+                 vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
+                 heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb \<and>
+                 total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
+    unfolding heap_var_rel_def
+    by blast
+
+  let ?ns' = "update_var (var_context ctxt) ns h' (AbsV (AHeap hb))"
+
+  have "ns = ?ns'"
+    using LookupHeapVarSame
+    by (simp add: HeapVarRel update_var_same_state)
+
+  moreover have "state_rel Pr StateCons TyRep Tr (AuxPred(h' \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h' \<omega>)) ctxt \<omega>def \<omega> ?ns'"
+  proof (rule state_rel_new_auxvar[OF StateRel \<open>h' \<notin> _\<close>])
+    show "pred_eq_heap Pr TyRep (field_translation Tr) ctxt h' \<omega> (AbsV (AHeap hb))"
+      unfolding pred_eq_heap_def pred_eq_heap_aux_def      
+      using HeapVarRel LookupVarTy
+      by blast
+  next
+    show "lookup_var_ty (var_context ctxt) h' = Some (TConSingle (THeapId TyRep))"
+      by (rule LookupVarTy)
+  next
+    show "type_of_val (type_interp ctxt) (AbsV (AHeap hb)) = TConSingle (THeapId TyRep)"
+      using HeapVarRel
+      by (metis LookupHeapVarSame LookupVarTy StateRel instantiate_nil option.sel state_rel_state_well_typed state_well_typed_lookup)  
+  qed (insert TypeInterp, simp_all)
+
+  ultimately show ?thesis
+    by (simp add: FieldTr)
+qed
+
+lemma heap_eval_var_upd_red_ast_bpl_propagate_capture:
+  assumes StateRel: "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"
+      and LookupTyNewVar: "lookup_var_ty (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep))"
+      and  "hvar = heap_var Tr"      
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and VarFresh:  
+          "hvar' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
+          range (const_repr Tr) \<union>
+          dom AuxPred"
+    shows "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Assign hvar' (Var hvar)#cs) str tr, cont), Normal ns) 
+                              ((BigBlock name cs str tr, cont), Normal ns') \<and>
+           state_rel_def_same Pr StateCons TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) (AuxPred(hvar \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt hvar \<omega>)) ctxt \<omega> ns'"
+           (is "\<exists>ns'. ?GoalRed ns' \<and> ?GoalStateRel ns'")
+proof -
+  from state_rel_heap_var_rel[OF StateRel, simplified heap_var_rel_def]
+  obtain hb where LookupVarOldVar: "lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap hb))" and                  
+                  ValTyOpt: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, [])" and
+                  HeapRel:  "ViperBoogieBasicRel.heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb" and
+                  TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
+  by blast
+
+  let ?ns' = "update_var (var_context ctxt) ns hvar' (AbsV (AHeap hb))"
+
+  have Red: "?GoalRed ?ns'"
+    apply (rule red_ast_bpl_one_assign[OF LookupTyNewVar])
+     apply (simp add: LookupVarOldVar red_expr_red_exprs.RedVar \<open>hvar = _\<close>)
+    using TypeInterp ValTyOpt ViperBoogieAbsValueInst.type_of_vbpl_val_case_of
+    by simp
+    
+
+  have StateRel':"state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ?ns'"
+    apply (rule state_rel_independent_var[OF StateRel])
+    using VarFresh
+       apply blast
+      apply (simp add: TypeInterp)
+     apply (rule LookupTyNewVar)
+    using TypeInterp ValTyOpt ViperBoogieAbsValueInst.type_of_vbpl_val_case_of
+    by simp
+
+  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' \<omega> ?ns'"
+    unfolding heap_var_rel_def
+    using LookupTyNewVar ValTyOpt HeapRel TotalHeapWellTy
+    by simp
+
+  have StateRelAux: "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega> ?ns'"        
+    apply (rule state_rel_heap_var_update[OF StateRel' HeapVarRel'])
+    using VarFresh
+    by blast
+
+  have StateRel': "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>heap_var := hvar', heap_var_def := hvar'\<rparr>) AuxPred ctxt \<omega> ?ns'"
+    using state_rel_def_same_set_synchronize_heap_var[OF StateRelAux, where ?hvar' = hvar']
+    by simp
+
+  have "?GoalStateRel ?ns'"
+  proof (rule state_rel_capture_current_heap[OF StateRel'], simp_all)
+    show "lookup_var_ty (var_context ctxt) hvar = Some (TConSingle (THeapId TyRep))"
+      using state_rel_heap_var_rel[OF StateRel, simplified heap_var_rel_def] \<open>hvar = _\<close>
+      by fast
+  qed (insert TypeInterp state_rel_heap_var_disjoint[OF StateRel, where ?hvar=hvar] \<open>hvar = _\<close> VarFresh LookupVarOldVar, simp_all)
+      
+  with \<open>?GoalRed ?ns'\<close> show ?thesis
+    by blast
+qed
+
+lemma state_rel_capture_total_state_change_eval_state:
+  assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
+      and "m \<noteq> h"
+      and DisjAuxPred: "{m,h} \<inter> dom AuxPred = {}"
+      and "\<omega>0 = \<omega>def"
+  shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := m, heap_var := h\<rparr>) AuxPred ctxt \<omega>def \<omega>0 ns"
+proof -
+  obtain mb where LookupMask: "lookup_var (var_context ctxt) ns m = Some (AbsV (AMask mb))" and
+                  LookupVarTyMask: "lookup_var_ty (var_context ctxt) m = Some (TConSingle (TMaskId TyRep))" and
+                  MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>0) mb"
+    using state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=m] \<open>m \<noteq> h\<close> 
+    unfolding pred_eq_mask_def
+    by auto    
+
+  obtain hb where LookupVarTyHeap: "lookup_var_ty (var_context ctxt) h = Some (TConSingle (THeapId TyRep))" and
+                  LookupHeap: "lookup_var (var_context ctxt) ns h = Some (AbsV (AHeap hb))" and
+                  PredEqHeapAux: "pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>0 hb" and
+                  TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>0)"
+    using state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=h] \<open>m \<noteq> h\<close>
+    unfolding pred_eq_heap_def
+    by auto
+  
+  show ?thesis
+    unfolding state_rel_def state_rel0_def
+  proof (intro conjI)
+    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>))
+      (heap_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
+      unfolding heap_var_rel_def
+      apply (intro conjI)
+       apply (rule exI[where ?x = hb])
+      using  PredEqHeapAux[simplified pred_eq_heap_aux_def] 
+       apply (simp add: LookupHeap LookupVarTyHeap  del: vbpl_absval_ty_opt_heap_simp_alt)
+      apply (rule TotalHeapWellTy)
+      done
+  next
+    show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>))
+      (mask_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
+      unfolding mask_var_rel_def
+      apply (rule exI[where ?x = mb])
+      using LookupMask LookupVarTyMask MaskRel
+      by simp
+  next
+    show "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
+      apply (rule aux_vars_pred_sat_weaken[OF state_rel_aux_vars_pred_sat[OF StateRel]])
+      using DisjAuxPred
+       apply fastforce
+      using DisjAuxPred
+      by (metis (no_types, lifting) domIff insert_disjoint(2) map_upd_Some_unfold option.distinct(1))
+  next 
+    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
+    proof -
+      from state_rel_store_rel[OF StateRel] have 
+        "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega>def ns"
+        using state_rel_eval_welldef_eq[OF StateRel] store_rel_stable
+        by metis
+
+      thus ?thesis
+        using \<open>\<omega>0 = \<omega>def\<close>
+        by simp
+    qed
+  next
+    show "disjoint_list
+     [{heap_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>), heap_var_def (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)},
+      {mask_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>), mask_var_def (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)},
+      ran (var_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)), ran (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)),
+      range (const_repr (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)), dom AuxPred]"
+      apply simp \<comment>\<open>check other lemmas above on updating evaluation state, should be able to reuse lemmas\<close>
+      sorry
+  qed (insert StateRel[simplified state_rel_def state_rel0_def] 
+              state_rel_state_well_typed[OF StateRel]  
+              \<open>\<omega>0 = \<omega>def\<close>, simp_all)
+qed
+
+
 subsection \<open>Tracking the well-definedness state\<close>
 
 lemma state_rel_def_same_to_state_rel:
@@ -1148,7 +1536,7 @@ lemma red_ast_bpl_rel_inst_state_rel_conjunct2:
   using assms
   by blast  
 
-subsection \<open>Monotoncity\<close>
+subsection \<open>Monotonicity\<close>
 
 lemma true_mono_prop_downward: "mono_prop_downward (\<lambda>_. True)"
   unfolding mono_prop_downward_def

@@ -561,6 +561,26 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+lemma aux_vars_pred_sat_weaken:
+  assumes AuxVarsPredSat: "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
+      and "dom AuxPred' \<subseteq> dom AuxPred"
+      and WeakerPred: "\<And>x P' P v. AuxPred x = Some P \<Longrightarrow> AuxPred' x = Some P' \<Longrightarrow> P v \<Longrightarrow> P' v"
+    shows "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
+  unfolding aux_vars_pred_sat_def
+  proof (rule allI | rule impI)+
+    fix x P'
+    assume "AuxPred' x = Some P'"
+    moreover from this obtain P where "AuxPred x = Some P"
+      using \<open>dom _ \<subseteq> dom _\<close>
+      by blast
+
+    ultimately show "has_Some P' (lookup_var (var_context ctxt) ns x)"
+      using AuxVarsPredSat WeakerPred
+      unfolding aux_vars_pred_sat_def
+      by (metis has_Some_iff)
+  qed  
+
+
 definition state_rel0 :: "ViperLang.program \<Rightarrow> 
                           ('a full_total_state \<Rightarrow> bool) \<Rightarrow>
                           ('a vbpl_absval) absval_ty_fun \<Rightarrow> 
@@ -1018,6 +1038,8 @@ lemma heap_var_disjoint:
   apply force
   done
 
+lemmas state_rel_heap_var_disjoint = heap_var_disjoint[OF state_rel_state_rel0]
+
 lemma mask_var_disjoint:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
           "mvar = mask_var_def Tr \<or> mvar = mask_var Tr"
@@ -1052,6 +1074,8 @@ lemma mask_var_disjoint:
   apply (erule allE[where ?x=5])
   apply force
   done
+
+lemmas state_rel_mask_var_disjoint = mask_var_disjoint[OF state_rel_state_rel0]
 
 lemma set_inter_union_conj: "A \<inter> B = {} \<and> A \<inter> C = {} \<Longrightarrow> A \<inter> (B \<union> C) = {}"
   by auto
@@ -1308,19 +1332,8 @@ proof (intro conjI)
   note StateRel0 = state_rel_state_rel0[OF StateRel]
 
   show "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
-  unfolding aux_vars_pred_sat_def
-  proof (rule allI | rule impI)+
-    fix x P'
-    assume "AuxPred' x = Some P'"
-    moreover from this obtain P where "AuxPred x = Some P"
-      using \<open>dom _ \<subseteq> dom _\<close>
-      by blast
-
-    ultimately show "has_Some P' (lookup_var (var_context ctxt) ns x)"
-      using state_rel0_aux_vars_pred_sat[OF StateRel0] WeakerPred
-      unfolding aux_vars_pred_sat_def
-      by (metis has_Some_iff)
-  qed   
+    using aux_vars_pred_sat_weaken[OF state_rel0_aux_vars_pred_sat[OF StateRel0]] \<open>dom _ \<subseteq> dom _\<close> WeakerPred
+    by blast
 
   (* TODO: adjust the tactic disjoint_list_subset_tac such that it can be applied here *)
   show "disjoint_list

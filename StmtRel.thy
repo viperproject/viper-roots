@@ -1008,26 +1008,6 @@ qed (simp)
 
 subsection \<open>Assert statement relation\<close>
 
-definition pred_eq_mask
-  where "pred_eq_mask Pr FieldTr \<omega> v \<equiv> \<exists>mb. v = AbsV (AMask mb) \<and> mask_rel Pr FieldTr (get_mh_total_full \<omega>) mb"
-
-definition pred_eq_heap
-  where "pred_eq_heap Pr TyRep FieldTr \<omega> v \<equiv> \<exists>hb. vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[]) \<and>
-                                              heap_rel Pr FieldTr (get_hh_total_full \<omega>) hb"
-
-abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explicit to ensure that the Viper states have the same type\<close>
- "program
-     \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
-        \<Rightarrow> 'a ty_repr_bpl
-           \<Rightarrow> tr_vpr_bpl
-              \<Rightarrow> (nat \<Rightarrow> ('a vbpl_absval Semantics.val \<Rightarrow> bool) option)
-                 \<Rightarrow> ('a vbpl_absval, 'b) econtext_bpl_general_scheme \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool"
-  where "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega> \<equiv> 
-        state_rel Pr StateCons TyRep Tr 
-                      (AuxPred(m \<mapsto> pred_eq_mask Pr (field_translation Tr) \<omega>)
-                              (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) \<omega>))  
-                       ctxt"
-
 lemma assert_stmt_rel:
   assumes \<comment>\<open>CaptureState: "red_ast_bpl_rel (uncurry_eq R) (\<lambda> \<omega> ns. (uncurry (RStore (snd \<omega>))) \<omega> ns) P ctxt \<gamma> \<gamma>1"\<close>
           InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
