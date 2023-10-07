@@ -147,12 +147,20 @@ lemma red_ast_bpl_rel_weaken_input:
   by blast
 
 lemma red_ast_bpl_rel_strengthen_output:
-  assumes "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
-      and "red_ast_bpl_rel R0 R1' P ctxt \<gamma>0 \<gamma>1"
+  assumes "red_ast_bpl_rel R0 R1' P ctxt \<gamma>0 \<gamma>1"
+      and "\<And> \<omega> ns. R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
     shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
   using assms
   unfolding red_ast_bpl_rel_def
   by blast  
+
+lemma red_ast_bpl_rel_strengthen_output_2:
+  assumes "red_ast_bpl_rel R0 R1' P ctxt \<gamma>0 \<gamma>1"
+      and "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Q \<omega>"
+      and "\<And> \<omega> ns. Q \<omega> \<and> R1' \<omega> ns \<Longrightarrow> R1 \<omega> ns"
+    shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+  using assms
+  by (metis red_ast_bpl_rel_def)
 
 lemma red_ast_bpl_rel_input_implies_output:
   assumes "\<And>\<omega> ns. R1 \<omega> ns \<Longrightarrow> R2 \<omega> ns"

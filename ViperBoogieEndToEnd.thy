@@ -270,7 +270,6 @@ definition method_rel
                       method_decl.body mdecl \<noteq> None \<longrightarrow> \<comment>\<open>correctness of body is relevant only if the method has a body\<close>
                       vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
                       (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
-                       \<comment>\<open>TODO: generalize for abstract methods (then only postcondition framing matters)\<close>
                          stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>    
                           \<comment>\<open>because framedness of the postcondition was checked above, we may use it here.
                              TODO: could make sense to abstract \<^const>\<open>framing_exh\<close> away via a parameter\<close>                   

@@ -1159,6 +1159,14 @@ abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explici
                                 (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>))  
                          ctxt"
 
+lemma state_rel_capture_total_stateI:
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+      and "AuxPred' = (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>0)
+                              (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>0))"
+    shows "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"
+  using assms
+  by simp
+
 lemma state_rel_capture_current_mask:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
@@ -1436,17 +1444,20 @@ proof -
 qed
 
 lemma state_rel_capture_total_state_change_eval_state:
-  assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
+  assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
       and "m \<noteq> h"
       and DisjAuxPred: "{m,h} \<inter> dom AuxPred = {}"
       and "\<omega>0 = \<omega>def"
-  shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := m, heap_var := h\<rparr>) AuxPred ctxt \<omega>def \<omega>0 ns"
+      and "Tr = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := m, heap_var_def := h\<rparr>"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega>0 ns"
+  sorry
+(*
 proof -
   obtain mb where LookupMask: "lookup_var (var_context ctxt) ns m = Some (AbsV (AMask mb))" and
                   LookupVarTyMask: "lookup_var_ty (var_context ctxt) m = Some (TConSingle (TMaskId TyRep))" and
                   MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>0) mb"
     using state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=m] \<open>m \<noteq> h\<close> 
-    unfolding pred_eq_mask_def
+    unfolding pred_eq_mask_def \<open>Tr = _\<close>
     by auto    
 
   obtain hb where LookupVarTyHeap: "lookup_var_ty (var_context ctxt) h = Some (TConSingle (THeapId TyRep))" and
@@ -1454,27 +1465,27 @@ proof -
                   PredEqHeapAux: "pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>0 hb" and
                   TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>0)"
     using state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=h] \<open>m \<noteq> h\<close>
-    unfolding pred_eq_heap_def
+    unfolding pred_eq_heap_def \<open>Tr = _\<close>
     by auto
   
   show ?thesis
     unfolding state_rel_def state_rel0_def
   proof (intro conjI)
-    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>))
-      (heap_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
-      unfolding heap_var_rel_def
+    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr)
+      (heap_var Tr) \<omega>0 ns"
+      unfolding heap_var_rel_def \<open>Tr = _\<close>
       apply (intro conjI)
        apply (rule exI[where ?x = hb])
       using  PredEqHeapAux[simplified pred_eq_heap_aux_def] 
-       apply (simp add: LookupHeap LookupVarTyHeap  del: vbpl_absval_ty_opt_heap_simp_alt)
+       apply (simp add: LookupHeap LookupVarTyHeap \<open>Tr = _\<close>  del: vbpl_absval_ty_opt_heap_simp_alt)
       apply (rule TotalHeapWellTy)
       done
   next
-    show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>))
-      (mask_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
+    show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr)
+      (mask_var Tr) \<omega>0 ns"
       unfolding mask_var_rel_def
       apply (rule exI[where ?x = mb])
-      using LookupMask LookupVarTyMask MaskRel
+      using LookupMask LookupVarTyMask MaskRel \<open>Tr = _\<close>
       by simp
   next
     show "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
@@ -1484,12 +1495,12 @@ proof -
       using DisjAuxPred
       by (metis (no_types, lifting) domIff insert_disjoint(2) map_upd_Some_unfold option.distinct(1))
   next 
-    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)) \<omega>0 ns"
+    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega>0 ns"
     proof -
       from state_rel_store_rel[OF StateRel] have 
         "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega>def ns"
-        using state_rel_eval_welldef_eq[OF StateRel] store_rel_stable
-        by metis
+        using state_rel_eval_welldef_eq[OF StateRel] store_rel_stable \<open>Tr = _\<close>
+        by (metis assms(5) tr_vpr_bpl.select_convs(7) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2))
 
       thus ?thesis
         using \<open>\<omega>0 = \<omega>def\<close>
@@ -1497,17 +1508,17 @@ proof -
     qed
   next
     show "disjoint_list
-     [{heap_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>), heap_var_def (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)},
-      {mask_var (Tr\<lparr>mask_var := m, heap_var := h\<rparr>), mask_var_def (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)},
-      ran (var_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)), ran (field_translation (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)),
-      range (const_repr (Tr\<lparr>mask_var := m, heap_var := h\<rparr>)), dom AuxPred]"
+     [{heap_var Tr, heap_var_def Tr},
+      {mask_var Tr, mask_var_def Tr},
+      ran (var_translation Tr), ran (field_translation Tr),
+      range (const_repr Tr), dom AuxPred]"
       apply simp \<comment>\<open>check other lemmas above on updating evaluation state, should be able to reuse lemmas\<close>
       sorry
   qed (insert StateRel[simplified state_rel_def state_rel0_def] 
               state_rel_state_well_typed[OF StateRel]  
-              \<open>\<omega>0 = \<omega>def\<close>, simp_all)
+              \<open>\<omega>0 = \<omega>def\<close> \<open>Tr = _\<close>, simp_all)
 qed
-
+*)
 
 subsection \<open>Tracking the well-definedness state\<close>
 
