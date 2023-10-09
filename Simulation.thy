@@ -71,8 +71,15 @@ lemma rel_failure_elim:
 
 lemma rel_general_success_refl:
   assumes "\<And> \<omega>. \<not> Fail \<omega>"
-      and  "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
+      and "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>'"
     shows "rel_general R R Success Fail P ctxt \<gamma> \<gamma>"
+  using assms
+  by (auto intro!: rel_intro intro: red_ast_bpl_refl)
+
+lemma rel_general_success_refl_2:
+  assumes "\<And> \<omega>. \<not> Fail \<omega>"
+      and "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R' \<omega>' ns"
+    shows "rel_general R R' Success Fail P ctxt \<gamma> \<gamma>"
   using assms
   by (auto intro!: rel_intro intro: red_ast_bpl_refl)
 
