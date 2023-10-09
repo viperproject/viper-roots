@@ -619,6 +619,7 @@ qed
 lemma exhale_rel_field_acc_upd_rel:
 assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longrightarrow>                            
                            state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) ns" and
+        StateRelOutput: "\<And> \<omega>0_\<omega> ns. (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt)) \<omega>0_\<omega> ns \<Longrightarrow> R' \<omega>0_\<omega> ns"
         "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     WfConsistency: "wf_total_consistency ctxt_vpr StateCons Rt" and
@@ -631,7 +632,7 @@ assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longr
     MaskVar: "m_bpl = mask_var Tr " and
     FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
     RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
-shows "rel_general R (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt)) 
+shows "rel_general R R' 
                       (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. fst \<omega>0_\<omega> = fst \<omega>0_\<omega>' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) (snd \<omega>0_\<omega>'))
                       (\<lambda>_. False)
                       P ctxt 
@@ -719,9 +720,9 @@ next
 next
   fix \<omega>0_\<omega>def' ns
   assume "uncurry (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) \<omega>0_\<omega>def' ns"
-  thus "uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt) \<omega>0_\<omega>def' ns"
-    using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove
-    using map_add_upd_left map_le_def by fastforce
+  thus "R' \<omega>0_\<omega>def' ns"
+    using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove StateRelOutput map_add_upd_left map_le_def 
+    by fastforce
 next
   fix \<omega>0_\<omega>def \<omega>0_\<omega>def' ns a
   assume "R \<omega>0_\<omega>def ns" and

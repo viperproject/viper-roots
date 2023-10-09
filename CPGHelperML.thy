@@ -178,13 +178,23 @@ fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_ne
   (Rmsg' (errorMsgPrefix^"DefVarAuxVarDisj") ((#aux_var_disj_tac basic_stmt_rel_info) ctxt) ctxt)
 
 fun upd_mask_def_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =
-  (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
+  (Rmsg' "UpdMaskDefVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
   (Rmsg' "UpdMaskDefVar2" (resolve_tac ctxt @{thms mask_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
   (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdMask" ctxt)
 
 fun upd_heap_def_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt  =
   (Rmsg' "UpdHeapDefVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
   (Rmsg' "UpdHeapDefVar2" (resolve_tac ctxt @{thms heap_def_var_upd_red_ast_bpl_propagate}) ctxt) THEN'
+  (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdHeap" ctxt)
+
+fun capture_mask_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =
+  (Rmsg' "CaptureMaskVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
+  (Rmsg' "CaptureMaskVar2" (resolve_tac ctxt @{thms mask_eval_var_upd_red_ast_bpl_propagate_capture}) ctxt) THEN'
+  (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "CaptureMask" ctxt)
+
+fun capture_heap_var_tac lookup_ty_new_var_thm (basic_stmt_rel_info : basic_stmt_rel_info) ctxt =
+  (Rmsg' "CaptureHeapVar1" (resolve_tac ctxt @{thms red_ast_bpl_relI}) ctxt) THEN'
+  (Rmsg' "CaptureHeapVar2" (resolve_tac ctxt @{thms heap_eval_var_upd_red_ast_bpl_propagate_capture}) ctxt) THEN'
   (upd_def_var_tac_aux basic_stmt_rel_info lookup_ty_new_var_thm "UpdHeap" ctxt)
 
 
@@ -201,9 +211,29 @@ fun EVERY'_red_ast_bpl_rel_transitive _ [] = K all_tac
 
 fun EVERY'_red_ast_bpl_rel_transitive_refl ctxt tacs = 
     EVERY'_red_ast_bpl_rel_transitive ctxt tacs THEN'
-    (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN'
+    ((* old version: resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN' *)
+      resolve_tac ctxt @{thms red_ast_bpl_rel_input_eq_output} THEN'
       assm_full_simp_solved_tac ctxt
     )
+
+
+fun EVERY'_red_ast_bpl_rel_transitive_custom _ _ [] = K all_tac
+|   EVERY'_red_ast_bpl_rel_transitive_custom ctxt transitive_thm (tac :: tacs) = 
+      resolve_tac ctxt [transitive_thm] THEN'
+      tac ctxt THEN' 
+      assm_full_simp_solved_tac ctxt THEN'            
+      EVERY'_red_ast_bpl_rel_transitive_custom ctxt transitive_thm tacs
+
+fun EVERY'_red_ast_bpl_rel_transitive_with_inv_fst_eq_snd ctxt tacs =
+    EVERY'_red_ast_bpl_rel_transitive_custom ctxt 
+           @{thm red_ast_bpl_rel_transitive_with_inv[where ?Q="\<lambda>\<omega>. fst \<omega> = snd \<omega>"]}
+           tacs
+
+fun state_rel_capture_state_intro ctxt =
+  (Rmsg' "state rel capture state intro 1" (asm_full_simp_tac ctxt) ctxt) THEN'
+  (Rmsg' "state rel capture state intro 2" (resolve_tac ctxt @{thms state_rel_capture_total_stateI}) ctxt) THEN'
+  (Rmsg' "state rel capture state intro 3" (blast_tac ctxt) ctxt) THEN'
+  (Rmsg' "state rel capture state intro 4" (fastforce_tac ctxt []) ctxt)
 
 (* tactic for introducing temporary perm variable,
    assumes that the current big block is unfolded *)

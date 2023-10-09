@@ -169,6 +169,13 @@ lemma red_ast_bpl_rel_input_implies_output:
   unfolding red_ast_bpl_rel_def 
   by blast
 
+lemma red_ast_bpl_rel_input_eq_output:
+  assumes "\<And>\<omega> ns. R1 \<omega> ns \<longleftrightarrow> R2 \<omega> ns"
+  shows "red_ast_bpl_rel R1 R2 P ctxt \<gamma> \<gamma>"  
+  using assms red_ast_bpl_refl
+  unfolding red_ast_bpl_rel_def 
+  by blast
+
 lemma red_ast_bpl_rel_refl:
   shows "red_ast_bpl_rel R R P ctxt \<gamma> \<gamma>"  
   using red_ast_bpl_refl
@@ -196,6 +203,24 @@ lemma red_ast_bpl_rel_transitive_3:
     shows "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>2"
   using assms red_ast_bpl_rel_transitive
   by blast
+
+lemma red_ast_bpl_rel_transitive_with_inv:
+  assumes Rel1: "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+      and Inv: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Q \<omega>"
+      and Rel2: "red_ast_bpl_rel (\<lambda>\<omega> ns. R1 \<omega> ns \<and> Q \<omega>) R2 P ctxt \<gamma>1 \<gamma>2"
+    shows "red_ast_bpl_rel R0 R2 P ctxt \<gamma>0 \<gamma>2"
+proof (rule red_ast_bpl_relI)
+  fix \<omega> ns
+  assume "R0 \<omega> ns"
+  with Rel1 obtain ns1 where "red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>1, Normal ns1) \<and> R1 \<omega> ns1" 
+    unfolding red_ast_bpl_rel_def
+    by blast
+
+  with Rel2 show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>0, Normal ns) (\<gamma>2, Normal ns') \<and> R2 \<omega> ns'"
+    unfolding red_ast_bpl_rel_def
+    using Inv[OF \<open>R0 \<omega> ns\<close>] red_ast_bpl_transitive 
+    by blast
+qed
 
 lemma red_ast_bpl_rel_one_simple_cmd:
   assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow>

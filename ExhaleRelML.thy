@@ -24,6 +24,18 @@ ML \<open>
      exhale_rel_hint: 'a exhale_rel_hint 
   }
 
+  type 'a assert_rel_complete_hint = {
+     setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
+     (* chooses the invariant instantiation and the state relation *)
+     assert_stmt_rel_thm: thm,
+     (* tactic applied right after assert_stmt_rel_thm such that the resulting subgoal is
+        exhale_rel *)
+     init_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
+     (* tactic applied after on the resetting state subgoal *)
+     reset_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
+     exhale_rel_hint: 'a exhale_rel_hint 
+  }
+
   type 'a atomic_exhale_rel_tac = (Proof.context -> basic_stmt_rel_info -> (Proof.context -> basic_stmt_rel_info -> int -> tactic) option -> 'a -> int -> tactic)
 
   type 'a exhale_rel_info = {
@@ -153,7 +165,8 @@ ML \<open>
   fun upd_exhale_field_acc_tac ctxt (info: basic_stmt_rel_info) exp_rel_info =    
     (Rmsg' "UpdExhField Init Progress" (rewrite_rel_general_tac ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc_upd_rel}) ctxt) THEN'
-    (Rmsg' "UpdExhField StateRel" (simp_then_if_not_solved_blast_tac ctxt |> SOLVED') ctxt) THEN'    
+    (Rmsg' "UpdExhField StateRel Input" (simp_then_if_not_solved_blast_tac ctxt |> SOLVED') ctxt) THEN'    
+    (Rmsg' "UpdExhField StateRel Output" (simp_then_if_not_solved_blast_tac ctxt |> SOLVED') ctxt) THEN'    
    (* old version: (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN' *)
     (Rmsg' "UpdExhField Dom AuxPred" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField Wf TyRepr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'

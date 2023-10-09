@@ -1146,6 +1146,18 @@ definition pred_eq_heap
                                          pred_eq_heap_aux Pr TyRep FieldTr \<omega> hb) \<and>
                                     total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
 
+definition aux_pred_capture_state
+  where "aux_pred_capture_state Pr TyRep Tr AuxPred ctxt m h \<omega> \<equiv>
+           AuxPred(m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)
+                  (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>)"
+
+lemma aux_pred_capture_state_dom: 
+  "dom (aux_pred_capture_state Pr TyRep Tr AuxPred ctxt m h \<omega>) = dom AuxPred \<union> {m,h}"
+  unfolding aux_pred_capture_state_def
+  by auto
+
+find_theorems dom map_upd_set
+
 abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explicit to ensure that the Viper states have the same type\<close>
  "program
      \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
@@ -1155,8 +1167,7 @@ abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explici
                  \<Rightarrow> ('a vbpl_absval, 'b) econtext_bpl_general_scheme \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool"
   where "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega> \<equiv> 
           state_rel Pr StateCons TyRep Tr 
-                        (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)
-                                (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>))  
+                         (aux_pred_capture_state Pr TyRep Tr AuxPred ctxt m h \<omega>)
                          ctxt"
 
 lemma state_rel_capture_total_stateI:
@@ -1165,6 +1176,7 @@ lemma state_rel_capture_total_stateI:
                               (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>0))"
     shows "state_rel_capture_total_state Pr StateCons TyRep Tr AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"
   using assms
+  unfolding aux_pred_capture_state_def
   by simp
 
 lemma state_rel_capture_current_mask:
