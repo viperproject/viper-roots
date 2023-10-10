@@ -263,10 +263,10 @@ ML \<open>
     (Rmsg' "stmt rel assert propagate progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
 (*    (Rmsg' "stmt rel assert track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' assm_full_simp_solved_tac ctxt) ctxt) THEN'*)
     (Rmsg' "stmt rel assert setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
-    (K (print_tac ctxt "after setup well def assert")) THEN'
-    (Rmsg' "stmt rel assert exhale rel post propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_posts_same_exh}) ctxt) THEN'
+   (* (Rmsg' "stmt rel assert exhale rel post propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_posts_same_exh}) ctxt) THEN'*)
+    (Rmsg' "assert rel exhale rel capture state abstract" (resolve_tac ctxt @{thms exhale_rel_capture_state_abstract}) ctxt) THEN'
      exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
-    (Rmsg' "stmt rel assert exhale rel revert well-def vars" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'
+   (* (Rmsg' "stmt rel assert exhale rel revert well-def vars" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'*)
     (Rmsg' "stmt rel assert reset state" ((#reset_state_tac hint) (#basic_info info) ctxt) ctxt)
   
   fun assert_rel_init_tac_standard setup_assert_state_tacs (basic_info: basic_stmt_rel_info) ctxt =
@@ -279,8 +279,20 @@ ML \<open>
             @{thm red_ast_bpl_rel_transitive_with_inv_capture_state[where ?Q="\<lambda>\<omega>. fst \<omega> = snd \<omega>"]}
            (map (fn tac => tac basic_info) setup_assert_state_tacs)) ctxt) THEN'
     (Rmsg' "assert rel show state rel capture init 1" (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output}) ctxt) THEN'
-    (Rmsg' "assert rel show state rel capture init 2" (state_rel_capture_state_intro ctxt) ctxt) THEN'
-    (Rmsg' "assert rel exhale rel capture state abstract" (resolve_tac ctxt @{thms exhale_rel_capture_state_abstract}) ctxt)
+    (Rmsg' "assert rel show state rel capture init 2" (state_rel_capture_state_intro ctxt) ctxt)
+    
+  fun assert_rel_reset_state_tac_standard (basic_info: basic_stmt_rel_info) ctxt =
+    (Rmsg' "assert rel reset state init" (resolve_tac ctxt @{thms rel_general_success_refl_2}) ctxt) THEN'
+    (Rmsg' "assert rel reset state no failure" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset state simplify goal" (asm_full_simp_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset tac change eval state init" (resolve_tac ctxt @{thms state_rel_capture_total_state_change_eval_state}) ctxt) THEN'
+    (Rmsg' "assert rel reset tac state rel" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset tac mask and heap disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset tac field translation eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset tac aux pred disjointness" ((#aux_var_disj_tac basic_info) ctxt) ctxt) THEN'
+    (Rmsg' "assert rel reset tac well def same" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel translation records update" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt)
+
                  
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
@@ -298,7 +310,6 @@ ML \<open>
         (Rmsg' "AtomicExh3 Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | AssertHint assert_complete_hint =>
-        (K (print_tac ctxt "before assert tac")) THEN'
         (Rmsg' "AtomicAssert Start" (resolve_tac ctxt [#assert_stmt_rel_thm assert_complete_hint]) ctxt) THEN'
         (Rmsg' "AtomicAssert Init" ((#init_tac assert_complete_hint) basic_info ctxt) ctxt) THEN' 
         (assert_rel_tac ctxt exhale_info assert_complete_hint)
