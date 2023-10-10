@@ -258,19 +258,16 @@ ML \<open>
        | NONE => exhale_pure_no_havoc_tac ctxt
     )
 
-  fun assert_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a assert_rel_complete_hint) =
+  fun exhale_rel_setup_well_def_tac (setup_well_def_tac: Proof.context -> int -> tactic) ctxt =
     (Rmsg' "stmt rel assert exhale rel pre propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv}) ctxt) THEN'
     (Rmsg' "stmt rel assert propagate progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
-(*    (Rmsg' "stmt rel assert track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' assm_full_simp_solved_tac ctxt) ctxt) THEN'*)
-    (Rmsg' "stmt rel assert setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
-   (* (Rmsg' "stmt rel assert exhale rel post propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_posts_same_exh}) ctxt) THEN'*)
-    (Rmsg' "assert rel exhale rel capture state abstract" (resolve_tac ctxt @{thms exhale_rel_capture_state_abstract}) ctxt) THEN'
+    (Rmsg' "stmt rel assert setup well-def state exhale" (setup_well_def_tac ctxt) ctxt)
+
+  fun assert_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a assert_rel_complete_hint) =
      exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
-   (* (Rmsg' "stmt rel assert exhale rel revert well-def vars" (exhale_revert_state_relation ctxt (#basic_info info)) ctxt) THEN'*)
     (Rmsg' "stmt rel assert reset state" ((#reset_state_tac hint) (#basic_info info) ctxt) ctxt)
   
-  fun assert_rel_init_tac_standard setup_assert_state_tacs (basic_info: basic_stmt_rel_info) ctxt =
-    
+  fun assert_rel_init_tac_standard setup_assert_state_tacs (basic_info: basic_stmt_rel_info) (setup_well_def_tac: Proof.context -> int -> tactic) ctxt =    
     (Rmsg' "assert rel mask and heap var" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt) THEN'
     (Rmsg' "assert rel invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "assert rel setup assert propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv}) ctxt) THEN'
@@ -279,8 +276,20 @@ ML \<open>
             @{thm red_ast_bpl_rel_transitive_with_inv_capture_state[where ?Q="\<lambda>\<omega>. fst \<omega> = snd \<omega>"]}
            (map (fn tac => tac basic_info) setup_assert_state_tacs)) ctxt) THEN'
     (Rmsg' "assert rel show state rel capture init 1" (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output}) ctxt) THEN'
-    (Rmsg' "assert rel show state rel capture init 2" (state_rel_capture_state_intro ctxt) ctxt)
-    
+    (Rmsg' "assert rel show state rel capture init 2" (state_rel_capture_state_intro ctxt) ctxt) THEN'
+    exhale_rel_setup_well_def_tac setup_well_def_tac ctxt THEN'
+    (* abstract captured state such that AuxPred does not depend on state, otherwise automation does not work
+       we abstract at this point, because at this point we can make sure that the input and output relation are the same,
+       which is required by the tactic *)
+    (Rmsg' "assert rel exhale rel capture state abstract" (resolve_tac ctxt @{thms exhale_rel_capture_state_abstract}) ctxt)
+
+  fun assert_rel_init_tac_pure (_: basic_stmt_rel_info) (setup_well_def_tac: Proof.context -> int -> tactic) ctxt =    
+    (Rmsg' "assert rel invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "assert rel setup assert propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv_same_exh}) ctxt) THEN'
+    (Rmsg' "stmt rel assert propagate progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
+    (Rmsg' "stmt rel exhale track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (Rmsg' "stmt rel assert setup well-def state exhale" (setup_well_def_tac ctxt) ctxt)
+
   fun assert_rel_reset_state_tac_standard (basic_info: basic_stmt_rel_info) ctxt =
     (Rmsg' "assert rel reset state init" (resolve_tac ctxt @{thms rel_general_success_refl_2}) ctxt) THEN'
     (Rmsg' "assert rel reset state no failure" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
@@ -293,6 +302,8 @@ ML \<open>
     (Rmsg' "assert rel reset tac well def same" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "assert rel translation records update" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt)
 
+  fun assert_rel_reset_state_tac_pure (basic_info: basic_stmt_rel_info) ctxt =
+    K no_tac
                  
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 
@@ -311,7 +322,7 @@ ML \<open>
         (exhale_rel_tac ctxt exhale_info exh_complete_hint)
      | AssertHint assert_complete_hint =>
         (Rmsg' "AtomicAssert Start" (resolve_tac ctxt [#assert_stmt_rel_thm assert_complete_hint]) ctxt) THEN'
-        (Rmsg' "AtomicAssert Init" ((#init_tac assert_complete_hint) basic_info ctxt) ctxt) THEN' 
+        (Rmsg' "AtomicAssert Init" ((#init_tac assert_complete_hint) basic_info (#setup_well_def_state_tac assert_complete_hint basic_info) ctxt) ctxt) THEN' 
         (assert_rel_tac ctxt exhale_info assert_complete_hint)
      | MethodCallHint (callee_name, rets_lookup_decl_thms, inhale_info_call, exhale_info_call, exh_pre_complete_hint, inh_post_complete_hint) => 
         let val callee_data = Symtab.lookup (#method_data_table basic_info) callee_name |> Option.valOf in

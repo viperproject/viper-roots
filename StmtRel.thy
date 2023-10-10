@@ -1120,7 +1120,7 @@ lemma exhale_rel_capture_state_abstract:
   using exhale_rel_elim_2[OF ExhaleRel]
   by blast
 
-lemma assert_stmt_rel_alt_inst_2:
+lemma assert_stmt_rel_inst_2:
   assumes InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
       and ExhaleRel: " exhale_rel (rel_ext_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
                                   R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>2"

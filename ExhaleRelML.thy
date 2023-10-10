@@ -29,8 +29,8 @@ ML \<open>
      (* chooses the invariant instantiation and the state relation *)
      assert_stmt_rel_thm: thm,
      (* tactic applied right after assert_stmt_rel_thm such that the resulting subgoal is
-        exhale_rel *)
-     init_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
+        exhale_rel; the second argument tactic is for setting up the well-definedness state *)
+     init_tac: basic_stmt_rel_info -> (Proof.context -> int -> tactic) -> Proof.context -> int -> tactic,
      (* tactic applied after on the resetting state subgoal *)
      reset_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
      exhale_rel_hint: 'a exhale_rel_hint 
