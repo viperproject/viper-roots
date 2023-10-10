@@ -655,6 +655,15 @@ next
     by blast
 qed
 
+lemma red_pure_exps_total_Some_lengthD: 
+  assumes "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some v_args)"
+  shows "length es = length v_args"
+proof -
+  from red_pure_exps_total_list_all2[OF assms]
+  show ?thesis
+    by (simp add: list_all2_lengthD)
+qed
+
 lemma list_all2_red_pure_exps_total:
   assumes "list_all2 (\<lambda>e v. red_pure_exp_total ctxt R \<omega>_def e \<omega> (Val v)) es vs"
   shows "red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs)"

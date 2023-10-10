@@ -64,6 +64,16 @@ lemma exhale_rel_failure_elim:
   unfolding exhale_rel_def rel_general_def
   by simp
 
+lemma exhale_rel_elim_2:
+  assumes "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
+      and "R \<omega>0 \<omega> ns"
+      and "Q assertion_vpr \<omega>0 \<omega>"
+      and "red_exhale ctxt_vpr StateCons \<omega>0 assertion_vpr \<omega> res"
+    shows "rel_vpr_aux (\<lambda>\<omega>' ns. R' \<omega>0 \<omega>' ns) P ctxt \<gamma> \<gamma>' ns res"
+  using assms
+  unfolding exhale_rel_def rel_vpr_aux_def rel_general_def
+  by force
+
 subsection \<open>Exhale relation invariant\<close>
 
 definition is_exh_rel_invariant
