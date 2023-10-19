@@ -758,7 +758,7 @@ proof (rule allI | rule impI)+
               with OnlyArgsInPre VprNoPermUnfoldingSpec RedInhPre \<open>rpre = RNormal \<omega>pre\<close>
               have RedInhStoreBody: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) 
                         ?\<omega>_store_body (RNormal (\<omega>pre \<lparr> get_store_total := get_store_total \<omega>body \<rparr>))"
-                using red_pure_exp_inhale_store_same_on_free_var(3)[OF RedInhPre _ StoresAgreeOnArgs]
+                using red_pure_exp_inhale_store_same_on_free_var(3)[OF RedInhPre _ StoresAgreeOnArgs] WfConsistency
                 by simp
                 
               hence 
