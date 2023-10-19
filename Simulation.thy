@@ -438,7 +438,7 @@ lemma rel_general_cond:
                            (is "rel_general R1 R1 SuccessExp FailExp P ctxt \<gamma> ?\<gamma>_if") and
 
           \<comment>\<open>\<^term>\<open>R1Thn\<close> and \<^term>\<open>R1Else\<close> may differ from \<^term>\<open>R1\<close> because the knowledge that a branch is taken
-             provides constrains the states.\<close>
+             constrains the states.\<close>
 
           RelThn: "rel_general R1Thn R2 SuccessThn FailThn P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" and
           RelElse: "rel_general R1Else R2 SuccessElse FailElse P ctxt (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)" and

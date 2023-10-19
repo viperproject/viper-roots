@@ -1035,7 +1035,7 @@ proof -
   qed
 qed
 
-text \<open>The following lemma expresses the well-definedness result provided by in an
+text \<open>The following lemma expresses the well-definedness result provided by an
  if-statement encoding for a lazy binary operation in the case where short-circuiting does not apply.\<close>
 lemma syn_lazy_bop_short_circuit_wf_rel:
   assumes
@@ -1593,7 +1593,8 @@ qed
 method wf_rel_bop_op_trivial_tac =
         (rule wf_rel_bop_op_trivial, solves\<open>simp\<close>) 
 
-\<comment>\<open>the following tactic only works for trivial well-definedness checks\<close>
+\<comment>\<open>the following tactic only works for trivial well-definedness checks; see ExprWfRel.thy for a more general 
+  tactic expressed in ML\<close>
 
 method wf_tac = (rule var_expr_wf_rel | 
                  rule lit_expr_wf_rel |

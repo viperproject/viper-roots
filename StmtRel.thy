@@ -2050,7 +2050,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
   
       hence AssertionFraming_\<omega>0'_only_args: "assertion_framing_state ctxt_vpr StateCons (method_decl.pre mdecl) ?\<omega>0_empty"
      \<comment>\<open>using that return variables do not appear in precondition\<close>
-        apply (rule assertion_framing_store_same_on_free_var)
+        apply (rule assertion_framing_store_same_on_free_var[OF WfConsistency])
         apply (insert StoreSameOnArgs, insert MethodSpecSubset)
         by auto
   

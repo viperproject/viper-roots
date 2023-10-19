@@ -2,87 +2,6 @@ theory ViperBoogieRelUtil
   imports ViperBoogieTranslationInterface ExpRel Simulation
 begin
 
-subsection \<open>Well-formed state consistency\<close>
-
-text \<open>Many of the theorems are parametrized by the state consistency. Many of the theorems require
-certain properties on the state consistency. The following well-formedness definition captures
-these properties.\<close>
-
-definition wf_total_consistency 
-  where "wf_total_consistency ctxt R Rt \<equiv> 
-               mono_prop_downward R \<and>
-               (\<forall>\<omega>. is_empty_total_full \<omega> \<longrightarrow> R \<omega>) \<and>
-               (\<forall>\<omega> \<omega>' \<Lambda> stmt. R \<omega> \<longrightarrow> red_stmt_total ctxt R \<Lambda> stmt \<omega> (RNormal \<omega>') \<longrightarrow> R \<omega>') \<and>
-               \<comment>\<open>The following statement ensures that states in the body of a scope preserve consistency.\<close>
-               (\<forall>\<omega> v. R \<omega> \<longrightarrow> R (shift_and_add_state_total \<omega> v)) \<and> 
-               (\<forall>\<omega>. R \<omega> \<longleftrightarrow> (Rt (get_total_full \<omega>) \<and> (\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> Rt \<phi>)) )"
-
-lemma total_consistencyI:
-  assumes "wf_total_consistency ctxt R Rt"
-      and "Rt (get_total_full \<omega>)"
-      and "\<And> lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<Longrightarrow> Rt \<phi>"
-    shows "R \<omega>"
-  using assms
-  unfolding wf_total_consistency_def
-  by blast
-
-lemma wf_total_consistency_trivial: "wf_total_consistency ctxt (\<lambda>_.True) (\<lambda>_.True)"
-  unfolding wf_total_consistency_def mono_prop_downward_def
-  by blast
-
-lemma total_consistency_red_stmt_preserve:
-  assumes "wf_total_consistency ctxt R Rt" 
-      and "R \<omega>"
-      and "red_stmt_total ctxt R \<Lambda> stmt \<omega> (RNormal \<omega>')"
-    shows "R \<omega>'"
-  using assms
-  unfolding wf_total_consistency_def
-  by blast
-
-lemma total_consistency_store_update:
-  assumes "wf_total_consistency ctxt R Rt" 
-      and "R \<omega>" 
-      and "get_total_full \<omega>' = get_total_full \<omega>" 
-      and "get_trace_total \<omega>' = get_trace_total \<omega>"
-    shows "R \<omega>'"
-  using assms
-  unfolding wf_total_consistency_def
-  by metis
-
-lemma total_consistency_store_update_2:
-  assumes "wf_total_consistency ctxt R Rt" 
-      and "R \<omega>" 
-    shows "R (\<omega> \<lparr> get_store_total := \<sigma> \<rparr>)"
-  using assms total_consistency_store_update
-  by fastforce
-
-lemma total_consistency_trace_update:
-  assumes "wf_total_consistency ctxt R Rt" 
-      and "R \<omega>" 
-      and "get_store_total \<omega>' = get_store_total \<omega>"
-      and "get_total_full \<omega>' = get_total_full \<omega>" 
-      and "\<And> lbl \<phi>. get_trace_total \<omega>' lbl = Some \<phi> \<Longrightarrow> Rt \<phi>"
-    shows "R \<omega>'"
-  using assms 
-  unfolding wf_total_consistency_def
-  by simp
-
-lemma total_consistency_trace_update_2:
-  assumes "wf_total_consistency ctxt R Rt" 
-      and "R \<omega>" 
-      and "\<And> lbl \<phi>. t lbl = Some \<phi> \<Longrightarrow> Rt \<phi>"
-    shows "R (\<omega> \<lparr> get_trace_total := t \<rparr>)"
-  using assms 
-  unfolding wf_total_consistency_def
-  by simp
-
-lemma wf_total_consistency_trace_mono_downwardD:
-  assumes "wf_total_consistency ctxt R Rt"
-  shows "mono_prop_downward R"
-  using assms
-  unfolding wf_total_consistency_def
-  by blast
-
 subsection \<open>Temporary variable management\<close>
 
 lemma store_temporary_var:
@@ -1526,13 +1445,47 @@ proof -
         by metis
     qed
   next
-    show "disjoint_list
+    have Disj1: "disjoint_list
+     [{heap_var Tr', heap_var_def Tr'},
+      {mask_var Tr', mask_var_def Tr'},
+      ran (var_translation Tr'), ran (field_translation Tr'),
+      range (const_repr Tr'), dom AuxPred]"      
+      using state_rel_disjoint[OF StateRel, simplified aux_pred_capture_state_dom]
+      apply (rule disjoint_list_subset_list_all2)
+      by fastforce
+
+    have Disj2: "disjoint_list
+     ([{heap_var Tr', heap_var_def Tr'}]@
+       (({mask_var Tr', mask_var_def Tr'} \<union> {m})#
+       [ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'), dom AuxPred]))"
+      apply (rule disjoint_list_add_set)
+      using Disj1
+       apply simp
+      using state_rel_aux_pred_disjoint[OF StateRel, simplified aux_pred_capture_state_dom] DisjAuxPred
+      by force
+
+    have  "disjoint_list
+       ([]@(({heap_var Tr', heap_var_def Tr'} \<union> {h})#
+        [{mask_var Tr', mask_var_def Tr', m},
+        ran (var_translation Tr'), ran (field_translation Tr'),
+        range (const_repr Tr'), dom AuxPred]))"
+      apply (rule disjoint_list_add_set)      
+      using Disj2
+       apply simp
+       apply (erule disjoint_list_subset_list_all2)
+       apply simp
+      using state_rel_aux_pred_disjoint[OF StateRel, simplified aux_pred_capture_state_dom] DisjAuxPred \<open>m \<noteq> h\<close>
+      by force
+
+    thus "disjoint_list
      [{heap_var Tr, heap_var_def Tr},
       {mask_var Tr, mask_var_def Tr},
       ran (var_translation Tr), ran (field_translation Tr),
       range (const_repr Tr), dom AuxPred]"
-      apply simp \<comment>\<open>check other lemmas above on updating evaluation state, should be able to reuse lemmas\<close>
-      sorry
+      apply (rule disjoint_list_subset_list_all2)
+      apply (simp add: \<open>Tr = _\<close>)
+      done
+
   qed (insert StateRel[simplified state_rel_def state_rel0_def] 
               state_rel_state_well_typed[OF StateRel]  
               \<open>\<omega>0 = \<omega>def\<close> \<open>Tr = _\<close>, simp_all)
