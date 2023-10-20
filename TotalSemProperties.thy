@@ -2336,15 +2336,134 @@ lemma red_stmt_preserves_labels:
       and "res = RNormal \<omega>'"
       and "get_trace_total \<omega> lbl = Some \<phi>"
     shows "get_trace_total \<omega>' lbl = Some \<phi>"
-  sorry
+  using assms
+proof (induction arbitrary: \<omega>')
+  case (RedInhale A \<omega> res \<Lambda>)
+  then show ?case 
+    by (metis inhale_only_changes_mask(3))
+next
+  case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
+  then show ?case 
+    by (metis (no_types, lifting) exhale_only_changes_total_state_aux havoc_locs_state_same_trace stmt_result_total.inject)
+next
+  case (RedHavoc \<Lambda> x ty v \<omega>)
+  then show ?case 
+    using havoc_locs_state_same_trace
+    by fastforce
+next
+  case (RedLocalAssign \<omega> e v \<Lambda> x ty)
+  then show ?case by fastforce
+next
+  case (RedFieldAssign \<omega> e_r addr f e v ty \<Lambda>)
+  then show ?case by fastforce    
+next
+  case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
+  from this obtain \<omega>Post where "resPost = RNormal \<omega>Post"
+    by (metis map_stmt_result_total.simps(2) map_stmt_result_total.simps(3) stmt_result_total.exhaust)
+  moreover from this obtain \<omega>Pre where "resPre = RNormal \<omega>Pre"
+    using RedMethodCall
+    by (metis stmt_result_total.exhaust)
+  ultimately have "res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) (RNormal \<omega>Post)"
+    using RedMethodCall
+    by blast    
+  thus ?case    
+    unfolding reset_state_after_call_def
+    using \<open>get_trace_total \<omega> lbl = _\<close> \<open>res = RNormal \<omega>'\<close>
+    by simp    
+next
+  case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
+  then show ?case 
+    by auto
+next
+  case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res \<Lambda>)
+  hence "\<omega>' \<in> W'"
+    using th_result_rel_normal
+    by blast
+
+  then show ?case 
+    using \<open>W' = _\<close> \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>
+    by fastforce    
+next
+  case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>' \<Lambda>)
+  then show ?case 
+    by fastforce
+next
+  case (RedFold \<omega> e_args v_args e_p v_p pred_id res \<Lambda>)
+  then show ?case 
+    by (auto elim: FoldRelNormalCase)    
+next
+  case (RedFoldWildcard \<omega> e_args v_args pred_id p res \<Lambda>)
+  then show ?case 
+    by (auto elim: FoldRelNormalCase)    
+next
+  case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
+  then show ?case 
+  by (cases res) simp_all
+next
+  case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
+  then show ?case by blast
+next
+  case (RedIfFalse \<omega> e_b \<Lambda> s_els res s_thn)
+  then show ?case by blast
+next
+  case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
+  then show ?case by blast
+qed (simp_all)
 
 lemma red_stmt_preserves_unmodified_variables:
   assumes "red_stmt_total ctxt_vpr StateCons \<Lambda> stmt \<omega> res"
       and "res = RNormal \<omega>'"
       and "x \<notin> modif stmt"
     shows "get_store_total \<omega> x = get_store_total \<omega>' x"
-  sorry
-
+  using assms
+proof (induction arbitrary: \<omega>')
+  case (RedInhale A \<omega> res \<Lambda>)
+  then show ?case 
+    by (metis inhale_only_changes_mask(3))
+next
+  case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
+  then show ?case 
+    by (metis (no_types, lifting) exhale_only_changes_total_state_aux havoc_locs_state_same_store stmt_result_total.inject)
+next
+  case (RedHavoc \<Lambda> x ty v \<omega>)
+  then show ?case by fastforce
+next
+  case (RedLocalAssign \<omega> e v \<Lambda> x ty)
+  then show ?case by fastforce
+next
+  case (RedFieldAssign \<omega> e_r addr f e v ty \<Lambda>)
+  then show ?case by fastforce
+next
+  case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
+  then show ?case sorry
+next
+  case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
+  then show ?case by fastforce
+next
+  case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res \<Lambda>)
+  then show ?case sorry
+next
+  case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>' \<Lambda>)
+  then show ?case sorry
+next
+  case (RedFold \<omega> e_args v_args e_p v_p pred_id res \<Lambda>)
+  then show ?case sorry
+next
+  case (RedFoldWildcard \<omega> e_args v_args pred_id p res \<Lambda>)
+  then show ?case sorry
+next
+  case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
+  then show ?case sorry
+next
+  case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
+  then show ?case by fastforce
+next
+  case (RedIfFalse \<omega> e_b \<Lambda> s_els res s_thn)
+  then show ?case by fastforce
+next
+  case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
+  then show ?case by fastforce
+qed (simp_all)
 
 lemma free_var_assertion_map_free_var_pure_exp:                                                            
   "free_var_assertion (Atomic A) = \<Union> (set (map free_var_pure_exp (sub_expressions_atomic A)))"
@@ -2381,14 +2500,6 @@ lemma inhale_perm_single_similar:
   using assms
   unfolding inhale_perm_single_def
   oops
-
-(*
-lemma inhale_perm_single_nonempty:
-  assumes "pgte pwrite (padd (get_mh_total_full \<omega> lh) q)"
-  shows "inhale_perm_single R \<omega> lh (Some (Abs_prat p)) \<noteq> {}"
-  using assms
-  unfolding inhale_perm_single_def
-*)
 
 lemma inhale_perm_single_Some_non_empty_preserve:
   assumes WfConsistent: "wf_total_consistency ctxt R Rt"
@@ -2789,6 +2900,26 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+lemma exh_if_total_map_stmt_result_total:
+  assumes "b \<longleftrightarrow> b'"
+      and "\<omega> = f \<omega>'"
+    shows "exh_if_total b \<omega> = map_stmt_result_total f (exh_if_total b' \<omega>')" 
+  using assms
+  apply (cases "exh_if_total b \<omega>")
+  apply (erule exh_if_total.elims, simp, simp)+
+  done
+
+lemma red_exhale_accI:
+  assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+      and "a = the_address r"      
+      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p)))" (is "\<omega>' = ?\<omega>def")      
+      and "res = exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_prat p))) \<omega>'" 
+    shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
+  unfolding \<open>res = _\<close> \<open>\<omega>' = _\<close>
+  apply (rule TotalSemantics.ExhAcc)
+  using assms by auto
+
 lemma exhale_same_on_free_var:
   assumes "red_exhale ctxt StateCons \<omega>def1 A \<omega>1 res1"
       and "res2 = map_stmt_result_total (\<lambda>\<omega>. \<omega> \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>) res1"
@@ -2800,7 +2931,55 @@ lemma exhale_same_on_free_var:
   using assms
 proof (induction arbitrary: \<omega>2 res2)
   case (ExhAcc mh \<omega> e_r r e_p p a f)
-  then show ?case sorry
+
+  hence ConstraintExp: "no_unfolding_pure_exp e_r \<and> no_unfolding_pure_exp e_p"
+    by simp
+
+  from ExhAcc have FreeVarExp: "\<And>x. x \<in> free_var_pure_exp e_r \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x"
+                               "\<And>x. x \<in> free_var_pure_exp e_p \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x"
+    by simp_all
+
+  with ConstraintExp have RedRef: "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+                          RedPerm: "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e_p;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+    using red_pure_exp_inhale_store_same_on_free_var(1)  ExhAcc
+    by blast+
+
+  let ?\<omega>' = " (if r = Null then \<omega>2 else update_mh_loc_total_full \<omega>2 (the_address r, f) (get_mh_total_full \<omega>2 (the_address r, f) - Abs_prat p))"
+  show ?case
+  proof (rule red_exhale_accI[OF RedRef RedPerm], simp, simp)
+    show "res2 = exh_if_total (0 \<le> p \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_prat p))) ?\<omega>'"
+    proof (cases r)
+      case (Address a')
+      hence "r = Address a"
+        using ExhAcc
+        by simp
+
+      show ?thesis 
+        unfolding \<open>r = Address a\<close> \<open>res2 = _\<close>
+      proof (rule HOL.sym, simp, rule exh_if_total_map_stmt_result_total)
+        have Eq1: "get_total_full \<omega>2 = get_total_full \<omega>"
+          using ExhAcc
+          by simp
+
+        show "\<omega>2\<lparr>get_total_full := get_total_full \<omega>2
+         \<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>2))((a, f) := get_mh_total (get_total_full \<omega>2) (a, f) - Abs_prat p)\<rparr>\<rparr> =
+                \<omega>\<lparr>get_total_full := get_total_full \<omega>\<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>))((a, f) := mh (a, f) - Abs_prat p)\<rparr>,
+                  get_store_total := get_store_total \<omega>2\<rparr>"
+          unfolding Eq1 \<open>mh = _\<close>
+          apply (rule full_total_state.equality)
+          by (simp_all add: ExhAcc)      
+      qed (simp add: ExhAcc)
+    next
+      case Null
+      then show ?thesis 
+        apply (simp add: \<open>res2 = _\<close>)
+        apply (rule HOL.sym)
+        apply (rule exh_if_total_map_stmt_result_total)
+         apply simp
+          apply (rule full_total_state.equality)
+        by (simp_all add: ExhAcc)      
+    qed
+  qed      
 next
   case (ExhAccWildcard mh \<omega> e_r r a q f)
   then show ?case sorry
@@ -2823,7 +3002,13 @@ next
     by (metis (full_types) ExhPure.prems(1) exh_if_total.simps(1) exh_if_total.simps(2) map_stmt_result_total.simps(1) map_stmt_result_total.simps(3))
 next
   case (SubAtomicFailure A \<omega>)
-  then show ?case sorry
+  hence "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (sub_expressions_atomic A) \<omega>2 None"
+    using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_atomic_subexp free_var_assertion_map_free_var_pure_exp
+    by blast
+
+  then show ?case 
+    using SubAtomicFailure    
+    by (auto intro: TotalSemantics.SubAtomicFailure)
 next
   case (ExhStarNormal A \<omega> \<omega>'' B res)
   let ?\<omega>''2 = "\<omega>'' \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>"

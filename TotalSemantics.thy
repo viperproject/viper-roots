@@ -215,6 +215,10 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
        red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_prat q) pred_body) \<omega>0 RFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
+inductive_cases FoldRelNormalCase: "fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>')"
+inductive_cases FoldRelFailureCase: "fold_rel ctxt R pred_id vs q \<omega> RFailure"
+
+
 fun sub_expressions :: "stmt \<Rightarrow> pure_exp list" where
   "sub_expressions (If p _ _) = [p]"
 | "sub_expressions (LocalAssign _ e) = [e]"
@@ -315,13 +319,13 @@ always has at least one failure transition. This is in-sync with the recent Carb
       resPre = RFailure \<or> resPre = RMagic \<Longrightarrow> res = resPre;
       \<And> \<omega>Pre. resPre = RNormal \<omega>Pre \<Longrightarrow> 
       \<comment>\<open>can't use havoc here directly in a natural way to get updated state\<close>
-            red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.post mdecl))                                     
+            (red_stmt_total ctxt R \<Lambda> (Inhale (method_decl.post mdecl))                                     
                                \<comment>\<open>arguments: 0,1,2,...,n-1 return variables: n,n+1,...\<close>
                               \<lparr> get_store_total = (shift_and_add_list_alt Map.empty (v_args@v_rets)), 
                                 get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
                                 get_total_full = get_total_full \<omega>Pre \<rparr>
                               resPost \<and>
-            res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost \<rbrakk> \<Longrightarrow>        
+            res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) resPost) \<rbrakk> \<Longrightarrow>        
       red_stmt_total ctxt R \<Lambda> (MethodCall ys m es) \<omega> res"
  \<comment>\<open>Labels are not overwritten (would not be possible anyway in well-formed programs)\<close>
 | RedLabel:  "\<lbrakk> \<omega>' = (if get_trace_total \<omega> lbl = None then 
