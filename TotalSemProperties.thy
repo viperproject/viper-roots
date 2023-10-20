@@ -2416,7 +2416,7 @@ lemma red_stmt_preserves_unmodified_variables:
       and "x \<notin> modif stmt"
     shows "get_store_total \<omega> x = get_store_total \<omega>' x"
   using assms
-proof (induction arbitrary: \<omega>')
+proof (induction arbitrary: \<omega>' x)
   case (RedInhale A \<omega> res \<Lambda>)
   then show ?case 
     by (metis inhale_only_changes_mask(3))
@@ -2435,25 +2435,64 @@ next
   then show ?case by fastforce
 next
   case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
-  then show ?case sorry
+  from this obtain \<omega>Post where "resPost = RNormal \<omega>Post"
+    by (metis map_stmt_result_total.simps(2) map_stmt_result_total.simps(3) stmt_result_total.exhaust)
+  moreover from this obtain \<omega>Pre where "resPre = RNormal \<omega>Pre"
+    using RedMethodCall
+    by (metis stmt_result_total.exhaust)
+  ultimately have "res = map_stmt_result_total (reset_state_after_call ys v_rets \<omega>) (RNormal \<omega>Post)"
+    using RedMethodCall
+    by blast
+  thus ?case
+    unfolding reset_state_after_call_def
+    using \<open>x \<notin> modif (MethodCall ys m es)\<close> \<open>res = RNormal \<omega>'\<close>
+    by auto
 next
   case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
   then show ?case by fastforce
 next
   case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res \<Lambda>)
-  then show ?case sorry
+  hence "\<omega>' \<in> W'"
+    using th_result_rel_normal
+    by blast
+
+  then show ?case 
+    using \<open>W' = _\<close>
+    by fastforce        
 next
   case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>' \<Lambda>)
-  then show ?case sorry
+  then show ?case by fastforce
 next
   case (RedFold \<omega> e_args v_args e_p v_p pred_id res \<Lambda>)
-  then show ?case sorry
+  then show ?case 
+    by (auto elim: FoldRelNormalCase)    
 next
   case (RedFoldWildcard \<omega> e_args v_args pred_id p res \<Lambda>)
-  then show ?case sorry
+  then show ?case 
+    by (auto elim: FoldRelNormalCase)    
 next
   case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
-  then show ?case sorry
+  from this obtain \<omega>Body where "res = RNormal \<omega>Body"
+    by (cases res) auto
+
+  moreover from \<open>x \<notin> _\<close> have "(Suc x) \<notin> modif scopeBody"    
+    by (fastforce simp: shift_down_set_def)
+
+  ultimately have "get_store_total (shift_and_add_state_total \<omega> v) (Suc x) = get_store_total \<omega>Body (Suc x)"
+    using RedScope.IH
+    by blast
+
+  hence *: "get_store_total \<omega> x = get_store_total \<omega>Body (Suc x)"
+    by (simp add: shift_and_add_def)
+
+  from \<open>res = RNormal \<omega>Body\<close> RedScope have "\<omega>' = unshift_state_total 1 \<omega>Body"
+    by fastforce
+
+  hence "get_store_total \<omega>' x = get_store_total \<omega>Body (Suc x)"
+    by (simp add: unshift_2_def)    
+
+  thus ?case
+    using * by simp
 next
   case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
   then show ?case by fastforce
