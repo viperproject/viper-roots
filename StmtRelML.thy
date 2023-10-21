@@ -268,7 +268,6 @@ ML \<open>
     (Rmsg' "stmt rel assert reset state" ((#reset_state_tac hint) (#basic_info info) ctxt) ctxt)
   
   fun assert_rel_init_tac_standard setup_assert_state_tacs (basic_info: basic_stmt_rel_info) (setup_well_def_tac: Proof.context -> int -> tactic) ctxt =    
-    (Rmsg' "assert rel mask and heap var" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt) THEN'
     (Rmsg' "assert rel invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "assert rel setup assert propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv}) ctxt) THEN'
     (Rmsg' "assert rel setup assert state tac" 
@@ -280,7 +279,7 @@ ML \<open>
     exhale_rel_setup_well_def_tac setup_well_def_tac ctxt THEN'
     (* abstract captured state such that AuxPred does not depend on state, otherwise automation does not work
        we abstract at this point, because at this point we can make sure that the input and output relation are the same,
-       which is required by the tactic *)
+       which is required by the lemma *)
     (Rmsg' "assert rel exhale rel capture state abstract" (resolve_tac ctxt @{thms exhale_rel_capture_state_abstract}) ctxt)
 
   fun assert_rel_init_tac_pure (_: basic_stmt_rel_info) (setup_well_def_tac: Proof.context -> int -> tactic) ctxt =    
@@ -303,7 +302,17 @@ ML \<open>
     (Rmsg' "assert rel translation records update" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt)
 
   fun assert_rel_reset_state_tac_pure (basic_info: basic_stmt_rel_info) ctxt =
-    K no_tac
+    (Rmsg' "assert pure rel reset state init" (resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}) ctxt) THEN'
+      (Rmsg' "assert pure rel reset state weaken input" (resolve_tac ctxt @{thms red_ast_bpl_rel_weaken_input}) ctxt) THEN'
+        (Rmsg' "assert pure rel reset state set def to eval" (resolve_tac ctxt @{thms state_rel_set_def_to_eval}) ctxt) THEN'
+          (Rmsg' "assert pure rel reset state implication input rel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "assert pure rel reset state input implies output" (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output}) ctxt) THEN'
+          (Rmsg' "assert pure rel reset state input implies output 2" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt) THEN'
+    (Rmsg' "assert pure rel reset state finish" (resolve_tac ctxt @{thms assert_reset_state_pure}) ctxt) THEN'
+      (Rmsg' "assert pure rel reset state finish 2" (blast_tac ctxt) ctxt) THEN'
+      (Rmsg' "assert pure rel reset state finish 3" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+      (Rmsg' "assert pure rel reset state finish 3" (assm_full_simp_solved_tac ctxt) ctxt)
+
                  
   fun atomic_rel_inst_tac ctxt (inhale_info: atomic_inhale_rel_hint inhale_rel_info) (exhale_info: atomic_exhale_rel_hint exhale_rel_info) (basic_info : basic_stmt_rel_info) (atomic_hint : atomic_rel_hint)  = 
     (case atomic_hint of 

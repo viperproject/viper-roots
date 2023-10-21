@@ -642,8 +642,7 @@ lemma exhale_stmt_rel:
       and ExhaleRel: "exhale_rel (rel_ext_eq R) Rexh Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>2"
       and InvHolds: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
       and UpdHavoc: "rel_general (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) 
-               (\<lambda>\<omega> \<omega>'. \<comment>\<open>fst \<omega>' = snd \<omega>' \<and> \<comment>\<open>well-definedness and evaluation state are the same after update\<close>\<close>
-                       \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
                        red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
                        \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
                        snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
@@ -1019,11 +1018,11 @@ lemma assert_stmt_rel:
       before the assert is executed. The first disjunct expresses the original Viper state
       as the well-definedness state, which is correct since the exhale does not change the well-definedness
       state.\<close>
-      and ResetState: "rel_general (uncurry Rexh) (uncurry_eq R) 
-                                   (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1) \<and>
+      and ResetState: "rel_general (uncurry Rexh) (\<lambda>\<omega> ns. R (snd \<omega>) ns) 
+                                   (\<lambda> \<omega>1 \<omega>2. snd \<omega>2 = fst \<omega>1 \<and>
                                              red_exhale ctxt_vpr StateCons (fst \<omega>1) A (fst \<omega>1) (RNormal (snd \<omega>1))) 
                                    (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'
-                      \<or> red_ast_bpl_rel (uncurry_eq R) (uncurry_eq R) P ctxt \<gamma> \<gamma>'"
+                      \<or> red_ast_bpl_rel R R P ctxt \<gamma> \<gamma>'"
                  (is "?ResetFromExhale \<or> ?ResetFromStart")
     shows "stmt_rel R R ctxt_vpr StateCons \<Lambda>_vpr P ctxt (ViperLang.Assert A) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro_2)
@@ -1048,7 +1047,7 @@ proof (rule stmt_rel_intro_2)
     show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>' ns'"
     proof (cases)
       case 1
-      with \<open>Rexh \<omega> \<omega>_exh ns_exh\<close> rel_success_elim[OF 1]
+      with rel_success_elim[OF 1] \<open>Rexh \<omega> \<omega>_exh ns_exh\<close> 
       obtain ns' where "red_ast_bpl P ctxt (\<gamma>2, Normal ns_exh) (\<gamma>', Normal ns')" and "R \<omega> ns'"
         using RedExh
         by fastforce  
@@ -1083,14 +1082,13 @@ lemma red_ast_bpl_rel_transitive_with_inv_capture_state:
   using assms
   by (rule red_ast_bpl_rel_transitive_with_inv)
 
-lemma assert_stmt_rel_inst_1:
-  assumes "m = mask_var Tr \<and> h = heap_var Tr"
-      and InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
+lemma assert_stmt_rel_inst:
+  assumes InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
       and ExhaleRel: " exhale_rel (rel_ext_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
                                   R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>2"
       and ResetState: "rel_general (uncurry R')
-                                          (uncurry_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
-                                          (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1) \<and>
+                                          (\<lambda> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (snd \<omega>) ns)
+                                          (\<lambda> \<omega>1 \<omega>2. snd \<omega>2 = fst \<omega>1 \<and>
                                              red_exhale ctxt_vpr StateCons (fst \<omega>1) A (fst \<omega>1) (RNormal (snd \<omega>1)))
                                           (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
     shows "stmt_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
@@ -1120,34 +1118,38 @@ lemma exhale_rel_capture_state_abstract:
   using exhale_rel_elim_2[OF ExhaleRel]
   by blast
 
-lemma assert_stmt_rel_inst_2:
-  assumes InvHolds: "\<And> \<omega> ns. state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns \<Longrightarrow> Q A \<omega> \<omega>"
-      and ExhaleRel: " exhale_rel (rel_ext_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
-                                  R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>2"
-      and ResetState: "rel_general (uncurry R')
-                                          (uncurry_eq (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)) 
-                                          (\<lambda> \<omega>1 \<omega>2. \<omega>2 = (fst \<omega>1, fst \<omega>1) \<and>
-                                             red_exhale ctxt_vpr StateCons (fst \<omega>1) A (fst \<omega>1) (RNormal (snd \<omega>1)))
-                                          (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
-    shows "stmt_rel (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                    (ViperLang.Assert A) \<gamma> \<gamma>'"
-  apply (rule assert_stmt_rel[where ?Q=Q])
-    apply (rule InvHolds)
-    apply assumption
-   apply (rule ExhaleRel)
-  apply (rule disjI1)
-  apply (rule ResetState)
-  done
+lemma assert_reset_state_pure:
+  assumes Success: "\<And> \<omega> \<omega>'.  Success \<omega> \<omega>' \<Longrightarrow> snd \<omega>' = fst \<omega> \<and>
+                              red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>))"
+      and "is_pure A"
+      and \<comment>\<open>as long as the evaluation state is the same, relation is preserved\<close>
+          RelImplies: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> snd \<omega> = snd \<omega>' \<Longrightarrow>  R' \<omega>' ns" 
+    shows "rel_general R R' Success (\<lambda>_. False) P ctxt \<gamma> \<gamma>" 
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" and "Success \<omega> \<omega>'"
+
+  with Success have "snd \<omega>' = fst \<omega>" and "red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>))"
+    by blast+
+
+  hence "fst \<omega> = snd \<omega>"
+    using exhale_pure_normal_same \<open>is_pure A\<close>
+    by blast
+
+  hence "R' \<omega>' ns"
+    using RelImplies[OF \<open>R \<omega> ns\<close>] \<open>snd \<omega>' = fst \<omega>\<close>
+    by simp    
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R' \<omega>' ns'"    
+    using red_ast_bpl_refl \<open>R \<omega> ns\<close>
+    by blast
+qed (simp)
 
 subsection \<open>Method call relation\<close> 
 
 fun the_var :: "ViperLang.pure_exp \<Rightarrow> ViperLang.var" where 
   "the_var (ViperLang.Var x) = x"
 | "the_var _ = undefined"
-
-term map_upds
-
-value "upt 0 4"
 
 lemma dom_map_upds_test:
   assumes "xs \<noteq> []" and "length xs = length ys"
