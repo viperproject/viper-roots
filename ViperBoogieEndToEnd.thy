@@ -419,8 +419,8 @@ lemma end_to_end_vpr_method_correct_partial:
       and DomainType: "domain_type TyRep = absval_interp_total ctxt_vpr"
       and ProgMethod: "methods (program_total ctxt_vpr) mname = Some mdecl"
       and VprMethodBody: "method_decl.body mdecl \<noteq> None \<Longrightarrow> method_decl.body mdecl = Some body_vpr"
-      and VprNoPermUnfoldingSpec: "no_perm_assertion (method_decl.pre mdecl) \<and> no_unfolding_assertion (method_decl.pre mdecl) \<and>
-                                   no_perm_assertion (method_decl.post mdecl) \<and> no_unfolding_assertion (method_decl.post mdecl)"
+      and VprNoPermSupportedSpec: "no_perm_assertion (method_decl.pre mdecl) \<and> supported_assertion (method_decl.pre mdecl) \<and>
+                                   no_perm_assertion (method_decl.post mdecl) \<and> supported_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
       and ArgsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
                                   (\<And>x. x < length (method_decl.args mdecl) \<Longrightarrow> x \<notin> modif body_vpr)"
@@ -628,7 +628,7 @@ proof (rule allI | rule impI)+
 
           with inhale_no_perm_downwards_mono(3) ConsistencyDownwardMono  RedInhPost 
           have "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) ?\<omega>PostEmpty RFailure"
-            using is_empty_empty_full_total_state \<open>res = _\<close>  VprNoPermUnfoldingSpec
+            using is_empty_empty_full_total_state \<open>res = _\<close>  VprNoPermSupportedSpec supported_assertion_no_unfolding
             by blast
             
           with stmt_rel_failure_elim[OF PostFramingInhRel \<open>RPostFrameStart _ _\<close>]
@@ -755,7 +755,7 @@ proof (rule allI | rule impI)+
                   by simp           
               qed                
 
-              with OnlyArgsInPre VprNoPermUnfoldingSpec RedInhPre \<open>rpre = RNormal \<omega>pre\<close>
+              with OnlyArgsInPre VprNoPermSupportedSpec RedInhPre \<open>rpre = RNormal \<omega>pre\<close>
               have RedInhStoreBody: "red_inhale ctxt_vpr StateCons (method_decl.pre mdecl) 
                         ?\<omega>_store_body (RNormal (\<omega>pre \<lparr> get_store_total := get_store_total \<omega>body \<rparr>))"
                 using red_pure_exp_inhale_store_same_on_free_var(3)[OF RedInhPre _ StoresAgreeOnArgs] WfConsistency

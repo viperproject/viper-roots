@@ -2585,7 +2585,7 @@ subsection \<open>Temp\<close>
 lemma red_pure_exp_inhale_store_same_on_free_var:
   shows "ctxt, R, \<omega>_def_opt \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow>
          \<omega>_def_opt = Some \<omega>_def \<Longrightarrow>
-        no_unfolding_pure_exp e \<Longrightarrow>
+        supported_pure_exp e \<Longrightarrow>
         (\<And> x. x \<in> free_var_pure_exp e \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>     
         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>      
         get_trace_total \<omega>_def = get_trace_total \<omega>_def2 \<and> get_total_full \<omega>_def = get_total_full \<omega>_def2 \<Longrightarrow>  \<comment>\<open>just needed for IH (could also separate result on changing well-definedness state)\<close>                 
@@ -2595,10 +2595,10 @@ lemma red_pure_exp_inhale_store_same_on_free_var:
          (\<And> x. x \<in> \<Union> (set (map free_var_pure_exp es)) \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow>
         get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow>     
         get_trace_total \<omega>_def = get_trace_total \<omega>_def2 \<and> get_total_full \<omega>_def = get_total_full \<omega>_def2 \<Longrightarrow>  \<comment>\<open>just needed for IH (could also separate result on changing well-definedness state)\<close>          
-         list_all (\<lambda>e. no_unfolding_pure_exp e) es \<Longrightarrow>
+         list_all (\<lambda>e. supported_pure_exp e) es \<Longrightarrow>
          red_pure_exps_total ctxt R (Some (\<omega>_def2)) es \<omega>2 resES" and
         "red_inhale ctxt R A \<omega>1 res \<Longrightarrow> 
-         no_unfolding_assertion A \<Longrightarrow>
+         supported_assertion A \<Longrightarrow>
          (\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x) \<Longrightarrow> 
          get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2 \<Longrightarrow> 
          wf_total_consistency ctxt R Rt \<Longrightarrow> 
@@ -2610,9 +2610,6 @@ proof (induction arbitrary: \<omega>_def \<omega>2 \<omega>_def2 and \<omega>_de
 next
   case (RedVar \<omega> n v \<omega>_def_opt)
   then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
-next
-  case (RedResult \<omega> v \<omega>_def_opt)
-  then show ?case sorry \<comment>\<open>TODO: no result expression\<close>
 next
   case (RedBinopLazy \<omega>_def_opt e1 \<omega> v1 bop v e2)
   then show ?case by (auto intro!: red_exp_inhale_unfold_intros)
@@ -2696,7 +2693,7 @@ next
   then show ?case by simp \<comment>\<open>cannot occur\<close>
 next
   case (RedSubFailure e' \<omega>_def_opt \<omega>)
-  hence "list_all no_unfolding_pure_exp (sub_pure_exp_total e')"
+  hence "list_all supported_pure_exp (sub_pure_exp_total e')"
     using pure_exp_pred_subexp by presburger
   hence "red_pure_exps_total ctxt R (Some \<omega>_def2) (sub_pure_exp_total e') \<omega>2 None"
     using RedSubFailure free_var_subexp
@@ -2834,16 +2831,7 @@ next
           by simp          
       qed
     qed (simp)
-  qed    
-next
-  case (InhAccPred \<omega> e_args v_args e_p p W' pred_id res)
-  then show ?case sorry
-next
-  case (InhAccWildcard \<omega> e_r r W' f res)
-  then show ?case sorry
-next
-  case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
-  then show ?case sorry
+  qed
 next
   case (InhPure \<omega> e b)
   hence "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
@@ -2856,9 +2844,9 @@ next
     by fastforce    
 next
   case (InhSubAtomicFailure A \<omega>)
-  moreover from this have "list_all no_unfolding_pure_exp (sub_expressions_atomic A)"
+  moreover from this have "list_all supported_pure_exp (sub_expressions_atomic A)"
     using assert_pred_atomic_subexp
-    by simp
+    by (metis list.pred_mono_strong pure_exp_pred.simps)
   moreover have
     FreeVar: "\<And>x. x \<in> \<Union> (set (map free_var_pure_exp (sub_expressions_atomic A))) \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x" 
     using free_var_assertion_map_free_var_pure_exp InhSubAtomicFailure
@@ -2874,8 +2862,8 @@ next
   moreover have "red_inhale ctxt R B ?\<omega>''2
                              (map_stmt_result_total (get_store_total_update (\<lambda>_. get_store_total ?\<omega>''2)) res)"
   proof (rule InhStarNormal.IH(4))
-    from InhStarNormal show "no_unfolding_assertion B"
-      by simp
+    from InhStarNormal show "supported_assertion B"
+      by (meson assert_pred.simps assert_pred_rec.simps(3))
   next
     fix x 
     assume "x \<in> free_var_assertion B"
@@ -2919,7 +2907,7 @@ lemma assertion_framing_store_same_on_free_var:
       and "assertion_framing_state ctxt StateCons A \<omega>"
       and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>' x"
       and "get_trace_total \<omega> = get_trace_total \<omega>' \<and> get_total_full \<omega> = get_total_full \<omega>'"
-      and "no_unfolding_assertion A"
+      and "supported_assertion A"
     shows "assertion_framing_state ctxt StateCons A \<omega>'"
   unfolding assertion_framing_state_def
 proof (rule allI | rule impI)+
@@ -2965,13 +2953,13 @@ lemma exhale_same_on_free_var:
       and "\<And> x. x \<in> free_var_assertion A \<Longrightarrow> get_store_total \<omega>1 x = get_store_total \<omega>2 x"
       and "get_trace_total \<omega>1 = get_trace_total \<omega>2 \<and> get_total_full \<omega>1 = get_total_full \<omega>2"
       and "get_trace_total \<omega>def1 = get_trace_total \<omega>def2 \<and> get_total_full \<omega>def1 = get_total_full \<omega>def2"
-      and "no_unfolding_assertion A"      
+      and "supported_assertion A"      
     shows "red_exhale ctxt StateCons \<omega>def2 A \<omega>2 res2"
   using assms
 proof (induction arbitrary: \<omega>2 res2)
   case (ExhAcc mh \<omega> e_r r e_p p a f)
 
-  hence ConstraintExp: "no_unfolding_pure_exp e_r \<and> no_unfolding_pure_exp e_p"
+  hence ConstraintExp: "supported_pure_exp e_r \<and> supported_pure_exp e_p"
     by simp
 
   from ExhAcc have FreeVarExp: "\<And>x. x \<in> free_var_pure_exp e_r \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x"
@@ -3020,19 +3008,11 @@ proof (induction arbitrary: \<omega>2 res2)
     qed
   qed      
 next
-  case (ExhAccWildcard mh \<omega> e_r r a q f)
-  then show ?case sorry
-next
-  case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id)
-  then show ?case sorry
-next
-  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
-  then show ?case sorry
-next
   case (ExhPure e \<omega> b)
-  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
-    using red_pure_exp_inhale_store_same_on_free_var(1)
-    by (metis assert_pred_atomic_subexp free_var_assertion.simps(1) free_var_atomic_assert.simps(1) list_all_simps(1) sub_expressions_atomic.simps(1))
+  hence "supported_pure_exp e"
+    by simp
+  with ExhPure have "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
+    using red_pure_exp_inhale_store_same_on_free_var(1) free_var_assertion.simps(1) free_var_atomic_assert.simps(1) by blast    
   moreover have "\<omega>2 = \<omega>\<lparr>get_store_total := get_store_total \<omega>2\<rparr>"
     apply (rule full_total_state.equality)
     by (auto simp: ExhPure)
@@ -3041,10 +3021,11 @@ next
     by (metis (full_types) ExhPure.prems(1) exh_if_total.simps(1) exh_if_total.simps(2) map_stmt_result_total.simps(1) map_stmt_result_total.simps(3))
 next
   case (SubAtomicFailure A \<omega>)
-  hence "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (sub_expressions_atomic A) \<omega>2 None"
+  hence "list_all supported_pure_exp (sub_expressions_atomic A)"
+    by (metis assert_pred_atomic_subexp list.pred_mono_strong pure_exp_pred.simps)
+  with SubAtomicFailure have "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (sub_expressions_atomic A) \<omega>2 None"
     using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_atomic_subexp free_var_assertion_map_free_var_pure_exp
     by blast
-
   then show ?case 
     using SubAtomicFailure    
     by (auto intro: TotalSemantics.SubAtomicFailure)
@@ -3081,83 +3062,38 @@ next
   by (auto intro: red_exhale.intros)
 next
   case (ExhImpTrue e \<omega> A res)  
-  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+  hence "supported_pure_exp e"
+    by (meson assert_pred.elims(2) assert_pred_rec.simps(2) pure_exp_pred.elims(2))
+  with ExhImpTrue have "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
     using red_pure_exp_inhale_store_same_on_free_var(1)
-    by (metis UnCI assert_pred.elims(2) assert_pred_rec.simps(2) free_var_assertion.simps(2))
-
+    by (metis UnCI free_var_assertion.simps(2))
   thus ?case
     using ExhImpTrue
     by (auto intro: red_exhale.intros)  
 next
   case (ExhImpFalse e \<omega> A)
-  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+  hence "supported_pure_exp e"
+    by (meson assert_pred.elims(2) assert_pred_rec.simps(2) pure_exp_pred.elims(2))
+  with ExhImpFalse have "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
     using red_pure_exp_inhale_store_same_on_free_var(1)
-    by (metis UnCI assert_pred.elims(2) assert_pred_rec.simps(2) free_var_assertion.simps(2))
-
+    by (metis UnCI free_var_assertion.simps(2))
   moreover have "\<omega>2 = \<omega> \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>"
     apply (rule full_total_state.equality)
     using ExhImpFalse
     by auto
-
   ultimately show ?case
     using ExhImpFalse
     by (metis map_stmt_result_total.simps(1) red_exhale.ExhImpFalse)
 next
   case (ExhImpFailure e \<omega> A)
-  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
+  hence "supported_pure_exp e"
+    by (meson assert_pred.elims(2) assert_pred_rec.simps(2) pure_exp_pred.elims(2))
+  with ExhImpFailure have "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
     using red_pure_exp_inhale_store_same_on_free_var(1)
-    by (metis UnCI assert_pred.elims(2) assert_pred_rec.simps(2) free_var_assertion.simps(2))
+    by (metis Un_iff free_var_assertion.simps(2))
   then show ?case 
     using ExhImpFailure
     by (auto intro!: red_exhale.intros)
-qed
+qed (simp_all)
 
-
-
-
-(*
-subsection \<open>Unfold leads to one normal successor state\<close>
-
-lemma unfold_at_least_one:
-  assumes "ViperLang.predicates Pr pred_id = Some pdecl" and
-          "ViperLang.predicate_decl.body pdecl = Some pbody" and
-          C: "total_heap_consistent Pr \<Delta> \<omega>" and
-          RedArgs: "red_pure_exps_total Pr \<Delta> (Some \<omega>) e_args \<omega> (Some v_args)" and
-          RedPerm: "Pr, \<Delta>, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)" and
-          PredPerm:"pgte (get_mp_total_full \<omega> (pred_id, v_args)) (Abs_prat p)"
-          "p > 0"
-  shows "\<exists> \<omega>'. total_heap_consistent Pr \<Delta> \<omega>' \<and> red_stmt_total_single_set Pr \<Delta> \<Lambda> (Unfold pred_id e_args (PureExp e_p)) \<omega> (Inr (), RNormal \<omega>')"
-proof -
-  let ?q = "(Abs_prat p)"
-  from \<open>p > 0\<close> have "?q \<noteq> pnone" using positive_rat_prat
-    by simp    
-  with assms obtain \<omega>' where URel:"unfold_rel Pr \<Delta> pred_id v_args ?q \<omega> \<omega>'" and C\<omega>': "total_heap_consistent Pr \<Delta> \<omega>'"
-    by (metis option.distinct(1) option_fold.simps(1) total_heap_consistent.cases)
-
-  from \<open>p > 0\<close> have PEq:"Rep_prat (Abs_prat p) = p"
-    using Abs_prat_inverse by auto
-  
-  show ?thesis
-    apply (rule exI[where ?x=\<omega>'])
-    apply (rule conjI[OF \<open>total_heap_consistent Pr \<Delta> \<omega>'\<close>])
-    apply (rule RedUnfold)
-       apply (rule RedArgs)
-      apply (rule RedPerm)
-     apply (rule refl)
-    apply (rule THResultNormal_alt)
-      apply (simp add: URel C\<omega>')
-     apply (rule conjI[OF \<open>p > 0\<close>])
-     using PredPerm PEq pgte.rep_eq
-     by auto
-qed
-
-lemma fold_normal_consistent:
-  assumes "fold_rel Pr \<Delta> pred_id v_args p \<omega> (RNormal \<omega>')" and
-       C: "total_heap_consistent Pr \<Delta> \<omega>"
-     shows "total_heap_consistent Pr \<Delta> \<omega>'"
-  using assms
-proof cases
-case (FoldRelNormal pred_decl pred_body m' mp'' m)
-then show ?thesis oops
-*)
 end

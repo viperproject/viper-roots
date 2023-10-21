@@ -69,7 +69,7 @@ text \<open>The following lemma would follow directly from determinism of expres
 lemma pure_exp_eval_true_false:
   assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
   shows "\<not>(Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True))"
-  sorry
+  oops
 
 lemma wd_not_fail:
   assumes "Pr, \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t v" and "wd_pure_exp_total Pr \<Delta> CInhale e \<omega>"
@@ -90,7 +90,7 @@ next
   then show ?case by simp
 next
   case (RedPropagateFailure e e' \<omega>)
-  then show ?case sorry
+  then show ?case oops
 qed auto
 
 lemma havoc_rel_expr_eval_same: 
@@ -146,7 +146,7 @@ case (RedOldFailure t l e uz va)
   then show ?case by auto
 next
   case (RedPropagateFailure e e' \<omega>)
-  then show ?case sorry
+  then show ?case oops
 next
   case (RedField e \<omega> a f v)
   thus ?case
@@ -195,7 +195,7 @@ proof (induction)
       by (metis red_pure_exp_total.RedCondExpFalse wd_pure_exp_total.simps(5))
   next
     case (RedPropagateFailure e e' \<omega>)
-    then show ?case sorry 
+    then show ?case oops 
   next
     case (RedField e \<omega> a f v)
     hence "(a,f) \<in> locs" by simp
@@ -242,7 +242,7 @@ lemma havoc_rel_wd_same_exhale:
           "get_mask_total_full \<omega> = get_mask_total_full \<omega>'"
   shows "wd_pure_exp_total Pr \<Delta> (CExhale locs) e \<omega>'"
   using assms
-  sorry
+  oops
  (*
   apply (induction Pr \<Delta> "(CExhale locs)" e \<omega> rule: wd_pure_exp_total.induct)
                 apply clarsimp
@@ -269,7 +269,7 @@ proof (induction Pr \<Delta> "(CExhale locs)" e \<omega> arbitrary: \<omega> \<o
     using "4.prems"
       apply simp
     
-    sorry
+    oops
 *)
 
 lemma havoc_rel_wd_same_exhale_2:
@@ -612,34 +612,34 @@ next
   thus ?case
 next
   case (ExhImpFailure e \<omega>_orig m A)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhAcc \<omega> m e_r a e_p p f locs m')
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhAccFail1 e_r \<omega> r e_p p locs f m)
-  then show ?case sorry
+  then show ?case oops
 next
 case (ExhAccFail2 \<omega> m e_r a e_p p locs f)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhAccWildcard \<omega> m e_r a p f locs m')
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhAccWildcardFail1 e_r \<omega> r locs f m)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhAccWildcardFail2 \<omega> m e_r a locs f)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhInhaleExhale B m res A)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhPure \<omega> m locs e b)
-  then show ?case sorry
+  then show ?case oops
 next
   case (ExhPureFail \<omega> m locs e)
-  then show ?case sorry
+  then show ?case oops
 qed
 
 lemma havoc_rel_red_exhale_2:

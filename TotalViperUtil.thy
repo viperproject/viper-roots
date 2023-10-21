@@ -129,6 +129,8 @@ abbreviation no_perm_pure_exp
 abbreviation no_perm_assertion
   where "no_perm_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
 
+text \<open>parts not supported by proof generation\<close>
+
 fun no_unfolding_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
   where 
     "no_unfolding_pure_exp_no_rec (Unfolding p es e) = False"
@@ -139,6 +141,42 @@ abbreviation no_unfolding_pure_exp
 
 abbreviation no_unfolding_assertion
   where "no_unfolding_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_unfolding_pure_exp_no_rec"
+
+fun not_supported_exp_no_rec :: "pure_exp \<Rightarrow> bool"
+  where 
+    "not_supported_exp_no_rec (Unfolding p es e) = False"
+  | "not_supported_exp_no_rec Result = False"
+  | "not_supported_exp_no_rec _ = True"
+
+abbreviation supported_pure_exp
+  where "supported_pure_exp \<equiv> pure_exp_pred not_supported_exp_no_rec"
+
+fun supported_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> bool"
+  where
+    "supported_atomic_assert (Acc e f Wildcard) = False" \<comment>\<open>wildcard permission amounts not supported\<close>
+  | "supported_atomic_assert (AccPredicate pred es q) = False" \<comment>\<open>predicates not supported\<close>
+  | "supported_atomic_assert _ = True"
+
+abbreviation supported_assertion
+  where "supported_assertion \<equiv> assert_pred (\<lambda>_. True) supported_atomic_assert supported_pure_exp"
+
+lemma supported_pure_exp_no_unfolding:
+  assumes "supported_pure_exp e"
+  shows "no_unfolding_pure_exp e"
+  using assms
+  apply (induction e)
+                apply simp_all
+  using list.pred_mono_strong apply force+
+  done
+
+lemma supported_assertion_no_unfolding:
+  assumes "supported_assertion A"
+  shows "no_unfolding_assertion A"
+  using assms
+  apply (induction A)
+         apply (simp_all add: supported_pure_exp_no_unfolding)
+   apply (metis atomic_assert_pred_rec.simps(1) atomic_assert_pred_rec.simps(3) pure_exp_pred.elims(2) supported_atomic_assert.elims(2) supported_pure_exp_no_unfolding)
+  using supported_pure_exp_no_unfolding by auto
 
 subsection \<open>Free variables\<close>
 

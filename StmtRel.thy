@@ -1618,8 +1618,8 @@ lemma method_call_stmt_rel_inst:
       and MethodSpecsFramed: "vpr_method_spec_correct_total ctxt_vpr StateCons mdecl"
       and MethodSpecSubset:  "no_perm_assertion (method_decl.pre mdecl) \<and>                                    
                               no_perm_assertion (method_decl.post mdecl) \<and> 
-                              no_unfolding_assertion (method_decl.pre mdecl) \<and>
-                              no_unfolding_assertion (method_decl.post mdecl)"
+                              supported_assertion (method_decl.pre mdecl) \<and>
+                              supported_assertion (method_decl.post mdecl)"
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length es"
       and "rtype_interp ctxt = []"
       and DomainTyRep: "domain_type TyRep = absval_interp_total ctxt_vpr"
@@ -2552,7 +2552,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
             using ConsistencyDownwardMono mono_prop_downward_ord_implies_mono_prop_downward 
             by auto
           ultimately show ?thesis
-            using exhale_inhale_normal MethodSpecSubset
+            using exhale_inhale_normal MethodSpecSubset supported_assertion_no_unfolding
             by blast
         qed
         ultimately have PostFramedAuxSmaller: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full (?\<omega>0_rets \<ominus> ?\<omega>pre_exh_aux_rets)) (get_store_total ?\<omega>0_rets)"
@@ -2566,7 +2566,8 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
             by (metis \<open>?\<omega>0_rets \<succeq> ?\<omega>pre_exh_aux_rets\<close> full_total_state.select_convs(3) full_total_state.update_convs(1) greater_full_total_state_total_state minus_smaller total_state_greater_equiv)
           thus ?thesis
             using vpr_postcondition_framed_mono ConsistencyDownwardMono MethodSpecSubset PostFramedAuxSmaller 
-            by blast
+                  supported_assertion_no_unfolding
+            by blast            
         qed
 
       show ?thesis
