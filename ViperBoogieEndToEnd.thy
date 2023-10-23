@@ -409,7 +409,7 @@ lemma end_to_end_vpr_method_correct_partial:
   assumes 
           \<comment>\<open>The Boogie procedure is correct. Note that we need to explicitly provide the types such that
              we can then instantiate the Boogie type interpretation with \<^term>\<open>vbpl_absval_ty TyRep\<close>.\<close>
-          Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants global_vars axioms (proc_bpl :: ast procedure) 
+          Boogie_correct: "proc_is_correct (vbpl_absval_ty (TyRep :: 'a ty_repr_bpl)) fun_decls constants unique_consts global_vars axioms (proc_bpl :: ast procedure) 
                   (Ast.proc_body_satisfies_spec :: (('a vbpl_absval, ast) proc_body_satisfies_spec_ty))"
       and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
       and WfTyRep: "wf_ty_repr_bpl TyRep"
@@ -424,7 +424,7 @@ lemma end_to_end_vpr_method_correct_partial:
       and OnlyArgsInPre: "\<And> x. x \<in> free_var_assertion (method_decl.pre mdecl) \<Longrightarrow> x < length (method_decl.args mdecl)"
       and ArgsUnmodified: "method_decl.body mdecl \<noteq> None \<Longrightarrow> 
                                   (\<And>x. x < length (method_decl.args mdecl) \<Longrightarrow> x \<notin> modif body_vpr)"
-      and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"
+      and "\<Lambda> = nth_option (method_decl.args mdecl @ rets mdecl)"      
 
 \<comment>\<open>Boogie properties\<close>
       and FunInterp: "fun_interp_wf (vbpl_absval_ty TyRep) fun_decls (fun_interp ctxt)"
@@ -454,6 +454,7 @@ lemma end_to_end_vpr_method_correct_partial:
                            ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr> \<and>  
                            \<comment>\<open>well-typedness of Boogie state follows from state relation\<close>
                            (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)) \<omega> ns \<and>
+                           unique_constants_distinct gs unique_consts \<and>
                            axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
 shows "vpr_method_correct_total_partial ctxt_vpr StateCons mdecl"
   unfolding vpr_method_correct_total_partial_def vpr_method_correct_total_aux_def
@@ -493,6 +494,8 @@ proof (rule allI | rule impI)+
     "ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>" and
   StateRelInitialInst: 
     "state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) \<omega> ns" and
+  UniqueConstants:
+    "unique_constants_distinct gs unique_consts" and
   AxiomsSat:
     "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
     using InitialStateRel[OF StoreWellTy HeapWellTy \<open>is_empty_total_full \<omega>\<close>]
@@ -542,6 +545,9 @@ proof (rule allI | rule impI)+
   next 
     show "state_typ_wf (vbpl_absval_ty TyRep) [] ls (proc_args proc_bpl @ locals_bpl @ proc_rets proc_bpl)"
       by (rule LocalsWf)
+  next
+    show "unique_constants_distinct gs unique_consts"
+      by (rule UniqueConstants)
   next
     show "axioms_sat (vbpl_absval_ty TyRep) (constants, []) (fun_interp ctxt) (global_to_nstate (state_restriction gs constants)) axioms"
       by (rule AxiomsSat)
@@ -1436,12 +1442,7 @@ lemma init_state_in_state_relation:
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
           InjConstRepr: "inj (const_repr Tr)" and
-          FieldTrTy: (*"\<And>f_vpr t_vpr. 
-                          declared_fields (program_total ctxt_vpr) f_vpr = Some t_vpr \<Longrightarrow>
-                        \<exists> f_bpl.  
-                           field_translation Tr f_vpr = Some f_bpl \<and>
-                           field_tr_prop T (fst (var_context ctxt)) (f_vpr, t_vpr) (f_vpr, f_bpl)" and*)
-                     "field_tr_prop_full (program_total ctxt_vpr) (fst (var_context ctxt)) T (field_translation Tr)" and
+          FieldTrTy: "field_tr_prop_full (program_total ctxt_vpr) (fst (var_context ctxt)) T (field_translation Tr)" and
           HeapTy: "lookup_vdecls_ty (fst (var_context ctxt)) (heap_var Tr) = Some (TConSingle (THeapId T))" and
           MaskTy: "lookup_vdecls_ty (fst (var_context ctxt)) (mask_var Tr) = Some (TConSingle (TMaskId T))" and
           ConstTy: "\<And>c. lookup_vdecls_ty (fst (var_context ctxt)) (const_repr Tr c) = Some (boogie_const_ty T c)" and
@@ -1623,6 +1624,95 @@ proof -
     show "aux_vars_pred_sat (var_context ctxt) Map.empty ns"
       by (simp add: aux_vars_pred_sat_def)  
   qed (insert assms DisjSimp, auto)
+qed
+
+subsection \<open>Unique constants helper lemmas\<close>
+
+lemma unique_consts_field_prop:
+  assumes RanFieldTr: "set unique_cs \<subseteq> ran (field_translation Tr)"
+      and DomEq: "dom (declared_fields Pr) = dom (field_translation Tr)"
+    shows "\<forall> c \<in> set unique_cs. \<exists> f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some c"
+proof
+  fix c
+  assume "c \<in> set unique_cs"
+  from this obtain f_vpr where "field_translation Tr f_vpr = Some c"
+    using RanFieldTr
+    unfolding ran_def
+    by blast
+  with DomEq 
+  show "\<exists>f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some c"
+    by blast
+qed
+
+lemma unique_constants_initial_global_state:
+  assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
+      and "distinct unique_cs"
+      and FieldProp: "\<forall> c \<in> set unique_cs. \<exists> f_vpr. declared_fields Pr f_vpr \<noteq> None \<and> field_translation Tr f_vpr = Some c"
+    shows "unique_constants_distinct (initial_global_state TyRep \<Lambda> Pr Tr \<omega>) unique_cs" (is "unique_constants_distinct ?gs unique_cs")
+  using assms
+proof (induction unique_cs)
+  case Nil
+  then show ?case by (simp add: unique_constants_distinct_def)
+next
+  case (Cons c cs)  
+
+  have GlobalStateFieldLookup: "\<And> c'. c' \<in> set (c#cs) \<Longrightarrow> \<exists>t. ?gs c' = Some (AbsV (AField (NormalField c' t)))"
+  proof -
+    fix c'
+    assume "c' \<in> set (c#cs)"
+    from this Cons obtain f_vpr where FieldLookup: "declared_fields Pr f_vpr \<noteq> None" and 
+                               FieldTr: "field_translation Tr f_vpr = Some c'"    
+      by fast
+
+    with initial_global_state_aux_field[OF Disj]
+    obtain t where "initial_global_state_aux Pr Tr \<omega> c' = Some (AbsV (AField (NormalField c' t)))"
+      by blast
+    hence "?gs c' = Some (AbsV (AField (NormalField c' t)))"
+      unfolding initial_global_state_def
+      by simp
+    thus "\<exists>t. ?gs c' = Some (AbsV (AField (NormalField c' t)))"
+      by simp
+  qed 
+
+  show ?case 
+    unfolding unique_constants_distinct_def 
+  proof (simp, rule conjI)
+    show "distinct (map (\<lambda>x. the (?gs x)) cs)"
+    proof -
+      have "unique_constants_distinct (initial_global_state TyRep \<Lambda> Pr Tr \<omega>) cs"
+        using Cons
+        by simp
+      thus ?thesis
+        unfolding unique_constants_distinct_def
+        by blast
+    qed
+
+  next
+    show "the (?gs c) \<notin> (\<lambda>x. the (?gs x)) ` set cs" (is "_ \<notin> ?M")
+    proof 
+      assume "the (?gs c) \<in> ?M"
+      from this obtain c' where 
+        "c' \<in> set cs" and
+        Eq: "the (?gs c) = the (?gs c')"
+        by blast
+
+      obtain t where "the (?gs c) = AbsV (AField (NormalField c t))"
+        using GlobalStateFieldLookup
+        by fastforce
+
+      moreover obtain t' where "the (?gs c') = AbsV (AField (NormalField c' t'))"
+        using GlobalStateFieldLookup \<open>c' \<in> _\<close>
+        by fastforce
+
+      moreover have "c \<noteq> c'"
+        using \<open>distinct (c # cs)\<close> \<open>c' \<in> _\<close>
+        by auto
+
+      ultimately show False
+        using Eq
+        by auto
+    qed
+  qed
 qed
 
 subsection \<open>Misc\<close>

@@ -528,7 +528,7 @@ subsection \<open>Misc\<close>
 
 lemma proc_is_correct_elim:
   assumes 
-     "proc_is_correct A fun_decls constants global_vars axioms proc proc_body_satisfies_spec_general" and
+     "proc_is_correct A fun_decls constants unique_consts global_vars axioms proc proc_body_satisfies_spec_general" and
      "proc_body proc = Some (locals, p_body)" and
      "\<forall>t. closed t \<longrightarrow> (\<exists>v. type_of_val A (v :: 'a val) = t)" and
      "\<forall>v. closed ((type_of_val A) v)" and
@@ -536,6 +536,7 @@ lemma proc_is_correct_elim:
      "(list_all closed \<Omega> \<and> length \<Omega> = proc_ty_args proc)" and
      "state_typ_wf A \<Omega> gs (constants @ global_vars)" and
      "state_typ_wf A \<Omega> ls ((proc_args proc)@ (locals @ proc_rets proc))" and
+     "unique_constants_distinct gs unique_consts" and
      "axioms_sat A (constants, []) \<Gamma> (global_to_nstate (state_restriction gs constants)) axioms"
 shows 
   "(proc_body_satisfies_spec_general 
