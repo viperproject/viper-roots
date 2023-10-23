@@ -722,6 +722,55 @@ lemma exhale_true_stmt_rel:
   apply (erule ExhPure_case)
   by (auto elim: red_pure_exp_total_elims exh_if_total.elims)
 
+lemma exhale_true_stmt_rel_2:
+  assumes "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> R' \<omega> ns"
+  shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale (Atomic (Pure (ELit (ViperLang.LBool True))))) \<gamma> \<gamma>"
+proof (rule stmt_rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R \<omega> ns" 
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (Atomic (Pure (ELit (ViperLang.lit.LBool True))))) \<omega> (RNormal \<omega>')"
+
+  hence "\<omega> = \<omega>'"
+  proof (rule RedExhale_case)
+    fix \<omega>_exh \<omega>''
+    assume RNormalEq: "RNormal \<omega>' = RNormal \<omega>''"
+       and RedExh: "red_exhale ctxt_vpr StateCons \<omega> (Atomic (Pure (ELit (ViperLang.lit.LBool True)))) \<omega> (RNormal \<omega>_exh)"
+       and HavocState:"\<omega>'' \<in> havoc_locs_state ctxt_vpr \<omega>_exh
+           {loc. pnone < get_mh_total (get_total_full \<omega>) loc \<and> get_mh_total (get_total_full \<omega>_exh) loc = pnone}"
+
+    from RedExh have "\<omega> = \<omega>_exh"
+      using exhale_pure_normal_same
+      by fastforce      
+
+    with HavocState have "\<omega>'' = \<omega>"
+      using havoc_locs_state_empty
+      by (metis (mono_tags, lifting) empty_Collect_eq less_imp_neq)
+
+    thus "\<omega> = \<omega>'"
+      using RNormalEq
+      by auto
+  qed simp_all
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>, Normal ns') \<and> R' \<omega>' ns'"
+    using assms \<open>R \<omega> ns\<close> red_ast_bpl_refl
+    by fast
+next
+  fix \<omega> ns
+  assume "R \<omega> ns"
+  assume "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Exhale (Atomic (Pure (ELit (ViperLang.lit.LBool True))))) \<omega> RFailure"
+  hence False
+    apply cases
+     apply (erule ExhPure_case)
+      apply (metis TotalExpressions.RedLit_case ValueAndBasicState.val.inject(2) exh_if_total_failure extended_val.inject val_of_lit.simps(1))
+     apply (erule TotalExpressions.RedLit_case)
+     apply blast
+    apply simp
+    done
+
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
+    by simp
+qed
+
 text \<open>The following lemma and the next one must have the same number and kind of premises, since currently a single 
       tactic deals with the premises.\<close>
 lemma exhale_stmt_rel_inst_no_inv:

@@ -13,6 +13,7 @@ ML \<open>
        exp_wf_rel_info *       
        exp_rel_info *
        ('a inhale_rel_hint)
+  | TrivialInhHint (* inhale true, but no code is emitted *)
   | NoInhHint (* used for debugging purposes *)
 
   type 'a atomic_inhale_rel_tac = (Proof.context -> basic_stmt_rel_info ->  (Proof.context -> basic_stmt_rel_info -> int -> tactic) option ->'a -> int -> tactic)
@@ -58,10 +59,11 @@ ML \<open>
           (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
              variable for the recursive call to inhale_rel_tac *)
            simplify_continuation ctxt THEN'
-           (Rmsg' "InhaleRel 3" (resolve_tac ctxt [@{thm inhale_propagate_post}]) ctxt) THEN'           
+           (Rmsg' "InhaleRel 3" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'           
            (inhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
            (Rmsg' "InhaleRel 4" (progress_red_bpl_rel_tac ctxt) ctxt)
          )
+    | TrivialInhHint => (Rmsg' "InhaleRel Trivial True Assertion" (resolve_tac ctxt @{thms inhale_rel_true}) ctxt)
     | AtomicInhHint atomicHint => (#atomic_inhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
     | NoInhHint => K all_tac
  

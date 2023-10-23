@@ -14,7 +14,7 @@ ML \<open>
        ('a exhale_rel_hint)
   | NoExhHint (* used for debugging purposes *)
 
-  type 'a exhale_rel_complete_hint = {
+  type 'a normal_exhale_rel_complete_hint = {
      setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,
      (* chooses the invariant instantiation *)
      exhale_stmt_rel_thm: thm, 
@@ -23,6 +23,10 @@ ML \<open>
      lookup_decl_exhale_heap: thm option, 
      exhale_rel_hint: 'a exhale_rel_hint 
   }
+
+  datatype 'a exhale_rel_complete_hint =
+    TrivialExhCompleteHint (* exhale true, but no code is emitted *)
+  | NormalExhCompleteHint of ('a normal_exhale_rel_complete_hint)
 
   type 'a assert_rel_complete_hint = {
      setup_well_def_state_tac: basic_stmt_rel_info -> Proof.context -> int -> tactic,

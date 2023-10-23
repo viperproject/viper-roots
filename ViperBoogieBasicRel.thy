@@ -921,7 +921,8 @@ lemma store_rel_shift:
 
 subsection \<open>State relationship properties\<close>
 
-abbreviation state_rel_ext
+abbreviation state_rel_ext :: "('a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow>
+                               'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "state_rel_ext R \<omega>def \<omega> ns \<equiv> R \<omega> ns \<and> \<omega>def = \<omega>"
 
 lemma state_rel_state_rel0:

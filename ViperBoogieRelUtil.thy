@@ -1500,6 +1500,13 @@ lemma state_rel_def_same_to_state_rel:
   using assms
   by simp
 
+lemma red_ast_bpl_rel_to_state_rel:
+  assumes "\<And> \<omega> ns. R1 \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt (fst \<omega>) (snd \<omega>) ns"
+  shows "red_ast_bpl_rel R1 (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt))  P ctxt \<gamma> \<gamma>"
+  apply (rule red_ast_bpl_rel_input_implies_output)
+  using assms
+  by simp
+
 subsection \<open>Instantiating the output relation\<close>
 
 text \<open>The following lemmas are useful for constraining the output relation, if the output relation is a

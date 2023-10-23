@@ -236,14 +236,19 @@ ML \<open>
 
   fun exhale_pure_no_havoc_tac ctxt =
     (Rmsg' "exhale no havoc init" (resolve_tac ctxt @{thms exhale_pure_stmt_rel_upd_havoc}) ctxt) THEN'
-    (Rmsg' "exhale no havoc state rel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+    (* The "ORELSE' blast_tac" case was added because for some reason simp_then_if_not_solved_blast_tac did not work.
+       For that example, when the goal was copied into the Isabelle GUI, then running simp_then_if_not_solved_blast_tac 
+       worked. It is not clear why. *)
+    (Rmsg' "exhale no havoc state rel" (simp_then_if_not_solved_blast_tac ctxt ORELSE' blast_tac ctxt) ctxt) THEN'
     (Rmsg' "exhale no havoc success cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "exhale no havoc pure assertion cond" (assm_full_simp_solved_tac ctxt) ctxt)
 
-  fun exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a exhale_rel_complete_hint) =    
+  fun normal_exhale_rel_tac ctxt (info: 'a exhale_rel_info) (hint: 'a normal_exhale_rel_complete_hint) =    
     (Rmsg' "stmt rel exhale pre propagate" (resolve_tac ctxt @{thms exhale_rel_propagate_pre_no_inv_same_exh}) ctxt) THEN'
     (Rmsg' "stmt rel exhale propagate progress" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive} THEN' (progress_red_bpl_rel_tac ctxt)) ctxt) THEN'
-    (Rmsg' "stmt rel exhale track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' assm_full_simp_solved_tac ctxt) ctxt) THEN'
+(*  old version: (Rmsg' "stmt rel exhale track well-def" (resolve_tac ctxt [@{thm red_ast_bpl_rel_weaken_input} OF @{thms state_rel_def_same_to_state_rel}] THEN' simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'*)
+    (Rmsg' "stmt rel exhale track well-def propagate" (resolve_tac ctxt @{thms red_ast_bpl_rel_transitive}) ctxt) THEN'
+    (Rmsg' "stmt rel exhale track well-def" (resolve_tac ctxt @{thms red_ast_bpl_rel_to_state_rel} THEN' simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
     (Rmsg' "setup well-def state exhale" ((#setup_well_def_state_tac hint) (#basic_info info) ctxt) ctxt) THEN'
     exhale_rel_aux_tac ctxt info (#exhale_rel_hint hint) THEN'
     (Rmsg' "stmt rel exhale havoc pre propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}) ctxt) THEN'
@@ -324,11 +329,14 @@ ML \<open>
         (Rmsg' "AtomincInh StateRel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "AtomincInh Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info (#inhale_rel_hint inh_complete_hint))
-     | ExhaleHint exh_complete_hint =>
+     | ExhaleHint (NormalExhCompleteHint exh_complete_hint) =>
         (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'
         (Rmsg' "AtomicExh2 Consistency" (fastforce_tac ctxt []) ctxt) THEN'
         (Rmsg' "AtomicExh3 Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-        (exhale_rel_tac ctxt exhale_info exh_complete_hint)
+        (normal_exhale_rel_tac ctxt exhale_info exh_complete_hint)
+     | ExhaleHint TrivialExhCompleteHint =>
+        (Rmsg' "AtomicExh Trivial" (resolve_tac ctxt @{thms exhale_true_stmt_rel_2}) ctxt) THEN'
+        (Rmsg' "AtomicExh Trivial State Rel Impies" (simp_then_if_not_solved_blast_tac ctxt) ctxt)
      | AssertHint assert_complete_hint =>
         (Rmsg' "AtomicAssert Start" (resolve_tac ctxt [#assert_stmt_rel_thm assert_complete_hint]) ctxt) THEN'
         (Rmsg' "AtomicAssert Init" ((#init_tac assert_complete_hint) basic_info (#setup_well_def_state_tac assert_complete_hint basic_info) ctxt) ctxt) THEN' 
