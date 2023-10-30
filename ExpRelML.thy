@@ -12,24 +12,27 @@ subsection \<open>ML tactics\<close>
 
 ML \<open>
 
-datatype boogie_prim_type = TBool | TInt | TReal
+datatype type_safety_key = TBool | TInt | TReal | TSameType
 
-(* provide type safety theorem for each primitive type *)
-type type_safety_thm_map = boogie_prim_type -> thm
+(* provide type safety theorems *)
+type type_safety_thm_map = type_safety_key -> thm
 
 fun gen_type_safety_thm_map fun_interp_wf fun_decls_wf var_context_wf state_wf =
    let val type_safety_bpl_aux_bool = 
             @{thm type_safety_top_level_inv} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf]
        val type_safety_bpl_aux_int = 
-            @{thm type_safety_top_level_inv_int} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf] 
+            @{thm type_safety_top_level_inv_int} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf]
        val type_safety_bpl_aux_real =
-            @{thm type_safety_top_level_inv_real} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf] 
+            @{thm type_safety_top_level_inv_real} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf]
+       val type_safety_bpl_aux_same_type = 
+            @{thm type_safety_top_level_two_expressions_same_type} OF [fun_interp_wf, fun_decls_wf, var_context_wf, state_wf]
     in
     (fn primTy => 
        case primTy of
           TBool => type_safety_bpl_aux_bool
         | TInt => type_safety_bpl_aux_int
         | TReal => type_safety_bpl_aux_real
+        | TSameType => type_safety_bpl_aux_same_type
     )
    end
 
@@ -65,11 +68,42 @@ fun expr_red_tac type_safety_thm simplify_rtype_interp_tac lookup_var_thms looku
   assm_full_simp_solved_tac ctxt THEN'
   typing_tac ctxt NoPolyHint lookup_var_thms lookup_fun_thms
 
+fun expr_red_two_exprs_tac type_safety_thm simplify_rtype_interp_tac lookup_var_thms lookup_fun_thms ctxt = 
+  simplify_rtype_interp_tac ctxt THEN'
+  resolve_tac ctxt [type_safety_thm] THEN'
+  assm_full_simp_solved_tac ctxt THEN'
+  assm_full_simp_solved_tac ctxt THEN'
+  typing_tac ctxt NoPolyHint lookup_var_thms lookup_fun_thms THEN'
+  typing_tac ctxt NoPolyHint lookup_var_thms lookup_fun_thms
+
 fun binop_eager_rel_tac info ctxt = 
-  resolve_tac ctxt [@{thm exp_rel_binop_eager}] THEN'
-  assm_full_simp_solved_tac ctxt THEN' (* bop *)
-  ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
-  ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)
+  FIRST' [
+    (* CASE 1: an eager operation that is not a multiplication or a permission division *)
+    resolve_tac ctxt [@{thm exp_rel_binop_eager}] THEN'
+    assm_full_simp_solved_tac ctxt THEN' (* bop *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *),
+
+    (*CASE 2: a multiplication or permission division with explicit conversion *)
+    resolve_tac ctxt [@{thm exp_rel_binop_mult_permdiv_conv}] THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e2 *)
+    (fn i => fn st => 
+         (* e1 reduces to an integer *)
+       expr_red_tac (#type_safety_thm_map info TInt) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) THEN'
+    (fn i => fn st => 
+         (* e2 reduces to a real *)
+       expr_red_tac (#type_safety_thm_map info TReal) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st),
+
+    (*CASE 3: a multiplication or permission division without explicit conversion *)
+    resolve_tac ctxt [@{thm exp_rel_binop_mult_permdiv_no_conv}] THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e2 *)
+    (fn i => fn st => 
+         (* e1 and e2 reduce to the same type *)
+       expr_red_two_exprs_tac (#type_safety_thm_map info TSameType) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) ]
 and
   binop_lazy_rel_tac (info : exp_rel_info) ctxt = 
   resolve_tac ctxt [@{thm exp_rel_binop_lazy}] THEN'

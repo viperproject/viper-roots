@@ -891,8 +891,11 @@ proof (rule wf_rel_intro)
     hence "v2_bpl = RealV (real_of_rat p)" and "p \<noteq> 0" using RedBpl ValRel \<open>v2 = _\<close> NonZero by auto
 
     have "bop = PermDiv"
-      using Bop EvalBinop \<open>v2 = _\<close>
-      by (metis binop_result.distinct(3) empty_iff eval_binop.simps(18) eval_binop.simps(2) eval_binop_div_mod_normal_types eval_perm_perm.simps(11) eval_perm_perm.simps(12) insert_iff)
+      apply (insert Bop EvalBinop \<open>v2 = _\<close>)
+      apply (erule eval_binop.elims)
+                          apply simp_all
+       apply (rule eval_perm_perm.elims)
+      by fastforce+
     have "zero = Lit (LReal 0)"
       proof (rule ccontr)
         assume "zero \<noteq> Lit (Lang.lit.LReal 0)"

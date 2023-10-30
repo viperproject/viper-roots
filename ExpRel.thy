@@ -45,7 +45,8 @@ lemma binop_lazy_rel_correct:
 
 lemma binop_nonlazy_rel_correct:
   assumes "eval_binop v1_vpr bop_vpr v2_vpr = BinopNormal v_vpr" and
-          "binop_rel bop_vpr = bop_bpl"
+          "binop_rel bop_vpr = bop_bpl" and
+          "bop_vpr \<notin> {Mult, PermDiv}"
   shows   "binop_eval_val bop_bpl (val_rel_vpr_bpl v1_vpr) (val_rel_vpr_bpl v2_vpr) = Some (val_rel_vpr_bpl v_vpr)"
   using assms
   apply (cases rule: eval_binop.elims)
@@ -55,9 +56,6 @@ lemma binop_nonlazy_rel_correct:
       \<comment>\<open>integer division of two integers\<close>
       apply (unfold Semantics.smt_div_def Semantics.eucl_div_def Binop.smt_div_def Binop.eucl_div_def)
       apply fastforce
-     \<comment>\<open>real division of two integers\<close>
-    apply (unfold smt_real_div_def)
-     apply (metis (mono_tags, opaque_lifting) Fract_of_int_quotient binop_result.distinct(5) binop_result.inject of_int_0_eq_iff of_rat_divide of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
       \<comment>\<open>modulo\<close>
     apply (unfold Semantics.smt_mod_def Semantics.eucl_mod_def Binop.smt_mod_def Binop.eucl_mod_def)
     apply fastforce
@@ -68,8 +66,12 @@ lemma binop_nonlazy_rel_correct:
 \<comment>\<open>operator between two booleans\<close>
   using real_divide_code apply auto[1]
   apply (cases bop_vpr) 
-                apply simp_all
-  done 
+                  apply simp_all
+   apply (cases bop_vpr) 
+                 apply simp_all
+   apply (cases bop_vpr) 
+                 apply simp_all
+  done
 
 subsection \<open>Semantic approach\<close>
 
@@ -77,6 +79,15 @@ lemma exp_rel_vpr_bpl_intro:
 assumes "\<And> StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
                     (ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
                     (\<exists>v2. (red_expr_bpl ctxt e_bpl ns v2) \<and> (val_rel_vpr_bpl v1 = v2))"                   
+shows "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
+  using assms
+  unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
+  by auto
+
+lemma exp_rel_vpr_bpl_intro_2:
+assumes "\<And> StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
+                    (ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
+                     red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)"                   
 shows "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
   using assms
   unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
@@ -230,9 +241,12 @@ lemma exp_rel_unop:
   apply (rule exp_rel_vpr_bpl_elim[OF ExpRel])
   by (auto elim!: TotalExpressions.RedUnop_case intro!: Semantics.RedUnOp unop_rel_correct[OF _ UopRel] )
 
+subsubsection \<open>Binary Operations\<close>
+
 lemma exp_rel_binop:
   assumes
    BopRel: "binop_rel bop = bopb" and
+           "bop \<notin> {Mult, PermDiv}" and
    \<comment>\<open>If the binary operation is lazy, we need a well-typedness result on e2, since the Viper reduction
       of \<^term>\<open>Binop e1 bop e2\<close> might not need to reduce e2 if e1 establishes the result.\<close>
    RedE2Bpl: "binop_lazy bop \<noteq> None \<Longrightarrow> (\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<exists>b. red_expr_bpl ctxt e2_bpl ns (BoolV b))" and
@@ -292,7 +306,7 @@ proof (rule exp_rel_vpr_bpl_intro)
       by auto
 
     ultimately show ?thesis
-      using  BopEvalNormalVpr \<open>binop_rel _ = _\<close> binop_nonlazy_rel_correct      
+      using  BopEvalNormalVpr \<open>binop_rel _ = _\<close> binop_nonlazy_rel_correct \<open>bop \<notin> _\<close>  
       by (blast intro: RedBinOp)
   qed
 
@@ -302,7 +316,7 @@ qed
 
 lemma exp_rel_binop_eager:
   assumes
-   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None"and
+   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<notin> { Mult, PermDiv }" and
    E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
    E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
  shows
@@ -320,6 +334,189 @@ lemma exp_rel_binop_lazy:
    "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
   using assms
   by (auto intro: exp_rel_binop)
+
+text \<open>For multiplication and permission division, we need other rules, because there is a mismatch 
+between Viper and Boogie. Viper permits multiplication and permission division between integers 
+and permissions, while Boogie only supports the same type for both operands.\<close>
+
+text \<open>The following rule captures the case when the operands have the same type.\<close>
+
+lemma exp_rel_binop_mult_permdiv_no_conv:
+  assumes
+   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<in> { Mult, PermDiv }" and
+   E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
+   E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl" and
+   RedBplSameType: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
+                (\<exists>v1 v2. red_expr_bpl ctxt e1_bpl ns v1 \<and> red_expr_bpl ctxt e2_bpl ns v2 \<and>
+                         type_of_val (type_interp ctxt) v1 = type_of_val (type_interp ctxt) v2)"              
+  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
+proof (rule exp_rel_vpr_bpl_intro_2)
+  fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v
+  assume R: "R \<omega>_def1 \<omega> ns"
+  assume "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+  thus "red_expr_bpl ctxt (e1_bpl \<guillemotleft>bopb\<guillemotright> e2_bpl) ns (val_rel_vpr_bpl v)"
+  proof (cases)
+    case (RedBinop v1 v2)   
+
+    have RedE1Bpl:"red_expr_bpl ctxt e1_bpl ns (val_rel_vpr_bpl v1)"
+      apply (rule exp_rel_vpr_bpl_elim[OF E1Rel])
+      using R RedBinop
+      by auto
+
+    moreover have RedE2Bpl:"red_expr_bpl ctxt e2_bpl ns (val_rel_vpr_bpl v2)"
+      apply (rule exp_rel_vpr_bpl_elim[OF E2Rel])
+      using R RedBinop
+      by auto
+
+    show ?thesis
+    proof (rule Semantics.RedBinOp[OF RedE1Bpl RedE2Bpl])
+
+        have v1IntPerm: "(\<exists>i. v1 = VInt i) \<or> (\<exists>r. v1 = VPerm r)"
+          apply (insert RedBinop BopRel)
+          apply (cases v1; cases v2; simp_all)
+          by fastforce
+        moreover have v2IntPerm: "(\<exists>i. v2 = VInt i) \<or> (\<exists>r. v2 = VPerm r)"
+          apply (insert RedBinop BopRel)
+          apply (cases v1; cases v2; simp_all)
+          by fastforce
+
+        from RedBplSameType[OF R] obtain v1_bpl v2_bpl where 
+          "red_expr_bpl ctxt e1_bpl ns v1_bpl"
+        and "red_expr_bpl ctxt e2_bpl ns v2_bpl"
+        and BplSameType: "type_of_val (type_interp ctxt) v1_bpl = type_of_val (type_interp ctxt) v2_bpl"
+          by blast
+        hence "val_rel_vpr_bpl v1 = v1_bpl" and "val_rel_vpr_bpl v2 = v2_bpl"
+          using  RedE1Bpl RedE2Bpl expr_eval_determ(1)
+          by blast+
+        hence BplSameType': "type_of_val (type_interp ctxt) (val_rel_vpr_bpl v1) = type_of_val (type_interp ctxt) (val_rel_vpr_bpl v2)"
+          using BplSameType
+          by blast
+       
+        consider (IntOp) i1 i2 where "val_rel_vpr_bpl v1 = IntV i1" and "val_rel_vpr_bpl v2 = IntV i2" |
+                 (RealOp) r1 r2 where "val_rel_vpr_bpl v1 = RealV r1" and "val_rel_vpr_bpl v2 = RealV r2"
+        proof -
+          from v1IntPerm consider i where "v1 = VInt i" | r where "v1 = VPerm r"
+            by auto
+          thus ?thesis
+          proof cases
+            case 1
+            hence *: "val_rel_vpr_bpl v1 = IntV i"
+              by simp
+            hence "type_of_val (type_interp ctxt) (val_rel_vpr_bpl v2) = TPrim TInt"
+              using BplSameType'
+              by auto
+            hence "\<exists>i2. val_rel_vpr_bpl v2 = IntV i2"
+              by (metis ty_to_closed.simps(1) vc_tint_intv vc_type_of_val.simps)
+          
+            then show ?thesis 
+              using * IntOp
+              by blast
+          next
+            case 2
+            hence *: "val_rel_vpr_bpl v1 = RealV (real_of_rat r)"
+              by simp
+            hence "type_of_val (type_interp ctxt) (val_rel_vpr_bpl v2) = TPrim TReal"
+              using BplSameType'
+              by auto
+            hence "\<exists>i2. val_rel_vpr_bpl v2 = RealV i2"
+              by (simp add: treal_realv)          
+            then show ?thesis 
+              using * RealOp
+              by blast
+          qed
+        qed               
+        thus "binop_eval_val bopb (val_rel_vpr_bpl v1) (val_rel_vpr_bpl v2) = Some (val_rel_vpr_bpl v)"
+        proof cases
+          case IntOp
+          then show ?thesis 
+            apply (insert BopRel RedBinop IntOp)
+             apply (rule val_rel_vpr_bpl.elims[OF IntOp(1)])
+                 apply simp_all
+             apply (rule val_rel_vpr_bpl.elims[OF IntOp(2)])
+                apply simp_all
+            apply (cases bop)
+            apply simp_all
+             apply fastforce
+            apply (simp add: smt_real_div_def)
+            by (metis binop_result.distinct(5) binop_result.inject of_rat_rat val_rel_vpr_bpl.simps(5))
+        next
+          case RealOp
+          show ?thesis 
+            apply (insert RealOp BopRel RedBinop)
+             apply (rule val_rel_vpr_bpl.elims[OF RealOp(1)])
+                 apply simp_all
+             apply (rule val_rel_vpr_bpl.elims[OF RealOp(2)])
+                apply simp_all
+            apply (cases bop)
+                          apply simp_all
+             apply (metis of_rat_mult val_rel_vpr_bpl.simps(5))
+            apply (simp add: smt_real_div_def)
+            by (metis binop_result.distinct(5) binop_result.sel of_rat_divide val_rel_vpr_bpl.simps(5))
+        qed
+      qed
+    qed (insert assms, auto)
+  qed
+
+  text \<open>The following rule captures one case when the first Viper operand is an integer expression,
+        but the resulting type of the operation is a permission. In practice, the Viper implementation
+        ensures that the other case (where the second operand is an integer expression) cannot occur
+        in the AST.\<close>
+
+lemma exp_rel_binop_mult_permdiv_conv:
+  assumes
+   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<in> { Mult, PermDiv }" and
+   E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
+   E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl" and
+  RedE1BplInt: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>i1. red_expr_bpl ctxt e1_bpl ns (IntV i1))" and       
+  RedE2BplReal: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>r2. red_expr_bpl ctxt e2_bpl ns (RealV r2))"       
+  shows
+     "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp (Lang.UnOp IntToReal e1_bpl) bopb e2_bpl)"
+proof (rule exp_rel_vpr_bpl_intro_2)
+  fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v
+  assume R: "R \<omega>_def1 \<omega> ns"
+  assume "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+  thus "red_expr_bpl ctxt ((Lang.UnOp IntToReal e1_bpl) \<guillemotleft>bopb\<guillemotright> e2_bpl) ns (val_rel_vpr_bpl v)"
+  proof (cases)
+    case (RedBinop v1 v2)     
+
+    have "red_expr_bpl ctxt e1_bpl ns (val_rel_vpr_bpl v1)"
+      apply (rule exp_rel_vpr_bpl_elim[OF E1Rel])
+      using R RedBinop
+      by auto
+    moreover with RedE1BplInt[OF R] obtain i1 where EqV1: "val_rel_vpr_bpl v1 = IntV i1"
+      using expr_eval_determ(1)
+      by blast 
+    ultimately have RedConvE1Bpl: "red_expr_bpl ctxt (Lang.UnOp IntToReal e1_bpl) ns (RealV (real_of_int i1))"
+      by (auto intro!: Semantics.RedUnOp)
+      
+
+    have RedE2Bpl:"red_expr_bpl ctxt e2_bpl ns (val_rel_vpr_bpl v2)"
+      apply (rule exp_rel_vpr_bpl_elim[OF E2Rel])
+      using R RedBinop
+      by auto
+    with RedE2BplReal[OF R] obtain r2 where EqV2:"val_rel_vpr_bpl v2 = RealV r2"
+      using expr_eval_determ(1)
+      by blast
+
+    show ?thesis
+    proof (rule Semantics.RedBinOp[OF RedConvE1Bpl RedE2Bpl])
+      show "binop_eval_val bopb (RealV (real_of_int i1)) (val_rel_vpr_bpl v2) = Some (val_rel_vpr_bpl v)"
+        apply (insert BopRel RedBinop)
+        apply (simp add: EqV2)
+        apply (rule val_rel_vpr_bpl.elims[OF EqV1])
+            apply simp_all
+         apply (rule val_rel_vpr_bpl.elims[OF EqV2])
+            apply simp_all
+        apply (cases bop)
+                      apply simp_all
+         apply (metis of_rat_mult of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+            apply (simp add: smt_real_div_def)
+        by (metis binop_result.distinct(5) binop_result.inject of_rat_divide of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+    qed
+  qed (insert assms, auto)
+qed
 
 \<comment>\<open>TODO: semantic lemmas for expression relation with permission introspection, function evaluation, etc...\<close>
 
