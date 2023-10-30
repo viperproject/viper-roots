@@ -13,6 +13,7 @@ ML \<open>
        exp_wf_rel_info *       
        exp_rel_info *
        ('a inhale_rel_hint)
+  | GoodStateAfter of 'a inhale_rel_hint
   | TrivialInhHint (* inhale true, but no code is emitted *)
   | NoInhHint (* used for debugging purposes *)
 
@@ -63,6 +64,13 @@ ML \<open>
            (inhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
            (Rmsg' "InhaleRel 4" (progress_red_bpl_rel_tac ctxt) ctxt)
          )
+    | GoodStateAfter hint => 
+       (let val basic_info = #basic_info info in
+         (Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
+         inhale_rel_aux_tac ctxt info hint THEN'
+         (Rmsg' "InhaleRel Good State" (rewrite_red_bpl_rel_tac ctxt THEN'
+                                        progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
+        end)
     | TrivialInhHint => (Rmsg' "InhaleRel Trivial True Assertion" (resolve_tac ctxt @{thms inhale_rel_true}) ctxt)
     | AtomicInhHint atomicHint => (#atomic_inhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
     | NoInhHint => K all_tac
@@ -71,10 +79,10 @@ ML \<open>
            Might want to control this via the hints *)    
   fun inhale_rel_tac ctxt (info: 'a inhale_rel_info) (hint: 'a inhale_rel_hint) =
    (let val basic_info = #basic_info info in
-     (Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
-     inhale_rel_aux_tac ctxt info hint THEN'
-     (Rmsg' "InhaleRel Good State" (rewrite_red_bpl_rel_tac ctxt THEN'
-                                    progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
+     (*(Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'*)
+     inhale_rel_aux_tac ctxt info hint
+     (*(Rmsg' "InhaleRel Good State" (rewrite_red_bpl_rel_tac ctxt THEN'
+                                    progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)*)
     end)
 
 \<close>
@@ -178,9 +186,9 @@ ML \<open>
          (Rmsg' "InhPure progress after wf" (progress_tac ctxt) ctxt) THEN' 
          (Rmsg' "InhPure exp rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
     | FieldAccInhHint _ => 
-         (Rmsg' "InhField acc propagate" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
-         atomic_inhale_field_acc_tac ctxt info no_def_checks_tac_opt atomic_inh_hint THEN'
-         (Rmsg' "InhField acc good state" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm info) (#tr_def_thm info)) ctxt)
+         (*(Rmsg' "InhField acc propagate" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'*)
+         atomic_inhale_field_acc_tac ctxt info no_def_checks_tac_opt atomic_inh_hint
+         (*(Rmsg' "InhField acc good state" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm info) (#tr_def_thm info)) ctxt)*)
 
 \<close>
 

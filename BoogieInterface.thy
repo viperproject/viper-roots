@@ -16,6 +16,31 @@ abbreviation create_ctxt_bpl :: "'a absval_ty_fun \<Rightarrow> var_context \<Ri
 abbreviation red_expr_bpl :: "'a econtext_bpl_general \<Rightarrow> expr \<Rightarrow> 'a nstate \<Rightarrow> 'a val \<Rightarrow> bool"
   where "red_expr_bpl ctxt e ns v \<equiv> type_interp ctxt, var_context ctxt, fun_interp ctxt, rtype_interp ctxt \<turnstile> \<langle>e, ns\<rangle> \<Down> v"   
 
+subsubsection \<open>Type Safety Lemmas\<close>
+
+corollary type_safety_top_level_two_expressions_same_type:
+  assumes Wf_\<Gamma>:"fun_interp_wf A F \<Gamma>" and
+          Wf_F:"list_all (wf_fdecl \<circ> snd) F" and
+          Wf_\<Lambda>: "\<forall>x \<tau>. lookup_var_ty \<Lambda> x = Some \<tau> \<longrightarrow> wf_ty 0 \<tau>" and
+          "state_well_typed A \<Lambda> [] n_s" and
+          "wf_expr 0 e1 \<and> wf_expr 0 e2" and
+          "F, (lookup_var_ty \<Lambda>, Map.empty) \<turnstile> e1 : \<tau>" and
+          "F, (lookup_var_ty \<Lambda>, Map.empty) \<turnstile> e2 : \<tau>"
+        shows "\<exists>v1 v2. (A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e1,n_s\<rangle> \<Down> v1) \<and> (A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e2,n_s\<rangle> \<Down> v2) \<and> type_of_val A v1 = type_of_val A v2"
+proof -
+  let ?\<Delta> = "(lookup_var_ty \<Lambda>, Map.empty)"
+  have "\<exists>v. (A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e1,n_s\<rangle> \<Down> v) \<and> type_of_val A v = instantiate [] \<tau>" 
+    apply (rule type_safety_top_level)
+    using assms
+    by auto
+  moreover have "\<exists>v. (A,\<Lambda>,\<Gamma>,[] \<turnstile> \<langle>e2,n_s\<rangle> \<Down> v) \<and> type_of_val A v = instantiate [] \<tau>"
+    apply (rule type_safety_top_level)
+    using assms
+    by auto
+  ultimately show ?thesis
+    by metis
+qed
+
 subsection \<open>Ast\<close>
 
 type_synonym ast_bpl = Ast.ast
