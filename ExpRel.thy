@@ -576,6 +576,51 @@ proof (rule exp_rel_vpr_bpl_intro_2)
   qed (insert assms, auto)
 qed
 
+text \<open>The Boogie type checker rewrites equalities of Boolean expressions into iff operations\<close>
+
+lemma exp_rel_binop_eq_iff:
+  assumes E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl"
+      and E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
+      and RedE1BplBool: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>b1. red_expr_bpl ctxt e1_bpl ns (BoolV b1))"
+      and RedE2BplBool: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> (\<exists>b2. red_expr_bpl ctxt e2_bpl ns (BoolV b2))"             
+    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 ViperLang.Eq e2) (e1_bpl \<guillemotleft>Lang.Iff\<guillemotright> e2_bpl)"
+proof (rule exp_rel_vpr_bpl_intro_2)
+  fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v
+  assume R: "R \<omega>_def1 \<omega> ns"
+  assume "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>Binop e1 ViperLang.binop.Eq e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+  thus "red_expr_bpl ctxt (e1_bpl \<guillemotleft>Lang.Iff\<guillemotright> e2_bpl) ns (val_rel_vpr_bpl v)"
+  proof (cases)
+    case (RedBinop v1 v2)  
+   
+    have RedE1Bpl: "red_expr_bpl ctxt e1_bpl ns (val_rel_vpr_bpl v1)" (is "red_expr_bpl ctxt e1_bpl ns ?v1b")
+      apply (rule exp_rel_vpr_bpl_elim[OF E1Rel])
+      using R RedBinop
+      by auto
+    from this obtain b1 where "?v1b = BoolV b1"
+      using RedE1BplBool[OF R] expr_eval_determ(1)
+      by blast
+    hence "v1 = VBool b1"
+      by (cases v1) auto
+
+    have RedE2Bpl: "red_expr_bpl ctxt e2_bpl ns (val_rel_vpr_bpl v2)" (is "red_expr_bpl ctxt e2_bpl ns ?v2b")
+      apply (rule exp_rel_vpr_bpl_elim[OF E2Rel])
+      using R RedBinop
+      by auto
+    from this obtain b2 where "?v2b = BoolV b2"
+      using RedE2BplBool[OF R] expr_eval_determ(1)
+      by blast
+    hence "v2 = VBool b2"
+       by (cases v2) auto
+
+    show ?thesis
+      apply (insert RedBinop)
+      apply (rule Semantics.RedBinOp[OF RedE1Bpl RedE2Bpl])
+      apply (simp add: \<open>v1 = _\<close> \<open>v2 = _\<close>)
+      by fastforce
+  qed (simp)
+qed           
+
 \<comment>\<open>TODO: semantic lemmas for expression relation with permission introspection, function evaluation, etc...\<close>
 
 subsection \<open>Proving expression reduction from expression relation\<close>

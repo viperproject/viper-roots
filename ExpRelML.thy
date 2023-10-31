@@ -109,7 +109,18 @@ fun binop_eager_rel_tac info ctxt =
     resolve_tac ctxt @{thms exp_rel_binop_switch_operands} THEN'
     assm_full_simp_solved_tac ctxt THEN'
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
-    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)    
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *),
+
+    (*CASE 5: eq is translated to iff *)
+    resolve_tac ctxt [@{thm exp_rel_binop_eq_iff}] THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e2 *)
+    (fn i => fn st => 
+         (* e1 reduces to a Boolean *)
+       expr_red_tac (#type_safety_thm_map info TBool) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) THEN'
+    (fn i => fn st => 
+         (* e2 reduces to a Boolean *)
+       expr_red_tac (#type_safety_thm_map info TBool) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st)
  ]
 and
   binop_lazy_rel_tac (info : exp_rel_info) ctxt = 
