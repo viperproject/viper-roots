@@ -114,6 +114,11 @@ and
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *) 
   ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)
 and
+  unop_rel_tac info ctxt =
+    resolve_tac ctxt @{thms exp_rel_unop} THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
+and
   field_access_rel_tac (info : exp_rel_info) ctxt = 
     (#field_access_rel_pre_tac info ctxt) THEN'
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
@@ -125,6 +130,7 @@ and
       FIRST' [
         var_rel_tac (#lookup_var_rel_tac info) ctxt |> SOLVED',
         lit_tac (#vpr_lit_bpl_exp_rel_tac info) ctxt |> SOLVED',
+        (fn i => fn st => unop_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => binop_eager_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => binop_lazy_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => field_access_rel_tac info ctxt i st) |> SOLVED'
