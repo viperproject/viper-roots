@@ -2,3 +2,7 @@
 	path = foundational_boogie
 	url = https://github.com/gauravpartha/foundational_boogie/
 	branch = adjust_interface
+[submodule "viper-semantics"]
+	path = viper-semantics
+	url = https://gitlab.inf.ethz.ch/tdardini/viper-semantics
+	branch = cpg
