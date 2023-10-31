@@ -78,13 +78,13 @@ fun expr_red_two_exprs_tac type_safety_thm simplify_rtype_interp_tac lookup_var_
 
 fun binop_eager_rel_tac info ctxt = 
   FIRST' [
-    (* CASE 1: an eager operation that is not a multiplication or a permission division *)
+    (* CASE 1: an eager operation that is not a multiplication *)
     resolve_tac ctxt [@{thm exp_rel_binop_eager}] THEN'
     assm_full_simp_solved_tac ctxt THEN' (* bop *)
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *),
 
-    (*CASE 2: a multiplication or permission division with explicit conversion *)
+    (*CASE 2: a multiplication with explicit conversion *)
     resolve_tac ctxt [@{thm exp_rel_binop_mult_permdiv_conv}] THEN'
     assm_full_simp_solved_tac ctxt THEN'
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
@@ -96,14 +96,21 @@ fun binop_eager_rel_tac info ctxt =
          (* e2 reduces to a real *)
        expr_red_tac (#type_safety_thm_map info TReal) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st),
 
-    (*CASE 3: a multiplication or permission division without explicit conversion *)
-    resolve_tac ctxt [@{thm exp_rel_binop_mult_permdiv_no_conv}] THEN'
+    (*CASE 3: a multiplication without explicit conversion *)
+    resolve_tac ctxt [@{thm exp_rel_binop_mult_no_conv}] THEN'
     assm_full_simp_solved_tac ctxt THEN'
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e2 *)
     (fn i => fn st => 
          (* e1 and e2 reduce to the same type *)
-       expr_red_two_exprs_tac (#type_safety_thm_map info TSameType) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st) ]
+       expr_red_two_exprs_tac (#type_safety_thm_map info TSameType) (#simplify_rtype_interp_tac info) (#lookup_var_thms info) (#lookup_fun_bpl_thms info) ctxt i st),
+
+    (*CASE 4: operands are swapped with a swapped binary operation *)
+    resolve_tac ctxt @{thms exp_rel_binop_switch_operands} THEN'
+    assm_full_simp_solved_tac ctxt THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* e1 *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* e2 *)    
+ ]
 and
   binop_lazy_rel_tac (info : exp_rel_info) ctxt = 
   resolve_tac ctxt [@{thm exp_rel_binop_lazy}] THEN'

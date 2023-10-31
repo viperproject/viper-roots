@@ -33,6 +33,14 @@ fun binop_rel :: "ViperLang.binop \<Rightarrow> Lang.binop"
   | "binop_rel ViperLang.BImp = Lang.Imp"
   | "binop_rel ViperLang.And = Lang.And"
 
+fun binop_swap_rel :: "ViperLang.binop \<rightharpoonup> Lang.binop"
+  where 
+    "binop_swap_rel ViperLang.Gt = Some Lang.Lt"
+  | "binop_swap_rel ViperLang.Gte = Some Lang.Le"
+  | "binop_swap_rel ViperLang.Lt = Some Lang.Gt"
+  | "binop_swap_rel ViperLang.Lte = Some Lang.Ge"
+  | "binop_swap_rel _ = None"   
+
 lemma binop_lazy_rel_correct:
   assumes "eval_binop_lazy v_vpr bop_vpr = Some v'_vpr" and
           "binop_rel bop_vpr = bop_bpl" and
@@ -46,7 +54,7 @@ lemma binop_lazy_rel_correct:
 lemma binop_nonlazy_rel_correct:
   assumes "eval_binop v1_vpr bop_vpr v2_vpr = BinopNormal v_vpr" and
           "binop_rel bop_vpr = bop_bpl" and
-          "bop_vpr \<notin> {Mult, PermDiv}"
+          "bop_vpr \<noteq> Mult"
   shows   "binop_eval_val bop_bpl (val_rel_vpr_bpl v1_vpr) (val_rel_vpr_bpl v2_vpr) = Some (val_rel_vpr_bpl v_vpr)"
   using assms
   apply (cases rule: eval_binop.elims)
@@ -55,7 +63,11 @@ lemma binop_nonlazy_rel_correct:
                   apply simp_all
       \<comment>\<open>integer division of two integers\<close>
       apply (unfold Semantics.smt_div_def Semantics.eucl_div_def Binop.smt_div_def Binop.eucl_div_def)
-      apply fastforce
+        apply fastforce
+
+       apply (unfold Semantics.smt_real_div_def)
+       apply (smt (verit) binop_result.distinct(5) binop_result.inject of_int_0_eq_iff of_rat_rat val_rel_vpr_bpl.simps(5))
+
       \<comment>\<open>modulo\<close>
     apply (unfold Semantics.smt_mod_def Semantics.eucl_mod_def Binop.smt_mod_def Binop.eucl_mod_def)
     apply fastforce
@@ -71,7 +83,12 @@ lemma binop_nonlazy_rel_correct:
                  apply simp_all
    apply (cases bop_vpr) 
                  apply simp_all
-  done
+       apply (unfold Semantics.smt_real_div_def)
+   apply (metis (mono_tags, opaque_lifting) binop_result.distinct(5) binop_result.inject of_rat_divide of_rat_eq_0_iff of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+  apply (cases bop_vpr)
+                apply simp_all
+       apply (unfold Semantics.smt_real_div_def)
+  by (metis (mono_tags, lifting) binop_result.distinct(5) binop_result.inject of_int_eq_0_iff of_rat_divide of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
 
 subsection \<open>Semantic approach\<close>
 
@@ -246,7 +263,7 @@ subsubsection \<open>Binary Operations\<close>
 lemma exp_rel_binop:
   assumes
    BopRel: "binop_rel bop = bopb" and
-           "bop \<notin> {Mult, PermDiv}" and
+           "bop \<noteq> Mult" and
    \<comment>\<open>If the binary operation is lazy, we need a well-typedness result on e2, since the Viper reduction
       of \<^term>\<open>Binop e1 bop e2\<close> might not need to reduce e2 if e1 establishes the result.\<close>
    RedE2Bpl: "binop_lazy bop \<noteq> None \<Longrightarrow> (\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> \<exists>b. red_expr_bpl ctxt e2_bpl ns (BoolV b))" and
@@ -306,7 +323,7 @@ proof (rule exp_rel_vpr_bpl_intro)
       by auto
 
     ultimately show ?thesis
-      using  BopEvalNormalVpr \<open>binop_rel _ = _\<close> binop_nonlazy_rel_correct \<open>bop \<notin> _\<close>  
+      using  BopEvalNormalVpr \<open>binop_rel _ = _\<close> binop_nonlazy_rel_correct \<open>bop \<noteq> _\<close>  
       by (blast intro: RedBinOp)
   qed
 
@@ -316,13 +333,60 @@ qed
 
 lemma exp_rel_binop_eager:
   assumes
-   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<notin> { Mult, PermDiv }" and
+   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<noteq> Mult" and
    E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
    E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
  shows
    "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl bopb e2_bpl)"
   using assms
   by (auto intro: exp_rel_binop)
+
+lemma binop_eval_swap:
+  assumes "binop_rel bop = bopb"
+      and "binop_swap_rel bop = Some bopb_swap"
+      and "binop_eval_val bopb v1 v2 = Some v"
+    shows "binop_eval_val bopb_swap v2 v1 = Some v"
+  apply (insert assms)
+  apply (rule lit_val_elim[where ?v=v1]; rule lit_val_elim[where ?v=v2]; cases bop)
+  by simp_all
+
+lemma exp_rel_binop_switch_operands:
+  assumes BopSwapRel: "binop_swap_rel bop = Some bopb_swap"
+      and E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl"
+      and E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"     
+    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e2_bpl bopb_swap e1_bpl)"
+proof -
+  let ?bopb = "binop_rel bop"
+
+  from BopSwapRel have "binop_lazy bop = None \<and> bop \<noteq> Mult"
+    by (cases bop) auto
+
+  with E1Rel E2Rel exp_rel_binop_eager
+  have ExpRelNormal: "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Binop e1 bop e2) (Lang.BinOp e1_bpl ?bopb e2_bpl)"
+    by blast
+
+  show ?thesis
+  proof (rule exp_rel_vpr_bpl_intro_2)
+    fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1
+    assume "R \<omega>_def1 \<omega> ns"
+       and "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>ViperLang.Binop e1 bop e2;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+    hence "red_expr_bpl ctxt (Lang.BinOp e1_bpl ?bopb e2_bpl) ns (val_rel_vpr_bpl v1)" (is "red_expr_bpl ctxt _ ns ?vb")
+      using ExpRelNormal
+      by (meson exp_rel_vpr_bpl_elim)
+
+    from this obtain vb1 vb2 where
+           "red_expr_bpl ctxt e1_bpl ns vb1" and "red_expr_bpl ctxt e2_bpl ns vb2"
+         and "binop_eval_val ?bopb vb1 vb2 = (Some ?vb)"     
+      by auto
+
+    moreover from this have "binop_eval_val bopb_swap vb2 vb1 = (Some ?vb)"
+      using binop_eval_swap BopSwapRel
+      by blast
+
+    ultimately show "red_expr_bpl ctxt (Lang.BinOp e2_bpl bopb_swap e1_bpl) ns ?vb"
+      by (auto intro: RedBinOp)
+  qed
+qed
 
 lemma exp_rel_binop_lazy:
   assumes
@@ -335,15 +399,15 @@ lemma exp_rel_binop_lazy:
   using assms
   by (auto intro: exp_rel_binop)
 
-text \<open>For multiplication and permission division, we need other rules, because there is a mismatch 
-between Viper and Boogie. Viper permits multiplication and permission division between integers 
-and permissions, while Boogie only supports the same type for both operands.\<close>
+text \<open>For multiplication, we need other rules, because there is a mismatch 
+between Viper and Boogie. Viper permits multiplication between integers and permissions, 
+while Boogie only supports the same type for both operands.\<close>
 
 text \<open>The following rule captures the case when the operands have the same type.\<close>
 
-lemma exp_rel_binop_mult_permdiv_no_conv:
+lemma exp_rel_binop_mult_no_conv:
   assumes
-   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop \<in> { Mult, PermDiv }" and
+   BopRel: "binop_rel bop = bopb \<and> binop_lazy bop = None \<and> bop = Mult" and
    E1Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl" and
    E2Rel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl" and
    RedBplSameType: "\<And>\<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> 
@@ -374,12 +438,10 @@ proof (rule exp_rel_vpr_bpl_intro_2)
 
         have v1IntPerm: "(\<exists>i. v1 = VInt i) \<or> (\<exists>r. v1 = VPerm r)"
           apply (insert RedBinop BopRel)
-          apply (cases v1; cases v2; simp_all)
-          by fastforce
+          by (cases v1; cases v2; simp_all)
         moreover have v2IntPerm: "(\<exists>i. v2 = VInt i) \<or> (\<exists>r. v2 = VPerm r)"
           apply (insert RedBinop BopRel)
-          apply (cases v1; cases v2; simp_all)
-          by fastforce
+          by (cases v1; cases v2; simp_all)
 
         from RedBplSameType[OF R] obtain v1_bpl v2_bpl where 
           "red_expr_bpl ctxt e1_bpl ns v1_bpl"
@@ -437,9 +499,7 @@ proof (rule exp_rel_vpr_bpl_intro_2)
                 apply simp_all
             apply (cases bop)
             apply simp_all
-             apply fastforce
-            apply (simp add: smt_real_div_def)
-            by (metis binop_result.distinct(5) binop_result.inject of_rat_rat val_rel_vpr_bpl.simps(5))
+            by fastforce
         next
           case RealOp
           show ?thesis 
@@ -450,9 +510,7 @@ proof (rule exp_rel_vpr_bpl_intro_2)
                 apply simp_all
             apply (cases bop)
                           apply simp_all
-             apply (metis of_rat_mult val_rel_vpr_bpl.simps(5))
-            apply (simp add: smt_real_div_def)
-            by (metis binop_result.distinct(5) binop_result.sel of_rat_divide val_rel_vpr_bpl.simps(5))
+            by (metis of_rat_mult val_rel_vpr_bpl.simps(5))
         qed
       qed
     qed (insert assms, auto)
