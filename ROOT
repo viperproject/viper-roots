@@ -5,25 +5,24 @@ session TotalViper = Viper +
   theories
     TotalViperState
     TotalStateUtil
-    TotalConsistency
     TotalExpressions
     TotalSemantics
     TotalSemProperties
     TotalUtil
     ViperBoogieAbsValueInst
     ViperBoogieBasicRel
-	ViperBoogieFunctionInst
-	ViperBoogieTranslationInterface
-	ViperBoogieRelUtil
-	TotalViperHelperML
-	CPGHelperML
+    ViperBoogieFunctionInst
+    ViperBoogieTranslationInterface
+    ViperBoogieRelUtil
+    TotalViperHelperML
+    CPGHelperML
     ExpRel
     ExpRelML
     ExprWfRel
     ExprWfRelML
     StmtRel
-	InhaleRelML
-	ExhaleRelML
-	StmtRelML
-	
-	
+    InhaleRelML
+    ExhaleRelML
+    StmtRelML
+    ViperBoogieEndToEnd
+    ViperBoogieEndToEndML
