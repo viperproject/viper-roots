@@ -288,7 +288,7 @@ next
 
 
 text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> can be used to omit well-definedness checks
-       on direct subexpressions of an assertion\<close>
+      on direct subexpressions of an assertion\<close>
 
 lemma framing_exhI_exprs_wf_rel:
   assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"

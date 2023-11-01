@@ -157,7 +157,7 @@ ML \<open>
     (Rmsg' "Assign var translation" ( (#var_rel_tac basic_stmt_rel_info) ctxt |> SOLVED') ctxt) THEN'
     
     (Rmsg' "Assign LHS Bpl Ty" (assm_full_simp_solved_with_thms_tac [lookup_bpl_target_thm] ctxt) ctxt) THEN'
-    (Rmsg' "Assign TyRel" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN' 
+    (Rmsg' "Assign TyRel" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def}] ctxt) ctxt) THEN' 
     (Rmsg' "Assign Rhs Rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)   
 
 
@@ -350,7 +350,7 @@ ML \<open>
         (Rmsg' "MethodCall MethodSpecsFramed" (EVERY' [eresolve_tac ctxt @{thms vpr_method_spec_correct_total_from_all}, 
                                                   resolve_tac ctxt [#method_lookup_thm callee_data]]) ctxt) THEN'
         (Rmsg' "MethodCall MethodSpecSubset" (assm_full_simp_solved_with_thms_tac [#method_pre_thm callee_data, #method_post_thm callee_data] ctxt) ctxt) THEN'
-        (Rmsg' "MethodCall OnlyArgsInPre" (assm_full_simp_solved_with_thms_tac [#method_pre_thm callee_data] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall OnlyArgsInPre" (fastforce_tac ctxt [#method_pre_thm callee_data]) ctxt) THEN'
         (Rmsg' "MethodCall Empty Rinterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "MethodCall DomainTyRep" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
         (Rmsg' "MethodCall TyInterpBplEq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
@@ -361,10 +361,10 @@ ML \<open>
         (Rmsg' "MethodCall XsBplEq" (#var_rel_tac basic_info ctxt) ctxt) THEN'
         (Rmsg' "MethodCall RetsSubsetVarTranslation" (#var_rel_tac basic_info ctxt) ctxt) THEN' 
         (Rmsg' "MethodCall YsBplEq" (#var_rel_tac basic_info ctxt) ctxt) THEN'
-        (Rmsg' "MethodCall ArgsAndRetsDisjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ArgsAndRetsDisjoint" (assm_full_simp_solved_with_thms_tac [@{thm shift_and_add_def}] ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Distinct Args" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Distinct Rets" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-        (Rmsg' "MethodCall LookupDeclRetsBpl" (assm_full_simp_solved_with_thms_tac ([#method_rets_thm callee_data, @{thm ty_repr_basic_def}]@rets_lookup_decl_thms)  ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall LookupDeclRetsBpl" (assm_full_simp_solved_with_thms_tac ([#method_rets_thm callee_data, @{thm ty_repr_basic_def}, @{thm shift_and_add_def}]@rets_lookup_decl_thms)  ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Var Translation Pre Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Exhale Pre" ( simp_only_tac [#method_pre_thm callee_data] ctxt THEN'
                                          atomic_rel_inst_tac ctxt inhale_info_call exhale_info_call basic_info (ExhaleHint exh_pre_complete_hint)) ctxt) THEN'
