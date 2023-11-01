@@ -693,13 +693,13 @@ subsubsection \<open>Well-definedness for free if expressions are subexpressions
 
 lemma assertion_framing_exprs_wf_rel_inh:
   assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
-               assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+               assertion_framing_state ctxt_vpr StateCons A \<omega>def \<and>
                get_store_total \<omega> = get_store_total \<omega>def \<and> 
                get_trace_total \<omega> = get_trace_total \<omega>def \<and>
                get_h_total_full \<omega> = get_h_total_full \<omega>def"
-      and "es = sub_expressions_atomic A"
+      and "es = sub_expressions_assertion A"
       and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
-    shows  "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
+    shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (cases "es = []")
   case True
   then show ?thesis 
@@ -715,7 +715,7 @@ proof (rule wf_rel_intro)
   assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
 
   from \<open>R \<omega>def \<omega> ns\<close> have
-    AssertionFramed: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and
+    AssertionFramed: "assertion_framing_state ctxt_vpr StateCons A \<omega>def" and
     OnlyMaskDiffers: "get_store_total \<omega> = get_store_total \<omega>def \<and> 
      get_trace_total \<omega> = get_trace_total \<omega>def \<and>
      get_h_total_full \<omega> = get_h_total_full \<omega>def"
@@ -725,11 +725,16 @@ proof (rule wf_rel_intro)
   from RedExps OnlyMaskDiffers have "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega>def None"
     using red_pure_exp_only_differ_on_mask(2) ExprConstraint
     by blast
-  hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
-    using assms \<open>es \<noteq> []\<close> InhSubAtomicFailure
-    by blast
+  hence "red_inhale ctxt_vpr StateCons A \<omega>def RFailure"
+    apply (cases A)
+    using assms \<open>es \<noteq> []\<close>
+           apply simp_all
+    using InhSubAtomicFailure
+     apply blast
+    using InhImpFailure    
+    by (metis (no_types, lifting) option.discI red_pure_exps_total_singleton)
 
-  moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
+  moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
     using assms
     by blast
   ultimately have False
@@ -739,13 +744,13 @@ proof (rule wf_rel_intro)
   thus contra
     by blast
    qed (blast intro: red_ast_bpl_refl)
-qed
+ qed
 
 lemma assertion_framing_exprs_wf_rel_inh_well_def_same:
   assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
-               assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+               assertion_framing_state ctxt_vpr StateCons A \<omega>def \<and>
                \<omega> = \<omega>def"
-      and "es = sub_expressions_atomic A"
+      and "es = sub_expressions_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (cases "es = []")
   case True
@@ -762,15 +767,20 @@ next
     assume "R \<omega>def \<omega> ns" and RedExps: "red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None"
   
     from \<open>R \<omega>def \<omega> ns\<close> have
-      AssertionFramed: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def" and "\<omega> = \<omega>def"
+      AssertionFramed: "assertion_framing_state ctxt_vpr StateCons A \<omega>def" and "\<omega> = \<omega>def"
       using assms
       by auto
   
-    hence "red_inhale ctxt_vpr StateCons (Atomic A) \<omega>def RFailure"
-      using assms \<open>es \<noteq> []\<close> InhSubAtomicFailure RedExps
-      by blast
-  
-    moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def"
+    hence "red_inhale ctxt_vpr StateCons A \<omega>def RFailure"
+      apply (cases A)
+      using assms \<open>es \<noteq> []\<close>
+             apply simp_all
+      using InhSubAtomicFailure RedExps
+       apply blast
+      using InhImpFailure RedExps
+      by (metis option.distinct(1) red_pure_exps_total_singleton)
+
+    moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
       using assms
       by blast
     ultimately have False

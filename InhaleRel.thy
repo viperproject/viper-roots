@@ -101,13 +101,13 @@ lemma assertion_framing_is_inh_rel_invariant:
 
 lemma assertion_framing_state_inh_exprs_wf_rel:
   assumes StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
-                                         assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>"      
-      and "es = sub_expressions_atomic A"
+                                         assertion_framing_state ctxt_vpr StateCons A \<omega>"      
+      and "es = sub_expressions_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (rule assertion_framing_exprs_wf_rel_inh_well_def_same[OF _ \<open>es = _\<close>])
   fix \<omega>def \<omega> ns
   assume "R \<omega>def \<omega> ns"
-  thus "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and> \<omega> = \<omega>def"
+  thus "assertion_framing_state ctxt_vpr StateCons A \<omega>def \<and> \<omega> = \<omega>def"
     using StateRel
     by blast
 qed

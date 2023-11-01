@@ -287,26 +287,26 @@ next
  qed
 
 
- text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> can be used to omit well-definedness checks
+text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> can be used to omit well-definedness checks
        on direct subexpressions of an assertion\<close>
 
 lemma framing_exhI_exprs_wf_rel:
   assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"
-      and "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons (Atomic A) \<omega>def \<omega>"      
-      and "es = sub_expressions_atomic A"
+      and "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons A \<omega>def \<omega>"      
+      and "es = sub_expressions_assertion A"
       and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
-      and AssertionConstraint: "no_perm_assertion (Atomic A) \<and> no_unfolding_assertion (Atomic A)"
+      and AssertionConstraint: "no_perm_assertion A \<and> no_unfolding_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (rule assertion_framing_exprs_wf_rel_inh)
   fix \<omega>def \<omega> ns
   assume "R \<omega>def \<omega> ns"
-  hence FramingExh: "framing_exh ctxt_vpr StateCons (Atomic A) \<omega>def \<omega>"
+  hence FramingExh: "framing_exh ctxt_vpr StateCons A \<omega>def \<omega>"
     using assms
     by simp
 
   from this obtain \<omega>_inh \<omega>_sum where 
       StateConstraint: "\<omega>_inh \<oplus> \<omega> = Some \<omega>_sum \<and> \<omega>def \<succeq> \<omega>_sum"
-  and FramingStateInh: "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>_inh"
+  and FramingStateInh: "assertion_framing_state ctxt_vpr StateCons A \<omega>_inh"
     unfolding framing_exh_def
     by blast
 
@@ -319,7 +319,7 @@ proof (rule assertion_framing_exprs_wf_rel_inh)
   from StateConstraint have "\<omega>def \<succeq> \<omega>"
     by (metis greater_equiv succ_trans)
 
-  show "assertion_framing_state ctxt_vpr StateCons (Atomic A) \<omega>def \<and>
+  show "assertion_framing_state ctxt_vpr StateCons A \<omega>def \<and>
        get_store_total \<omega> = get_store_total \<omega>def \<and> get_trace_total \<omega> = get_trace_total \<omega>def \<and> get_h_total_full \<omega> = get_h_total_full \<omega>def"
     (is "?Goal1 \<and> ?Goal2")
   proof (rule conjI)
