@@ -603,34 +603,53 @@ next
   qed
 qed
 
-    
+lemma cond_exp_wf_rel:
+  assumes CondWfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt cond 
+                       \<gamma>1 (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)"
+      and CondExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt cond cond_bpl"
+      and ThnWfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e_thn 
+                       (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+      and ElsWfRel: "expr_wf_rel R ctxt_vpr StateCons P ctxt e_els 
+                       (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"      
+    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.CondExp cond e_thn e_els) 
+                         \<gamma>1
+                         (next, cont)"
+  using CondWfRel ThnWfRel ElsWfRel
+  unfolding wf_rel_def
+proof (rule rel_general_cond)
+  fix \<omega> \<omega>' ns
+  assume R: "R (fst \<omega>) (snd \<omega>) ns"
+     and *: "\<omega> = \<omega>' \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>pure_exp.CondExp cond e_thn e_els;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)" (is "_ \<and> (\<exists>v. ?RedCondVpr v)")
+  from this obtain v where  "?RedCondVpr v"
+    by blast
 
-text \<open>In the unfolding relation lemma, the relations R and R' are used to relate to the well-definedness
-state outside and inside the unfolding, respectively. The assumptions express how to move from R to
-R' and back:
-  \<^item> R to R': Via reduction in the Boogie program (basically some initialization code follow by an inhale)
-  \<^item> R' to R: The corresponding assumption expresses that R' contains all the information in R. In particular,
-   if R has some constraint on a Boogie variable, then R' must have the same constraint. This should
-   work for the current encoding, but may be too strong.
-TODO: I think the current R' to R does not make sense. One needs to somehow share ns between the two,
-which would mean another parameter. Not sure what the most abstract notion is here. One option could be 
-to have another Boogie state is input and then one could express two-state invariants such as 
-"value stays the same". It would also be interesting to understand whether Benjamin's auxiliary 
-constraints make sense here.
-
-lemma unfolding_wf_rel:
-  assumes 
-        R_to_R': "\<And> \<omega>def \<omega>def' vs \<omega> ns. 
-                      R \<omega>def \<omega> ns \<Longrightarrow>
-                      unfold_rel ctxt_vpr StateCons p vs pwrite \<omega>def \<omega>def' \<Longrightarrow>                      
-                      \<exists>ns'. R' \<omega>def' \<omega> ns' \<and>                             
-                            red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns')" and
-        R'_to_R: "\<And> \<omega>def \<omega>def' \<omega> ns ns'. R \<omega>def \<omega> ns \<Longrightarrow> R' \<omega>def' \<omega> ns' \<Longrightarrow> R \<omega>def \<omega> ns'" and
-        WfRelArgs: "exprs_wf_rel R' ctxt_vpr StateCons P ctxt xs \<gamma>1 \<gamma>2" and
-        WfRel: "expr_wf_rel R' ctxt_vpr StateCons P ctxt ubody \<gamma>2 \<gamma>3"
-      shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (Unfolding p xs ubody) \<gamma>1 \<gamma>3"
-  oops
-\<close>
+  thus "(\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and>
+        R (fst \<omega>) (snd \<omega>) ns \<and> \<omega> = \<omega>' \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_thn;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<or>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and>
+        R (fst \<omega>) (snd \<omega>) ns \<and> \<omega> = \<omega>' \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_els;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v))"
+    apply (cases)
+     apply (insert exp_rel_vpr_bplD[OF CondExpRel])
+     apply (metis R * val_rel_vpr_bpl.simps(2))
+    apply (insert exp_rel_vpr_bplD[OF CondExpRel])
+    by (metis R * val_rel_vpr_bpl.simps(2))
+next
+  fix \<omega> ns
+  assume R: "R (fst \<omega>) (snd \<omega>) ns"
+  assume "ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>pure_exp.CondExp cond e_thn e_els;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+  thus "ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+       (\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and>
+        R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_thn;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and>
+        R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_els;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure) "
+    apply (cases)
+      apply (insert exp_rel_vpr_bplD[OF CondExpRel])
+      apply (metis R val_rel_vpr_bpl.simps(2))
+     apply (metis R val_rel_vpr_bpl.simps(2))
+    apply simp
+    by (metis option.discI red_pure_exps_total_singleton)
+qed
 
 subsubsection \<open>Well-definedness for free if expressions are subexpressions of a framed assertion\<close>
 
