@@ -21,7 +21,7 @@ normal case, so in terms of completeness the current relation does not say much)
 type_synonym 'a vpr_state = "'a full_total_state"
 type_synonym 'a bpl_state = "('a vbpl_absval) nstate"
 
-definition wf_rel :: 
+definition wf_rel ::
   "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow> 
    ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow>
    ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> bool) \<Rightarrow>
@@ -30,44 +30,13 @@ definition wf_rel ::
    'a econtext_bpl \<Rightarrow>
    (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont)  \<Rightarrow> 
    bool" where
-  "wf_rel R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>'  \<equiv>
-   \<forall> \<omega>def \<omega> ns.
-    R \<omega>def \<omega> ns \<longrightarrow>
-     (IsNormal \<omega>def \<omega> \<longrightarrow>
-       (\<exists> ns'.
-         red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and>
-         R' \<omega>def \<omega> ns')
-     ) \<and>
-     (IsFailure \<omega>def \<omega> \<longrightarrow>
-       (\<exists>c'.         
-        red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
-        snd c' = Failure)
-     )"
-
-\<comment>\<open>TODO: replace wf_rel by wf_rel_inst and reuse propagation lemmas from rel_general\<close>
-definition wf_rel_inst ::
-  "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow> 
-   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> 'a bpl_state \<Rightarrow> bool) \<Rightarrow>
-   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> bool) \<Rightarrow>
-   ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow> bool) \<Rightarrow>
-   ast \<Rightarrow>
-   'a econtext_bpl \<Rightarrow>
-   (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont)  \<Rightarrow> 
-   bool" where
-  "wf_rel_inst R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<equiv>
+  "wf_rel R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<equiv>
         rel_general 
             (\<lambda> \<omega>def_\<omega> ns. R (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns)
             (\<lambda> \<omega>def_\<omega> ns. R' (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns)
             (\<lambda>\<omega>def_\<omega> \<omega>def_\<omega>'. \<omega>def_\<omega> = \<omega>def_\<omega>' \<and> IsNormal (fst \<omega>def_\<omega>) (snd (\<omega>def_\<omega>)))
             (\<lambda>\<omega>def_\<omega>. IsFailure (fst \<omega>def_\<omega>) (snd (\<omega>def_\<omega>)))
             P ctxt \<gamma> \<gamma>'"
-
-lemma wf_rel_inst_eq:
-  "wf_rel R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow> wf_rel_inst R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>'"
-  unfolding wf_rel_def wf_rel_inst_def rel_general_def
-  by auto
-
-lemmas wf_rel_inst_eq_1 = HOL.iffD1[OF wf_rel_inst_eq]
 
 lemma wf_rel_general:
   "wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R' \<omega> ns) IsNormal IsFailure P ctxt \<gamma> \<gamma>' \<longleftrightarrow>
@@ -115,7 +84,7 @@ lemma wf_rel_intro [case_names normal failure]:
           red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and>
           snd c' = Failure)"
  shows "wf_rel R R' IsNormal IsFailure P ctxt \<gamma> \<gamma>'"
-  unfolding wf_rel_def
+  unfolding wf_rel_def rel_general_def
   using assms
   by fastforce
 
@@ -127,8 +96,8 @@ lemma wf_rel_normal_elim:
  shows
    "\<exists> ns'. R' \<omega>def \<omega> ns' \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
   using assms
-  unfolding wf_rel_def
-  by blast
+  unfolding wf_rel_def rel_general_def
+  by fastforce
 
 lemma exprs_wf_rel_normal_elim:
   assumes 
@@ -138,8 +107,8 @@ lemma exprs_wf_rel_normal_elim:
   shows
         "\<exists> ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
   using assms
-  unfolding exprs_wf_rel_def wf_rel_def
-  by blast
+  unfolding exprs_wf_rel_def wf_rel_def rel_general_def
+  by fastforce
 
 lemma exprs_wf_rel_alt_normal_elim:
   assumes 
@@ -186,8 +155,8 @@ lemma wf_rel_failure_elim:
  shows 
    "(\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure)"
   using assms
-  unfolding wf_rel_def
-  by blast
+  unfolding wf_rel_def rel_general_def
+  by fastforce
 
 lemma exprs_wf_rel_failure_elim:
   assumes 
@@ -197,8 +166,8 @@ lemma exprs_wf_rel_failure_elim:
   shows
        "\<exists> c. red_ast_bpl P ctxt (\<gamma>, Normal ns) c \<and> snd c = Failure"
   using assms
-  unfolding exprs_wf_rel_def wf_rel_def
-  by blast
+  unfolding exprs_wf_rel_def wf_rel_def rel_general_def
+  by fastforce
   
 lemma exprs_wf_rel_alt_failure_elim:
   assumes 
@@ -284,7 +253,7 @@ next
 qed (insert assms, fastforce)
 
 lemma wf_rel_no_failure_refl: "wf_rel R R IsNormal (\<lambda>_ _. False) P ctxt \<gamma> \<gamma>" 
-  unfolding wf_rel_def red_ast_bpl_def
+  unfolding wf_rel_def red_ast_bpl_def rel_general_def
   by blast
 
 lemma exprs_wf_rel_Nil: "exprs_wf_rel R ctxt_vpr StateCons P ctxt [] \<gamma> \<gamma>"
@@ -292,7 +261,50 @@ lemma exprs_wf_rel_Nil: "exprs_wf_rel R ctxt_vpr StateCons P ctxt [] \<gamma> \<
   apply (rule wf_rel_intro)
   by (auto intro: red_ast_bpl_refl dest: red_exp_list_failure_Nil)
 
-subsection \<open>Rules to derive semantic well-definedness relation\<close>
+subsection \<open>Propagation rules\<close>
+
+
+lemma wf_rel_extend_1:
+  assumes 
+   Wf:"wf_rel R R' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>2" and
+   Red:"\<And>\<omega>def \<omega> ns2. R' \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3) \<and> R'' \<omega>def \<omega> ns3"
+ shows
+   "wf_rel R R'' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  using assms
+  unfolding wf_rel_def
+  by (simp add: red_ast_bpl_relI rel_propagate_post)
+
+lemma wf_rel_extend_1_same_rel:
+  assumes 
+   "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>2" and
+   "\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3) \<and> R \<omega>def \<omega> ns3"
+ shows 
+  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  using assms wf_rel_extend_1
+  by blast
+
+lemma wf_rel_extend_2:
+  assumes 
+   Red:"\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R' \<omega>def \<omega> ns3" and
+   Wf:"wf_rel R' R'' IsNormal IsFailure P ctxt \<gamma>2 \<gamma>3"
+ shows 
+  "wf_rel R R'' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  unfolding wf_rel_def
+  apply (rule rel_propagate_pre[where ?R1.0="uncurry R'", simplified red_ast_bpl_rel_def])
+  using assms
+  unfolding wf_rel_def
+  by fastforce+
+
+lemma wf_rel_extend_2_same_rel:
+  assumes 
+   Red:"\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R \<omega>def \<omega> ns3" and
+   Wf:"wf_rel R R IsNormal IsFailure P ctxt \<gamma>2 \<gamma>3"
+ shows 
+  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
+  using assms wf_rel_extend_2
+  by blast
+
+subsection \<open>Specific expressions\<close>
 
 lemma var_never_fails: 
   assumes "Pr, ctxt_vpr, \<omega>def \<turnstile> \<langle>ViperLang.Var x; \<omega>\<rangle> [\<Down>]\<^sub>t v"
@@ -325,78 +337,9 @@ lemma lit_expr_wf_rel: "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.ELit 
 lemma unop_expr_wf_rel_2:
   assumes "expr_wf_rel R ctxt_vpr StateCons P ctxt e \<gamma> \<gamma>'"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (ViperLang.Unop uop e) \<gamma> \<gamma>'"
-  unfolding wf_rel_def
-  apply (insert assms)
-  apply clarify
-  by (fastforce dest: unop_elim simp: wf_rel_def split: extended_val.split)
-
-lemma wf_rel_extend_1:
-  assumes 
-   Wf:"wf_rel R R' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>2" and
-   Red:"\<And>\<omega>def \<omega> ns2. R' \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3) \<and> R'' \<omega>def \<omega> ns3"
- shows
-   "wf_rel R R'' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
-proof (rule wf_rel_intro)
-  fix v \<omega>def \<omega> ns1  
-  assume R:"R \<omega>def \<omega> ns1" and "IsNormal \<omega>def \<omega>"
-  from this obtain ns2 where "R' \<omega>def \<omega> ns2" and Red1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)" using Wf
-    unfolding wf_rel_def
-    by blast
-  from this obtain ns3 where "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3)" and "R'' \<omega>def \<omega> ns3"
-    using Red
-    by blast    
-  hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
-    by (simp add: red_ast_bpl_def)
-  with \<open>R'' \<omega>def \<omega> ns3\<close> show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns') \<and>  R'' \<omega>def \<omega> ns'"
-    by blast
-qed (insert assms, unfold wf_rel_def, blast)
-
-lemma wf_rel_extend_1_same_rel:
-  assumes 
-   "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>2" and
-   "\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3) \<and> R \<omega>def \<omega> ns3"
- shows 
-  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
-  using assms wf_rel_extend_1
-  by blast
-
-lemma wf_rel_extend_2:
-  assumes 
-   Red:"\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R' \<omega>def \<omega> ns3" and
-   Wf:"wf_rel R' R'' IsNormal IsFailure P ctxt \<gamma>2 \<gamma>3"
- shows 
-  "wf_rel R R'' IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
-proof (rule wf_rel_intro)
-  fix v \<omega>def \<omega> ns1  
-  assume R:"R \<omega>def \<omega> ns1" and Normal:"IsNormal \<omega>def \<omega>"
-  from this obtain ns2 where "R' \<omega>def \<omega> ns2" and Red1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)" using Red
-    by blast
-  with Normal obtain ns3 where "red_ast_bpl P ctxt (\<gamma>2, Normal ns2) (\<gamma>3, Normal ns3)" and "R'' \<omega>def \<omega> ns3"
-    using Wf
-    unfolding wf_rel_def
-    by blast
-  hence "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns3)" using Red1
-    by (simp add: red_ast_bpl_def)
-  with \<open>R'' \<omega>def \<omega> ns3\<close> show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>3, Normal ns') \<and> R'' \<omega>def \<omega> ns'"
-    by blast
-next
-  fix v \<omega>def \<omega> ns1  
-  assume R:"R \<omega>def \<omega> ns1" and Failure:"IsFailure \<omega>def \<omega>"
-  from this obtain ns2 where "R' \<omega>def \<omega> ns2" and Red1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>2, Normal ns2)" using Red
-    by blast
-  with Failure show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>1, Normal ns1) c' \<and> snd c' = Failure"
-    unfolding red_ast_bpl_def
-    by (metis (no_types, lifting) Wf red_ast_bpl_def rtranclp_trans wf_rel_failure_elim)
-qed
-
-lemma wf_rel_extend_2_same_rel:
-  assumes 
-   Red:"\<And>\<omega>def \<omega> ns2. R \<omega>def \<omega> ns2 \<Longrightarrow> \<exists>ns3. red_ast_bpl P ctxt (\<gamma>1, Normal ns2) (\<gamma>2, Normal ns3) \<and> R \<omega>def \<omega> ns3" and
-   Wf:"wf_rel R R IsNormal IsFailure P ctxt \<gamma>2 \<gamma>3"
- shows 
-  "wf_rel R R IsNormal IsFailure P ctxt \<gamma>1 \<gamma>3"
-  using assms wf_rel_extend_2
-  by blast
+  using assms
+  by (fastforce dest: unop_elim wf_rel_normal_elim wf_rel_failure_elim
+                intro: wf_rel_intro)
 
 abbreviation wf_rel_bop_op 
   where "wf_rel_bop_op R R' ctxt_vpr StateCons P ctxt e1 bop e2 \<equiv>  wf_rel R R'
@@ -1397,7 +1340,7 @@ proof (rule wf_rel_intro)
       by auto
 
     hence RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a)))"
-      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      using exp_rel_vpr_bpl_elim[OF ExpRel] RedRcv R   
       by (metis val_rel_vpr_bpl.simps(3))
   
     from ValidLoc have VprHasPerm: "pgt (get_mh_total_full \<omega>def (a,f)) pnone"
@@ -1432,7 +1375,7 @@ proof (rule wf_rel_intro)
       by blast
 
     have RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef r))"
-      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      using exp_rel_vpr_bpl_elim[OF ExpRel] RedRcv R   
       by (metis val_rel_vpr_bpl.simps(3))
 
     have BplHasNoPerm: "m_bpl (r, NormalField f_bpl \<tau>) = 0"
@@ -1542,7 +1485,7 @@ proof (rule wf_rel_intro)
       by auto
 
     hence RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a)))"
-      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      using exp_rel_vpr_bpl_elim[OF ExpRel] RedRcv R   
       by (metis val_rel_vpr_bpl.simps(3))
   
     from WriteableLocs have VprHasPerm: "(get_mh_total_full \<omega>def (a,f)) = pwrite"
@@ -1576,7 +1519,7 @@ proof (rule wf_rel_intro)
       by blast
 
     have RedRcvBpl: "red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef r))"
-      using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRcv R   
+      using exp_rel_vpr_bpl_elim[OF ExpRel] RedRcv R   
       by (metis val_rel_vpr_bpl.simps(3))
 
     have BplHasNoPerm: "m_bpl (r, NormalField f_bpl \<tau>) \<noteq> 1"

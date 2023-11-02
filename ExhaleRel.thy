@@ -426,7 +426,7 @@ lemma exhale_rel_imp:
   unfolding exhale_rel_def
 proof (simp only: uncurry.simps, 
        rule rel_general_cond, 
-       fastforce intro: rel_general_conseq_input_output[OF rev_iffD1_def[OF wf_rel_inst_eq_1[OF ExpWfRel] wf_rel_inst_def]])
+       fastforce intro: rel_general_conseq_input_output[OF ExpWfRel[simplified wf_rel_def]])
   show "rel_general (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda>\<omega>0_\<omega>. R (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)) (\<lambda> \<omega> \<omega>'. \<omega> = \<omega>') (\<lambda>_. False) P ctxt (empty_else_block, convert_list_to_cont [] (KSeq next cont)) (next, cont)"
     apply (rule rel_intro)
     using red_ast_bpl_empty_block_2[OF EmptyElse]
