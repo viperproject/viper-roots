@@ -202,7 +202,7 @@ next
         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> \<omega> = \<omega>')"
     apply (cases)
     using ExpRel
-    by (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)+
+    by (fastforce dest: exp_rel_vpr_bplD simp: Invariant)+
 next
   fix \<omega> ns
   assume "red_inhale ctxt_vpr StateCons (assert.Imp cond A) \<omega> RFailure" and "R \<omega> ns \<and> Q (assert.Imp cond A) \<omega>"
@@ -212,7 +212,7 @@ next
         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> False)"
     apply (cases)
     using ExpRel
-    by (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)+
+    by (fastforce dest: exp_rel_vpr_bplD simp: Invariant)+
 qed
 
 lemma inhale_rel_imp_2:
@@ -371,7 +371,7 @@ lemma inhale_rcv_lookup:
           ExpRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt))
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" 
         shows "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" 
-  using assms(1-2) exp_rel_vpr_bpl_elim_2[OF ExpRel] 
+  using assms(1-2) exp_rel_vpr_bpl_elim[OF ExpRel] 
   unfolding inhale_acc_normal_premise_def  
   by (metis val_rel_vpr_bpl.simps(3))
 
@@ -388,7 +388,7 @@ lemma inhale_field_acc_non_null_rcv_rel:
                 ( (BigBlock name cs str tr, cont), Normal ns') \<and> 
                  ?R \<omega> ns'" (is "\<exists>ns'. red_ast_bpl P ctxt (?\<gamma>, Normal ns) (?\<gamma>', Normal ns') \<and> ?R _ _")
 proof (rule exI[where ?x="ns"])
-  from InhAccNormal exp_rel_vpr_bpl_elim_2[OF RcvRel] \<open>?R \<omega> ns\<close> have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
+  from InhAccNormal exp_rel_vpr_bplD[OF RcvRel] \<open>?R \<omega> ns\<close> have RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
     unfolding inhale_acc_normal_premise_def
     by (metis val_rel_vpr_bpl.simps(3))
 
@@ -479,7 +479,7 @@ next
     by blast
 
   thus "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
-    using exp_rel_vpr_bpl_elim_2[OF RcvRel] StateRel[OF \<open>R \<omega> ns\<close>]
+    using exp_rel_vpr_bplD[OF RcvRel] StateRel[OF \<open>R \<omega> ns\<close>]
     by (metis val_rel_vpr_bpl.simps(3))
 next
   fix \<omega> \<omega>' ns
@@ -557,7 +557,7 @@ proof (rule inhale_rel_intro)
     by blast
 
   with RedExp ExpRel have "red_expr_bpl ctxt e_bpl ns' (val_rel_vpr_bpl (VBool True))"
-    using exp_rel_vpr_bpl_elim_2
+    using exp_rel_vpr_bplD
     by fast   
 
   hence "red_expr_bpl ctxt e_bpl ns' (BoolV True)"

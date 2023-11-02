@@ -162,9 +162,9 @@ proof (rule rel_general_cond)
        ( red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> R \<omega> ns \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_thn \<omega> (RNormal \<omega>') \<or>
        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> (RNormal \<omega>'))"
     apply (cases)
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
+    using exp_rel_vpr_bplD[OF ExpRel]
     apply (metis \<open>R \<omega> ns\<close> val_rel_vpr_bpl.simps(2))
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel]
+    using exp_rel_vpr_bplD[OF ExpRel]
     by (metis \<open>R \<omega> ns\<close> val_rel_vpr_bpl.simps(2))
 next
   fix \<omega> ns
@@ -177,7 +177,7 @@ next
         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and>
         red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr s_els \<omega> RFailure)"
     apply(cases)
-      apply (insert exp_rel_vpr_bpl_elim_2[OF ExpRel])
+      apply (insert exp_rel_vpr_bplD[OF ExpRel])
       apply (metis \<open>R \<omega> ns\<close> val_rel_vpr_bpl.simps(2))
      apply (metis \<open>R \<omega> ns\<close> val_rel_vpr_bpl.simps(2))
     apply simp
@@ -244,9 +244,8 @@ proof (cases rule: stmt_rel_intro)
 
     let ?v_bpl = "val_rel_vpr_bpl v"
     have RedEBpl:"red_expr_bpl ctxt e_bpl ns' ?v_bpl"
-      apply (rule exp_rel_vpr_bpl_elim_2[OF ExpRel])
-      using R' RedEVpr
-      by fastforce
+      using R' RedEVpr ExpRel
+      by (fastforce dest: exp_rel_vpr_bplD)
 
     have ValBplTy:"type_of_val (type_interp ctxt) ?v_bpl = instantiate [] ty_bpl"
       using vTyVpr TyRel TyRelWf

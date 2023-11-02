@@ -114,21 +114,20 @@ lemma exp_rel_vpr_bpl_elim:
   assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl" and
           "(\<And> StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
                     (ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
-                    (\<exists>v2. (red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)) \<and> (val_rel_vpr_bpl v1 = v2))) \<Longrightarrow> P"
+                    ( (red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)))) \<Longrightarrow> P"
   shows P
   using assms
   unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
   by blast
 
-lemma exp_rel_vpr_bpl_elim_2:
-  assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl" and
-          "(\<And> \<omega> \<omega>_def1 ns v1. R \<omega>_def1 \<omega> ns \<Longrightarrow> 
-                    (ctxt_vpr, StateCons, \<omega>_def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow> 
-                    red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)) \<Longrightarrow> P"
-  shows P
+lemma exp_rel_vpr_bplD:
+  assumes "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
+      and "R \<omega>_def1 \<omega> ns"
+      and "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+    shows "red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v1)"
   using assms
-  unfolding exp_rel_vpr_bpl_def exp_rel_vb_single_def 
-  by blast
+  by (auto elim: exp_rel_vpr_bpl_elim)
+
 
 lemma exp_rel_equiv_vpr:
   assumes "\<And>v1 StateCons \<omega> \<omega>_def_opt. (ctxt_vpr, StateCons, \<omega>_def_opt \<turnstile> \<langle>e1_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v1) \<Longrightarrow>
@@ -257,6 +256,34 @@ lemma exp_rel_unop:
   apply (rule exp_rel_vpr_bpl_intro)
   apply (rule exp_rel_vpr_bpl_elim[OF ExpRel])
   by (auto elim!: TotalExpressions.RedUnop_case intro!: Semantics.RedUnOp unop_rel_correct[OF _ UopRel] )
+
+lemma exp_rel_condexp:
+  assumes ExpRel1: "exp_rel_vpr_bpl R ctxt_vpr ctxt e1 e1_bpl"
+      and ExpRel2: "exp_rel_vpr_bpl R ctxt_vpr ctxt e2 e2_bpl"
+      and ExpRel3: "exp_rel_vpr_bpl R ctxt_vpr ctxt e3 e3_bpl"
+    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.CondExp e1 e2 e3) (Lang.CondExp e1_bpl e2_bpl e3_bpl)"
+proof (rule exp_rel_vpr_bpl_intro_2)
+  fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v
+  assume R: "R \<omega>_def1 \<omega> ns"
+  assume "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>pure_exp.CondExp e1 e2 e3;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+
+  thus "red_expr_bpl ctxt (expr.CondExp e1_bpl e2_bpl e3_bpl) ns (val_rel_vpr_bpl v)"
+  proof (cases)
+    case RedCondExpTrue
+    hence "red_expr_bpl ctxt e1_bpl ns (BoolV True)" and "red_expr_bpl ctxt e2_bpl ns (val_rel_vpr_bpl v)"
+      using exp_rel_vpr_bplD[OF ExpRel1 R] exp_rel_vpr_bplD[OF ExpRel2 R]
+      by fastforce+
+    then show ?thesis 
+      by (auto intro!: Semantics.RedCondExpTrue)
+  next
+    case RedCondExpFalse
+    hence "red_expr_bpl ctxt e1_bpl ns (BoolV False)" and "red_expr_bpl ctxt e3_bpl ns (val_rel_vpr_bpl v)"
+      using exp_rel_vpr_bplD[OF ExpRel1 R] exp_rel_vpr_bplD[OF ExpRel3 R]
+      by fastforce+
+    then show ?thesis
+      by (auto intro!: Semantics.RedCondExpFalse)
+  qed
+qed
 
 subsubsection \<open>Binary Operations\<close>
 
@@ -735,6 +762,6 @@ lemma exp_rel_perm_access_2:
   apply (subst \<open>mvar = _\<close>)
   apply (rule exp_rel_perm_access[OF MaskReadWf StateRel FieldRelSingle])
   using RcvRel RedRcvVpr StateRel
-  by (fastforce elim: exp_rel_vpr_bpl_elim_2)
+  by (fastforce elim: exp_rel_vpr_bpl_elim)
 
 end

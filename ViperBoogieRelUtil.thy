@@ -51,7 +51,7 @@ lemma store_vpr_exp_to_temporary_var:
                 (state_rel Pr StateCons TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (val_rel_vpr_bpl v))) ctxt \<omega>def \<omega> ns')"
 proof (rule store_temporary_var[OF StateRel TyInterp EmptyRtype DisjAux LookupTyTemp _ TyValBpl])
   show "red_expr_bpl ctxt e_bpl ns (val_rel_vpr_bpl v)"
-    using exp_rel_vpr_bpl_elim_2[OF ExpRel] RedRhsVpr StateRel
+    using exp_rel_vpr_bpl_elim[OF ExpRel] RedRhsVpr StateRel
     by metis
 qed
 

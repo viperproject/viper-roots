@@ -459,8 +459,8 @@ next
        apply (rule conjI)
         apply blast
       using ExpRel R Success 
-       apply (fastforce elim: exp_rel_vpr_bpl_elim_2 simp: Invariant)
-      using ExpRel R Success exp_rel_vpr_bpl_elim_2
+       apply (fastforce elim: exp_rel_vpr_bpl_elim simp: Invariant)
+      using ExpRel R Success exp_rel_vpr_bpl_elim
       by (metis prod_eqI val_rel_vpr_bpl.simps(2))
   qed
 
@@ -475,7 +475,7 @@ next
    assume Fail: "?Fail \<omega>" and "R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>)" 
    thus "?Goal \<omega> ns"
      apply cases
-     using exp_rel_vpr_bpl_elim_2[OF ExpRel] Fail Invariant
+     using exp_rel_vpr_bpl_elim[OF ExpRel] Fail Invariant
       apply (metis val_rel_vpr_bpl.simps(2))
      by fast
  qed
@@ -666,7 +666,7 @@ next
   thus "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"
     using RcvRel StateRel[OF R]
     unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_assms_def
-    by (fastforce elim: exp_rel_vpr_bpl_elim_2)
+    by (fastforce elim: exp_rel_vpr_bpl_elim)
 next
   fix \<omega>0_\<omega>def \<omega>' ns
   assume R:"R \<omega>0_\<omega>def ns" and
