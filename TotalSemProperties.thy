@@ -25,6 +25,16 @@ lemma assert_pred_atomic_subexp:
   using assms atomic_assert_pred_subexp
   by simp
 
+lemma assert_pred_subexp:
+  assumes "assert_pred p_assert p_atm p_e A"
+  shows "list_all (pure_exp_pred p_e) (direct_sub_expressions_assertion A)"
+  apply (cases A)
+          apply simp_all
+  using assert_pred_atomic_subexp assms
+    apply blast
+  using assms
+  by simp_all
+
 lemma free_var_subexp:
   shows "\<Union> (set (map free_var_pure_exp (sub_pure_exp_total e))) \<subseteq> free_var_pure_exp e"
   by (cases e) auto  
@@ -554,7 +564,7 @@ next
   then show ?case
     by (metis stmt_result_total.distinct(3) stmt_result_total.inject)
 next
-  case (InhSubAtomicFailure A \<omega>)
+  case (InhSubExpFailure A \<omega>)
   then show ?case by simp
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)
@@ -567,9 +577,6 @@ next
   then show ?case by simp
 next
   case (InhImpFalse \<omega> e A)
-  then show ?case by simp
-next
-  case (InhImpFailure \<omega> e A)
   then show ?case by simp
 qed (rule HOL.TrueI)+
 
@@ -1006,7 +1013,7 @@ next
       proof cases
         case PermFail
            have "red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 RFailure"
-             apply (rule InhSubAtomicFailure)
+             apply (rule InhSubExpFailure)
              apply simp+
              apply (rule RedExpListCons)
              by (auto intro!: RefSuccess RedExpListCons PermFail RedExpListFailure)                      
@@ -1086,7 +1093,7 @@ next
     hence "e_args \<noteq> []"
       by (meson list.distinct(1) red_exp_list_failure_elim)    
     have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 RFailure"
-      apply (rule InhSubAtomicFailure)
+      apply (rule InhSubExpFailure)
        apply (simp add: \<open>e_args \<noteq> []\<close>)
       apply simp
       using ArgsFail
@@ -1102,7 +1109,7 @@ next
       proof cases
         case PermFail
          have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 RFailure"
-           apply (rule InhSubAtomicFailure)
+           apply (rule InhSubExpFailure)
            apply simp+
            using ArgsSuccess PermFail
            by (auto intro: red_pure_exps_total_append_failure_2 red_exp_inhale_unfold_intros)
@@ -1203,7 +1210,7 @@ next
     hence "e_args \<noteq> []"
       by (meson list.distinct(1) red_exp_list_failure_elim)    
     have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>2 RFailure"
-      apply (rule InhSubAtomicFailure)
+      apply (rule InhSubExpFailure)
       by (simp_all add: \<open>e_args \<noteq> []\<close> ArgsFail)      
     thus ?thesis
       by simp            
@@ -1252,7 +1259,7 @@ next
   proof cases
     case 1
     have "red_inhale ctxt R (Atomic (Pure e)) \<omega>2 RFailure"
-      apply (rule InhSubAtomicFailure)
+      apply (rule InhSubExpFailure)
       using 1
       by (auto intro!: red_exp_inhale_unfold_intros)
     thus ?thesis
@@ -1264,20 +1271,20 @@ next
       by force
   qed   
 next
-  case (InhSubAtomicFailure A \<omega>)
+  case (InhSubExpFailure A \<omega>)
   moreover from this have "Some \<omega>2 \<le> Some \<omega>"
     by simp
-  moreover have "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) (sub_expressions_atomic A)"
+  moreover have "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) (direct_sub_expressions_assertion A)"
   proof -
-    from \<open>no_perm_assertion (Atomic A) \<and> no_unfolding_assertion (Atomic A)\<close> have
-         "list_all (\<lambda>e. no_perm_pure_exp e) (sub_expressions_atomic A) \<and> list_all (\<lambda>e. no_unfolding_pure_exp e) (sub_expressions_atomic A)"
-      using assert_pred_atomic_subexp
+    from \<open>no_perm_assertion A \<and> no_unfolding_assertion A\<close> have
+         "list_all (\<lambda>e. no_perm_pure_exp e) (direct_sub_expressions_assertion A) \<and> list_all (\<lambda>e. no_unfolding_pure_exp e) (direct_sub_expressions_assertion A)"
+      using assert_pred_subexp
       by blast
     thus ?thesis
       by (simp add: list_all_length)
   qed
   ultimately show ?case 
-    using InhSubAtomicFailure TotalExpressions.InhSubAtomicFailure
+    using InhSubExpFailure TotalExpressions.InhSubExpFailure
     by (metis option.discI)
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)
@@ -1314,7 +1321,7 @@ next
   proof cases
     case 1
     then show ?thesis 
-      by (blast intro!: red_inhale_intros)
+      by (simp add: InhSubExpFailure RedExpListFailure)
   next
     case 2
     then show ?thesis 
@@ -1334,22 +1341,13 @@ next
   proof cases
     case 1
     then show ?thesis 
-      by (blast intro!: red_inhale_intros)
+      by (simp add: InhSubExpFailure RedExpListFailure)
   next
     case 2
     thus ?thesis
       using InhImpFalse 
       by (blast intro!: red_inhale_intros)
-  qed  
-next
-  case (InhImpFailure \<omega> e A)
-  hence "Some \<omega>2 \<le> Some \<omega>"
-    by simp
-  hence "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
-    using InhImpFailure
-    by simp
-  thus ?case
-    by (blast intro!: red_inhale_intros)      
+  qed
 qed (rule HOL.TrueI)+
 
 lemma assertion_framing_state_mono:
@@ -1601,8 +1599,8 @@ next
   then show ?thesis 
     using AssertionFraming
     unfolding \<open>es = sub_expressions_atomic atm\<close> assertion_framing_state_def
-    using InhSubAtomicFailure
-    by (metis list.discI)
+    using InhSubExpFailure
+    by (metis direct_sub_expressions_assertion.simps(1) list.discI)
 qed
 
 lemma red_pure_exp_sub_exp_atomic_change_state:
@@ -2086,7 +2084,7 @@ next
     have "\<not> ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t VFailure"
       using \<open>assertion_framing_state ctxt StateCons (Atomic (Pure e)) \<omega>_inh\<close>
       unfolding assertion_framing_state_def
-      by (metis (no_types, opaque_lifting) InhSubAtomicFailure RedExpListFailure not_None_eq red_exp_list_failure_Nil sub_expressions_atomic.simps(1))
+      by (metis ExhPure.prems(4) RedExpListFailure assertion_framing_state_sub_exps_not_failure sub_expressions_atomic.simps(1))
 
     thus ?thesis
       using red_pure_exp_different_def_state(1)[OF RedAux] ExhPure
@@ -2168,7 +2166,7 @@ next
     have "\<not> ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t VFailure"
       using AssertionFraming
       unfolding assertion_framing_state_def
-      using InhImpFailure by blast
+      using inh_imp_failure by blast
 
     thus ?thesis
       using red_pure_exp_different_def_state(1)[OF RedAux] ExhImpTrue
@@ -2199,7 +2197,7 @@ next
       by fastforce
 
     have "\<not> (ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t VFailure)"
-      using \<open>assertion_framing_state ctxt StateCons (assert.Imp e A) \<omega>_inh\<close> InhImpFailure
+      using \<open>assertion_framing_state ctxt StateCons (assert.Imp e A) \<omega>_inh\<close> inh_imp_failure
       unfolding assertion_framing_state_def
       by blast
 
@@ -2504,7 +2502,7 @@ next
   then show ?case by fastforce
 qed (simp_all)
 
-lemma free_var_assertion_map_free_var_pure_exp:                                                            
+lemma free_var_atomic_assertion_map_free_var_pure_exp:                                                            
   "free_var_assertion (Atomic A) = \<Union> (set (map free_var_pure_exp (sub_expressions_atomic A)))"
 proof (cases A)
   case (Pure e)
@@ -2520,6 +2518,12 @@ next
      apply force
     by force
 qed  
+
+lemma free_var_assertion_map_free_var_pure_exp:                                                            
+  "\<Union> (set (map free_var_pure_exp (direct_sub_expressions_assertion A))) \<subseteq> free_var_assertion A"
+  apply (cases A)
+  using free_var_atomic_assertion_map_free_var_pure_exp
+  by auto
 
 lemma th_result_rel_convert:
   assumes "th_result_rel a b W res"
@@ -2843,16 +2847,16 @@ next
     using TotalExpressions.InhPure
     by fastforce    
 next
-  case (InhSubAtomicFailure A \<omega>)
-  moreover from this have "list_all supported_pure_exp (sub_expressions_atomic A)"
-    using assert_pred_atomic_subexp
+  case (InhSubExpFailure A \<omega>)
+  moreover from this have "list_all supported_pure_exp (direct_sub_expressions_assertion A)"
+    using assert_pred_subexp
     by (metis list.pred_mono_strong pure_exp_pred.simps)
   moreover have
-    FreeVar: "\<And>x. x \<in> \<Union> (set (map free_var_pure_exp (sub_expressions_atomic A))) \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x" 
-    using free_var_assertion_map_free_var_pure_exp InhSubAtomicFailure
-    by presburger
+    FreeVar: "\<And>x. x \<in> \<Union> (set (map free_var_pure_exp (direct_sub_expressions_assertion A))) \<Longrightarrow> get_store_total \<omega> x = get_store_total \<omega>2 x" 
+    using free_var_assertion_map_free_var_pure_exp InhSubExpFailure
+    by blast    
   ultimately show ?case 
-    using InhSubAtomicFailure  TotalExpressions.InhSubAtomicFailure 
+    using InhSubExpFailure  TotalExpressions.InhSubExpFailure 
     by (metis map_stmt_result_total.simps(3))    
 next
   case (InhStarNormal A \<omega> \<omega>'' B res)
@@ -2863,7 +2867,7 @@ next
                              (map_stmt_result_total (get_store_total_update (\<lambda>_. get_store_total ?\<omega>''2)) res)"
   proof (rule InhStarNormal.IH(4))
     from InhStarNormal show "supported_assertion B"
-      by (meson assert_pred.simps assert_pred_rec.simps(3))
+      by (meson assert_pred.simps assert_pred_rec.simps(4))
   next
     fix x 
     assume "x \<in> free_var_assertion B"
@@ -2895,11 +2899,7 @@ next
     using InhImpFalse
     by auto
   ultimately show ?case 
-    by simp        
-next
-  case (InhImpFailure \<omega> e A)
-  then show ?case 
-    by (auto intro!: TotalExpressions.InhImpFailure)
+    by simp
 qed simp_all
 
 lemma assertion_framing_store_same_on_free_var:
@@ -3024,7 +3024,7 @@ next
   hence "list_all supported_pure_exp (sub_expressions_atomic A)"
     by (metis assert_pred_atomic_subexp list.pred_mono_strong pure_exp_pred.simps)
   with SubAtomicFailure have "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (sub_expressions_atomic A) \<omega>2 None"
-    using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_atomic_subexp free_var_assertion_map_free_var_pure_exp
+    using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_atomic_subexp free_var_atomic_assertion_map_free_var_pure_exp
     by blast
   then show ?case 
     using SubAtomicFailure    

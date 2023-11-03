@@ -659,7 +659,7 @@ lemma assertion_framing_exprs_wf_rel_inh:
                get_store_total \<omega> = get_store_total \<omega>def \<and> 
                get_trace_total \<omega> = get_trace_total \<omega>def \<and>
                get_h_total_full \<omega> = get_h_total_full \<omega>def"
-      and "es = sub_expressions_assertion A"
+      and "es = direct_sub_expressions_assertion A"
       and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (cases "es = []")
@@ -691,10 +691,12 @@ proof (rule wf_rel_intro)
     apply (cases A)
     using assms \<open>es \<noteq> []\<close>
            apply simp_all
-    using InhSubAtomicFailure
-     apply blast
-    using InhImpFailure    
-    by (metis (no_types, lifting) option.discI red_pure_exps_total_singleton)
+    using InhSubExpFailure AssertionFramed assertion_framing_state_sub_exps_not_failure
+      apply blast     
+    using inh_imp_failure
+    apply (simp add: InhSubExpFailure)
+    using inh_condassert_failure
+    by (simp add: InhSubExpFailure)
 
   moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
     using assms
@@ -712,7 +714,7 @@ lemma assertion_framing_exprs_wf_rel_inh_well_def_same:
   assumes "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> 
                assertion_framing_state ctxt_vpr StateCons A \<omega>def \<and>
                \<omega> = \<omega>def"
-      and "es = sub_expressions_assertion A"
+      and "es = direct_sub_expressions_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (cases "es = []")
   case True
@@ -737,10 +739,11 @@ next
       apply (cases A)
       using assms \<open>es \<noteq> []\<close>
              apply simp_all
-      using InhSubAtomicFailure RedExps
-       apply blast
-      using InhImpFailure RedExps
-      by (metis option.distinct(1) red_pure_exps_total_singleton)
+      using InhSubExpFailure RedExps assertion_framing_state_sub_exps_not_failure 
+        apply blast
+      using inh_imp_failure False InhSubExpFailure RedExps \<open>es = _\<close> apply blast
+      using inh_condassert_failure False InhSubExpFailure RedExps \<open>es = _\<close> 
+      by blast      
 
     moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
       using assms

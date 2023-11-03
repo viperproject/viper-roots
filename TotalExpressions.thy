@@ -119,10 +119,11 @@ fun sub_expressions_atomic :: "pure_exp atomic_assert \<Rightarrow> pure_exp lis
 | "sub_expressions_atomic (Acc x f p) = x # sub_expressions_exp_or_wildcard p"
 | "sub_expressions_atomic (AccPredicate P exps p) = exps @ sub_expressions_exp_or_wildcard p"
 
-fun sub_expressions_assertion :: "assertion \<Rightarrow> pure_exp list" where
-  "sub_expressions_assertion (Atomic A) = sub_expressions_atomic A"
-| "sub_expressions_assertion (Imp e A) = [e]"
-| "sub_expressions_assertion _ = []"
+fun direct_sub_expressions_assertion :: "assertion \<Rightarrow> pure_exp list" where
+  "direct_sub_expressions_assertion (Atomic A) = sub_expressions_atomic A"
+| "direct_sub_expressions_assertion (Imp e A) = [e]"
+| "direct_sub_expressions_assertion (CondAssert e A B) = [e]"
+| "direct_sub_expressions_assertion _ = []"
 
 subsection\<open>Auxiliary inhale definitions\<close>
 
@@ -357,10 +358,6 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | InhPure: 
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
       red_inhale ctxt R (Atomic (Pure e)) \<omega> (if b then RNormal \<omega> else RMagic)"
-| InhSubAtomicFailure: 
-    "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
-       red_pure_exps_total ctxt R (Some \<omega>) (sub_expressions_atomic A) \<omega> None \<rbrakk> \<Longrightarrow> 
-      red_inhale ctxt R (Atomic A) \<omega> RFailure"
 
 \<comment>\<open>Connectives inhale\<close>
 | InhStarNormal: 
@@ -378,9 +375,11 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | InhImpFalse:
  "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
     red_inhale ctxt R (Imp e A) \<omega> (RNormal \<omega>)"
-| InhImpFailure:
- "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow>
-   red_inhale ctxt R (Imp e A) \<omega> RFailure"
+
+| InhSubExpFailure: 
+    "\<lbrakk> (direct_sub_expressions_assertion A) \<noteq> [];
+       red_pure_exps_total ctxt R (Some \<omega>) (direct_sub_expressions_assertion A) \<omega> None \<rbrakk> \<Longrightarrow> 
+       red_inhale ctxt R A \<omega> RFailure"
 
 \<comment>\<open>unfold_rel\<close>
 | UnfoldRelStep: 
@@ -598,6 +597,18 @@ qed
 
 subsubsection \<open>Inhale\<close>
 
+lemma inh_imp_failure:
+  assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+  shows "red_inhale ctxt R (Imp e A) \<omega> RFailure"
+  using assms InhSubExpFailure[where ?A="Imp e A"] RedExpListFailure
+  by fastforce
+
+lemma inh_condassert_failure:
+  assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+  shows "red_inhale ctxt R (CondAssert e A B) \<omega> RFailure"
+  using assms InhSubExpFailure[where ?A="CondAssert e A B"] RedExpListFailure
+  by fastforce
+
 lemma inh_pure_normal:
   assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
   shows "red_inhale ctxt R (Atomic (Pure e)) \<omega> (RNormal \<omega>)"
@@ -617,12 +628,12 @@ lemmas red_inhale_intros =
   InhAccPredWildcard 
   inh_pure_normal
   inh_pure_magic
-  InhSubAtomicFailure
+  InhSubExpFailure
   InhStarNormal 
   InhStarFailureMagic
   InhImpTrue
   InhImpFalse 
-  InhImpFailure
+  
 
 inductive_cases InhStar_case: "red_inhale ctxt R (A && B) \<omega> res"
 inductive_cases InhImp_case: "red_inhale ctxt R (Imp e A) \<omega> res"

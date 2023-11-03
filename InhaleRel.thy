@@ -102,7 +102,7 @@ lemma assertion_framing_is_inh_rel_invariant:
 lemma assertion_framing_state_inh_exprs_wf_rel:
   assumes StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
                                          assertion_framing_state ctxt_vpr StateCons A \<omega>"      
-      and "es = sub_expressions_assertion A"
+      and "es = direct_sub_expressions_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
 proof (rule assertion_framing_exprs_wf_rel_inh_well_def_same[OF _ \<open>es = _\<close>])
   fix \<omega>def \<omega> ns
@@ -212,7 +212,9 @@ next
         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> False)"
     apply (cases)
     using ExpRel
-    by (fastforce dest: exp_rel_vpr_bplD simp: Invariant)+
+     apply simp
+    using Invariant exp_rel_vpr_bplD val_rel_vpr_bpl.simps(2) apply fastforce
+    by (metis direct_sub_expressions_assertion.simps(2) list.inject red_exp_list_failure_elim)
 qed
 
 lemma inhale_rel_imp_2:
@@ -327,7 +329,7 @@ proof (rule inhale_rel_intro_2)
         by blast
     qed
   next
-    case InhSubAtomicFailure 
+    case InhSubExpFailure 
     thus ?thesis
       unfolding rel_vpr_aux_def
       using exprs_wf_rel_failure_elim[OF WfSubexp] \<open>R \<omega> ns\<close> \<open>Q _ \<omega>\<close>

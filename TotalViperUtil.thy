@@ -105,6 +105,7 @@ fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomi
   "assert_pred p_assert p_atm p_e A \<longleftrightarrow> p_assert A \<and> assert_pred_rec p_assert p_atm p_e A"
 | "assert_pred_rec p_assert p_atm p_e (Atomic A_atm) \<longleftrightarrow> atomic_assert_pred p_atm p_e A_atm"
 | "assert_pred_rec p_assert p_atm p_e (Imp e A) \<longleftrightarrow> pure_exp_pred p_e e \<and> assert_pred p_assert p_atm p_e A"
+| "assert_pred_rec p_assert p_atm p_e (CondAssert e A B) \<longleftrightarrow> pure_exp_pred p_e e \<and> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
 | "assert_pred_rec p_assert p_atm p_e (A && B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
 | "assert_pred_rec p_assert p_atm p_e (ImpureAnd A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
 | "assert_pred_rec p_assert p_atm p_e (ImpureOr A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
@@ -209,6 +210,7 @@ fun
 fun free_var_assertion :: "assertion \<Rightarrow> var set"  where  
   "free_var_assertion (Atomic atm) = free_var_atomic_assert atm"
 | "free_var_assertion (Imp e A) = free_var_pure_exp e \<union> free_var_assertion A"
+| "free_var_assertion (CondAssert e A B) = free_var_pure_exp e \<union> free_var_assertion A \<union> free_var_assertion B"
 | "free_var_assertion (A && B) = free_var_assertion A \<union> free_var_assertion B"
 | "free_var_assertion (ImpureAnd A B) = free_var_assertion A \<union> free_var_assertion B"
 | "free_var_assertion (ImpureOr A B) = free_var_assertion A \<union> free_var_assertion B"
