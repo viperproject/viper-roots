@@ -375,6 +375,14 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | InhImpFalse:
  "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
     red_inhale ctxt R (Imp e A) \<omega> (RNormal \<omega>)"
+| InhCondAssertTrue:
+ "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)); 
+    red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
+    red_inhale ctxt R (CondAssert e A B) \<omega> res"
+| InhCondAssertFalse:
+ "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False);
+    red_inhale ctxt R B \<omega> res \<rbrakk> \<Longrightarrow> 
+    red_inhale ctxt R (CondAssert e A B) \<omega> res"
 
 | InhSubExpFailure: 
     "\<lbrakk> (direct_sub_expressions_assertion A) \<noteq> [];

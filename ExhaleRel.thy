@@ -275,7 +275,7 @@ next
     by blast
     
   hence "ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
-    using AssertionFraming InhImpFailure
+    using AssertionFraming inh_imp_failure
     unfolding assertion_framing_state_def
     by blast
 
@@ -293,7 +293,7 @@ text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> c
 lemma framing_exhI_exprs_wf_rel:
   assumes ConsistencyDownwardsMono: "mono_prop_downward_ord StateCons"
       and "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> framing_exh ctxt_vpr StateCons A \<omega>def \<omega>"      
-      and "es = sub_expressions_assertion A"
+      and "es = direct_sub_expressions_assertion A"
       and ExprConstraint: "list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e) es"
       and AssertionConstraint: "no_perm_assertion A \<and> no_unfolding_assertion A"
     shows "exprs_wf_rel R ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>"
