@@ -14,41 +14,9 @@ ML \<open>
   val Rmsg' = run_and_print_if_fail_tac'
 
   type exp_wf_rel_info = {
-    (* should be tactic that solves wf_rel_fieldacc *)       
+    (* tactic that solves wf_rel_fieldacc *)       
     field_access_wf_rel_syn_tac : Proof.context -> int -> tactic 
   }
-
-  fun exp_wf_rel_trivial_tac ctxt =
-      FIRST' [
-       resolve_tac ctxt [@{thm var_expr_wf_rel}],
-
-       resolve_tac ctxt [@{thm lit_expr_wf_rel}],    
-
-       resolve_tac ctxt [@{thm unop_expr_wf_rel_2}] THEN' 
-       (fn i => fn st =>  exp_wf_rel_trivial_tac ctxt i st),
-       
-       fn i => fn st =>
-         (i,st) |->
-         ( 
-           resolve_tac ctxt [@{thm binop_eager_expr_wf_rel}] THEN'
-           assm_full_simp_solved_tac ctxt THEN'
-           (exp_wf_rel_trivial_tac ctxt |> SOLVED') THEN'
-           (exp_wf_rel_trivial_tac ctxt |> SOLVED') THEN'
-           resolve_tac ctxt [@{thm wf_rel_bop_op_trivial}] THEN'
-           assm_full_simp_solved_tac ctxt
-         ),
-  
-       fn i => fn st => 
-         (i,st) |->
-         (
-           resolve_tac ctxt [@{thm binop_lazy_expr_wf_rel}] THEN'
-           assm_full_simp_solved_tac ctxt THEN'
-           (exp_wf_rel_trivial_tac ctxt |> SOLVED') THEN'
-           (exp_wf_rel_trivial_tac ctxt |> SOLVED') THEN'
-           resolve_tac ctxt [@{thm wf_rel_no_failure_refl}]
-         )
-      ]
-
   
   fun bop_wf_rel_div_mod exp_rel_info ctxt = 
       (* need to first progress the configuration in case the currently active bigblock is not unfolded or
@@ -103,7 +71,8 @@ ML \<open>
        fn i => fn st => exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt i st, (* uop *)
        fn i => fn st => binop_eager_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* bop eager *)
        fn i => fn st => binop_lazy_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* bop lazy *)
-       fn i => fn st => field_access_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st (* field access *)
+       fn i => fn st => field_access_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* field access *)
+       fn i => fn st => cond_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st (* cond exp *)
       ]
    and 
     binop_eager_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt =        
@@ -112,7 +81,6 @@ ML \<open>
       (bop_wf_rel_tac exp_rel_info ctxt |> SOLVED')
    and 
       binop_lazy_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt =   
-        (
          (Rmsg' "Wf E1" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN' (* e1 *)
          (Rmsg' "Lazy1" progress_tac ctxt) THEN' (* progress to if *) 
          (Rmsg' "LazyEmptyElse" (* empty else block *)
@@ -127,15 +95,37 @@ ML \<open>
          (Rmsg' "Simplify Cont" simplify_continuation ctxt) THEN' (* simplify continuation since we introduce convert_list_to_cont *)
          (Rmsg' "Wf E2" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN' (* e2 *)
          (Rmsg' "Progress2" progress_tac ctxt |> SOLVED')  (* progress to expected configuration *)
-        )
    and
      field_access_wf_rel_tac (exp_wf_rel_info : exp_wf_rel_info) exp_rel_info ctxt =
+       (* progress to field access *)
+       resolve_tac ctxt [@{thm wf_rel_extend_2_same_rel}] THEN' 
+       progress_tac ctxt THEN'
+       (Rmsg' "Wf Rcv Field Access" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN'  (* receiver *)
+       (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
+   and
+    cond_exp_wf_rel_tac (exp_wf_rel_info : exp_wf_rel_info) exp_rel_info ctxt =       
+       resolve_tac ctxt @{thms cond_exp_wf_rel} THEN'
        (
-         (* progress to field access *)
-         resolve_tac ctxt [@{thm wf_rel_extend_2_same_rel}] THEN' 
-         progress_tac ctxt THEN'
-         (Rmsg' "Wf Rcv Field Access" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED') THEN'  (* receiver *)
-         (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
+         resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN' 
+         (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN' (* cond wf *)
+         progress_tac ctxt (* progress if *) 
+       ) THEN'
+       (exp_rel_tac exp_rel_info ctxt |> SOLVED') THEN' (* cond exp rel *)
+       ( (* then branch *)
+         simplify_continuation ctxt THEN'
+         (* Apply propagation rule here, so that target program point in stmt_rel is a schematic 
+               variable for the recursive call to exp_wf_rel_tac *)
+         resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN'
+         (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN'
+         progress_tac ctxt
+       ) THEN'
+       ( (* else branch *)
+         simplify_continuation ctxt THEN'
+        (* Apply propagation rule here, so that target program point in stmt_rel is a schematic 
+                       variable for the recursive call to exp_wf_rel_tac *)
+         resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN'
+         (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN'
+         progress_tac ctxt
        )
 
    fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 
@@ -149,7 +139,7 @@ ML \<open>
       )
 
    (* The following tactic proves the well-definedness of a list of expressions. 
-      The argument k should be provided the number of expressions in the list.
+      The argument k should be the number of expressions in the list.
       If the option argument is NONE, then well-definedness checks are performed in the Boogie encoding
       and otherwise well-definedness checks are omitted in which case the option argument must provide
       a tactic to deal with that case. *)
