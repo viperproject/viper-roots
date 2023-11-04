@@ -93,10 +93,6 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhPure:
   "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Pure e)) \<omega> (exh_if_total b \<omega>)"
-| SubAtomicFailure: 
-  "\<lbrakk> (sub_expressions_atomic A) \<noteq> [];
-     red_pure_exps_total ctxt R (Some \<omega>0) (sub_expressions_atomic A) \<omega> None  \<rbrakk> \<Longrightarrow> 
-     red_exhale ctxt R \<omega>0 (Atomic A) \<omega> RFailure"
 
 \<comment>\<open>exhale A && B\<close>
 | ExhStarNormal: 
@@ -115,9 +111,22 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhImpFalse:  
  "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False) \<rbrakk> \<Longrightarrow> 
     red_exhale ctxt R \<omega>0 (Imp e A) \<omega> (RNormal \<omega>)"
-| ExhImpFailure:
- "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<rbrakk> \<Longrightarrow> 
-   red_exhale ctxt R \<omega>0 (Imp e A) \<omega> RFailure"
+
+\<comment>\<open>exhale e ? A : B\<close>
+| ExhCondTrue: 
+ "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True); 
+    red_exhale ctxt R \<omega>0 A \<omega> res \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (CondAssert e A B) \<omega> res"
+| ExhCondFalse: 
+ "\<lbrakk> ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False); 
+    red_exhale ctxt R \<omega>0 B \<omega> res \<rbrakk> \<Longrightarrow>
+    red_exhale ctxt R \<omega>0 (CondAssert e A B) \<omega> res" 
+
+\<comment>\<open>If a \<^emph>\<open>direct\<close> subexpression is not well-defined, then this result in failure.\<close>
+| ExhSubExpFailure: 
+  "\<lbrakk> direct_sub_expressions_assertion A \<noteq> [];
+     red_pure_exps_total ctxt R (Some \<omega>0) (direct_sub_expressions_assertion A) \<omega> None  \<rbrakk> \<Longrightarrow> 
+     red_exhale ctxt R \<omega>0 A \<omega> RFailure"
 
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
 

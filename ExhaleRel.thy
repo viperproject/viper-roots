@@ -477,7 +477,8 @@ next
      apply cases
      using exp_rel_vpr_bpl_elim[OF ExpRel] Fail Invariant
       apply (metis val_rel_vpr_bpl.simps(2))
-     by fast
+     apply simp
+     by (metis option.discI red_pure_exps_total_singleton)
  qed
 qed
 

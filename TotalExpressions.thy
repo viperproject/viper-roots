@@ -384,6 +384,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
     red_inhale ctxt R B \<omega> res \<rbrakk> \<Longrightarrow> 
     red_inhale ctxt R (CondAssert e A B) \<omega> res"
 
+\<comment>\<open>If a \<^emph>\<open>direct\<close> subexpression is not well-defined, then this result in failure.\<close>
 | InhSubExpFailure: 
     "\<lbrakk> (direct_sub_expressions_assertion A) \<noteq> [];
        red_pure_exps_total ctxt R (Some \<omega>) (direct_sub_expressions_assertion A) \<omega> None \<rbrakk> \<Longrightarrow> 
@@ -611,7 +612,7 @@ lemma inh_imp_failure:
   using assms InhSubExpFailure[where ?A="Imp e A"] RedExpListFailure
   by fastforce
 
-lemma inh_condassert_failure:
+lemma inh_cond_assert_failure:
   assumes "ctxt, R, Some \<omega> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
   shows "red_inhale ctxt R (CondAssert e A B) \<omega> RFailure"
   using assms InhSubExpFailure[where ?A="CondAssert e A B"] RedExpListFailure
@@ -636,12 +637,13 @@ lemmas red_inhale_intros =
   InhAccPredWildcard 
   inh_pure_normal
   inh_pure_magic
-  InhSubExpFailure
   InhStarNormal 
   InhStarFailureMagic
   InhImpTrue
   InhImpFalse 
-  
+  InhCondAssertTrue
+  InhCondAssertFalse
+  InhSubExpFailure
 
 inductive_cases InhStar_case: "red_inhale ctxt R (A && B) \<omega> res"
 inductive_cases InhImp_case: "red_inhale ctxt R (Imp e A) \<omega> res"

@@ -1463,9 +1463,6 @@ next
   then show ?case 
     by (auto elim: exh_if_total.elims)
 next
-  case (SubAtomicFailure A \<omega>)
-  then show ?case by fastforce
-next
   case (ExhStarNormal A \<omega> \<omega>' B res)
   then show ?case by presburger
 next
@@ -1478,8 +1475,14 @@ next
   case (ExhImpFalse e \<omega> A)
   then show ?case by fastforce
 next
-  case (ExhImpFailure e \<omega> A)
-  then show ?case by fast
+  case (ExhCondTrue e \<omega> A res B)
+  then show ?case by blast
+next
+  case (ExhCondFalse e \<omega> B res A)
+  then show ?case by blast
+next
+  case (ExhSubExpFailure A \<omega>)
+  then show ?case by fastforce
 qed
 
 lemma exhale_only_changes_total_state:
@@ -2138,9 +2141,6 @@ next
   then show ?case
     by (auto intro: inh_pure_normal simp: \<open>\<omega>_inh' = \<omega>_inh\<close>)
 next
-  case (SubAtomicFailure A \<omega>)
-  then show ?case by simp \<comment>\<open>contradiction\<close>
-next
   case (ExhStarNormal A \<omega> \<omega>'' B res)
   hence "\<omega> \<succeq> \<omega>''" and "\<omega>'' \<succeq> \<omega>'"
     by (simp_all add: exhale_normal_result_smaller)
@@ -2251,9 +2251,73 @@ next
   qed            
 
   then show ?case 
-    by (auto intro: red_inhale_intros simp: \<open>\<omega>_inh' = \<omega>_inh\<close>)  
+    by (auto intro: red_inhale_intros simp: \<open>\<omega>_inh' = \<omega>_inh\<close>)
 next
-  case (ExhImpFailure e \<omega> A)
+  case (ExhCondTrue e \<omega> A res B)
+  with minus_full_total_state_only_mask_different_2[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close>]
+  have RedAux: "ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t Val (VBool True)"    
+    using red_pure_exp_only_differ_on_mask
+    by fastforce
+
+  note AssertionFraming = \<open>assertion_framing_state ctxt StateCons (assert.CondAssert e A B) \<omega>_inh\<close>
+
+  have RedExpInh: "ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+  proof -
+    have "\<not> ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t VFailure"
+      using AssertionFraming
+      unfolding assertion_framing_state_def
+      using inh_cond_assert_failure by blast
+
+    thus ?thesis
+      using red_pure_exp_different_def_state(1)[OF RedAux] ExhCondTrue
+      by auto
+  qed
+
+  hence "assertion_framing_state ctxt StateCons A \<omega>_inh"
+    using assertion_framing_cond_assert_true AssertionFraming
+    by blast
+
+  hence "red_inhale ctxt StateCons A \<omega>_inh (RNormal \<omega>_inh')"
+    using ExhCondTrue
+    by auto
+
+  thus ?case
+    using RedExpInh
+    by (auto intro: red_inhale_intros)  
+next
+  case (ExhCondFalse e \<omega> B res A)
+  with minus_full_total_state_only_mask_different_2[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close>]
+  have RedAux: "ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t Val (VBool False)"    
+    using red_pure_exp_only_differ_on_mask
+    by fastforce
+
+  note AssertionFraming = \<open>assertion_framing_state ctxt StateCons (assert.CondAssert e A B) \<omega>_inh\<close>
+
+  have RedExpInh: "ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+  proof -
+    have "\<not> ctxt, StateCons, Some \<omega>_inh \<turnstile> \<langle>e;\<omega>_inh\<rangle> [\<Down>]\<^sub>t VFailure"
+      using AssertionFraming
+      unfolding assertion_framing_state_def
+      using inh_cond_assert_failure by blast
+
+    thus ?thesis
+      using red_pure_exp_different_def_state(1)[OF RedAux] ExhCondFalse
+      by auto
+  qed
+
+  hence "assertion_framing_state ctxt StateCons B \<omega>_inh"
+    using assertion_framing_cond_assert_false AssertionFraming
+    by blast
+
+  hence "red_inhale ctxt StateCons B \<omega>_inh (RNormal \<omega>_inh')"
+    using ExhCondFalse
+    by auto
+
+  thus ?case
+    using RedExpInh
+    by (auto intro: red_inhale_intros)
+next
+  case (ExhSubExpFailure A \<omega>)
   then show ?case by simp \<comment>\<open>contradiction\<close>
 qed
 
@@ -3076,16 +3140,6 @@ next
     using TotalSemantics.ExhPure
     by (metis (full_types) ExhPure.prems(1) exh_if_total.simps(1) exh_if_total.simps(2) map_stmt_result_total.simps(1) map_stmt_result_total.simps(3))
 next
-  case (SubAtomicFailure A \<omega>)
-  hence "list_all supported_pure_exp (sub_expressions_atomic A)"
-    by (metis assert_pred_atomic_subexp list.pred_mono_strong pure_exp_pred.simps)
-  with SubAtomicFailure have "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (sub_expressions_atomic A) \<omega>2 None"
-    using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_atomic_subexp free_var_atomic_assertion_map_free_var_pure_exp
-    by blast
-  then show ?case 
-    using SubAtomicFailure    
-    by (auto intro: TotalSemantics.SubAtomicFailure)
-next
   case (ExhStarNormal A \<omega> \<omega>'' B res)
   let ?\<omega>''2 = "\<omega>'' \<lparr> get_store_total := get_store_total \<omega>2 \<rparr>"
   from ExhStarNormal have RedExhA: "red_exhale ctxt StateCons \<omega>def2 A \<omega>2 (RNormal ?\<omega>''2)"
@@ -3141,15 +3195,35 @@ next
     using ExhImpFalse
     by (metis map_stmt_result_total.simps(1) red_exhale.ExhImpFalse)
 next
-  case (ExhImpFailure e \<omega> A)
+  case (ExhCondTrue e \<omega> A res B)
   hence "supported_pure_exp e"
-    by (meson assert_pred.elims(2) assert_pred_rec.simps(2) pure_exp_pred.elims(2))
-  with ExhImpFailure have "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t VFailure"
+    by auto
+  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
     using red_pure_exp_inhale_store_same_on_free_var(1)
-    by (metis Un_iff free_var_assertion.simps(2))
+    by (metis ExhCondTrue.hyps(1) ExhCondTrue.prems(2) ExhCondTrue.prems(3) ExhCondTrue.prems(4) UnCI free_var_assertion.simps(3))
+  thus ?case
+    using ExhCondTrue
+    by (auto intro: red_exhale.intros)
+next
+  case (ExhCondFalse e \<omega> B res A)
+  hence "supported_pure_exp e"
+    by auto
+  hence "ctxt, StateCons, Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    using red_pure_exp_inhale_store_same_on_free_var(1)
+    by (metis ExhCondFalse.hyps(1) ExhCondFalse.prems(2) ExhCondFalse.prems(3) ExhCondFalse.prems(4) UnCI free_var_assertion.simps(3))
+  thus ?case
+    using ExhCondFalse
+    by (auto intro: red_exhale.intros)
+next
+  case (ExhSubExpFailure A \<omega>)
+  hence "list_all supported_pure_exp (direct_sub_expressions_assertion A)"
+    by (metis assert_pred_subexp list.pred_mono_strong pure_exp_pred.simps)
+  with ExhSubExpFailure have "red_pure_exps_total ctxt StateCons (Some \<omega>def2) (direct_sub_expressions_assertion A) \<omega>2 None"
+    using red_pure_exp_inhale_store_same_on_free_var(2) assert_pred_subexp free_var_assertion_map_free_var_pure_exp
+    by blast
   then show ?case 
-    using ExhImpFailure
-    by (auto intro!: red_exhale.intros)
+    using ExhSubExpFailure    
+    by (auto intro: TotalSemantics.ExhSubExpFailure)
 qed (simp_all)
 
 end
