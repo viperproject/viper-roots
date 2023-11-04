@@ -13,6 +13,11 @@ ML \<open>
        exp_wf_rel_info *       
        exp_rel_info *
        ('a inhale_rel_hint)
+  | CondInhHint of 
+       exp_wf_rel_info *       
+       exp_rel_info *
+       ('a inhale_rel_hint) * (* then branch *)
+       ('a inhale_rel_hint)   (* else branch *)
   | GoodStateAfter of 'a inhale_rel_hint
   | TrivialInhHint (* inhale true, but no code is emitted *)
   | NoInhHint (* used for debugging purposes *)
@@ -46,24 +51,51 @@ ML \<open>
            (Rmsg' "InhaleRel Imp Init" (resolve_tac ctxt @{thms inhale_rel_imp_2}) ctxt) THEN'
            (Rmsg' "InhaleRel Imp Inv" (resolve_tac ctxt [#is_inh_rel_inv_thm info]) ctxt) THEN'
            (Rmsg' "InhaleRel Imp 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
-           (Rmsg' "InhaleRel wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
+           (Rmsg' "InhaleRel Imp wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
            (Rmsg' "InhaleRel Imp 2" ((progress_tac ctxt) |> SOLVED') ctxt)
          ) THEN'
-          (Rmsg' "InhaleRel empty else" (* empty else block *)                
+          (Rmsg' "InhaleRel Imp empty else" (* empty else block *)                
                  ((unfold_bigblock_in_goal ctxt) THEN'
                  (assm_full_simp_solved_tac ctxt))
               ctxt)  THEN'
          (
-           (Rmsg' "InhaleRel cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+           (Rmsg' "InhaleRel Imp cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
          ) THEN'
          (
           (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
              variable for the recursive call to inhale_rel_tac *)
            simplify_continuation ctxt THEN'
-           (Rmsg' "InhaleRel 3" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'           
+           (Rmsg' "InhaleRel Imp 3" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'           
            (inhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
-           (Rmsg' "InhaleRel 4" (progress_red_bpl_rel_tac ctxt) ctxt)
+           (Rmsg' "InhaleRel Imp 4" (progress_red_bpl_rel_tac ctxt) ctxt)
          )
+    | CondInhHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
+       (
+           (Rmsg' "InhaleRel Cond Init" (resolve_tac ctxt @{thms inhale_rel_cond_assert}) ctxt) THEN'
+           (Rmsg' "InhaleRel Cond Inv" (resolve_tac ctxt [#is_inh_rel_inv_thm info]) ctxt) THEN'
+           (Rmsg' "InhaleRel Cond 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
+           (Rmsg' "InhaleRel Cond wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
+           (Rmsg' "InhaleRel Cond 2" ((progress_tac ctxt) |> SOLVED') ctxt)
+       ) THEN'
+       (
+         (Rmsg' "InhaleRel Cond cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+       ) THEN'
+       (
+        (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+           variable for the recursive call to inhale_rel_tac *)
+         simplify_continuation ctxt THEN'
+         (Rmsg' "InhaleRel Cond 3" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'           
+         (inhale_rel_aux_tac ctxt info thn_hint |> SOLVED') THEN'
+         (Rmsg' "InhaleRel Cond 4" (progress_red_bpl_rel_tac ctxt) ctxt)
+       ) THEN'
+       (
+        (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+           variable for the recursive call to inhale_rel_tac *)
+         simplify_continuation ctxt THEN'
+         (Rmsg' "InhaleRel Cond 5" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'           
+         (inhale_rel_aux_tac ctxt info els_hint |> SOLVED') THEN'
+         (Rmsg' "InhaleRel Cond 6" (progress_red_bpl_rel_tac ctxt) ctxt)
+       )
     | GoodStateAfter hint => 
        (let val basic_info = #basic_info info in
          (Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
