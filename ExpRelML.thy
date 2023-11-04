@@ -140,7 +140,12 @@ and
   field_access_rel_tac (info : exp_rel_info) ctxt = 
     (#field_access_rel_pre_tac info ctxt) THEN'
     ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
-
+and
+  cond_exp_rel_tac (info : exp_rel_info) ctxt = 
+    resolve_tac ctxt @{thms exp_rel_condexp} THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* condition *) 
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') THEN' (* expr then-branch *)
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')       (* expr else-branch *)
 and 
   (* the reason for abstraction over the state st in multiple places is to avoid infinite recursion due
      to eager evaluation of arguments in a function call *)
@@ -151,7 +156,8 @@ and
         (fn i => fn st => unop_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => binop_eager_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => binop_lazy_rel_tac info ctxt i st) |> SOLVED',
-        (fn i => fn st => field_access_rel_tac info ctxt i st) |> SOLVED'
+        (fn i => fn st => field_access_rel_tac info ctxt i st) |> SOLVED',
+        (fn i => fn st => cond_exp_rel_tac info ctxt i st) |> SOLVED'
       ]
 \<close>
 

@@ -64,7 +64,8 @@ ML \<open>
        assm_full_simp_solved_tac ctxt, 
        resolve_tac ctxt [@{thm syn_lazy_bop_wf_rel_2}] THEN' (* bop lazy *) 
        assm_full_simp_solved_tac ctxt,   
-       resolve_tac ctxt [@{thm field_access_wf_rel}] (* field access *)
+       resolve_tac ctxt [@{thm field_access_wf_rel}], (* field access *)
+       resolve_tac ctxt @{thms cond_exp_wf_rel} (* conditional expression *)
       ] [  
        fn _ => fn st => all_tac st, (* var *)
        fn _ => fn st => all_tac st, (* lit *)
@@ -104,7 +105,6 @@ ML \<open>
        (Rmsg' "Wf Field Access" (#field_access_wf_rel_syn_tac exp_wf_rel_info) ctxt |> SOLVED')
    and
     cond_exp_wf_rel_tac (exp_wf_rel_info : exp_wf_rel_info) exp_rel_info ctxt =       
-       resolve_tac ctxt @{thms cond_exp_wf_rel} THEN'
        (
          resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN' 
          (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN' (* cond wf *)
@@ -114,7 +114,7 @@ ML \<open>
        ( (* then branch *)
          simplify_continuation ctxt THEN'
          (* Apply propagation rule here, so that target program point in stmt_rel is a schematic 
-               variable for the recursive call to exp_wf_rel_tac *)
+            variable for the recursive call to exp_wf_rel_tac *)
          resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN'
          (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN'
          progress_tac ctxt
@@ -122,7 +122,7 @@ ML \<open>
        ( (* else branch *)
          simplify_continuation ctxt THEN'
         (* Apply propagation rule here, so that target program point in stmt_rel is a schematic 
-                       variable for the recursive call to exp_wf_rel_tac *)
+           variable for the recursive call to exp_wf_rel_tac *)
          resolve_tac ctxt @{thms wf_rel_extend_1_same_rel} THEN'
          (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN'
          progress_tac ctxt
