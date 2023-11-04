@@ -73,17 +73,32 @@ definition is_inh_rel_invariant
           (\<forall> A1 A2 \<omega>. Q (A1 && A2) \<omega> \<longrightarrow> 
                   (Q A1 \<omega>) \<and>
                   (\<forall>\<omega>'. red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>') \<longrightarrow> Q A2 \<omega>')) \<and>
-          (\<forall> e A \<omega>. Q (assert.Imp e A) \<omega> \<longrightarrow> ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>)"
+          (\<forall> e A \<omega>. Q (assert.Imp e A) \<omega> \<longrightarrow> ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>) \<and>
+          (\<forall> e A B \<omega> b. Q (assert.CondAssert e A B) \<omega> \<longrightarrow> ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool b)) \<longrightarrow>
+                        ((b \<longrightarrow> Q A \<omega>) \<and> (\<not>b \<longrightarrow> Q B \<omega>)))"
 
 lemma is_inh_rel_invariant_intro:
   assumes "\<And> A1 A2 \<omega>. Q (A1 && A2) \<omega> \<Longrightarrow> Q A1 \<omega>" and
           "\<And> A1 A2 \<omega> \<omega>'. Q (A1 && A2) \<omega> \<Longrightarrow> red_inhale ctxt StateCons A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>'" and
           "\<And> e A \<omega>. Q (assert.Imp e A) \<omega> \<Longrightarrow> 
                     ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>"
-        shows "is_inh_rel_invariant ctxt StateCons Q"
-  using assms
+          "\<And> e A B \<omega>. Q (assert.CondAssert e A B) \<omega> \<Longrightarrow> 
+                    ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>"
+          "\<And> e A B \<omega>. Q (assert.CondAssert e A B) \<omega> \<Longrightarrow> 
+                    ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool False)) \<Longrightarrow> Q B \<omega>"
+        shows "is_inh_rel_invariant ctxt StateCons Q"  
   unfolding is_inh_rel_invariant_def
-  by blast
+  apply (intro conjI)
+  using assms 
+    apply blast
+  using assms
+   apply blast
+  \<comment>\<open>conditional assertion\<close>
+  apply (rule allI)+
+  apply (rename_tac b)
+  apply (case_tac b)
+  using assms
+  by (metis (full_types))+
 
 subsubsection \<open>Invariant instantiations\<close>
 
@@ -97,7 +112,9 @@ text \<open>\<^const>\<open>assertion_framing_state\<close> invariant instantiat
 
 lemma assertion_framing_is_inh_rel_invariant:
   "is_inh_rel_invariant ctxt_vpr StateCons (assertion_framing_state ctxt_vpr StateCons)"
-  by (blast intro: is_inh_rel_invariant_intro dest: assertion_framing_star assertion_framing_imp)
+  by (blast intro: is_inh_rel_invariant_intro 
+            dest: assertion_framing_star assertion_framing_imp 
+                  assertion_framing_cond_assert_true assertion_framing_cond_assert_false)
 
 lemma assertion_framing_state_inh_exprs_wf_rel:
   assumes StateRel: "\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> \<omega>def = \<omega> \<and>
@@ -211,9 +228,7 @@ next
        (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R \<omega> ns \<and> Q A \<omega>) \<and> red_inhale ctxt_vpr StateCons A \<omega> RFailure \<or>
         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> R \<omega> ns \<and> False)"
     apply (cases)
-    using ExpRel
-     apply simp
-    using Invariant exp_rel_vpr_bplD val_rel_vpr_bpl.simps(2) apply fastforce
+    using ExpRel Invariant exp_rel_vpr_bplD val_rel_vpr_bpl.simps(2) apply fastforce
     by (metis direct_sub_expressions_assertion.simps(2) list.inject red_exp_list_failure_elim)
 qed
 
@@ -233,6 +248,52 @@ lemma inhale_rel_imp_2:
   unfolding is_inh_rel_invariant_def
   by (blast intro!: inhale_rel_imp)
 
+lemma inhale_rel_cond_assert:
+  assumes Invariant: "is_inh_rel_invariant ctxt_vpr StateCons Q"
+      and ExpWfRel:          
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns \<and> Q (assert.CondAssert cond A B) \<omega>) ctxt_vpr StateCons P ctxt cond 
+            \<gamma>1
+            (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)" 
+        (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
+      and ExpRel: "exp_rel_vpr_bpl (\<lambda> \<omega>def \<omega> ns. \<omega>def = \<omega> \<and> R \<omega> ns) ctxt_vpr ctxt cond cond_bpl"
+      and ThnRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)" 
+                 (is "inhale_rel R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)")
+      and ElsRel: "inhale_rel R Q ctxt_vpr StateCons P ctxt B (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)" 
+                 (is "inhale_rel R Q _ _ _ _ _ ?\<gamma>_els (next, cont)")
+    shows "inhale_rel R Q ctxt_vpr StateCons P ctxt (assert.CondAssert cond A B) \<gamma>1 (next, cont)"
+  unfolding inhale_rel_def
+proof (rule rel_general_cond,
+       fastforce intro: rel_general_conseq_input_output[OF wf_rel_general_1[OF ExpWfRel]],
+       rule ThnRel[simplified inhale_rel_def],
+       rule ElsRel[simplified inhale_rel_def])
+  fix \<omega> \<omega>' ns
+  assume "red_inhale ctxt_vpr StateCons (CondAssert cond A B) \<omega> (RNormal \<omega>')"
+    and "R \<omega> ns \<and> Q (CondAssert cond A B) \<omega>"
+
+  thus "((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
+         (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R \<omega> ns \<and> Q A \<omega>) \<and> red_inhale ctxt_vpr StateCons A \<omega> (RNormal \<omega>') \<or>
+         red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> (R \<omega> ns \<and> Q B \<omega>) \<and> red_inhale ctxt_vpr StateCons B \<omega> (RNormal \<omega>'))"
+    apply (cases)
+    using Invariant[simplified is_inh_rel_invariant_def] exp_rel_vpr_bplD[OF ExpRel]
+    by (metis val_rel_vpr_bpl.simps(2))+
+next
+  fix \<omega> ns
+  assume "red_inhale ctxt_vpr StateCons (CondAssert cond A B) \<omega> RFailure"
+     and "R \<omega> ns \<and> Q (CondAssert cond A B) \<omega>"
+
+  thus "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+       ((\<exists>v. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>cond;\<omega>\<rangle> [\<Down>]\<^sub>t Val v) \<and> \<omega> = \<omega>) \<and>
+       (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R \<omega> ns \<and> Q A \<omega>) \<and> red_inhale ctxt_vpr StateCons A \<omega> RFailure \<or>
+        red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> (R \<omega> ns \<and> Q B \<omega>) \<and> red_inhale ctxt_vpr StateCons B \<omega> RFailure)"
+    apply (cases)
+    using Invariant[simplified is_inh_rel_invariant_def] exp_rel_vpr_bplD[OF ExpRel]
+      apply (metis val_rel_vpr_bpl.simps(2))
+    using Invariant[simplified is_inh_rel_invariant_def] exp_rel_vpr_bplD[OF ExpRel]
+      apply (metis val_rel_vpr_bpl.simps(2))
+    apply simp
+    by (metis option.discI red_pure_exps_total_singleton)
+qed
+    
 subsection \<open>Field access predicate rule\<close>
 
 definition inhale_acc_normal_premise

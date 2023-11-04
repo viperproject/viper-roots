@@ -578,6 +578,12 @@ next
 next
   case (InhImpFalse \<omega> e A)
   then show ?case by simp
+next
+  case (InhCondAssertTrue \<omega> e A res B)
+  then show ?case by simp
+next
+  case (InhCondAssertFalse \<omega> e B res A)
+  then show ?case by simp
 qed (rule HOL.TrueI)+
 
 text \<open>inhale preserves failure for smaller states if there is no permission introspection\<close>
@@ -1347,6 +1353,44 @@ next
     thus ?thesis
       using InhImpFalse 
       by (blast intro!: red_inhale_intros)
+  qed
+next
+  case (InhCondAssertTrue \<omega> e A res B)
+  moreover from this have "Some \<omega>2 \<le> Some \<omega>"
+    by simp
+  moreover from InhCondAssertTrue have SubConstraint: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<and> no_perm_assertion A \<and> no_unfolding_assertion A"
+    by simp
+  ultimately consider "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    by (metis option.discI)
+    thus ?case 
+  proof cases
+    case 1
+    then show ?thesis 
+      by (simp add: InhSubExpFailure RedExpListFailure)
+  next
+    case 2
+    thus ?thesis
+      using InhCondAssertTrue 
+      by (metis SubConstraint TotalExpressions.InhCondAssertTrue)
+  qed
+next
+  case (InhCondAssertFalse \<omega> e B res A)
+  moreover from this have "Some \<omega>2 \<le> Some \<omega>"
+    by simp
+  moreover from InhCondAssertFalse have SubConstraint: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<and> no_perm_assertion B \<and> no_unfolding_assertion B"
+    by simp
+  ultimately consider "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t VFailure" | "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    by (metis Some_Some_ifD)
+  thus ?case
+  proof cases
+    case 1
+    then show ?thesis 
+      by (simp add: InhSubExpFailure RedExpListFailure)
+  next
+    case 2
+    thus ?thesis
+      using InhCondAssertFalse
+      by (metis SubConstraint TotalExpressions.InhCondAssertFalse)
   qed
 qed (rule HOL.TrueI)+
 
@@ -2900,6 +2944,18 @@ next
     by auto
   ultimately show ?case 
     by simp
+next
+  case (InhCondAssertTrue \<omega> e A res B)
+  moreover from this have "red_inhale ctxt R A \<omega>2 (map_stmt_result_total (get_store_total_update (\<lambda>_. get_store_total \<omega>2)) res)"
+    by auto
+  ultimately show ?case
+    by (auto intro!: TotalExpressions.InhCondAssertTrue)    
+next
+  case (InhCondAssertFalse \<omega> e B res A)
+  moreover from this have "red_inhale ctxt R B \<omega>2 (map_stmt_result_total (get_store_total_update (\<lambda>_. get_store_total \<omega>2)) res)"
+    by auto
+  ultimately show ?case
+    by (auto intro!: TotalExpressions.InhCondAssertFalse)
 qed simp_all
 
 lemma assertion_framing_store_same_on_free_var:

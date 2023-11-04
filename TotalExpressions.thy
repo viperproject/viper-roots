@@ -871,11 +871,27 @@ next
 qed
 
 lemma assertion_framing_imp: 
-  assumes "assertion_framing_state ctxt StateCons (Imp e A) \<omega>" and
-          "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True))"  
-        shows "assertion_framing_state ctxt StateCons A \<omega>"
+  assumes "assertion_framing_state ctxt StateCons (Imp e A) \<omega>"
+     and "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True))"  
+   shows "assertion_framing_state ctxt StateCons A \<omega>"
   using assms
   unfolding assertion_framing_state_def
   by (auto intro: InhImpTrue)
+
+lemma assertion_framing_cond_assert_true:
+  assumes "assertion_framing_state ctxt StateCons (CondAssert e A B) \<omega>"
+      and "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True))"
+    shows "assertion_framing_state ctxt StateCons A \<omega>"
+  using assms
+  unfolding assertion_framing_state_def
+  by (auto intro: InhCondAssertTrue)
+
+lemma assertion_framing_cond_assert_false:
+  assumes "assertion_framing_state ctxt StateCons (CondAssert e A B) \<omega>"
+      and "ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool False))"
+    shows "assertion_framing_state ctxt StateCons B \<omega>"
+  using assms
+  unfolding assertion_framing_state_def
+  by (auto intro: InhCondAssertFalse)
 
 end
