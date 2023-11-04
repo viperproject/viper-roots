@@ -12,6 +12,11 @@ ML \<open>
        exp_wf_rel_info *       
        exp_rel_info *
        ('a exhale_rel_hint)
+  | CondExhHint of 
+       exp_wf_rel_info *       
+       exp_rel_info *
+       ('a exhale_rel_hint) * (* then-branch hint *)
+       ('a exhale_rel_hint)   (* else-branch hint *)
   | NoExhHint (* used for debugging purposes *)
 
   type 'a normal_exhale_rel_complete_hint = {
@@ -61,29 +66,57 @@ ML \<open>
         (exhale_rel_aux_tac ctxt info left_hint |> SOLVED') THEN'
         (exhale_rel_aux_tac ctxt info right_hint |> SOLVED')
     | ImpExhHint (exp_wf_rel_info, exp_rel_info, right_hint) => 
-         (Rmsg' "ExhaleRel Imp" (resolve_tac ctxt [@{thm exhale_rel_imp_2}]) ctxt) THEN'
-         (Rmsg' "ExhaleRel Imp exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN'
-         (Rmsg' "ExhaleRel Imp inv constraint on cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
-         (
-           (Rmsg' "ExhaleRel Imp 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
-           (Rmsg' "ExhaleRel Imp wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
-           (Rmsg' "ExhaleRel Imp 2" ((progress_tac ctxt) |> SOLVED') ctxt)
-         ) THEN'
-          (Rmsg' "ExhaleRel Imp empty else" (* empty else block *)                
-                 ((unfold_bigblock_in_goal ctxt) THEN'
-                 (assm_full_simp_solved_tac ctxt))
-              ctxt)  THEN'
-         (
-           (Rmsg' "ExhaleRel Imp cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
-         ) THEN'
-         (
-           simplify_continuation ctxt THEN'
+        (Rmsg' "ExhaleRel Imp" (resolve_tac ctxt [@{thm exhale_rel_imp_2}]) ctxt) THEN'
+        (Rmsg' "ExhaleRel Imp exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN'
+        (Rmsg' "ExhaleRel Imp inv constraint on cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
+        (
+          (Rmsg' "ExhaleRel Imp 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
+          (Rmsg' "ExhaleRel Imp wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
+          (Rmsg' "ExhaleRel Imp 2" ((progress_tac ctxt) |> SOLVED') ctxt)
+        ) THEN'
+        (Rmsg' "ExhaleRel Imp empty else" (* empty else block *)                
+           ((unfold_bigblock_in_goal ctxt) THEN'
+           (assm_full_simp_solved_tac ctxt))
+          ctxt)  THEN'
+        (
+          (Rmsg' "ExhaleRel Imp cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+        ) THEN'
+        (
+          simplify_continuation ctxt THEN'
+         (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+           variable for the recursive call to exhale_rel_tac *)
+         (Rmsg' "ExhaleRel Imp 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
+         (exhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
+         (Rmsg' "ExhaleRel Imp 4" (progress_red_bpl_rel_tac ctxt) ctxt)
+        )
+    | CondExhHint (exp_wf_rel_info, exp_rel_info, thn_hint, els_hint) =>
+        (Rmsg' "ExhaleRel Cond" (resolve_tac ctxt [@{thm exhale_rel_cond}]) ctxt) THEN'
+        (Rmsg' "ExhaleRel Cond exhale rel inv" (resolve_tac ctxt [#is_exh_rel_inv_thm info]) ctxt) THEN'
+        (Rmsg' "ExhaleRel Cond inv constraint on cond" (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
+        (
+          (Rmsg' "ExhaleRel Cond 1" (resolve_tac ctxt [@{thm wf_rel_extend_1_same_rel}]) ctxt) THEN'
+          (Rmsg' "ExhaleRel Cond wf cond" (exp_wf_rel_tac (#basic_info info) exp_wf_rel_info exp_rel_info ctxt (#no_def_checks_tac_opt info) |> SOLVED') ctxt) THEN'
+          (Rmsg' "ExhaleRel Cond 2" ((progress_tac ctxt) |> SOLVED') ctxt)
+        ) THEN'
+        (
+          (Rmsg' "ExhaleRel Cond cond rel" (exp_rel_tac exp_rel_info ctxt |> SOLVED') ctxt)
+        ) THEN'
+        (
+          simplify_continuation ctxt THEN'
           (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
-             variable for the recursive call to exhale_rel_tac *)
-           (Rmsg' "ExhaleRel Imp 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
-           (exhale_rel_aux_tac ctxt info right_hint |> SOLVED') THEN'
-           (Rmsg' "ExhaleRel Imp 4" (progress_red_bpl_rel_tac ctxt) ctxt)
-         )
+           variable for the recursive call to exhale_rel_tac *)
+          (Rmsg' "ExhaleRel Cond 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
+          (exhale_rel_aux_tac ctxt info thn_hint |> SOLVED') THEN'
+          (Rmsg' "ExhaleRel Cond 4" (progress_red_bpl_rel_tac ctxt) ctxt)
+        ) THEN'
+        (
+          simplify_continuation ctxt THEN'
+          (* apply propagation rule here, so that target program point in stmt_rel is a schematic 
+           variable for the recursive call to exhale_rel_tac *)
+          (Rmsg' "ExhaleRel Cond 3" (resolve_tac ctxt [@{thm exhale_rel_propagate_post}]) ctxt) THEN'           
+          (exhale_rel_aux_tac ctxt info els_hint |> SOLVED') THEN'
+          (Rmsg' "ExhaleRel Cond 4" (progress_red_bpl_rel_tac ctxt) ctxt)
+        )
     | AtomicExhHint atomicHint => (#atomic_exhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
     | NoExhHint => K all_tac
 \<close>

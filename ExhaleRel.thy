@@ -82,7 +82,10 @@ definition is_exh_rel_invariant
                   (Q A1 \<omega>def \<omega>) \<and> 
                   (\<forall>\<omega>'. red_exhale ctxt StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<longrightarrow> Q A2 \<omega>def \<omega>')) \<and>
           (\<forall> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<and> cond_exp e \<longrightarrow>
-                         ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>def \<omega>)"
+                         ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<longrightarrow> Q A \<omega>def \<omega>) \<and>
+          (\<forall> e A B \<omega>def \<omega> b. Q (assert.CondAssert e A B) \<omega>def \<omega> \<and> cond_exp e \<longrightarrow>
+                         ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool b)) \<longrightarrow>
+                                  (if b then Q A \<omega>def \<omega> else Q B \<omega>def \<omega>))"
 
 lemma is_exh_rel_invariant_intro:
   assumes "\<And> A1 A2 \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> cond_assert A1 \<Longrightarrow> Q A1 \<omega>def \<omega>" and
@@ -91,6 +94,9 @@ lemma is_exh_rel_invariant_intro:
                                                    \<Longrightarrow> Q A2 \<omega>def \<omega>'" and
           "\<And> e A \<omega>def \<omega>. Q (assert.Imp e A) \<omega>def \<omega> \<Longrightarrow> cond_exp e \<Longrightarrow> 
                     ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q A \<omega>def \<omega>"
+          "\<And> e A B \<omega>def \<omega> b. Q (assert.CondAssert e A B) \<omega>def \<omega> \<Longrightarrow> cond_exp e \<Longrightarrow> 
+                              ctxt, StateCons, Some \<omega>def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool b)) \<Longrightarrow> 
+                              if b then Q A \<omega>def \<omega> else Q B \<omega>def \<omega>"
         shows "is_exh_rel_invariant ctxt StateCons cond_assert cond_exp Q"
   using assms
   unfolding is_exh_rel_invariant_def
@@ -103,7 +109,7 @@ text \<open>trivial invariant instantiation\<close>
 lemma true_is_assertion_red_invariant_exh:
   shows "is_exh_rel_invariant ctxt_vpr (\<lambda>_.True) (\<lambda>_. True) (\<lambda>_. True) (\<lambda>_ _ _. True)"
   unfolding is_exh_rel_invariant_def
-  by blast
+  by auto
 
 text \<open>framing_exh instantiation\<close>
 
@@ -283,9 +289,52 @@ next
     using assertion_framing_imp
     using AssertionFraming \<open>\<omega>def \<succeq> \<omega>sum\<close> \<open>\<omega>inh \<oplus> \<omega> = Some \<omega>sum\<close>
     unfolding framing_exh_def
-     by blast
- qed
+    by blast
+next
+  \<comment>\<open>Conditional assertion\<close>
+  \<comment>\<open>TODO: would be good to share proofs with implication case\<close>
+  fix e A B b
+  fix \<omega>def \<omega> :: "'a full_total_state"
 
+  assume FramingExh: "framing_exh ctxt_vpr StateCons (assert.CondAssert e A B) \<omega>def \<omega>" and
+         ConstrainedExp: "no_perm_pure_exp e \<and> no_unfolding_pure_exp e" and
+         RedCond: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
+
+  from FramingExh obtain \<omega>inh \<omega>sum
+    where \<omega>def_valid: "StateCons \<omega>def" "valid_heap_mask (get_mh_total_full \<omega>def)" and
+          "\<omega>inh \<oplus> \<omega> = Some \<omega>sum" and
+          "\<omega>def \<succeq> \<omega>sum" and          
+          AssertionFraming: "assertion_framing_state ctxt_vpr StateCons (assert.CondAssert e A B) \<omega>inh"
+    unfolding framing_exh_def
+    by blast
+
+  hence "\<omega>def \<succeq> \<omega>inh" and "\<omega>def \<succeq> \<omega>"
+    by (metis commutative greater_equiv succ_trans)+
+ 
+  hence "get_h_total_full \<omega>inh = get_h_total_full \<omega>"
+    using full_total_state_greater_only_mask_changed
+    by metis
+
+  with RedCond ConstrainedExp
+  have "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
+    by (metis \<open>(\<omega>def::'a::type full_total_state) \<succeq> (\<omega>::'a::type full_total_state)\<close> \<open>(\<omega>def::'a::type full_total_state) \<succeq> (\<omega>inh::'a::type full_total_state)\<close> full_total_state_greater_only_mask_changed red_pure_exp_only_differ_on_mask(1))
+
+  with \<open>\<omega>def \<succeq> \<omega>inh\<close> have "ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool b) \<or>
+                           ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t VFailure"
+    using ConstrainedExp red_pure_exp_different_def_state
+    by blast
+
+  hence "ctxt_vpr, StateCons, Some \<omega>inh \<turnstile> \<langle>e;\<omega>inh\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
+    using AssertionFraming inh_cond_assert_failure
+    unfolding assertion_framing_state_def
+    by blast
+
+  with FramingExh show "if b then (framing_exh ctxt_vpr StateCons A \<omega>def \<omega>) else (framing_exh ctxt_vpr StateCons B \<omega>def \<omega>)"
+    using assertion_framing_cond_assert_true assertion_framing_cond_assert_false
+    using AssertionFraming \<open>\<omega>def \<succeq> \<omega>sum\<close> \<open>\<omega>inh \<oplus> \<omega> = Some \<omega>sum\<close>
+    unfolding framing_exh_def
+    by (metis (full_types))
+qed
 
 text \<open>The following lemma shows that \<^const>\<open>framing_exh\<close> can be used to omit well-definedness checks
       on direct subexpressions of an assertion\<close>
@@ -500,6 +549,123 @@ lemma exhale_rel_imp_2:
   unfolding is_exh_rel_invariant_def
   by blast
 
+lemma exhale_rel_cond:
+  assumes Invariant: "is_exh_rel_invariant ctxt_vpr StateCons cond_assert cond_exp Q"
+      and Cond: "cond_exp cond"
+      and ExpWfRel: 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (assert.CondAssert cond A B) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt cond 
+           \<gamma>1
+           (if_bigblock name (Some (cond_bpl)) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont)" 
+          (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt cond _ ?\<gamma>_if")
+      and ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt cond cond_bpl"
+      and ThnRel: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+                (is "exhale_rel R R Q _ _ _ _ _ ?\<gamma>_thn (next, cont)")
+      and ElsRel: "exhale_rel R R Q ctxt_vpr StateCons P ctxt B (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
+                (is "exhale_rel R R Q _ _ _ _ _ ?\<gamma>_els (next, cont)")
+    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (assert.CondAssert cond A B) \<gamma>1 (next, cont)"
+  unfolding exhale_rel_def
+proof (simp only: uncurry.simps, 
+       rule rel_general_cond, 
+       fastforce intro: rel_general_conseq_input_output[OF ExpWfRel[simplified wf_rel_def]])
+
+  let ?Success = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) (CondAssert cond A B) (snd \<omega>) (RNormal (snd \<omega>'))"
+  let ?SuccessExp = "\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"
+  let ?SuccessElse = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) B (snd \<omega>) (RNormal (snd \<omega>'))"
+
+  let ?Fail ="\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) (CondAssert cond A B) (snd \<omega>) RFailure"
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+  let ?FailElse = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) B (snd \<omega>) RFailure"
+  let ?FailExp = "\<lambda>\<omega>. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+
+  from ThnRel
+  show "rel_general (\<lambda>a ns. R (fst a) (snd a) ns \<and> Q A (fst a) (snd a)) (\<lambda>a. R (fst a) (snd a)) ?SuccessThn ?FailThn P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
+    unfolding exhale_rel_def
+    by auto
+
+  from ElsRel
+  show "rel_general (\<lambda>a ns. R (fst a) (snd a) ns \<and> Q B (fst a) (snd a)) (\<lambda>a. R (fst a) (snd a)) ?SuccessElse ?FailElse P ctxt (els_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
+    unfolding exhale_rel_def
+    by auto
+
+  show "\<And> \<omega> \<omega>' ns. ?Success \<omega> \<omega>' \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.CondAssert cond A B) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+                        ?SuccessExp \<omega> \<omega> \<and> \<comment>\<open>implicit assumption that success of conditional does not lead to side effects\<close>
+                       ((red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q A (fst \<omega>) (snd \<omega>)) \<and> ?SuccessThn \<omega> \<omega>') \<or> 
+                        (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q B (fst \<omega>) (snd \<omega>)) \<and> ?SuccessElse \<omega> \<omega>'))"
+             (is "\<And> \<omega> \<omega>' ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> \<omega>' ns")
+  proof - 
+    fix \<omega> \<omega>' ns
+    assume Success:"?Success \<omega> \<omega>'" and R: "R (fst \<omega>) (snd \<omega>) ns \<and> Q (CondAssert cond A B) (fst \<omega>) (snd \<omega>)"
+    from conjunct2[OF \<open>?Success \<omega> \<omega>'\<close>]
+    show "?Goal \<omega> \<omega>' ns"
+    proof cases
+      case ExhCondTrue
+      hence "red_expr_bpl ctxt cond_bpl ns (BoolV True)"
+        using exp_rel_vpr_bplD[OF ExpRel] R
+        by fastforce
+      moreover have "Q A (fst \<omega>) (snd \<omega>)"
+        using R Invariant Cond
+        unfolding is_exh_rel_invariant_def 
+        by (metis local.ExhCondTrue(1))
+      ultimately show ?thesis 
+        using ExhCondTrue R Success 
+        by auto
+    next
+      case ExhCondFalse
+      hence "red_expr_bpl ctxt cond_bpl ns (BoolV False)"
+        using exp_rel_vpr_bplD[OF ExpRel] R
+        by fastforce
+      moreover have "Q B (fst \<omega>) (snd \<omega>)"
+        using R Invariant Cond
+        unfolding is_exh_rel_invariant_def 
+        by (metis local.ExhCondFalse(1))
+      ultimately show ?thesis 
+        using ExhCondFalse R Success 
+        by auto   
+    qed
+  qed
+
+  show "\<And> \<omega> ns. ?Fail \<omega> \<Longrightarrow> R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.CondAssert cond A B) (fst \<omega>) (snd \<omega>) \<Longrightarrow> 
+                 ?FailExp \<omega> \<or>
+                 (?SuccessExp \<omega> \<omega> \<and>
+                   ( (red_expr_bpl ctxt cond_bpl ns (BoolV True) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q A (fst \<omega>) (snd \<omega>)) \<and> ?FailThn \<omega>) \<or> 
+                     (red_expr_bpl ctxt cond_bpl ns (BoolV False) \<and> (R (fst \<omega>) (snd \<omega>) ns \<and> Q B (fst \<omega>) (snd \<omega>)) \<and> ?FailElse \<omega>) )
+                 )" (is "\<And> \<omega> ns. _ \<Longrightarrow> _ \<Longrightarrow> ?Goal \<omega> ns")
+  proof -
+   fix \<omega> ns
+   assume Fail: "?Fail \<omega>" and R:"R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.CondAssert cond A B) (fst \<omega>) (snd \<omega>)" 
+   thus "?Goal \<omega> ns"
+   proof cases
+     case ExhCondTrue
+      hence "red_expr_bpl ctxt cond_bpl ns (BoolV True)"
+        using exp_rel_vpr_bplD[OF ExpRel] R
+        by fastforce
+      moreover have "Q A (fst \<omega>) (snd \<omega>)"
+        using R Invariant Cond
+        unfolding is_exh_rel_invariant_def 
+        by (metis local.ExhCondTrue(1))
+      ultimately show ?thesis
+        using ExhCondTrue R by blast
+    next
+     case ExhCondFalse
+      hence "red_expr_bpl ctxt cond_bpl ns (BoolV False)"
+        using exp_rel_vpr_bplD[OF ExpRel] R
+        by fastforce
+      moreover have "Q B (fst \<omega>) (snd \<omega>)"
+        using R Invariant Cond
+        unfolding is_exh_rel_invariant_def 
+        by (metis local.ExhCondFalse(1))
+      ultimately show ?thesis
+        using ExhCondFalse R by blast 
+    next 
+     case ExhSubExpFailure
+     then show ?thesis 
+       apply simp
+       by (metis option.discI red_pure_exps_total_singleton)
+   qed
+ qed
+qed
+
 subsection \<open>Field access predicate rule\<close>
 
 definition exhale_field_acc_rel_perm_success
@@ -619,7 +785,7 @@ proof (rule exhale_rel_intro_2)
         by (metis fst_conv mem_Collect_eq snd_conv)
     qed
   next
-    case SubAtomicFailure
+    case ExhSubExpFailure
     thus ?thesis
       unfolding rel_vpr_aux_def
       using exprs_wf_rel_failure_elim[OF WfSubexp] R0 \<open>Q _ \<omega>0 \<omega>\<close>

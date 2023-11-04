@@ -695,7 +695,7 @@ proof (rule wf_rel_intro)
       apply blast     
     using inh_imp_failure
     apply (simp add: InhSubExpFailure)
-    using inh_condassert_failure
+    using inh_cond_assert_failure
     by (simp add: InhSubExpFailure)
 
   moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
@@ -742,7 +742,7 @@ next
       using InhSubExpFailure RedExps assertion_framing_state_sub_exps_not_failure 
         apply blast
       using inh_imp_failure False InhSubExpFailure RedExps \<open>es = _\<close> apply blast
-      using inh_condassert_failure False InhSubExpFailure RedExps \<open>es = _\<close> 
+      using inh_cond_assert_failure False InhSubExpFailure RedExps \<open>es = _\<close> 
       by blast      
 
     moreover from \<open>R \<omega>def \<omega> ns\<close> have "assertion_framing_state ctxt_vpr StateCons A \<omega>def"
