@@ -204,7 +204,6 @@ ML \<open>
     (Rmsg' "UpdExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc_upd_rel}) ctxt) THEN'
     (Rmsg' "UpdExhField StateRel Input" (simp_then_if_not_solved_blast_tac ctxt |> SOLVED') ctxt) THEN'    
     (Rmsg' "UpdExhField StateRel Output" (simp_then_if_not_solved_blast_tac ctxt |> SOLVED') ctxt) THEN'    
-   (* old version: (Rmsg' "UpdExhField Dom AuxPred" (fastforce_tac ctxt []) ctxt) THEN' *)
     (Rmsg' "UpdExhField Dom AuxPred" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField Wf TyRepr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
     (Rmsg' "UpdExhField Wf Total Consistency" (resolve_tac ctxt [#consistency_wf_thm info]) ctxt) THEN'
@@ -222,8 +221,6 @@ ML \<open>
     case exh_field_acc_hint of
       FieldAccExhHint (exp_wf_rel_info, exp_rel_info, lookup_aux_var_ty_thm, lookup_aux_var_state_rel_thm, exp_rel_perm_access_thm) =>
         (Rmsg' "ExhField 1" (resolve_tac ctxt @{thms exhale_rel_field_acc}) ctxt) THEN'
-          (*(Rmsg' "ExhField wf rcv" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'
-          (Rmsg' "ExhField wf perm" ((exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt) |> SOLVED') ctxt) THEN'*)
           (Rmsg' "ExhField wf subexpressions" (exps_wf_rel_tac info exp_wf_rel_info exp_rel_info ctxt no_def_checks_tac_opt 2) ctxt) THEN'   
           (Rmsg' "ExhField unfold current bigblock" (rewrite_rel_general_tac ctxt) ctxt) THEN'     
           (Rmsg' "ExhField 2 propagate" (resolve_tac ctxt @{thms rel_propagate_pre_2}) ctxt) THEN'
