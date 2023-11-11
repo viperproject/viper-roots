@@ -17,6 +17,17 @@ definition exhale_rel ::
            (\<lambda> \<omega>0_\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) RFailure)
            P ctxt \<gamma> \<gamma>'"
 
+text \<open>The above definition directly introduces the invariant assertion \<^term>\<open>Q\<close>. The definition 
+without the invariant assertion is the same where \<^term>\<open>Q\<close> is instantiated to be \<^term>\<open>\<lambda>_ _ _. True\<close>.
+The following lemma shows that one can express the version with the invariant assertion as an instantiation
+of the version without the invariant assertion.\<close>
+
+lemma exhale_rel_without_inv_to_with_inv:
+  "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<longleftrightarrow>
+   exhale_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q assertion_vpr \<omega>def \<omega>) R' (\<lambda> _ _ _. True) ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
+  unfolding exhale_rel_def rel_general_def
+  by auto
+
 lemma exhale_rel_intro:
   assumes "\<And> \<omega>0 \<omega> \<omega>' ns. R \<omega>0 \<omega> ns \<Longrightarrow>
                       Q assertion_vpr \<omega>0 \<omega> \<Longrightarrow>
@@ -429,8 +440,8 @@ subsection \<open>Structural rules\<close>
 
 lemma exhale_rel_star: 
   assumes Invariant1: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Q A1 \<omega>def \<omega>"
-      and Invariant2: "\<And> \<omega>def \<omega> \<omega>'. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> 
-                                    red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>def \<omega>'"
+      and Invariant2: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> 
+                                  (\<And>\<omega>'. red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>def \<omega>')"
       and ExhRelA1: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2"
       and ExhRelA2: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
     shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
@@ -824,7 +835,7 @@ proof (rule rel_general_conseq_output,
          snd \<omega>' = (if (r = Null) then (snd \<omega>0_\<omega>def) else (update_mh_loc_total_full (snd \<omega>0_\<omega>def) (the_address r, f)
                                                    ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) - (Abs_prat p))))"
     using MaskDefDifferent
-    unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_perm_success_def
+    unfolding exhale_acc_normal_premise_def 
     by presburger
 next
   fix \<omega>0_\<omega>def \<omega>' ns
