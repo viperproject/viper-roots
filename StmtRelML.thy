@@ -93,15 +93,19 @@ and
                to progress to an empty block essentially consuming all big blocks, instead of
                having to progress to the big block after the if-statement). Same for else-branch. *)
              simplify_continuation ctxt THEN'
-             (Rmsg' "If3" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
+             (Rmsg' "If3 Then" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'
+             (* rewrite then-branch, since block will be folded *)
+             (Rmsg' "If4 Then" (progress_stmt_rel_tac ctxt) ctxt) THEN'                    
              (stmt_rel_tac ctxt info thn_hint |> SOLVED') THEN'
-             (Rmsg' "If4" (progress_red_bpl_rel_tac ctxt) ctxt)
+             (Rmsg' "If5 Then" (progress_red_bpl_rel_tac ctxt) ctxt)
            ) THEN'
            (
             simplify_continuation ctxt THEN'
-            (Rmsg' "If5" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN'           
+            (Rmsg' "If3 Else" (resolve_tac ctxt [@{thm stmt_rel_propagate_2_same_rel}]) ctxt) THEN' 
+            (* rewrite else-branch, since block will be folded *)
+            (Rmsg' "If4 Else" (progress_stmt_rel_tac ctxt) ctxt) THEN' 
             (stmt_rel_tac ctxt info els_hint |> SOLVED') THEN'
-            (Rmsg' "If6" (progress_red_bpl_rel_tac ctxt) ctxt)
+            (Rmsg' "If5 Else" (progress_red_bpl_rel_tac ctxt) ctxt)
            ) THEN'
            (rewrite_red_bpl_rel_tac ctxt) (*rewrite here to make sure good state can be progressed after *)
       | _ => error "unsupported hint in stmt_rel_single_stmt_tac"
