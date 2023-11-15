@@ -2891,7 +2891,6 @@ proof -
 qed
 
 lemma bg_expr_list_red_iff:
-\<comment>\<open>Taken from Benjamin's BoogieWrapper.thy: TODO proper merge\<close>
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>[], s\<rangle> [\<Down>] v) = (v = [])"
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e0#es, s\<rangle> [\<Down>] v)
     = (\<exists>v0 vs. v = v0#vs \<and> (A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e0, s\<rangle> \<Down> v0) \<and> (A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>es, s\<rangle> [\<Down>] vs))"
@@ -2899,7 +2898,6 @@ lemma bg_expr_list_red_iff:
       (rule iffI, (erule red_exprs.cases, simp, simp), (clarsimp, rule RedExpListCons; simp)))
 
 lemma bg_expr_list_red_all2:
-\<comment>\<open>Taken from Benjamin's BoogieWrapper.thy: TODO proper merge\<close>
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>es, s\<rangle> [\<Down>] vs) = list_all2 (\<lambda>e v. A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e, s\<rangle> \<Down> v) es vs"
   by (induct es arbitrary:vs; simp add:bg_expr_list_red_iff list_all2_Cons1)
 

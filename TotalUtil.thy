@@ -103,8 +103,6 @@ definition mono_prop_downward_ord
 
 subsection \<open>\<open>if_Some\<close>\<close>
 
-text \<open>interface for \<open>if_Some\<close> was initially defined by Benjamin Bonneau\<close>
-
 (*
 primrec if_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
     "if_Some f (Some x) = f x"
