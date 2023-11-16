@@ -1,7 +1,7 @@
 section \<open>A state model for the Viper total heap semantics\<close>
 
 theory TotalViperState
-imports Viper.ValueAndBasicState
+imports "viper-semantics/ValueAndBasicState"
 begin
 
 text \<open> We use the following naming scheme:

@@ -1,5 +1,5 @@
 theory ExpRelML
-imports ExpRel Boogie_Lang.TypingML Boogie_Lang.HelperML
+imports ExpRel "foundational_boogie/BoogieLang/TypingML" "foundational_boogie/BoogieLang/HelperML"
 begin
 
 subsection \<open>Auxiliary lemmas for the tactics\<close>

@@ -1,7 +1,7 @@
 section \<open>Helper lemmas, instantiations, definitions for the total state\<close>
 
 theory TotalStateUtil
-imports Viper.SepAlgebra TotalViperUtil TotalViperState Viper.DeBruijn
+imports "viper-semantics/SepAlgebra" TotalViperUtil TotalViperState "viper-semantics/DeBruijn"
 begin
 
 subsection \<open>update_store_total\<close>

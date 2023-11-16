@@ -1,5 +1,5 @@
 theory ViperBoogieHelperML
-imports ViperBoogieFunctionInst TotalViperHelperML Boogie_Lang.HelperML
+imports ViperBoogieFunctionInst TotalViperHelperML "foundational_boogie/BoogieLang/HelperML"
 begin
 
 ML \<open>
