@@ -1,7 +1,9 @@
-session TotalViper = Viper +
+session TotalViper = "HOL" +
   sessions
     "HOL-Eisbach"
-    "Boogie_Lang"
+  directories
+    "foundational_boogie/BoogieLang"
+    "viper-semantics"
   theories
     TotalViperState
     TotalStateUtil

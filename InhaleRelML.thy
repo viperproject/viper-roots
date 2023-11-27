@@ -1,5 +1,5 @@
 theory InhaleRelML
-imports Boogie_Lang.HelperML ExprWfRelML InhaleRel ViperBoogieHelperML
+imports "foundational_boogie/BoogieLang/HelperML" ExprWfRelML InhaleRel ViperBoogieHelperML
 begin
 
 ML \<open>
