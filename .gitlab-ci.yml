@@ -1,0 +1,17 @@
+stages:
+  - build
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+setup_isabelle:
+  stage: build
+  image: python:3.10
+  script:
+    - git submodule update --init --recursive
+    - mkdir -p isabelle
+    - curl -L https://isabelle.in.tum.de/website-Isabelle2022/dist/Isabelle2022_linux.tar.gz -o isabelle.tar.gz
+    - tar -xzf isabelle.tar.gz -C isabelle --strip-components=1
+    - ./isabelle/bin/isabelle build -j4 -D .
+  only:
+    - merge_requests
