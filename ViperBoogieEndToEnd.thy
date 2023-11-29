@@ -1029,6 +1029,13 @@ proof -
     by simp
 qed
 
+
+lemma eq_someD:
+  assumes "a = f (SOME t. Q t)" and "Q t"
+  obtains t' where "Q t' \<and> a = f t'"
+  using assms 
+  by (metis someI_ex)
+
 lemma initial_global_state_aux_field_2: 
   assumes Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]" and
           Inj: "inj_on (field_translation Tr) (dom (field_translation Tr))" and
@@ -1040,11 +1047,13 @@ proof -
     using FieldTr FieldVpr
     by blast
 
-  note Aux = initial_global_state_aux_field[OF Disj *]
+  note Aux = initial_global_state_aux_field[OF Disj *] 
+
   with FieldTr FieldVpr obtain f'_vpr t' where 
     "?g x = Some (AbsV (AField (NormalField x t')))" and
-    "field_translation Tr f'_vpr = Some x \<and> declared_fields Pr f'_vpr = Some t'"     
-    by (smt (verit, best) exE_some)(* SMT proof *)
+    "field_translation Tr f'_vpr = Some x \<and> declared_fields Pr f'_vpr = Some t'"  
+    using eq_someD[where ?f= "\<lambda>t. Some (AbsV (AField (NormalField x t)))", OF Aux]
+    by metis
 
   thus ?thesis
     using Inj FieldTr FieldVpr   
@@ -1184,11 +1193,12 @@ proof -
                                      v = val_rel_vpr_bpl v_vpr)" (is "_ = Some ?v")
     by simp
 
-  moreover from this obtain x_vpr' v_vpr' where
+  moreover from eq_someD[where ?f = Some, OF this] obtain x_vpr' v_vpr' where
     "var_translation Tr x_vpr' = Some x_bpl" and
     "get_store_total \<omega> x_vpr' = Some v_vpr'"
     "?v = val_rel_vpr_bpl v_vpr'"
-    by (smt (verit, best) StoreSome VarTrSome verit_sko_ex') (* SMT proof *)
+    using StoreSome VarTrSome
+    by (metis (no_types, lifting) calculation option.inject)    
 
   ultimately show ?thesis
     using assms
@@ -1248,7 +1258,8 @@ proof (rule extend_named_state_var_context_state_typ_wf[OF Closed closed_types_i
     "get_store_total \<omega> x_vpr' = Some v_vpr'" and
     "v = val_rel_vpr_bpl v_vpr'"
     using \<open>v = _\<close>    
-    by (smt (verit, ccfv_threshold) Nitpick.Eps_psimp) (* SMT proof *)
+    using * Inj initial_local_state_aux_Some 
+    by fastforce
 
   hence "v = val_rel_vpr_bpl v_vpr"
     using VarTr Inj
