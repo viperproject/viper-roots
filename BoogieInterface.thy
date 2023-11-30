@@ -1,5 +1,5 @@
 theory BoogieInterface
-imports "foundational_boogie/BoogieLang/Ast" TotalUtil
+imports Boogie_Lang.Ast TotalUtil
 begin
 
 subsection \<open>Expressions\<close>

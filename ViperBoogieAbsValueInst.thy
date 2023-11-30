@@ -1,7 +1,7 @@
 section \<open>Viper Instantiation of Boogie Abstract Values\<close>
 
 theory ViperBoogieAbsValueInst
-imports "viper-semantics/ViperLang" "viper-semantics/ValueAndBasicState" "foundational_boogie/BoogieLang/Semantics" HOL.Real TotalUtil "foundational_boogie/BoogieLang/VCExprHelper"
+imports ViperCommon.ViperLang ViperCommon.ValueAndBasicState Boogie_Lang.Semantics HOL.Real TotalUtil Boogie_Lang.VCExprHelper
 begin
 
 text \<open>
