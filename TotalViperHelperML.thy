@@ -1,5 +1,5 @@
 theory TotalViperHelperML
-imports "foundational_boogie/BoogieLang/HelperML"
+imports Boogie_Lang.HelperML
 begin
 
 ML \<open>

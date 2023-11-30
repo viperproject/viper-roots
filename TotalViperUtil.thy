@@ -1,7 +1,7 @@
 section \<open>Utility functions and lemmas for Viper\<close>
 
 theory TotalViperUtil
-imports "viper-semantics/ValueAndBasicState" "viper-semantics/DeBruijn" "viper-semantics/ViperUtil" TotalUtil
+imports ViperCommon.ValueAndBasicState ViperCommon.DeBruijn ViperCommon.ViperUtil TotalUtil
 begin
 
 fun get_address_opt :: "'a val \<Rightarrow> address option"

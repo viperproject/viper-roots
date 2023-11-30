@@ -1,7 +1,7 @@
 section \<open>Expression evaluation, well-definedness, inhale, total heap consistency\<close>
 
 theory TotalExpressions
-imports "viper-semantics/ViperLang" "viper-semantics/ValueAndBasicState" TotalViperState "viper-semantics/Binop" "viper-semantics/DeBruijn" "viper-semantics/PredicatesUtil" TotalStateUtil
+imports ViperCommon.ViperLang ViperCommon.ValueAndBasicState TotalViperState ViperCommon.Binop ViperCommon.DeBruijn ViperCommon.PredicatesUtil TotalStateUtil
 begin
 
 subsection \<open>Heap-dependent function interpretation\<close>

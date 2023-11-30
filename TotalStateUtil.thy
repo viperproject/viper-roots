@@ -1,7 +1,7 @@
 section \<open>Helper lemmas, instantiations, definitions for the total state\<close>
 
 theory TotalStateUtil
-imports "viper-semantics/SepAlgebra" TotalViperUtil TotalViperState "viper-semantics/DeBruijn"
+imports ViperCommon.SepAlgebra TotalViperUtil TotalViperState ViperCommon.DeBruijn
 begin
 
 subsection \<open>update_store_total\<close>
@@ -377,10 +377,11 @@ instance proof
     unfolding plus_total_state_ext_def
     by (clarsimp simp: * ** MEqAB MEqBC split: if_split if_split_asm)
   qed
-
+(*
   show "a \<oplus> b = None \<and> b \<oplus> c = Some bc \<Longrightarrow> a \<oplus> bc = None"
   unfolding plus_total_state_ext_def
   by (clarsimp split: if_split if_split_asm)
+*)
 
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
   unfolding plus_total_state_ext_def
@@ -485,10 +486,12 @@ proof
       unfolding plus_full_total_state_ext_def defined_def
       by (auto split: if_split if_split_asm)
   qed
-            
+
+(*
   show "a \<oplus> b = None \<and> b \<oplus> c = Some bc \<Longrightarrow> a \<oplus> bc = None"
     unfolding plus_full_total_state_ext_def
     by (metis (no_types, lifting) Some_Some_ifD asso3 defined_def full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) option.exhaust_sel option.inject)
+*)
 
   show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a" (is "?A \<Longrightarrow> ?B \<Longrightarrow> _")
   proof -
