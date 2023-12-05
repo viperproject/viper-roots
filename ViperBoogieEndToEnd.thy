@@ -2044,4 +2044,159 @@ lemma heap_upd_ty_preserved_2_basic:
   unfolding ty_repr_basic_def
   by (metis FieldTy2 NewVal OldHeap tcon_enum_to_id.simps(2) tcon_enum_to_id.simps(3) ty_repr_basic_def ty_repr_bpl.select_convs(1))
 
+subsection \<open>Old expressions\<close>
+
+lemma finished_remains: 
+  assumes "A,M,\<Lambda>,\<Gamma>,\<Omega>,G \<turnstile> (Inr (), s) -n\<rightarrow>* (m',n')"
+  shows "(m',n') = (Inr(), s)"
+  using assms
+proof (induction rule: rtranclp_induct2)
+  case refl
+  then show ?case by simp
+next
+  case (step a b a' b')
+  with step.hyps(2) show ?case
+    by (cases; simp)
+qed
+
+lemma red_cmd_old_state_same:
+  assumes "type_interp ctxt,[],var_context ctxt,fun_interp ctxt,rtype_interp ctxt \<turnstile> \<langle>c, Normal ns\<rangle> \<rightarrow> Normal ns'"
+  shows "old_global_state ns' = old_global_state ns"
+  using assms
+proof (cases)
+next
+  case (RedAssign x ty v e)
+  then show ?thesis 
+    by (simp add: update_var_old_global_same)
+next
+  case (RedHavocNormal x ty w v)
+  then show ?thesis 
+    by (simp add: update_var_old_global_same)
+qed (simp_all)
+
+lemma red_bigblock_small_old_state_same:
+  assumes "red_bigblock_small P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s = Normal ns"
+      and "s' = Normal ns'"
+    shows "old_global_state ns' = old_global_state ns"
+  using assms
+proof (cases)
+  case (RedBigBlockSmallSimpleCmd c name cs str tr cont)
+  then show ?thesis 
+    using \<open>s = _\<close> \<open>s' = _\<close> red_cmd_old_state_same
+    by blast    
+next
+  case (RedBigBlockSmallNoSimpleCmdOneStep name str tr cont b' cont')
+  from RedBigBlockSmallNoSimpleCmdOneStep(3)
+  show ?thesis 
+    using \<open>s = _\<close> \<open>s' = _\<close>
+    apply cases
+    by simp_all    
+qed
+
+lemma red_bigblock_small_normal_target:
+  assumes "red_bigblock_small P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s' = Normal ns'"
+    shows "\<exists>ns. s = Normal ns"
+  using assms
+proof cases
+  case (RedBigBlockSmallSimpleCmd c name cs str tr cont)
+  from this(3) assms show ?thesis 
+    by (cases) simp_all
+next
+  case (RedBigBlockSmallNoSimpleCmdOneStep name str tr cont b' cont')
+  from this(3) assms show ?thesis 
+    by (cases) simp_all
+qed
+
+lemma red_ast_bpl_normal_target:
+  assumes "red_ast_bpl P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s' = Normal ns'"
+    shows "\<exists>ns. s = Normal ns"
+  using assms
+  unfolding red_ast_bpl_def
+proof (induction rule: converse_rtranclp_induct2)
+  case refl
+  then show ?case 
+    by blast
+next
+  case (step \<gamma>1 s1 \<gamma>2 s2)
+  then show ?case 
+    using red_bigblock_small_normal_target
+    by blast
+qed
+
+lemmas red_bigblock_small_multi_normal_target = red_ast_bpl_normal_target[simplified red_ast_bpl_def]
+
+lemma red_ast_bpl_old_state_same:
+  assumes  "red_ast_bpl P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s = Normal ns"
+      and "s' = Normal ns'"
+  shows "old_global_state ns' = old_global_state ns"
+  using assms
+  unfolding red_ast_bpl_def
+proof (induction arbitrary: ns rule: converse_rtranclp_induct2)
+  case refl
+  then show ?case 
+    by simp
+next
+  case (step \<gamma>1 s1 \<gamma>2 s2)
+  from this obtain ns2 where "s2 = Normal ns2"
+    using red_bigblock_small_multi_normal_target
+    by blast
+  hence "old_global_state ns' = old_global_state ns2"
+    using step
+    by blast
+  moreover have "old_global_state ns2 = old_global_state ns" 
+    using \<open>red_bigblock_small P ctxt (\<gamma>1, s1) (\<gamma>2, s2)\<close> \<open>s2 = _\<close> \<open>s1 = _\<close>
+          red_bigblock_small_old_state_same
+    by blast
+  ultimately show ?case
+    by simp    
+qed
+
+lemma old_expressions_assume_initialization:
+  assumes StmtRel1: "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda> P ctxt s1 \<gamma>1 \<gamma>2"
+      and StmtRel2: "stmt_rel R2' R3 ctxt_vpr StateCons \<Lambda> P ctxt s2 \<gamma>2 \<gamma>3"
+      and InitState: "\<And> \<omega>'. \<exists>ns. Init ns \<and> R1 \<omega> ns \<and> Q \<omega>' (old_global_state ns)"
+      and RelTransition: "\<And> \<omega> ns. R2 \<omega> ns \<Longrightarrow> Q \<omega> (old_global_state ns) \<Longrightarrow> R2' \<omega> ns"
+      and RedStmtSeq: "red_stmt_total ctxt_vpr StateCons \<Lambda> (Seq s1 s2) \<omega> RFailure"
+    shows "\<exists>ns \<gamma>'. Init ns \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>', Failure)"
+proof (cases rule: RedSeqFailure_case[OF RedStmtSeq])
+  case (1 \<omega>')
+  from InitState obtain ns where nsProperties: "Init ns" "R1 \<omega> ns" "Q \<omega>' (old_global_state ns)"
+    by blast
+
+  with 1 obtain ns1 where 
+   RedBpl1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns1)" and "R2 \<omega>' ns1"
+    using stmt_rel_normal_elim[OF StmtRel1]
+    by blast
+
+  hence "Q \<omega>' (old_global_state ns1)"
+    using \<open>Q \<omega>' (old_global_state ns)\<close> red_ast_bpl_old_state_same
+    by metis
+
+  hence "R2' \<omega>' ns1"
+    using \<open>R2 _ _\<close> RelTransition
+    by blast
+
+  with 1 obtain c where "red_ast_bpl P ctxt (\<gamma>2, Normal ns1) c" and "snd c = Failure"
+    using stmt_rel_failure_elim[OF StmtRel2]
+    by blast
+
+  with RedBpl1 show ?thesis
+    using nsProperties red_ast_bpl_transitive
+    by (metis prod.exhaust_sel)
+next
+  case 2
+  from InitState obtain ns where "Init ns" and "R1 \<omega> ns"
+    by blast
+  then show ?thesis 
+    using 2 StmtRel1 stmt_rel_failure_elim
+    by (metis prod.collapse)
+next
+  case 3
+  then show ?thesis by simp
+qed
+
 end
