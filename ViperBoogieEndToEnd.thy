@@ -1049,7 +1049,7 @@ proof -
 
   note Aux = initial_global_state_aux_field[OF Disj *] 
 
-  with FieldTr FieldVpr obtain f'_vpr t' where 
+  from FieldTr FieldVpr obtain f'_vpr t' where 
     "?g x = Some (AbsV (AField (NormalField x t')))" and
     "field_translation Tr f'_vpr = Some x \<and> declared_fields Pr f'_vpr = Some t'"  
     using eq_someD[where ?f= "\<lambda>t. Some (AbsV (AField (NormalField x t)))", OF Aux]
