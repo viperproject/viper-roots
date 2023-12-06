@@ -1515,7 +1515,7 @@ proof -
   
   next
   
-    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var Tr) \<omega> ns"
+    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>) ns"
       unfolding heap_var_rel_def
     proof (intro conjI, rule exI, intro conjI)
       have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
@@ -1543,7 +1543,7 @@ proof -
         using DomainTy ViperHeapWellTy by auto
     qed
   
-    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var_def Tr) \<omega> ns"
+    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var_def Tr) (get_hh_total_full \<omega>) ns"
       using \<open>heap_var Tr = _\<close>
       by simp
   next  

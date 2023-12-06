@@ -687,7 +687,7 @@ proof -
     using HeapTy TypeInterp
     by simp
 
-  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' \<omega> ?ns'"
+  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' (get_hh_total_full \<omega>) ?ns'"
     unfolding heap_var_rel_def 
     using LookupTyNewVar HeapRel HeapTy HeapTyVpr
     by fastforce
@@ -813,7 +813,7 @@ proof -
     using HeapTy TypeInterp
     by simp
 
-  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar_def' \<omega>def ?ns'"
+  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar_def' (get_hh_total_full \<omega>def) ?ns'"
     unfolding heap_var_rel_def 
     using LookupTyNewVar HeapRel HeapTy HeapTyVpr
     by fastforce
@@ -925,12 +925,12 @@ proof -
   hence HeapPredSameEvalDef: "get_hp_total_full \<omega>def = get_hp_total_full \<omega>"
     by simp
 
-  have HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' (update_hh_total_full \<omega> hh') ?ns'"
+  have HeapVarRel: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' hh' ?ns'"
     unfolding heap_var_rel_def
     using lookup_var_decl_ty_Some LookupDeclNewVar HeapTyBpl HeapRel TotalHeapWellTy
     by auto
 
-  hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' (update_hh_total_full \<omega>def hh') ?ns'"
+  hence HeapVarRelDef: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' hh' ?ns'"
     by (rule heap_var_rel_stable) auto
   have BinderEmpty: "binder_state ns = Map.empty"
     using StateRel
@@ -946,8 +946,8 @@ proof -
             apply (rule update_hh_h_total)
            apply (erule Consistent)
          apply simp
-        apply (rule HeapVarRel)
-       apply (rule HeapVarRelDef)    
+        apply (simp add: HeapVarRel)
+       apply (simp add: HeapVarRelDef)    
       apply (metis LookupDeclNewVar global_state_update_local global_state_update_other lookup_var_decl_local_2)
      apply (simp add: update_var_old_global_same)
     using BinderEmpty
@@ -1350,7 +1350,7 @@ proof -
     using TypeInterp ValTyOpt ViperBoogieAbsValueInst.type_of_vbpl_val_case_of
     by simp
 
-  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' \<omega> ?ns'"
+  have HeapVarRel': "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar' (get_hh_total_full \<omega>) ?ns'"
     unfolding heap_var_rel_def
     using LookupTyNewVar ValTyOpt HeapRel TotalHeapWellTy
     by simp
@@ -1404,7 +1404,7 @@ proof -
   show ?thesis
     unfolding state_rel_def state_rel0_def
   proof (intro conjI)
-    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) \<omega>0 ns"
+    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>0) ns"
       unfolding heap_var_rel_def \<open>Tr = _\<close>
       apply (intro conjI)
        apply (rule exI[where ?x = hb])
@@ -1413,7 +1413,7 @@ proof -
       apply (rule TotalHeapWellTy)
       done
 
-    thus "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var_def Tr) \<omega>def ns"
+    thus "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var_def Tr) (get_hh_total_full \<omega>def) ns"
       using \<open>Tr = _\<close> \<open>\<omega>0 = \<omega>def\<close>
       by auto
   next

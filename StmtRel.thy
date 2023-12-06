@@ -998,7 +998,7 @@ proof -
       using \<open>\<omega>' \<in> _\<close> havoc_locs_state_same_trace
       by metis
   next
-    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) \<omega>' ?ns2"
+    show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>') ?ns2"
       using ProgramTotal
       unfolding heap_var_rel_def
       apply (subst \<open>hvar = _\<close>)+
