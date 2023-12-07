@@ -628,7 +628,7 @@ proof -
     by (simp add: TypeInterp)
 
 
-  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' \<omega> ns'"
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' (get_mh_total_full \<omega>) ns'"
     unfolding mask_var_rel_def Eq
     using LookupTyNewVar MaskRel
     by fastforce
@@ -751,7 +751,7 @@ proof -
     by (simp add: TypeInterp)
 
 
-  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar_def' \<omega>def ?ns'"
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar_def' (get_mh_total_full \<omega>def) ?ns'"
     unfolding mask_var_rel_def 
     using LookupTyNewVar MaskRel
     by fastforce
@@ -1241,7 +1241,7 @@ proof -
     by (simp add: TypeInterp)
 
 
-  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' \<omega> ?ns'"
+  have MaskVarRel': "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar' (get_mh_total_full \<omega>) ?ns'"
     unfolding mask_var_rel_def
     using LookupTyNewVar MaskRel
     by fastforce
@@ -1338,8 +1338,7 @@ proof -
     apply (rule red_ast_bpl_one_assign[OF LookupTyNewVar])
      apply (simp add: LookupVarOldVar red_expr_red_exprs.RedVar \<open>hvar = _\<close>)
     using TypeInterp ValTyOpt ViperBoogieAbsValueInst.type_of_vbpl_val_case_of
-    by simp
-    
+    by simp    
 
   have StateRel':"state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ?ns'"
     apply (rule state_rel_independent_var[OF StateRel])
@@ -1417,13 +1416,13 @@ proof -
       using \<open>Tr = _\<close> \<open>\<omega>0 = \<omega>def\<close>
       by auto
   next
-    show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (mask_var Tr) \<omega>0 ns"
+    show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (mask_var Tr) (get_mh_total_full \<omega>0) ns"
       unfolding mask_var_rel_def
       apply (rule exI[where ?x = mb])
       using LookupMask LookupVarTyMask MaskRel \<open>Tr = _\<close>
       by simp
 
-    thus "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (mask_var_def Tr) \<omega>def ns"
+    thus "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (mask_var_def Tr) (get_mh_total_full \<omega>def) ns"
       using \<open>Tr = _\<close> \<open>\<omega>0 = \<omega>def\<close>
       by auto
   next

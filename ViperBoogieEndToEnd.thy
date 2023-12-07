@@ -1547,7 +1547,7 @@ proof -
       using \<open>heap_var Tr = _\<close>
       by simp
   next  
-    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var Tr) \<omega> ns"
+    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var Tr) (get_mh_total_full \<omega>) ns"
       unfolding mask_var_rel_def
     proof (rule exI, intro conjI)
                     
@@ -1571,7 +1571,7 @@ proof -
         by (simp add: zero_prat.rep_eq)
     qed
   
-    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) \<omega> ns"
+    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) (get_mh_total_full \<omega>) ns"
       using \<open>mask_var Tr = _\<close>
       by simp
   
