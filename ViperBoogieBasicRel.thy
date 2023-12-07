@@ -39,6 +39,8 @@ definition default_state_rel_options :: state_rel_options
 text \<open>The following record abstracts over elements in the Boogie encoding that are used to represent
 Viper counterparts.\<close>
 
+type_synonym label_hm_repr_bpl = "label \<rightharpoonup> Lang.vname \<times> Lang.vname"
+
 record tr_vpr_bpl =
   heap_var :: Lang.vname
   mask_var :: Lang.vname
@@ -48,6 +50,8 @@ record tr_vpr_bpl =
   fun_translation :: "ViperLang.function_ident \<rightharpoonup> Lang.fname"
   var_translation :: "ViperLang.var \<rightharpoonup> Lang.vname" \<comment>\<open>local Boogie variables\<close>
   const_repr :: "boogie_const \<Rightarrow> Lang.vname"
+  \<comment>\<open>mapping from labels (identifying labeled states) to their r Boogie heap and mask variables\<close>
+  label_hm_translation :: label_hm_repr_bpl 
   state_rel_opt :: state_rel_options
   
  (*TODO: bound vars*)
@@ -580,6 +584,37 @@ lemma aux_vars_pred_sat_weaken:
       by (metis has_Some_iff)
   qed  
 
+definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> label_hm_repr_bpl \<Rightarrow> 'a total_trace \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
+  where "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns \<equiv>
+          (\<forall> lbl hm. LabelMap lbl = Some hm \<longrightarrow> 
+            (\<exists>\<phi>. t lbl = Some \<phi> \<and> 
+                 heap_var_rel Pr \<Lambda> TyRep FieldTr (fst hm) (get_hh_total \<phi>) ns \<and>
+                 mask_var_rel Pr \<Lambda> TyRep FieldTr (snd hm) (get_mh_total \<phi>) ns))"
+  
+definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
+  where "vars_label_hm_tr LabelMap \<equiv> (fst ` (ran LabelMap)) \<union> (snd ` (ran LabelMap))"
+
+lemma label_hm_rel_stable:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "t = t'"
+      and "\<And> x. x \<in> vars_label_hm_tr LabelMap \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
+    shows  "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t' ns'"
+  using assms heap_var_rel_stable mask_var_rel_stable
+  unfolding label_hm_rel_def vars_label_hm_tr_def  
+  by (metis UnI1 UnI2 imageI ranI)
+
+abbreviation state_rel0_disj_list
+  where "state_rel0_disj_list Tr AuxPred \<equiv> [{heap_var Tr, heap_var_def Tr},
+                      {mask_var Tr, mask_var_def Tr},
+                      (ran (var_translation Tr)), 
+                      (ran (field_translation Tr)),
+                      (range (const_repr Tr)),
+                      dom AuxPred,
+                      vars_label_hm_tr (label_hm_translation Tr)]"
+
+abbreviation state_rel0_disj_vars
+  where "state_rel0_disj_vars Tr AuxPred \<equiv> \<Union> (set (state_rel0_disj_list Tr AuxPred))"
+
 
 definition state_rel0 :: "ViperLang.program \<Rightarrow> 
                           ('a full_total_state \<Rightarrow> bool) \<Rightarrow>
@@ -606,12 +641,7 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
          \<comment>\<open>Store relation (only Viper variables, auxiliaries are not included)\<close>
            store_rel A \<Lambda> (var_translation Tr) \<omega> ns \<and>           
           \<comment>\<open>Disjointness condition for variables tracked by the relation\<close>
-           (disjoint_list [{heap_var Tr, heap_var_def Tr},
-                      {mask_var Tr, mask_var_def Tr},
-                      (ran (var_translation Tr)), 
-                      (ran (field_translation Tr)),
-                      (range (const_repr Tr)),
-                      dom AuxPred]) \<and>
+           disjoint_list (state_rel0_disj_list Tr AuxPred) \<and>
           \<comment>\<open>well-def state and evaluation state differ only on mask\<close>
            (
              get_store_total \<omega>def = get_store_total \<omega> \<and>
@@ -631,7 +661,11 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
            \<comment>\<open>Boogie state is well-typed (used to show well-typedness of Boogie expressions)\<close>
            state_well_typed A \<Lambda> [] ns \<and>
            \<comment>\<open>auxiliary variable constraints are satisfied\<close>
-           aux_vars_pred_sat \<Lambda> AuxPred ns"
+           aux_vars_pred_sat \<Lambda> AuxPred ns \<and>
+           \<comment>\<open>Labeled states are captured. Note that for the general case one will have to 
+             generalize this conjunct to depend on the Boogie state, since whether a state is active
+             in general is expressed via Boolean Boogie variable.\<close>
+           label_hm_rel Pr \<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
 
 definition state_rel
   where "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<equiv> 
@@ -738,6 +772,10 @@ method disjoint_list_subset_tac uses DisjointListAssm  =
   
   rename_tac i5,
   case_tac i5,
+  simp,
+
+  rename_tac i6,
+  case_tac i6,
   simp,
   
   blast)
@@ -992,12 +1030,7 @@ lemma state_rel_var_tr_inj:
 
 lemma state_rel0_disjoint:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "(disjoint_list [{heap_var Tr, heap_var_def Tr},
-                      {mask_var Tr, mask_var_def Tr},
-                      (ran (var_translation Tr)), 
-                      (ran (field_translation Tr)),
-                      (range (const_repr Tr)),
-                      dom AuxPred])"
+  shows "disjoint_list (state_rel0_disj_list Tr AuxPred)"
   using assms        
   unfolding state_rel0_def
   by blast
@@ -1009,7 +1042,8 @@ lemma heap_var_disjoint:
           "hvar = heap_var_def Tr \<or> hvar = heap_var Tr"
   shows "hvar \<noteq> mask_var Tr \<and> hvar \<noteq> mask_var_def Tr \<and> hvar \<notin> ran (var_translation Tr) \<and>
          hvar \<notin> ran (field_translation Tr) \<and> hvar \<notin> range (const_repr Tr) \<and>
-         hvar \<notin> dom AuxPred"
+         hvar \<notin> dom AuxPred \<and>
+         hvar \<notin> vars_label_hm_tr (label_hm_translation Tr)"
   apply (intro conjI)
   using state_rel0_disjoint[OF assms(1)] assms(2)
   apply (unfold disjoint_list_def)
@@ -1034,8 +1068,12 @@ lemma heap_var_disjoint:
    apply simp
    apply meson
 
-    apply (erule allE[where ?x=0])
-  apply (erule allE[where ?x=5])
+   apply (erule allE[where ?x=0])
+   apply (erule allE[where ?x=5])
+   apply force
+
+  apply (erule allE[where ?x=0])
+  apply (erule allE[where ?x=6])
   apply force
   done
 
@@ -1046,7 +1084,8 @@ lemma mask_var_disjoint:
           "mvar = mask_var_def Tr \<or> mvar = mask_var Tr"
   shows "mvar \<noteq> heap_var Tr \<and> mvar \<noteq> heap_var_def Tr \<and> mvar \<notin> ran (var_translation Tr) \<and>
          mvar \<notin> ran (field_translation Tr) \<and> mvar \<notin> range (const_repr Tr) \<and>
-         mvar \<notin> dom AuxPred"
+         mvar \<notin> dom AuxPred \<and>
+         mvar \<notin> vars_label_hm_tr (label_hm_translation Tr)"
   apply (intro conjI)
   using state_rel0_disjoint[OF assms(1)] assms(2)
   apply (unfold disjoint_list_def)
@@ -1071,8 +1110,12 @@ lemma mask_var_disjoint:
    apply simp
    apply meson
 
-    apply (erule allE[where ?x=1])
-  apply (erule allE[where ?x=5])
+   apply (erule allE[where ?x=1])
+   apply (erule allE[where ?x=5])
+   apply force
+
+  apply (erule allE[where ?x=1])
+  apply (erule allE[where ?x=6])
   apply force
   done
 
@@ -1087,7 +1130,8 @@ lemma var_translation_disjoint0:
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (field_translation Tr) \<union>
                                        range (const_repr Tr) \<union>
-                                       dom AuxPred) = {}"
+                                       dom AuxPred \<union>
+                                       vars_label_hm_tr (label_hm_translation Tr)) = {}"
 
   apply (rule set_inter_union_conj, rule conjI)+
   using state_rel0_disjoint[OF assms(1)]
@@ -1111,8 +1155,12 @@ lemma var_translation_disjoint0:
 
        apply (erule allE[where ?x=5])
    apply (erule allE[where ?x=2])
-    apply (simp add: disjnt_def inf_commute)
-  done    
+   apply (simp add: disjnt_def inf_commute)
+
+  apply (erule allE[where ?x=6])
+  apply (erule allE[where ?x=2])
+  apply (simp add: disjnt_def inf_commute)
+  done
 
 lemmas var_translation_disjoint = var_translation_disjoint0[OF state_rel_state_rel0]
 
@@ -1122,7 +1170,8 @@ lemma state_rel0_aux_pred_disjoint:
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (var_translation Tr) \<union>
                                        ran (field_translation Tr) \<union>
-                                       range (const_repr Tr)) = {}"
+                                       range (const_repr Tr) \<union>
+                                       vars_label_hm_tr (label_hm_translation Tr)) = {}"
   apply (rule set_inter_union_conj, rule conjI)+
   using state_rel0_disjoint[OF assms(1)]
     apply (unfold disjoint_list_def)
@@ -1145,7 +1194,11 @@ lemma state_rel0_aux_pred_disjoint:
 
        apply (erule allE[where ?x=4])
    apply (erule allE[where ?x=5])
-    apply (simp add: disjnt_def inf_commute)
+   apply (simp add: disjnt_def inf_commute)
+
+  apply (erule allE[where ?x=6])
+  apply (erule allE[where ?x=5])
+  apply (simp add: disjnt_def inf_commute)
   done
 
 lemmas state_rel_aux_pred_disjoint = state_rel0_aux_pred_disjoint[OF state_rel_state_rel0]
@@ -1237,36 +1290,6 @@ lemma state_rel0_binder_empty:
 
 lemmas state_rel_binder_empty = state_rel0_binder_empty[OF state_rel_state_rel0]
 
-lemma state_rel0_disj_mask_store:
-  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "mask_var Tr \<notin> ran (var_translation Tr)"
-proof -
-    from assms have Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
-      by (simp add: state_rel0_def)
-    thus "mask_var Tr \<notin> ran (var_translation Tr)"
-      unfolding disjoint_list_def
-      apply (rule allE[where ?x=1])
-      apply (erule allE[where ?x=2])
-      by simp      
-  qed
-
-lemmas state_rel_disj_mask_store = state_rel0_disj_mask_store[OF state_rel_state_rel0]
-
-lemma state_rel0_disj_mask_def_store:
-  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "mask_var_def Tr \<notin> ran (var_translation Tr)"
-proof -
-  from assms have Disj: "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
-    by (simp add: state_rel0_def)
-  thus "mask_var_def Tr \<notin> ran (var_translation Tr)"
-    unfolding disjoint_list_def
-    apply (rule allE[where ?x=1])
-    apply (erule allE[where ?x=2])
-    by simp
-qed
-
-lemmas state_rel_disj_mask_def_store = state_rel0_disj_mask_def_store[OF state_rel_state_rel0]
-
 lemma state_rel0_aux_vars_pred_sat:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "aux_vars_pred_sat \<Lambda> AuxPred ns"
@@ -1337,16 +1360,13 @@ proof (intro conjI)
     by blast
 
   (* TODO: adjust the tactic disjoint_list_subset_tac such that it can be applied here *)
-  show "disjoint_list
-     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
-      dom AuxPred']" (is "disjoint_list ?A'")
+  show "disjoint_list (state_rel0_disj_list Tr AuxPred')" (is "disjoint_list ?A'")
 
   proof (rule disjoint_list_subset[OF state_rel0_disjoint[OF StateRel0]], simp)
     fix i j
     assume "0 \<le> i" and
            "i < length
-                [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
-                 dom AuxPred]" (is "i < length ?A")
+                (state_rel0_disj_list Tr AuxPred)" (is "i < length ?A")
     show "?A' ! i \<subseteq> ?A ! i"            
       apply (cases i)
        apply simp
@@ -1379,6 +1399,53 @@ lemma state_rel_aux_pred_remove:
        apply (rule map_le_implies_dom_le[OF assms(2)])
     using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
     by (metis (no_types, lifting) dom_fun_upd fun_upd_triv insertCI map_le_def option.distinct(1) option.sel)
+
+lemma state_rel0_label_hm_rel:
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  shows "label_hm_rel Pr \<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+  using assms
+  by (simp add: state_rel0_def)
+
+lemmas state_rel_label_hm_rel = state_rel0_label_hm_rel[OF state_rel_state_rel0]
+
+lemma state_rel0_label_hm_disjoint:
+  assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+  shows "vars_label_hm_tr (label_hm_translation Tr) \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
+                                      {mask_var Tr, mask_var_def Tr} \<union>
+                                       ran (var_translation Tr) \<union>
+                                       ran (field_translation Tr) \<union>
+                                       range (const_repr Tr) \<union>
+                                       dom AuxPred) = {}"
+  apply (rule set_inter_union_conj, rule conjI)+
+  using state_rel0_disjoint[OF assms(1)]
+    apply (unfold disjoint_list_def)
+
+       apply (erule allE[where ?x=0])
+     apply (erule allE[where ?x=6])
+     apply simp
+
+       apply (erule allE[where ?x=1])
+     apply (erule allE[where ?x=6])
+    apply simp
+
+       apply (erule allE[where ?x=2])
+     apply (erule allE[where ?x=6])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=3])
+   apply (erule allE[where ?x=6])
+    apply (simp add: disjnt_def inf_commute)
+
+       apply (erule allE[where ?x=4])
+   apply (erule allE[where ?x=6])
+   apply (simp add: disjnt_def inf_commute)
+
+  apply (erule allE[where ?x=5])
+  apply (erule allE[where ?x=6])
+  apply (simp add: disjnt_def inf_commute)
+  done
+
+lemmas state_rel_label_hm_disjoint = state_rel0_label_hm_disjoint[OF state_rel_state_rel0]
 
 lemma lookup_disj_aux:
   assumes "\<And>x. x \<notin> M \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x" and
@@ -1487,8 +1554,7 @@ lemma state_rel0_store_update:
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
         Consistent: "consistent_state_rel_opt (state_rel_opt Tr') \<Longrightarrow> StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
-           "get_total_full \<omega> = get_total_full \<omega>'"  and
-         (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
+           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"  and
      OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran f \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
      StoreRel: "store_rel A \<Lambda> f \<omega>' ns'" and
      ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
@@ -1498,7 +1564,8 @@ lemma state_rel0_store_update:
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (field_translation Tr) \<union>
                                        range (const_repr Tr) \<union>
-                                       dom AuxPred) = {}"
+                                       dom AuxPred \<union>
+                                       vars_label_hm_tr (label_hm_translation Tr)) = {}"
    shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
@@ -1514,13 +1581,13 @@ proof (intro conjI)
     using StoreRel \<open>Tr' = _\<close>
     by simp
 
-  show "disjoint_list
-     [{heap_var Tr', heap_var_def Tr'}, {mask_var Tr', mask_var_def Tr'}, ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'), dom AuxPred]"
+  show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
   proof -
     from state_rel0_disjoint[OF StateRel]
     have "disjoint_list
           ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}]@
-           (ran (var_translation Tr) # [ran (field_translation Tr), range (const_repr Tr), dom AuxPred]))" (is "disjoint_list (?xs@(?M#?ys))")
+           (ran (var_translation Tr) # [ran (field_translation Tr), range (const_repr Tr), dom AuxPred,
+             vars_label_hm_tr (label_hm_translation Tr)]))" (is "disjoint_list (?xs@(?M#?ys))")
       by simp
     hence "disjoint_list (?xs@ran f#?ys)"
       apply (rule disjoint_list_replace_set)
@@ -1671,6 +1738,13 @@ proof (intro conjI)
       unfolding aux_vars_pred_sat_def
       by fastforce
   qed
+
+  show "label_hm_rel Pr \<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>') ns'"
+    apply (simp add: \<open>Tr' = _\<close>)
+    apply (rule label_hm_rel_stable[OF state_rel0_label_hm_rel[OF StateRel]])
+       apply (simp add: OnlyStoreAffectedVpr)
+      using OnlyStoreAffectedBpl RanVarTrDisj
+      by blast
 qed (insert StateRel WellDefSame Consistent, unfold state_rel0_def, auto)
 
 lemmas state_rel_store_update = state_rel0_state_rel[OF state_rel0_store_update[OF state_rel_state_rel0]]
@@ -1680,8 +1754,7 @@ lemma state_rel0_store_update_same_tr:
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
      Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
-           "get_total_full \<omega> = get_total_full \<omega>'"  and
-         (*  "get_m_total_full \<omega> = get_m_total_full \<omega>'" and*) 
+           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"  and
      OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran (var_translation Tr) \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
      StoreRel: "store_rel A \<Lambda> (var_translation Tr) \<omega>' ns'" and
      ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
@@ -1721,16 +1794,18 @@ lemma state_rel_store_update_2:
   done
 
 lemma state_rel_new_auxvar:
-  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-     AuxVarFresh: "aux_var \<notin> 
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and AuxVarFresh: "aux_var \<notin> state_rel0_disj_vars Tr AuxPred"
+     (*AuxVarFresh: "aux_var \<notin> 
                       ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)"  and   
-           "P aux_val" and
-                 "type_interp ctxt = vbpl_absval_ty TyRep" and
-     LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
+                      dom AuxPred \<union>
+                      vars_label_hm_tr (label_hm_translation Tr))"  and   *)          
+      and "P aux_val"
+      and "type_interp ctxt = vbpl_absval_ty TyRep"
+      and LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
                "type_of_val (type_interp ctxt) aux_val = \<tau>"
    shows "state_rel Pr StateCons TyRep Tr (AuxPred(aux_var \<mapsto> P)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"  
 proof -
@@ -1743,15 +1818,13 @@ proof -
       using store_rel_stable[OF state_rel0_store_rel[OF StateRel0]] AuxVarFresh
       by fastforce
   next
-    from state_rel0_disjoint[OF StateRel0]
+    from state_rel0_disjoint[OF StateRel0] thm disjoint_list_add
     have *:"disjoint_list 
        ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr)]@
-       [ dom AuxPred])"
+       (dom AuxPred # [vars_label_hm_tr (label_hm_translation Tr)]))"
       by simp
 
-    show "disjoint_list
-     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr),
-      dom (AuxPred(aux_var \<mapsto> P))]"
+    show "disjoint_list (state_rel0_disj_list Tr (AuxPred(aux_var \<mapsto> P)))"
       using AuxVarFresh disjoint_list_add[OF *]
       by auto
   next
@@ -1793,28 +1866,27 @@ proof -
   next
     show "type_interp ctxt = vbpl_absval_ty TyRep"
       by (simp add: \<open>type_interp ctxt = _\<close>)
+  next
+    show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) 
+                          (get_trace_total \<omega>) (update_var (var_context ctxt) ns aux_var aux_val)"
+      using label_hm_rel_stable[OF state_rel0_label_hm_rel[OF StateRel0]] AuxVarFresh
+      by fastforce      
   qed (insert StateRel0, unfold state_rel0_def, auto)
 qed
 
 lemma state_rel_independent_var:
-  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-     AuxVarFresh: "aux_var \<notin> 
-                      ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
-                      (ran (var_translation Tr)) \<union>
-                      (ran (field_translation Tr)) \<union>
-                      (range (const_repr Tr)) \<union>
-                      dom AuxPred)"  and   
-     TypeInterp:       "type_interp ctxt = vbpl_absval_ty TyRep" and
-     LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
-               "type_of_val (type_interp ctxt) aux_val = \<tau>"
-             shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
-
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and AuxVarFresh: "aux_var \<notin> state_rel0_disj_vars Tr AuxPred"
+      and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
+      and LookupTy: "lookup_var_ty (var_context ctxt) aux_var = Some \<tau>"
+      and AuxValTy: "type_of_val (type_interp ctxt) aux_val = \<tau>"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
 proof -
-  have StateRelUpd: "state_rel Pr StateCons TyRep Tr (AuxPred(aux_var \<mapsto> pred_eq aux_val)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"    
-    by (rule state_rel_new_auxvar[OF StateRel AuxVarFresh pred_eq_refl TypeInterp LookupTy])
+  have StateRelUpd: "state_rel Pr StateCons TyRep Tr (AuxPred(aux_var \<mapsto> pred_eq aux_val)) ctxt \<omega>def \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"   
+    by (rule state_rel_new_auxvar[OF StateRel AuxVarFresh pred_eq_refl TypeInterp LookupTy AuxValTy])
 
   from AuxVarFresh have "aux_var \<notin> dom AuxPred"
-    by blast
+    by simp
   show ?thesis
     apply (rule state_rel_aux_pred_remove[OF StateRelUpd])
     using \<open>aux_var \<notin> dom AuxPred\<close>
@@ -1827,24 +1899,23 @@ lemma state_rel_new_aux_var_no_state_upd:
                       ({heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union>
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
-                      (range (const_repr Tr))) = {}"  and   
+                      (range (const_repr Tr)) \<union>
+                      vars_label_hm_tr (label_hm_translation Tr)) = {}"  and   
            "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
          shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
   have "disjoint_list
      ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
-      range (const_repr Tr)] @ ((dom AuxPred') # []))"
+      range (const_repr Tr)] @ ((dom AuxPred') # [vars_label_hm_tr (label_hm_translation Tr)]))"
     apply (rule disjoint_list_replace_set)
     using state_rel_disjoint[OF StateRel]
      apply simp
     apply (simp add: disjnt_def)
     using AuxVarFresh
-    by blast
+    by auto
 
-  thus "disjoint_list
-     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
-      range (const_repr Tr), dom AuxPred']"
+  thus "disjoint_list (state_rel0_disj_list Tr AuxPred')"
     by simp
 qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto)
 
@@ -1860,7 +1931,7 @@ lemma state_rel0_heap_update:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred) = {}"
+                      dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
       and UpdStates: "\<omega>def' = update_h_total_full \<omega>def hh' hp'" 
                      "\<omega>' = update_h_total_full \<omega> hh' hp'"
       and Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>def' \<and> StateCons \<omega>'"
@@ -1985,16 +2056,15 @@ next
           ran (var_translation Tr), 
           ran (field_translation Tr),
           range (const_repr Tr),
-          dom AuxPred]))"
+          dom AuxPred,
+          vars_label_hm_tr (label_hm_translation Tr)]))"
     apply (rule disjoint_list_add_set)
     using state_rel0_disjoint[OF StateRel]
       apply simp
     using Disj
     by fastforce+
 
-  thus "disjoint_list
-     [{heap_var Tr', heap_var_def Tr'}, {mask_var Tr', mask_var_def Tr'}, ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'),
-      dom AuxPred]"
+  thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
     apply (rule disjoint_list_subset_list_all2)
     by (simp add: \<open>Tr' = _\<close>)
 next
@@ -2007,6 +2077,13 @@ next
     using HeapRelDef \<open>Tr' = _\<close> 
     unfolding heap_var_rel_def
     by auto
+next
+  show "label_hm_rel Pr \<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>') ns'"
+    apply (simp add: \<open>Tr' = _\<close>)
+    apply (rule label_hm_rel_stable[OF state_rel0_label_hm_rel[OF StateRel]])
+     apply (simp add: UpdStates)
+    using OnlyHeapAffected Disj
+    by blast
 qed (insert assms, unfold state_rel0_def, simp_all add: \<open>Tr' = _\<close>)
 
 lemmas state_rel_heap_update = 
@@ -2033,7 +2110,7 @@ proof (rule state_rel0_heap_update[OF StateRel TyInterp])
 next
   show "{heap_var Tr, heap_var_def Tr} \<inter>
     ({mask_var Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union>
-     dom AuxPred) = {}"
+     dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
     using heap_var_disjoint[OF StateRel]
     by simp
 next
@@ -2261,7 +2338,8 @@ lemma state_rel_heap_var_update:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)"
+                      dom AuxPred \<union>
+                      vars_label_hm_tr (label_hm_translation Tr))"
     shows "state_rel Pr StateCons TyRep (Tr\<lparr>heap_var := hvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
 proof (rule state_rel_heap_update[OF StateRel, where ?hvar' = hvar'])
   show "\<omega> = update_h_total_full \<omega> (get_hh_total_full \<omega>) (get_hp_total_full \<omega>)"
@@ -2271,7 +2349,7 @@ next
   show "{hvar', heap_var_def Tr} \<inter>
     ({mask_var Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
      range (const_repr Tr) \<union>
-     dom AuxPred) = {}"
+     dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
     by blast
 qed (insert HeapVarRel, insert state_rel_binder_empty[OF StateRel], insert state_rel_state_rel0[OF StateRel, simplified state_rel0_def], auto)    
 
@@ -2282,7 +2360,8 @@ lemma state_rel_heap_var_def_update:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)"
+                      dom AuxPred \<union>
+                      vars_label_hm_tr (label_hm_translation Tr))"
     shows "state_rel Pr StateCons TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
 proof (rule state_rel_heap_update[OF StateRel, where ?hvar_def' = hvar_def'])
   show "\<omega>def = update_h_total_full \<omega>def (get_hh_total_full \<omega>def) (get_hp_total_full \<omega>def)"
@@ -2292,7 +2371,7 @@ next
   show "{heap_var Tr, hvar_def'} \<inter>
     ({mask_var Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
      range (const_repr Tr) \<union>
-     dom AuxPred) = {}"
+     dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
     by blast
 qed (insert HeapVarRel, insert state_rel_binder_empty[OF StateRel], insert state_rel_state_rel0[OF StateRel, simplified state_rel0_def], simp_all)    
 
@@ -2307,7 +2386,8 @@ lemma state_rel0_mask_update:
                             (ran (var_translation Tr)) \<union>
                             (ran (field_translation Tr)) \<union>
                             (range (const_repr Tr)) \<union>
-                            dom AuxPred) = {}" and
+                            dom AuxPred \<union>
+                            vars_label_hm_tr (label_hm_translation Tr)) = {}" and
           UpdStates: "\<omega>' = update_m_total_full \<omega> mh' mp'" 
              "get_store_total \<omega>def' = get_store_total \<omega>' \<and>
               get_trace_total \<omega>def' = get_trace_total \<omega>' \<and>
@@ -2415,7 +2495,8 @@ next
               [ran (var_translation Tr), 
               ran (field_translation Tr),
               range (const_repr Tr),
-              dom AuxPred]
+              dom AuxPred,
+              vars_label_hm_tr (label_hm_translation Tr)]
           )
        )"
     apply (rule disjoint_list_add_set)
@@ -2424,11 +2505,16 @@ next
     using Disj
     by fastforce
 
-  thus "disjoint_list
-     [{heap_var Tr', heap_var_def Tr'}, {mask_var Tr', mask_var_def Tr'}, ran (var_translation Tr'), ran (field_translation Tr'), range (const_repr Tr'),
-      dom AuxPred]"
+  thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
     apply (rule disjoint_list_subset_list_all2)
     by (simp add: \<open>Tr' = _\<close>)
+next
+  show "label_hm_rel Pr \<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>') ns'"
+    apply (simp add: \<open>Tr' = _\<close>)
+    apply (rule label_hm_rel_stable[OF state_rel0_label_hm_rel[OF StateRel]])
+     apply (simp add: UpdStates)
+    using OnlyMaskAffected Disj
+    by blast    
 qed (insert assms, unfold mask_var_rel_def, unfold state_rel0_def, auto simp: \<open>Tr' = _\<close>)
 
 lemmas state_rel_mask_update_wip =
@@ -2725,12 +2811,7 @@ lemma state_rel_set_def_to_eval:
   shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>) AuxPred ctxt \<omega> \<omega> ns"
   unfolding state_rel_def state_rel0_def
 proof (intro conjI)
-  show "disjoint_list
-     [{heap_var (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>), heap_var_def (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>)},
-      {mask_var (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>), mask_var_def (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>)},
-      ran (var_translation (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>)),
-      ran (field_translation (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>)),
-      range (const_repr (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>)), dom AuxPred]"
+  show "disjoint_list (state_rel0_disj_list (Tr\<lparr>mask_var_def := mask_var Tr, heap_var_def := heap_var Tr\<rparr>) AuxPred)"
     by (disjoint_list_subset_tac DisjointListAssm: state_rel_disjoint[OF StateRel])
 qed (insert StateRel,
      unfold state_rel_def state_rel0_def, 
@@ -2750,7 +2831,8 @@ lemma state_rel_mask_var_update:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)" 
+                      dom AuxPred \<union>
+                      vars_label_hm_tr (label_hm_translation Tr))" 
     shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var := mvar'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
 proof (rule state_rel_mask_update_wip[OF StateRel, where ?mvar' = mvar'])      
   show "\<omega> = update_m_total_full \<omega> (get_mh_total_full \<omega>) (get_mp_total_full \<omega>)"
@@ -2758,7 +2840,8 @@ proof (rule state_rel_mask_update_wip[OF StateRel, where ?mvar' = mvar'])
 next  
   from VarFresh mask_var_disjoint[OF state_rel_state_rel0[OF StateRel]]
   show "{mvar', mask_var_def Tr} \<inter> 
-          ({heap_var Tr, heap_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred) = {}"
+          ({heap_var Tr, heap_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union>
+           range (const_repr Tr) \<union> dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
     by auto
 next
   show "binder_state ns = Map.empty"
@@ -2773,7 +2856,8 @@ lemma state_rel_mask_var_def_update:
                       (ran (var_translation Tr)) \<union>
                       (ran (field_translation Tr)) \<union>
                       (range (const_repr Tr)) \<union>
-                      dom AuxPred)" 
+                      dom AuxPred \<union> 
+                      vars_label_hm_tr (label_hm_translation Tr))" 
     shows "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns"
 proof (rule state_rel_mask_update_wip[OF StateRel, where ?mvar_def' = "mvar_def'"])      
   show "\<omega> = update_m_total_full \<omega> (get_mh_total_full \<omega>) (get_mp_total_full \<omega>)"
@@ -2781,7 +2865,8 @@ proof (rule state_rel_mask_update_wip[OF StateRel, where ?mvar_def' = "mvar_def'
 next  
   from VarFresh mask_var_disjoint[OF state_rel_state_rel0[OF StateRel]]
   show "{mask_var Tr, mvar_def'} \<inter> 
-          ({heap_var Tr, heap_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred) = {}"
+          ({heap_var Tr, heap_var_def Tr} \<union> ran (var_translation Tr) \<union> ran (field_translation Tr) \<union> 
+           range (const_repr Tr) \<union> dom AuxPred \<union> vars_label_hm_tr (label_hm_translation Tr)) = {}"
     by auto
 next
   show "binder_state ns = Map.empty"
@@ -2899,7 +2984,6 @@ lemma bg_expr_list_red_iff:
 lemma bg_expr_list_red_all2:
   "(A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>es, s\<rangle> [\<Down>] vs) = list_all2 (\<lambda>e v. A,\<Lambda>,\<Gamma>,\<Omega> \<turnstile> \<langle>e, s\<rangle> \<Down> v) es vs"
   by (induct es arbitrary:vs; simp add:bg_expr_list_red_iff list_all2_Cons1)
-
 
 subsection \<open>Misc\<close>
 
