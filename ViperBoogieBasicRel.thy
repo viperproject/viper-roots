@@ -590,6 +590,9 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
             (\<exists>\<phi>. t lbl = Some \<phi> \<and> 
                  heap_var_rel Pr \<Lambda> TyRep FieldTr (fst hm) (get_hh_total \<phi>) ns \<and>
                  mask_var_rel Pr \<Lambda> TyRep FieldTr (snd hm) (get_mh_total \<phi>) ns))"
+
+lemma label_hm_rel_empty: "label_hm_rel Pr \<Lambda> TyRep FieldTr Map.empty t ns"
+  by (simp add: label_hm_rel_def)
   
 definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
   where "vars_label_hm_tr LabelMap \<equiv> (fst ` (ran LabelMap)) \<union> (snd ` (ran LabelMap))"
@@ -663,8 +666,8 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
            \<comment>\<open>auxiliary variable constraints are satisfied\<close>
            aux_vars_pred_sat \<Lambda> AuxPred ns \<and>
            \<comment>\<open>Labeled states are captured. Note that for the general case one will have to 
-             generalize this conjunct to depend on the Boogie state, since whether a state is active
-             in general is expressed via Boolean Boogie variable.\<close>
+             generalize this conjunct to depend on the Boogie state, since whether a labeled
+             state is active in general is expressed via Boolean Boogie variable.\<close>
            label_hm_rel Pr \<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
 
 definition state_rel

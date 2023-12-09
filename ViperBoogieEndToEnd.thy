@@ -26,7 +26,7 @@ lemma state_rel_well_def_same_old_state:
           "\<And>l \<phi>. t l = Some \<phi> \<Longrightarrow> StateCons_t \<phi>" 
   shows "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred (update_trace_total w t) ns"
   unfolding state_rel_def state_rel0_def 
-  using state_rel_trace_independent
+  (*using state_rel_trace_independent*)
   oops
 (*
   apply (intro conjI)
@@ -253,7 +253,8 @@ definition post_framing_rel
            (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow> 
                                \<comment>\<open>One could omit emptiness and instead use a separate monotonicity theorem
                                   for inhale. We do this in a separate step.\<close> 
-                               is_empty_total_full \<omega>1 \<longrightarrow>                                                             
+                               is_empty_total_full \<omega>1 \<longrightarrow>     
+                               get_trace_total \<omega>1 old_label = Some (get_total_full \<omega>0) \<longrightarrow>
                                total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1) \<longrightarrow>
                                post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
                    )"
@@ -261,6 +262,8 @@ definition post_framing_rel
 definition method_rel
   where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
+                   \<comment>\<open>TODO: transition to state where trace contains old state (need to check whether post_framing_rel is 
+                            too liberal in terms of allowing any such trace)\<close>
                    post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 \<gamma>Pre \<and>
                    (  \<comment>\<open>The correctness of the spec must be taken into account in this left-hand side here and 
                          not in a previous conjunct, since the previous conjunct is required to justify the 
@@ -288,12 +291,14 @@ lemma post_framing_rel_aux:
       and LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)"
       and LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
       and ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var"
+      and DomLabelMap: "dom (label_hm_translation Tr) = {old_label}"
       and Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
                               {mask_var Tr, mask_var_def Tr} \<union>
                               (ran (var_translation Tr)) \<union>
                               (ran (field_translation Tr)) \<union>
                               (range (const_repr Tr)) \<union>
-                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}")
+                              dom AuxPred \<union>
+                              vars_label_hm_tr (label_hm_translation Tr)) = {}" (is "?A \<inter> ?B = {}")
       and "hvar' \<noteq> mvar'"
       and PropagateBpl: "red_ast_bpl_rel (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) 
                                          (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) proc_body_bpl ctxt 
@@ -314,7 +319,8 @@ proof (rule allI | rule impI)+
   fix ns
   assume "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>0 ns" (is "?R Tr \<omega>0 ns") and
          StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
-         HeapWellTy:  "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
+         OldState: "get_trace_total \<omega>1 old_label = Some (get_total_full \<omega>0)" and
+         HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
          IsEmpty: "is_empty_total_full \<omega>1"
 
   with PropagateBpl obtain ns1 where 
@@ -335,8 +341,15 @@ proof (rule allI | rule impI)+
   have "StateCons \<omega>1"
     using WfConsistency[simplified wf_total_consistency_def] IsEmpty
     by blast
+ 
+  have OldStateSame: "get_trace_total \<omega>1 old_label = get_trace_total \<omega>0 old_label"
+    sorry
 
-  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ \<open>StateCons \<omega>1\<close> _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+  have DomLabelMap2: "dom (label_hm_translation Tr) \<subseteq> {old_label}"
+    using DomLabelMap
+    by blast
+
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame OldStateSame DomLabelMap2 _ \<open>StateCons \<omega>1\<close> _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
        HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
@@ -344,7 +357,7 @@ proof (rule allI | rule impI)+
          Normal ns1)
         ((BigBlock name cs str tr, cont), Normal ns2)" and
     R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
-    using is_empty_total_wf_mask[OF IsEmpty] 
+    using is_empty_total_wf_mask[OF IsEmpty]
     by force
     
   with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
@@ -474,7 +487,7 @@ proof (rule allI | rule impI)+
               stmt_rel ?R1Post Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
     using VprMethodBody
-    by fastforce   
+    by fastforce
 
   text \<open>start actual proof\<close>
 
@@ -620,7 +633,8 @@ proof (rule allI | rule impI)+
           PostFramingInhRel: "stmt_rel RPostFrameStart RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
           using Rpre StoreSame is_empty_empty_full_total_state  HeapWellTy
           unfolding post_framing_rel_def post_framing_rel_aux_def
-          by (metis get_store_empty_full_total_state)
+          (*by (metis get_store_empty_full_total_state)*)
+          sorry \<comment>\<open>TODO\<close>
 
         show "res \<noteq> RFailure"
         proof (rule ccontr)
@@ -1448,7 +1462,8 @@ lemma init_state_in_state_relation:
           GlobalsLocalsDisj: "set (map fst (fst (var_context ctxt))) \<inter> set (map fst (snd (var_context ctxt))) = {}" and
 
           "heap_var Tr = heap_var_def Tr" and
-          "mask_var Tr = mask_var_def Tr" and
+          "mask_var Tr = mask_var_def Tr" and          
+          NoTrackedLabeledStates: "label_hm_translation Tr = Map.empty" and
 
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
@@ -1462,8 +1477,7 @@ lemma init_state_in_state_relation:
           VarTranslationTy: "\<And> x_vpr x_bpl. var_translation Tr x_vpr = Some x_bpl \<Longrightarrow>
                                    (\<exists>v_vpr. get_store_total \<omega> x_vpr = Some v_vpr \<and> 
                                             (\<exists>t. lookup_vdecls_ty (snd (var_context ctxt)) x_bpl = Some t \<and>
-                                                 type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))"
-
+                                                 type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))"          
 
   shows "state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons T Tr Map.empty) \<omega> ns"
 proof -

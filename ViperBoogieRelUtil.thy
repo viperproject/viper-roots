@@ -505,35 +505,46 @@ lemma construct_bpl_heap_from_vpr_heap_correct:
   using assms construct_bpl_heap_from_vpr_heap_correct_aux
   by meson
 
-subsection \<open>State components that do not affect state relation\<close>
-
-text \<open>The properties here will have to be adjusted once new features are added that require 
-taking more state components into account. \<close>
-
-
-text \<open>The following lemma will not hold once the state relation tracks old states.\<close>
+subsection \<open>Updating the trace\<close>
 
 \<comment>\<open>Need to update both the well-definedness and the evaluation state, because the state relation demands
 that they only differ on the mask.\<close>
-lemma state_rel_trace_independent:
+
+lemma state_rel_upd_trace_subset:
   assumes "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> wf_total_consistency ctxt_vpr StateCons StateCons_t" 
       and "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> (\<And> lbl \<phi>. t lbl = Some \<phi> \<Longrightarrow> StateCons_t \<phi>)" 
       and StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+          \<comment>\<open>the active (i.e., tracked by \<^const>\<open>label_hm_translation\<close>) labels tracked by the new trace 
+             must match the previous trace\<close>
+      and ActiveLabels: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
 proof - 
   from assms have ConsistencyUpd: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_trace_total \<omega>def t) \<and> StateCons (update_trace_total \<omega> t)"
     using state_rel_consistent total_consistency_trace_update_2
     by (metis update_trace_total.simps)
 
+  have LabelRel: 
+    "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
+    using ActiveLabels state_rel_label_hm_rel[OF StateRel]
+    unfolding label_hm_rel_def
+    by fastforce
+
   show ?thesis
     unfolding state_rel_def state_rel0_def
     apply (intro conjI)
-                 apply (insert StateRel[simplified state_rel_def state_rel0_def] ConsistencyUpd)
-                   apply (solves \<open>simp\<close>)+
-              apply (fastforce simp: store_rel_def)
-             apply (solves \<open>simp\<close>)+
-           apply (fastforce simp: heap_var_rel_def mask_var_rel_def)+
-    oops
+                     apply (insert StateRel[simplified state_rel_def state_rel0_def] ConsistencyUpd LabelRel)
+                     apply (solves \<open>simp\<close>)+
+                 apply (fastforce simp: store_rel_def)
+                apply (solves \<open>simp\<close>)+
+          apply (fastforce simp: heap_var_rel_def mask_var_rel_def)+
+    done
+qed
+
+subsection \<open>State components that do not affect state relation\<close>
+
+text \<open>The properties here will have to be adjusted once new features are added that require 
+taking more state components into account. \<close>
+
 
 text \<open>The following lemma will not hold once the state relation tracks predicates.\<close>
 
@@ -939,9 +950,10 @@ qed
 lemma post_framing_propagate_aux:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>0 \<omega>0 ns" and
           WfTyRep: "wf_ty_repr_bpl TyRep" and
-          (*WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" and*)
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
+          OldStateSame: "get_trace_total \<omega>1 old_label = get_trace_total \<omega>0 old_label" and
+          DomLabelMap: "dom (label_hm_translation Tr) \<subseteq> {old_label}" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>1)" and
           Consistent: "StateCons \<omega>1" and
           HeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>1)" and
@@ -963,8 +975,7 @@ lemma post_framing_propagate_aux:
   shows  "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (Havoc hvar'#Assign mvar' e_bpl#cs) str tr, cont), Normal ns) 
                             ((BigBlock name cs str tr, cont), Normal ns') \<and>
                 state_rel Pr StateCons TyRep (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt \<omega>1 \<omega>1 ns'"
-  oops
-(*proof -
+proof -
   from Disj have "hvar' \<notin> ?B" and "mvar' \<notin> ?B"
     by fast+
                             
@@ -998,9 +1009,17 @@ lemma post_framing_propagate_aux:
     
   let ?\<omega>'' = "update_trace_total (update_hp_total_full (update_mp_total_full ?\<omega>' (get_mp_total_full \<omega>1)) (get_hp_total_full \<omega>1)) (get_trace_total \<omega>1)"
 
-  from state_rel_trace_independent[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]] have
+  have
     StateRel4: "state_rel Pr StateCons TyRep (?Tr'\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>'' ?\<omega>'' ns''"
-    by simp
+  proof -
+    have *: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>0 lbl = Some \<phi>" (is "\<And> lbl. ?LHS lbl \<Longrightarrow> ?RHS lbl")
+      using DomLabelMap state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def] OldStateSame
+      by fastforce
+    show ?thesis
+    apply (rule state_rel_upd_trace_subset[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]])
+      by (simp_all add: *)
+  qed
+
   \<comment>\<open>Here, we reenable the state consistency using the consistency assumption on the final state.\<close>
 
   have "?\<omega>'' = \<omega>1"
@@ -1018,7 +1037,7 @@ lemma post_framing_propagate_aux:
     using RedBpl1 RedBpl2 red_ast_bpl_transitive state_rel_enable_consistency Consistent
     by blast
 qed
-*)
+
 
 subsection \<open>Tracking states in the auxiliary variables\<close>
 
