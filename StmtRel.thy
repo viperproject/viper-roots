@@ -1425,12 +1425,6 @@ abbreviation state_during_inhale_post_call ::
 
 subsubsection \<open>General lemma\<close>
 
-(*
-declare [[show_types]]
-declare [[show_sorts]]
-declare [[show_consts]]
-*)
-
 lemma method_call_stmt_rel_general:
   assumes MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
       and ArgsAreVars: "list_all (\<lambda>x. \<exists>a. x = ViperLang.Var a) es" \<comment>\<open>simplifying assumption: only variables as arguments\<close>
@@ -1687,18 +1681,22 @@ lemma method_call_stmt_rel_inst:
                      "list_all2 (\<lambda>y_bpl t_vpr. \<exists>t_bpl. vpr_to_bpl_ty TyRep t_vpr = Some t_bpl \<and>
                                            lookup_var_decl (var_context ctxt) y_bpl = Some (t_bpl, None))
                                 ys_bpl (method_decl.rets mdecl)"
-          \<comment>\<open> Since the rule only deals with variables in the arguments, well-definedness holds trivially
+          \<comment>\<open>Since the rule only deals with variables in the arguments, well-definedness holds trivially
              ExpWfRel: "exprs_wf_rel Rdef ctxt_vpr StateCons P ctxt es \<gamma> \<gamma>def"\<close>
-                   \<comment>\<open>simplifying assumption: unoptimized exhale and inhale\<close>
-                        \<comment>\<open>"var_tr' = [[0..<length es] [\<mapsto>] rev xs_bpl]" and \<close>
       and "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]"
+      and "label_vars_bpl = vars_label_hm_tr (label_hm_translation Tr)"
+      and ProgressToOldRel: "\<And> fpred. rel_general 
+                                         (state_rel_def_same Pr StateCons TyRep (Tr \<lparr> label_hm_translation := Map.empty \<rparr>) (map_upd_set AuxPred label_vars_bpl fpred) ctxt)
+                                         (state_rel_def_same Pr StateCons TyRep (Tr \<lparr> label_hm_translation := label_tr \<rparr>)  (map_upd_set AuxPred label_vars_bpl fpred) ctxt) 
+                       (\<lambda>\<omega> \<omega>'. \<omega>' = update_trace_total \<omega> [old_label \<mapsto> get_total_full \<omega>]) (\<lambda>_.False)
+                       P ctxt \<gamma> \<gamma>_exh_in"
       and ExhalePreRel:
                       "\<And> fpred.                                                
                         stmt_rel 
                               (\<lambda>\<omega> ns.
-                                 state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt \<omega> ns \<and>
+                                 state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - set xs_bpl)) fpred) ctxt \<omega> ns \<and>
                                  framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> \<omega>)
-                              (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) fpred) ctxt) 
+                              (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - set xs_bpl)) fpred) ctxt) 
                               ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
                               (Exhale (method_decl.pre mdecl)) \<gamma> (BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
       and "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix"
@@ -1706,10 +1704,10 @@ lemma method_call_stmt_rel_inst:
       and InhalePostRel: 
           "\<And> fpred.  stmt_rel 
                         (\<lambda> \<omega> ns. 
-                         state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt \<omega> ns \<and>
+                         state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) fpred) ctxt \<omega> ns \<and>
                          assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
                         )
-                        (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred) ctxt)
+                        (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) fpred) ctxt)
                         ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
                         (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
       shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
@@ -2040,7 +2038,8 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
       sorry \<comment>\<open>Need to first update trace and then store. Old version of state_rel_store_update did not
                put constraints on the trace, while the new version requires that the trace does not change.\<close>
   qed
-(*
+  thm state_rel_store_update
+(*                   
     proof (rule state_rel_store_update[where ?f= var_tr'])
       show "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr'\<rparr>)) \<Longrightarrow> StateCons ?\<omega>0"
         apply (rule total_consistencyI[OF WfConsistency])
