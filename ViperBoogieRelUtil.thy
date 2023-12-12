@@ -1012,12 +1012,12 @@ proof -
   have
     StateRel4: "state_rel Pr StateCons TyRep (?Tr'\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>'' ?\<omega>'' ns''"
   proof -
-    have *: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>0 lbl = Some \<phi>" (is "\<And> lbl. ?LHS lbl \<Longrightarrow> ?RHS lbl")
+    have *: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>0 lbl = Some \<phi>"
       using DomLabelMap state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def] OldStateSame
       by fastforce
     show ?thesis
     apply (rule state_rel_upd_trace_subset[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]])
-      by (simp_all add: *)
+      by (simp_all add: *)       
   qed
 
   \<comment>\<open>Here, we reenable the state consistency using the consistency assumption on the final state.\<close>
