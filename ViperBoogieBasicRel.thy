@@ -1557,7 +1557,7 @@ lemma state_rel0_store_update:
           WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
         Consistent: "consistent_state_rel_opt (state_rel_opt Tr') \<Longrightarrow> StateCons \<omega>'" and
      OnlyStoreAffectedVpr: 
-           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"  and
+           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'" and
      OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran f \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
      StoreRel: "store_rel A \<Lambda> f \<omega>' ns'" and
      ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and

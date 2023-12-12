@@ -2192,7 +2192,7 @@ qed
 lemma old_expressions_assume_initialization:
   assumes StmtRel1: "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda> P ctxt s1 \<gamma>1 \<gamma>2"
       and StmtRel2: "stmt_rel R2' R3 ctxt_vpr StateCons \<Lambda> P ctxt s2 \<gamma>2 \<gamma>3"
-      and InitState: "\<And> \<omega>'. \<exists>ns. Init ns \<and> R1 \<omega> ns \<and> Q \<omega>' (old_global_state ns)"
+      and InitState: "\<And> \<omega> \<omega>'. \<exists>ns. Init ns \<and> R1 \<omega> ns \<and> Q \<omega>' (old_global_state ns)"
       and RelTransition: "\<And> \<omega> ns. R2 \<omega> ns \<Longrightarrow> Q \<omega> (old_global_state ns) \<Longrightarrow> R2' \<omega> ns"
       and RedStmtSeq: "red_stmt_total ctxt_vpr StateCons \<Lambda> (Seq s1 s2) \<omega> RFailure"
     shows "\<exists>ns \<gamma>'. Init ns \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>', Failure)"
