@@ -1024,6 +1024,7 @@ lemma state_rel0_store_rel:
 
 lemmas state_rel_store_rel = state_rel0_store_rel[OF state_rel_state_rel0]
 
+lemmas state_rel_var_rel = store_rel_var_rel_2[OF state_rel_store_rel]
 lemma state_rel_var_tr_inj:
   assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   shows "inj_on (var_translation Tr) (dom (var_translation Tr))"
@@ -1264,6 +1265,8 @@ lemma state_rel0_boogie_const_rel:
   by simp
 
 lemmas state_rel_boogie_const_rel = state_rel0_boogie_const_rel[OF state_rel_state_rel0]
+
+lemmas state_rel_lit_rel = boogie_const_lit_rel[OF state_rel_boogie_const_rel]
 
 lemma state_rel_boogie_const_rel_2:
   assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and

@@ -854,7 +854,7 @@ proof
     by (metis \<open>a \<notin> _\<close> \<open>f a = Some b\<close> domIff inj_on_contraD nth_mem option.distinct(1))
 qed
 
-definition map_upd_set \<comment>\<open>make this a definition?\<close>
+definition map_upd_set
   where "map_upd_set A B f \<equiv> A ++ (\<lambda>x. if x \<in> B then Some (f x) else None)"
 
 lemma map_upd_set_dom:

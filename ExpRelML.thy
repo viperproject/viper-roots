@@ -2,12 +2,6 @@ theory ExpRelML
 imports ExpRel Boogie_Lang.TypingML Boogie_Lang.HelperML
 begin
 
-subsection \<open>Auxiliary lemmas for the tactics\<close>
-
-lemmas state_rel_var_rel = store_rel_var_rel_2[OF state_rel0_store_rel[OF state_rel_state_rel0]]
-lemmas state_rel_lit_rel = boogie_const_lit_rel[OF state_rel0_boogie_const_rel[OF state_rel_state_rel0]]
-lemmas state_rel_state_well_typed = state_rel0_state_well_typed[OF state_rel_state_rel0]
-
 subsection \<open>ML tactics\<close>
 
 ML \<open>
