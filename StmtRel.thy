@@ -1647,6 +1647,30 @@ qed
 
 subsubsection \<open>Instantiated lemma\<close>
 
+\<comment>\<open>TODO: move\<close>
+
+lemma map_upd_set_combine: "map_upd_set (map_upd_set f A g) B g = map_upd_set f (A \<union> B) g" (is "?lhs = ?rhs")
+proof (rule HOL.ext)
+  fix x
+  show "?lhs x = ?rhs x"
+  proof (cases "x \<in> A \<union> B")
+    case True
+    then show ?thesis 
+      by (metis Un_iff map_upd_set_lookup_1 map_upd_set_lookup_2)
+  next
+    case False
+    then show ?thesis 
+      by (simp add: map_upd_set_lookup_2)
+  qed
+qed
+
+lemma map_upd_set_change_function_1: 
+  assumes "\<And>x. x \<in> A \<Longrightarrow> g x = g' x"
+  shows "map_upd_set f A g = map_upd_set f A g'"
+  using assms 
+  unfolding map_upd_set_def
+  by metis
+
 lemma method_call_stmt_rel_inst:
   assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and ConsistencyDownwardMono: "mono_prop_downward_ord StateCons"
@@ -1701,14 +1725,14 @@ lemma method_call_stmt_rel_inst:
       and "cs_pre = havocs_list_bpl ys_bpl @ cs_pre_suffix"
       and "var_tr'' = Map.empty(upt 0 (length es+length ys) [\<mapsto>] (xs_bpl @ ys_bpl))"
       and InhalePostRel: 
-          "\<And> fpred.  stmt_rel 
+          "\<And> fpred. stmt_rel 
                         (\<lambda> \<omega> ns. 
                          state_rel_def_same Pr StateCons TyRep (Tr\<lparr> label_hm_translation := label_tr, var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) fpred) ctxt \<omega> ns \<and>
                          assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega> 
                         )
                         (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> label_hm_translation := label_tr, var_translation := var_tr'' \<rparr>) (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) fpred) ctxt)
                         ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                        (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"
+                        (Inhale (method_decl.post mdecl)) (BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre) \<gamma>'"          
       shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
 proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
       where ?g_exh="(\<lambda>\<omega>0 ns0. \<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns0 x)))" and
@@ -1933,6 +1957,15 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
       by (simp add: list_all2_conv_all_nth)
   qed
 
+  have "ran var_tr' = set xs_bpl"
+    unfolding \<open>var_tr' = _\<close>
+    by (simp add: LengthEqs map_upds_upt_ran)
+
+  have "ran var_tr'' = set xs_bpl \<union> set ys_bpl"
+    using LengthEqs map_upds_ran_distinct
+    unfolding \<open>var_tr'' = _\<close>
+    by (simp add: map_upds_upt_ran)
+
   \<comment>\<open>Main proof\<close>
 
   let ?\<omega>0 = "state_during_exhale_pre_call \<omega> v_args"
@@ -1964,17 +1997,17 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
 
     have StateRelDuringCall: "?RCall ?\<omega>0 ns'" 
     proof -
-      from var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] have 
-        *: "ran (var_translation Tr) \<inter> dom AuxPred = {}"
-        by blast
-  
-      have AuxSub: "map_upd_set AuxPred (ran (var_translation Tr) - set xs_bpl) ?fpred \<subseteq>\<^sub>m
-            map_upd_set AuxPred (ran (var_translation Tr)) ?fpred"
-        unfolding map_upd_set_def
-        apply (rule map_add_le_dom_disjoint)
-        using *
-         apply (smt (verit) disjoint_iff_not_equal domIff)
-        by (smt (verit) Diff_iff domIff map_le_def)
+      from var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+           state_rel_label_hm_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+      have *: "(label_vars_bpl \<union> ran (var_translation Tr)) \<inter> dom AuxPred = {}"
+        using \<open>label_vars_bpl = _\<close>
+        by fast
+
+      have LookupSameBpl:
+        "\<And>x. x \<in> ran (var_translation Tr) \<Longrightarrow> lookup_var (var_context ctxt) ns' x = lookup_var (var_context ctxt) ns x"
+        using StateRelConcrete[OF R0, THEN state_rel_var_rel] StateRelOld[THEN state_rel_var_rel]
+        unfolding ran_def
+        by fastforce
   
       have StoreRel: "store_rel (type_interp ctxt) (var_context ctxt) var_tr' ?\<omega>0 ns'"
       proof (rule store_relI)
@@ -2029,15 +2062,13 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
         next
           have "lookup_var (var_context ctxt) ns' x_bpl = lookup_var (var_context ctxt) ns x_bpl"
           proof -
-            obtain z_vpr where "var_translation Tr z_vpr = Some x_bpl"
+            have "x_bpl \<in> ran (var_translation Tr)"
               using \<open>set xs_bpl \<subseteq> ran (var_translation Tr)\<close> \<open>x_bpl \<in> set xs_bpl\<close> 
-              unfolding ran_def
               by blast
-            with StateRelConcrete[OF R0, THEN state_rel_var_rel] StateRelOld[THEN state_rel_var_rel]
-            show ?thesis
-              by fastforce
-          qed              
-
+            thus ?thesis
+              using LookupSameBpl
+              by blast
+          qed
           with * \<open>x_bpl = _\<close> 
           show "lookup_var (var_context ctxt) ns' x_bpl = Some (val_rel_vpr_bpl (v_args ! x_vpr))"
             by simp  
@@ -2058,13 +2089,33 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
         by force
   
       have "state_rel Pr StateCons TyRep (Tr \<lparr> label_hm_translation := label_tr, var_translation := Map.empty \<rparr>) ?AuxPredPre ctxt  ?\<omega>_old ?\<omega>_old ns'"
-        apply (rule state_rel_aux_pred_remove)
-         apply (rule state_rel_transfer_var_tr_to_aux_pred[OF StateRelOld])
-          apply simp
-          apply simp
-         apply simp
-        (*by (rule AuxSub)*)
-        sorry
+      proof -
+        have "map_upd_set (map_upd_set AuxPred label_vars_bpl ?fpred) (ran (var_translation Tr))
+                                                              (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns' x))) =
+              map_upd_set (map_upd_set AuxPred label_vars_bpl ?fpred) (ran (var_translation Tr)) ?fpred" (is "?map_upd_set_1 = _")
+          apply (rule map_upd_set_change_function_1)
+          by (simp add: LookupSameBpl)
+        also have "... = map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr))) ?fpred" (is "_ = ?map_upd_set_2")
+          by (rule map_upd_set_combine)
+        finally have MapUpdRewrite: "?map_upd_set_1 = ?map_upd_set_2"
+          by simp
+
+        have AuxSub: "map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - set xs_bpl)) ?fpred \<subseteq>\<^sub>m ?map_upd_set_2"
+          unfolding map_upd_set_def
+          apply (rule map_add_le_dom_disjoint)        
+          using *
+           apply (smt (verit) disjoint_iff_not_equal domIff)
+          by (smt (verit) Diff_iff Un_iff domIff map_le_def)
+
+        show ?thesis
+          apply (rule state_rel_aux_pred_remove)
+           apply (rule state_rel_transfer_var_tr_to_aux_pred[OF StateRelOld])
+             apply simp
+            apply simp
+           apply simp
+          apply (subst MapUpdRewrite)
+          by (rule AuxSub)
+      qed
   
       thus ?thesis
       proof (rule state_rel_store_update[where ?f= var_tr'])
@@ -2095,7 +2146,9 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
                vars_label_hm_tr
                 (label_hm_translation (Tr\<lparr>label_hm_translation := label_tr, var_translation := Map.empty\<rparr>))) =
               {}"
-                    sorry
+          apply (simp add: \<open>ran var_tr' = _\<close> map_upd_set_dom)          
+          using \<open>set xs_bpl \<subseteq> _\<close> var_translation_disjoint[OF StateRelOld, simplified map_upd_set_dom]
+          by auto
       qed (insert var_translation_disjoint[OF StateRelOld] \<open>set xs_bpl \<subseteq> _\<close> \<open>ran var_tr' = _\<close>,
            auto simp add: map_upd_set_lookup_2)
     qed
@@ -2175,8 +2228,8 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
 
   let ?\<gamma>pre = "(BigBlock name_pre cs_pre str_pre tr_pre, cont_pre)"
   let ?\<gamma>havoc = "(BigBlock name_pre cs_pre_suffix str_pre tr_pre, cont_pre)"
-  let ?AuxPredPostParam = "\<lambda>fpred. (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) fpred)"  
-  let ?RCallPostParam = "\<lambda>fpred. state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr'' \<rparr>) (?AuxPredPostParam fpred) ctxt"
+  let ?AuxPredPostParam = "\<lambda>fpred. (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) fpred)"  
+  let ?RCallPostParam = "\<lambda>fpred. state_rel_def_same Pr StateCons TyRep (Tr\<lparr> label_hm_translation := label_tr, var_translation := var_tr'' \<rparr>) (?AuxPredPostParam fpred) ctxt"
   let ?RCallPost = "?RCallPostParam ?fpred"
 
 \<comment>\<open>We next show that the havocs capture the nondeterministic assignments to the return variables\<close>
@@ -2253,21 +2306,15 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
           by simp
       qed
 
-     have "ran var_tr'' = set xs_bpl \<union> set ys_bpl"
-       using LengthEqs map_upds_ran_distinct
-       unfolding \<open>var_tr'' = _\<close>
-       by (simp add: map_upds_upt_ran)
-
-     from \<open>?RCall \<omega>pre nspre\<close> have
-       "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>var_translation := var_tr'\<rparr>)
-          (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)) (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) ctxt \<omega>pre nspre"
-       sorry
-(*
+     from \<open>?RCall \<omega>pre nspre\<close> have 
+       "state_rel_def_same Pr StateCons TyRep (Tr\<lparr> label_hm_translation := label_tr, var_translation := var_tr'\<rparr>)
+          (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))) (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) ctxt \<omega>pre nspre"        
        apply (rule state_rel_aux_pred_remove)
        apply (rule map_upd_set_subset)
         apply blast
-       using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
-      by blast*)
+       using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] \<open>label_vars_bpl = _\<close>
+             state_rel_label_hm_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+       by fast
 
      hence
       "?RCallPost \<omega>havoc ?nshavoc"
@@ -2461,19 +2508,24 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
          qed
        qed
      next
+       let ?Tr' = "(Tr\<lparr>label_hm_translation := label_tr, var_translation := var_tr'\<rparr>)"
        note aux_disj_thms = var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] 
               \<open>set xs_bpl \<subseteq> _\<close> \<open>set ys_bpl \<subseteq> _\<close> \<open>ran var_tr'' = _\<close>
+       hence DisjLabel: "ran var_tr'' \<inter> vars_label_hm_tr label_tr = {}"
+         using state_rel_label_hm_disjoint[OF \<open>?RCall \<omega>pre nspre\<close>, simplified map_upd_set_dom, simplified]
+         unfolding \<open>ran var_tr' = _\<close> 
+         by fast
+
        show "ran var_tr'' \<inter>
-            ({heap_var (Tr\<lparr>var_translation := var_tr'\<rparr>), heap_var_def (Tr\<lparr>var_translation := var_tr'\<rparr>)} \<union>
-             {mask_var (Tr\<lparr>var_translation := var_tr'\<rparr>), mask_var_def (Tr\<lparr>var_translation := var_tr'\<rparr>)} \<union>
-             ran (field_translation (Tr\<lparr>var_translation := var_tr'\<rparr>)) \<union>
-             range (const_repr (Tr\<lparr>var_translation := var_tr'\<rparr>)) \<union>
-             dom (map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))
+            ({heap_var ?Tr', heap_var_def ?Tr'} \<union>
+             {mask_var ?Tr', mask_var_def ?Tr'} \<union>
+             ran (field_translation ?Tr') \<union>
+             range (const_repr ?Tr') \<union>
+             dom (map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)))
                    (\<lambda>x. pred_eq (the (lookup_var (var_context ctxt) ns x)))) \<union>
-             vars_label_hm_tr (label_hm_translation (Tr\<lparr>var_translation := var_tr'\<rparr>))) = {}"
+             vars_label_hm_tr (label_hm_translation ?Tr')) = {}"
          apply simp
          apply (intro conjI)
-
          using aux_disj_thms
              apply blast
          using aux_disj_thms
@@ -2482,18 +2534,18 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
            apply blast
          using aux_disj_thms
           apply blast
-         using aux_disj_thms
-         by (auto simp add: map_upd_set_dom)
+
+         apply (simp add: map_upd_set_dom \<open>label_vars_bpl = _\<close>)
+         using aux_disj_thms DisjLabel
+         by blast 
      next 
        have "StateCons_t (get_total_full \<omega>pre)"
        proof -
-         have "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr'\<rparr>))"
-           by (simp add: ConsistencyEnabled)
-         with state_rel_consistent[OF \<open>?RCall \<omega>pre nspre\<close>]  WfConsistency 
+         from ConsistencyEnabled state_rel_consistent[OF \<open>?RCall \<omega>pre nspre\<close>]  WfConsistency 
          show ?thesis
            unfolding wf_total_consistency_def
-           sorry
-       qed                  
+           by auto
+       qed          
 
        show "StateCons \<omega>havoc"
          unfolding \<open>\<omega>havoc = _\<close>
@@ -2631,15 +2683,20 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
             show "StateCons ?\<omega>minus"
             proof (rule mono_prop_downwardD[OF wf_total_consistency_trace_mono_downwardD[OF WfConsistency] _ gt_\<omega>minus])
               show "StateCons ?\<omega>0_rets"
-                apply (rule total_consistency_store_update[OF WfConsistency])
-                using state_rel_consistent StateRelDuringCall ConsistencyEnabled
-                apply fastforce
-                by simp_all
+              proof -
+                have "StateCons_t (get_total_full \<omega>)"                
+                  using state_rel_consistent[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>] ConsistencyEnabled]
+                        WfConsistency[simplified wf_total_consistency_def]
+                  by blast
+                thus ?thesis
+                  using total_consistencyI[OF WfConsistency]
+                  by fastforce
+              qed    
             qed
           
             show "valid_heap_mask (get_mh_total_full ?\<omega>minus)"
               apply (rule valid_heap_mask_downward_mono)
-               apply (rule state_rel_wf_mask_simple[OF StateRelDuringCall])
+               apply (rule state_rel_wf_mask_simple[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]])
               using gt_\<omega>minus full_total_state_greater_mask 
               by fastforce
           qed
@@ -2701,7 +2758,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
     qed
   qed simp
 
-  show " stmt_rel
+  show "stmt_rel
             (\<lambda>\<omega> ns. (?RCallPost \<omega> ns) \<and>
                     assertion_framing_state ctxt_vpr StateCons (method_decl.post mdecl) \<omega>)
             ?RCallPost 
@@ -2725,6 +2782,13 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
     note RedInhPost = conjunct1[OF SuccessReset]
     note \<omega>resetEq = conjunct2[OF SuccessReset]
 
+    \<comment>\<open>TODO: currently the proof fails because the state relation depends on the trace and the trace changes here, which
+             the proof does not justify. To make the proof work, one should first justify the change of the trace (without anything else
+             changing) or the change of the story (without anything else changing). The latter seems symmetric to 
+             the case right before the exhale of the precondition where the proof first justifies the change of the trace, 
+             and then justifies the change of the store\<close>
+    have 
+
     have "get_store_total \<omega>post = (shift_and_add_list_alt Map.empty (v_args@v_rets))"
     using SuccessReset inhale_only_changes_mask(3)
       by (metis RedInhale_case full_total_state.select_convs(1) sub_expressions.simps(7))
@@ -2733,11 +2797,12 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
       unfolding \<open>\<omega>reset = _\<close>
     proof -
       from \<open>?RCallPost \<omega>post nspost\<close> have
-        "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
+        "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>label_hm_translation := label_tr, var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
         apply (rule state_rel_aux_pred_remove)
         apply (rule map_upd_set_subset2)
-        using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
-        by blast
+        using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] state_rel_label_hm_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+        unfolding \<open>label_vars_bpl = _\<close>
+        by fast
 
       thus "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
       proof (rule state_rel_store_update[where ?f="var_translation Tr"])
@@ -2904,7 +2969,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
                         XsBplEq VarTrSome \<open>set xs \<subseteq> _\<close>
                   by fast
                                        
-                have *: "map_upd_set AuxPred (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl))
+                have *: "map_upd_set AuxPred (label_vars_bpl \<union> (ran (var_translation Tr) - (set xs_bpl \<union> set ys_bpl)))
                          ?fpred var_bpl = Some (?fpred var_bpl)"
                   apply (rule map_upd_set_lookup_1)
                   using \<open>var_bpl \<notin> set xs_bpl\<close> \<open>var_bpl \<notin> set ys_bpl\<close> VarTrSome
@@ -2927,13 +2992,11 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
       next
         have "StateCons_t (get_total_full \<omega>post)"
         proof -
-          have "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>var_translation := var_tr''\<rparr>))"
-            by (simp add: ConsistencyEnabled)
-
-          with \<open>?RCallPost \<omega>post _\<close> state_rel_consistent WfConsistency 
+          from state_rel_consistent[OF \<open>?RCallPost \<omega>post _\<close>] ConsistencyEnabled \<open>?RCallPost \<omega>post _\<close> 
           show ?thesis
-          unfolding wf_total_consistency_def                
-          by blast
+            using WfConsistency
+            unfolding wf_total_consistency_def
+            by simp                      
         qed
 
         show "StateCons (reset_state_after_call ys v_rets \<omega> \<omega>post)"
@@ -2948,15 +3011,20 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
           using state_rel_state_well_typed[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified state_well_typed_def]
           by simp
       next
-        show "ran (var_translation Tr) \<inter>
-             ({heap_var (Tr\<lparr>var_translation := var_tr''\<rparr>), heap_var_def (Tr\<lparr>var_translation := var_tr''\<rparr>)} \<union>
-              {mask_var (Tr\<lparr>var_translation := var_tr''\<rparr>), mask_var_def (Tr\<lparr>var_translation := var_tr''\<rparr>)} \<union>
-              ran (field_translation (Tr\<lparr>var_translation := var_tr''\<rparr>)) \<union>
-              range (const_repr (Tr\<lparr>var_translation := var_tr''\<rparr>)) \<union>
+        let ?Tr' = "(Tr\<lparr>label_hm_translation := label_tr, var_translation := var_tr''\<rparr>)"
+        have "ran (var_translation Tr) \<inter> vars_label_hm_tr label_tr = {}"
+         using state_rel_label_hm_disjoint[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified map_upd_set_dom, simplified]
+         unfolding \<open>ran var_tr'' = _\<close>
+         by blast
+       thus "ran (var_translation Tr) \<inter>
+             ({heap_var ?Tr', heap_var_def ?Tr'} \<union>
+              {mask_var ?Tr', mask_var_def ?Tr'} \<union>
+              ran (field_translation ?Tr') \<union>
+              range (const_repr ?Tr') \<union>
               dom AuxPred \<union>
-              vars_label_hm_tr (label_hm_translation (Tr\<lparr>var_translation := var_tr''\<rparr>))) = {}"
+              vars_label_hm_tr (label_hm_translation ?Tr')) = {}"
           using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
-          by simp
+          by force
       next 
         show "get_total_full \<omega>post = get_total_full (reset_state_after_call ys v_rets \<omega> \<omega>post) \<and>
               get_trace_total \<omega>post = get_trace_total (reset_state_after_call ys v_rets \<omega> \<omega>post)"
