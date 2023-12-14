@@ -1398,13 +1398,13 @@ proof (intro conjI)
 qed (insert StateRel, unfold state_rel_def state_rel0_def, auto)
 
 lemma state_rel_aux_pred_remove:
-  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" and
-          "AuxPred' \<subseteq>\<^sub>m AuxPred"
-        shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
-      apply (rule state_rel_aux_pred_weaken[OF assms(1)])
-       apply (rule map_le_implies_dom_le[OF assms(2)])
-    using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
-    by (metis (no_types, lifting) dom_fun_upd fun_upd_triv insertCI map_le_def option.distinct(1) option.sel)
+  assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and "AuxPred' \<subseteq>\<^sub>m AuxPred"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
+  apply (rule state_rel_aux_pred_weaken[OF assms(1)])
+   apply (rule map_le_implies_dom_le[OF assms(2)])
+  using \<open>AuxPred' \<subseteq>\<^sub>m AuxPred\<close>
+  by (metis (no_types, lifting) dom_fun_upd fun_upd_triv insertCI map_le_def option.distinct(1) option.sel)
 
 lemma state_rel0_label_hm_rel:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"

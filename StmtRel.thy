@@ -2782,32 +2782,33 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
     note RedInhPost = conjunct1[OF SuccessReset]
     note \<omega>resetEq = conjunct2[OF SuccessReset]
 
-    \<comment>\<open>TODO: currently the proof fails because the state relation depends on the trace and the trace changes here, which
-             the proof does not justify. To make the proof work, one should first justify the change of the trace (without anything else
-             changing) or the change of the story (without anything else changing). The latter seems symmetric to 
-             the case right before the exhale of the precondition where the proof first justifies the change of the trace, 
-             and then justifies the change of the store\<close>
-    have 
-
-    have "get_store_total \<omega>post = (shift_and_add_list_alt Map.empty (v_args@v_rets))"
+    have "get_store_total \<omega>post = shift_and_add_list_alt Map.empty (v_args@v_rets)"
     using SuccessReset inhale_only_changes_mask(3)
-      by (metis RedInhale_case full_total_state.select_convs(1) sub_expressions.simps(7))
+    by (metis RedInhale_case full_total_state.select_convs(1) sub_expressions.simps(7))
 
-    show "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>reset nspost"
-      unfolding \<open>\<omega>reset = _\<close>
+    \<comment>\<open>We first show that the state relation holds for the state after the call where the trace has not been
+       reset. In a second, step we then justify resetting the trace.\<close>
+
+    let ?\<omega>reset_store_and_total = "update_trace_total (reset_state_after_call ys v_rets \<omega> \<omega>post) (get_trace_total \<omega>post)"    
+    let ?Tr = "Tr\<lparr>label_hm_translation := label_tr, var_translation := var_tr''\<rparr>"
+    let ?Tr' = "Tr\<lparr> label_hm_translation := label_tr \<rparr>"
+    let ?AuxPred' = "map_upd_set AuxPred label_vars_bpl ?fpred"
+
+    have "state_rel_def_same Pr StateCons TyRep ?Tr' ?AuxPred' ctxt ?\<omega>reset_store_and_total nspost"      
     proof -
       from \<open>?RCallPost \<omega>post nspost\<close> have
-        "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>label_hm_translation := label_tr, var_translation := var_tr''\<rparr>) AuxPred ctxt \<omega>post nspost"
+        "state_rel_def_same Pr StateCons TyRep ?Tr ?AuxPred' ctxt \<omega>post nspost"
         apply (rule state_rel_aux_pred_remove)
-        apply (rule map_upd_set_subset2)
+        apply (rule map_upd_set_subset)
+        apply blast
         using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]] state_rel_label_hm_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
         unfolding \<open>label_vars_bpl = _\<close>
         by fast
 
-      thus "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
+      thus "state_rel_def_same Pr StateCons TyRep ?Tr' ?AuxPred' ctxt ?\<omega>reset_store_and_total nspost"
       proof (rule state_rel_store_update[where ?f="var_translation Tr"])
         show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) 
-                        (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost"
+                        ?\<omega>reset_store_and_total nspost"
         proof (rule store_relI)
           show "inj_on (var_translation Tr) (dom (var_translation Tr))"
             using state_rel_store_rel[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
@@ -2815,7 +2816,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
         next
           fix var_vpr var_bpl
           assume VarTrSome: "var_translation Tr var_vpr = Some var_bpl"
-          show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) (reset_state_after_call ys v_rets \<omega> \<omega>post) nspost var_vpr var_bpl"
+          show "store_var_rel_aux (type_interp ctxt) (var_context ctxt) ?\<omega>reset_store_and_total nspost var_vpr var_bpl"
           proof (cases "var_vpr \<in> set ys")
             case True
             from this obtain id where "var_vpr = ys ! id" and "id < length ys"
@@ -2865,7 +2866,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
             show ?thesis
             unfolding store_var_rel_aux_def
             proof ((rule exI)+, intro conjI)
-              show "get_store_total (reset_state_after_call ys v_rets \<omega> \<omega>post) var_vpr = Some (v_rets ! id)"
+              show "get_store_total ?\<omega>reset_store_and_total var_vpr = Some (v_rets ! id)"
                 unfolding reset_state_after_call_def
                 apply simp
                 using \<open>var_vpr = _\<close> \<open>distinct ys\<close> map_upds_distinct_nth \<open>id < _\<close> LengthEqs
@@ -2893,7 +2894,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
                     YsBplEq VarTrSome \<open>set ys \<subseteq> _\<close>
               by fast
 
-            have "get_store_total (reset_state_after_call ys v_rets \<omega> \<omega>post) var_vpr = 
+            have "get_store_total ?\<omega>reset_store_and_total var_vpr = 
                    get_store_total \<omega> var_vpr"
               unfolding reset_state_after_call_def
               by (simp add: False)
@@ -2999,13 +3000,19 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
             by simp                      
         qed
 
-        show "StateCons (reset_state_after_call ys v_rets \<omega> \<omega>post)"
+        show "StateCons ?\<omega>reset_store_and_total"
           unfolding reset_state_after_call_def
+          apply(rule total_consistency_store_update[OF WfConsistency])
+          using state_rel_consistent[OF \<open>?RCallPost \<omega>post _\<close>] ConsistencyEnabled
+            apply simp
+           apply simp
+          by simp
+(*
           apply (rule total_consistencyI[OF WfConsistency])
            apply (simp add: \<open>StateCons_t (get_total_full \<omega>post)\<close>)                 
           using state_rel_consistent[OF StateRel] WfConsistency ConsistencyEnabled
           unfolding wf_total_consistency_def
-          by simp
+          by simp *)
       next
         show "binder_state nspost = Map.empty"
           using state_rel_state_well_typed[OF \<open>?RCallPost \<omega>post nspost\<close>, simplified state_well_typed_def]
@@ -3021,14 +3028,12 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
               {mask_var ?Tr', mask_var_def ?Tr'} \<union>
               ran (field_translation ?Tr') \<union>
               range (const_repr ?Tr') \<union>
-              dom AuxPred \<union>
+              dom ?AuxPred' \<union>
               vars_label_hm_tr (label_hm_translation ?Tr')) = {}"
-          using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
-          by force
+         apply (simp add: map_upd_set_dom \<open>label_vars_bpl = _\<close>)
+         using var_translation_disjoint[OF StateRelConcrete[OF \<open>R \<omega> ns\<close>]]
+         by fast          
       next 
-        show "get_total_full \<omega>post = get_total_full (reset_state_after_call ys v_rets \<omega> \<omega>post) \<and>
-              get_trace_total \<omega>post = get_trace_total (reset_state_after_call ys v_rets \<omega> \<omega>post)"
-          sorry \<comment>\<open>does not hold, need to update trace separately\<close>
 (*
           from SuccessReset obtain \<omega>pre where
             "red_inhale ctxt_vpr StateCons (method_decl.post mdecl) (state_during_inhale_post_call \<omega> \<omega>pre v_args v_rets) (RNormal \<omega>post)"
@@ -3041,6 +3046,9 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
           *)
       qed (simp_all add: reset_state_after_call_def)              
     qed
+
+    thus "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>reset nspost"
+      sorry
   qed (simp)
 qed
 
