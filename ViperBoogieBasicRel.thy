@@ -36,10 +36,10 @@ record state_rel_options =
 definition default_state_rel_options :: state_rel_options
   where "default_state_rel_options \<equiv> \<lparr> consistent_state_rel_opt = True \<rparr>"
 
+type_synonym label_hm_repr_bpl = "(label \<rightharpoonup> Lang.vname) \<times> (label \<rightharpoonup> Lang.vname)"
+
 text \<open>The following record abstracts over elements in the Boogie encoding that are used to represent
 Viper counterparts.\<close>
-
-type_synonym label_hm_repr_bpl = "label \<rightharpoonup> Lang.vname \<times> Lang.vname"
 
 record tr_vpr_bpl =
   heap_var :: Lang.vname
@@ -87,6 +87,7 @@ definition exp_rel_vb_single ::
 
 text \<open>Expression relation: Here, the well-definedness state is not fixed in the expression evaluation, 
 because we only care about the case where the expression successfully evaluates to a value.\<close>
+
 definition exp_rel_vpr_bpl :: 
    "('a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> 'a econtext_bpl \<Rightarrow> viper_expr \<Rightarrow> boogie_expr \<Rightarrow> bool"
    where "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl \<equiv> 
@@ -472,20 +473,20 @@ lemma boogie_const_lit_rel:
       apply (unfold boogie_const_rel_def)
   by (auto intro: RedVar RedLit)
 
-definition store_rel :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> var_context \<Rightarrow> (ViperLang.var \<rightharpoonup> Lang.vname) \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
-  where "store_rel A \<Lambda> var_rel \<omega> ns \<equiv> 
+definition store_rel :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> var_context \<Rightarrow> (ViperLang.var \<rightharpoonup> Lang.vname) \<Rightarrow> 'a store \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
+  where "store_rel A \<Lambda> var_rel st ns \<equiv> 
           inj_on var_rel (dom var_rel) \<and>
           (\<forall> var_vpr var_bpl. var_rel var_vpr = Some var_bpl \<longrightarrow> 
                         (\<exists>val_vpr ty_bpl.
-                                     (get_store_total \<omega> var_vpr) = Some val_vpr \<and>
+                                     (st var_vpr) = Some val_vpr \<and>
                                       lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
                                       lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
                                       type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl ))"
 
 lemma store_rel_var_rel:
-  assumes "store_rel A \<Lambda> var_tr \<omega> ns" and
+  assumes "store_rel A \<Lambda> var_tr st ns" and
           "var_tr var_vpr = Some var_bpl"
-  shows "\<exists>val_vpr ty_bpl. ((get_store_total \<omega>) var_vpr) = Some val_vpr \<and>
+  shows "\<exists>val_vpr ty_bpl. st var_vpr = Some val_vpr \<and>
                      lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
                      lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
                      type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl"
@@ -494,18 +495,18 @@ lemma store_rel_var_rel:
   by auto
 
 lemma store_rel_var_rel_2:
-  assumes "store_rel A \<Lambda> var_tr \<omega> ns" and
-          "var_tr var_vpr = Some var_bpl"
-  shows "\<exists>val_vpr. ((get_store_total \<omega>) var_vpr) = Some val_vpr \<and>
-                     lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
+  assumes "store_rel A \<Lambda> var_tr st ns"
+      and "var_tr var_vpr = Some var_bpl"
+  shows "\<exists>val_vpr. st var_vpr = Some val_vpr \<and>
+                   lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr)"
   using assms store_rel_var_rel
   by blast
  
 lemma store_rel_stable:
-  assumes "store_rel A \<Lambda> var_tr \<omega> ns"
-          "get_store_total \<omega> = get_store_total \<omega>'"
-          "\<And>x. x \<in> ran var_tr \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
-        shows "store_rel A \<Lambda> var_tr \<omega>' ns'"
+  assumes "store_rel A \<Lambda> var_tr st ns"
+      and "st = st'"
+      and "\<And>x. x \<in> ran var_tr \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
+    shows "store_rel A \<Lambda> var_tr st' ns'"
   using assms
   unfolding store_rel_def
   by (simp add: ranI)
@@ -584,18 +585,26 @@ lemma aux_vars_pred_sat_weaken:
       by (metis has_Some_iff)
   qed  
 
+definition label_rel :: "(vname \<Rightarrow> 'a total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool)  \<Rightarrow> (label \<rightharpoonup> vname) \<Rightarrow> 'a total_trace \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
+  where "label_rel P LabelMap t ns \<equiv> 
+             (\<forall> lbl h. LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. t lbl = Some \<phi> \<and> P h \<phi> ns))"
+
 definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> label_hm_repr_bpl \<Rightarrow> 'a total_trace \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns \<equiv>
-          (\<forall> lbl hm. LabelMap lbl = Some hm \<longrightarrow> 
-            (\<exists>\<phi>. t lbl = Some \<phi> \<and> 
+             label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst LabelMap) t ns
+          \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns"
+            (*(\<exists>\<phi>. t lbl = Some \<phi> \<and>                  
                  heap_var_rel Pr \<Lambda> TyRep FieldTr (fst hm) (get_hh_total \<phi>) ns \<and>
-                 mask_var_rel Pr \<Lambda> TyRep FieldTr (snd hm) (get_mh_total \<phi>) ns))"
+                 mask_var_rel Pr \<Lambda> TyRep FieldTr (snd hm) (get_mh_total \<phi>) ns))"*)
 
-lemma label_hm_rel_empty: "label_hm_rel Pr \<Lambda> TyRep FieldTr Map.empty t ns"
-  by (simp add: label_hm_rel_def)
+lemma label_hm_rel_empty: "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
+  by (simp add: label_hm_rel_def label_rel_def)
   
 definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
-  where "vars_label_hm_tr LabelMap \<equiv> (fst ` (ran LabelMap)) \<union> (snd ` (ran LabelMap))"
+  where "vars_label_hm_tr LabelMap \<equiv> (ran (fst LabelMap)) \<union> (ran (snd LabelMap))"
+
+definition active_labels_hm_tr :: "label_hm_repr_bpl \<Rightarrow> label set"
+  where "active_labels_hm_tr LabelMap = dom (fst LabelMap) \<union> dom (snd LabelMap)"
 
 lemma label_hm_rel_stable:
   assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
@@ -603,8 +612,8 @@ lemma label_hm_rel_stable:
       and "\<And> x. x \<in> vars_label_hm_tr LabelMap \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
     shows  "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t' ns'"
   using assms heap_var_rel_stable mask_var_rel_stable
-  unfolding label_hm_rel_def vars_label_hm_tr_def  
-  by (metis UnI1 UnI2 imageI ranI)
+  unfolding label_hm_rel_def vars_label_hm_tr_def label_rel_def
+  by (metis (no_types, lifting) UnCI ranI)
 
 abbreviation state_rel0_disj_list
   where "state_rel0_disj_list Tr AuxPred \<equiv> [{heap_var Tr, heap_var_def Tr},
@@ -642,7 +651,7 @@ definition state_rel0 :: "ViperLang.program \<Rightarrow>
          \<comment>\<open>type interpretation must be the expected one\<close>
            (A = vbpl_absval_ty TyRep) \<and>
          \<comment>\<open>Store relation (only Viper variables, auxiliaries are not included)\<close>
-           store_rel A \<Lambda> (var_translation Tr) \<omega> ns \<and>           
+           store_rel A \<Lambda> (var_translation Tr) (get_store_total \<omega>) ns \<and>           
           \<comment>\<open>Disjointness condition for variables tracked by the relation\<close>
            disjoint_list (state_rel0_disj_list Tr AuxPred) \<and>
           \<comment>\<open>well-def state and evaluation state differ only on mask\<close>
@@ -786,9 +795,9 @@ method disjoint_list_subset_tac uses DisjointListAssm  =
 subsection \<open>Store relationship properties\<close>
 
 definition store_var_rel_aux
-  where "store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl \<equiv>
+  where "store_var_rel_aux A \<Lambda> st ns var_vpr var_bpl \<equiv>
            (\<exists>val_vpr ty_bpl.
-                             (get_store_total \<omega> var_vpr) = Some val_vpr \<and>
+                              st var_vpr = Some val_vpr \<and>
                               lookup_var \<Lambda> ns var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
                               lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
                               type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl )"
@@ -797,20 +806,20 @@ definition store_var_rel_aux
 lemma store_relI:
   assumes "inj_on f (dom f)"
           "\<And> var_vpr var_bpl. f var_vpr = Some var_bpl \<Longrightarrow>
-                        store_var_rel_aux A \<Lambda> \<omega> ns var_vpr var_bpl"
-  shows "store_rel A \<Lambda> f \<omega> ns"
+                        store_var_rel_aux A \<Lambda> st ns var_vpr var_bpl"
+  shows "store_rel A \<Lambda> f st ns"
   using assms
   unfolding store_rel_def store_var_rel_aux_def
   by blast
 
 lemma store_rel_add_new_var:
-  assumes StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns"
+  assumes StoreRel: "store_rel A \<Lambda> var_tr st ns"
       and "v' = val_rel_vpr_bpl v"
       and "var_tr' = var_tr(x_vpr \<mapsto> x_bpl)"
       and LookupVarTyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
       and TypeOfValBpl: "type_of_val A v' = ty"
       and "x_bpl \<notin> ran var_tr"
-    shows "store_rel A \<Lambda> var_tr' (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+    shows "store_rel A \<Lambda> var_tr' (st(x_vpr \<mapsto> v)) (update_var \<Lambda> ns x_bpl v')"
 proof (rule store_relI)
   show "inj_on var_tr' (dom var_tr')"
     unfolding inj_on_def
@@ -841,10 +850,10 @@ proof (rule store_relI)
 next
   fix var_vpr var_bpl
   assume "var_tr' var_vpr = Some var_bpl"
-  let ?\<omega>' = "update_var_total \<omega> x_vpr v"
+  let ?st' = "st(x_vpr \<mapsto> v)"
   let ?ns' = "update_var \<Lambda> ns x_bpl v'"
 
-  show "store_var_rel_aux A \<Lambda> ?\<omega>' ?ns' var_vpr var_bpl"
+  show "store_var_rel_aux A \<Lambda> ?st' ?ns' var_vpr var_bpl"
   proof (cases "var_vpr = x_vpr")
     case True
     moreover from this have "var_bpl = x_bpl"
@@ -874,19 +883,19 @@ qed
 
 lemma store_rel_update:
   assumes 
-       StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns" and 
+       StoreRel: "store_rel A \<Lambda> var_tr st ns" and 
        "v' = val_rel_vpr_bpl v" and
        VarTrX: "var_tr x_vpr = Some x_bpl" and
        TyBpl: "lookup_var_ty \<Lambda> x_bpl = Some ty"
               "type_of_val A v' = ty"
    shows
-       "store_rel A \<Lambda> var_tr (update_var_total \<omega> x_vpr v) (update_var \<Lambda> ns x_bpl v')"
+       "store_rel A \<Lambda> var_tr (st(x_vpr \<mapsto> v)) (update_var \<Lambda> ns x_bpl v')"
   unfolding store_rel_def
 proof (rule conjI, insert StoreRel, fastforce simp: store_rel_def, (rule allI | rule impI)+)
   fix var_vpr var_bpl
   assume VarTr: "var_tr var_vpr = Some var_bpl"
   show "\<exists>val_vpr ty_bpl.          
-          get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some val_vpr \<and>
+          (st(x_vpr \<mapsto> v)) var_vpr = Some val_vpr \<and>
           lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl val_vpr) \<and>
           lookup_var_ty \<Lambda> var_bpl = Some ty_bpl \<and>
           type_of_val A (val_rel_vpr_bpl val_vpr) = ty_bpl"
@@ -900,7 +909,7 @@ proof (rule conjI, insert StoreRel, fastforce simp: store_rel_def, (rule allI | 
     hence "x_bpl \<noteq> var_bpl" using store_rel_var_tr_inj[OF StoreRel] VarTr VarTrX
       by (metis domI inj_onD)
     with \<open>var_vpr \<noteq> x_vpr\<close> VarTr StoreRel obtain v_vpr ty_bpl where 
-      "get_store_total (update_var_total \<omega> x_vpr v) var_vpr = Some v_vpr" and
+      "(st(x_vpr \<mapsto> v)) var_vpr = Some v_vpr" and
       "lookup_var \<Lambda> (update_var \<Lambda> ns x_bpl v') var_bpl = Some (val_rel_vpr_bpl v_vpr)"
       "lookup_var_ty \<Lambda> var_bpl = Some ty_bpl" and
       "type_of_val A (val_rel_vpr_bpl v_vpr) = ty_bpl"
@@ -917,12 +926,12 @@ text \<open>The following lemma shows when the store relation is preserved if on
       the variable is deleted.\<close>
 
 lemma store_rel_update_vpr_rename_or_delete:
-  assumes StoreRel: "store_rel A \<Lambda> var_tr \<omega> ns"   
+  assumes StoreRel: "store_rel A \<Lambda> var_tr st ns"   
       and "inj_on f (dom f)"
       and InsideDomEq: "\<And>i. i \<in> dom f \<Longrightarrow> var_tr' i = var_tr (the (f i))"
       and OutsideDomEq: "\<And>i. i \<notin> dom f \<Longrightarrow> var_tr' i = None"
-      and InsideDomStore: "\<And>i y. f i = Some y \<Longrightarrow> y \<in> dom var_tr \<Longrightarrow> get_store_total \<omega>' i = get_store_total \<omega> (the (f i))"
-    shows "store_rel A \<Lambda> var_tr' \<omega>' ns"
+      and InsideDomStore: "\<And>i y. f i = Some y \<Longrightarrow> y \<in> dom var_tr \<Longrightarrow> st' i = st (the (f i))"
+    shows "store_rel A \<Lambda> var_tr' st' ns"
 proof (rule store_relI)
   show "inj_on var_tr' (dom var_tr')"
     using assms
@@ -938,22 +947,22 @@ next
     using InsideDomEq \<open>var_tr' var_vpr = Some var_bpl\<close>
     by fastforce        
 
-  thus "store_var_rel_aux A \<Lambda> \<omega>' ns var_vpr var_bpl "
+  thus "store_var_rel_aux A \<Lambda> st' ns var_vpr var_bpl "
     unfolding store_var_rel_aux_def
     using StoreRel[simplified store_rel_def] InsideDomStore \<open>f var_vpr = Some _\<close>
     by (simp add: domI)
 qed  
 
 lemma store_rel_unshift:
-  assumes "store_rel A \<Lambda> var_tr \<omega> ns"
-  shows "store_rel A \<Lambda> (unshift_2 n var_tr) (unshift_state_total n \<omega>) ns"
+  assumes "store_rel A \<Lambda> var_tr st ns"
+  shows "store_rel A \<Lambda> (unshift_2 n var_tr) (unshift_2 n st) ns"
   apply (rule store_rel_update_vpr_rename_or_delete[where ?f = "\<lambda>x. Some (x+n)", OF assms])
      apply (metis (mono_tags, lifting) add_right_cancel injD inj_Some inj_onI)
   by (auto simp: unshift_2_def)
 
 lemma store_rel_shift:
-  assumes "store_rel A \<Lambda> var_tr \<omega> ns"
-  shows "store_rel A \<Lambda> (DeBruijn.shift n var_tr) (shift_state_total n \<omega>) ns"
+  assumes "store_rel A \<Lambda> var_tr st ns"
+  shows "store_rel A \<Lambda> (DeBruijn.shift n var_tr) (DeBruijn.shift n st) ns"
   apply (rule store_rel_update_vpr_rename_or_delete[where ?f = "\<lambda>x. if x < n then None else Some (x-n)", OF assms])
      apply (fastforce simp: inj_on_def split: if_split_asm)
     apply (fastforce simp: DeBruijn.shift_def split: if_split_asm)
@@ -1017,7 +1026,7 @@ lemmas state_rel_type_interp = state_rel0_type_interp[OF state_rel_state_rel0]
 
 lemma state_rel0_store_rel:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
-  shows "store_rel A \<Lambda> (var_translation Tr) \<omega> ns"
+  shows "store_rel A \<Lambda> (var_translation Tr) (get_store_total \<omega>) ns"
   using assms        
   unfolding state_rel0_def
   by blast
@@ -1025,6 +1034,7 @@ lemma state_rel0_store_rel:
 lemmas state_rel_store_rel = state_rel0_store_rel[OF state_rel_state_rel0]
 
 lemmas state_rel_var_rel = store_rel_var_rel_2[OF state_rel_store_rel]
+
 lemma state_rel_var_tr_inj:
   assumes "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   shows "inj_on (var_translation Tr) (dom (var_translation Tr))"
@@ -1555,24 +1565,24 @@ lemma state_well_typed_upd_2:
   by (metis StateWt state_well_typed_def update_var_binder_same)
 
 lemma state_rel0_store_update:
-  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
-                    "Tr' = Tr\<lparr>var_translation := f\<rparr>" and
-          WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
-        Consistent: "consistent_state_rel_opt (state_rel_opt Tr') \<Longrightarrow> StateCons \<omega>'" and
-     OnlyStoreAffectedVpr: 
-           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'" and
-     OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran f \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
-     StoreRel: "store_rel A \<Lambda> f \<omega>' ns'" and
-     ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
-     OldStateEq: "old_global_state ns' = old_global_state ns" and
-     BinderEmpty: "binder_state ns' = Map.empty" and
-     RanVarTrDisj:    "ran f \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
+  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+      and "Tr' = Tr\<lparr>var_translation := f\<rparr>"
+      and WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'"
+      and Consistent: "consistent_state_rel_opt (state_rel_opt Tr') \<Longrightarrow> StateCons \<omega>'"
+      and OnlyStoreAffectedVpr: 
+           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"
+      and OnlyStoreAffectedBpl: "\<And>x. x \<notin> ran f \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
+      and StoreRel: "store_rel A \<Lambda> f (get_store_total \<omega>') ns'"
+      and ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x"
+      and OldStateEq: "old_global_state ns' = old_global_state ns"
+      and BinderEmpty: "binder_state ns' = Map.empty"
+      and RanVarTrDisj:    "ran f \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
                                       {mask_var Tr, mask_var_def Tr} \<union>
                                        ran (field_translation Tr) \<union>
                                        range (const_repr Tr) \<union>
                                        dom AuxPred \<union>
                                        vars_label_hm_tr (label_hm_translation Tr)) = {}"
-   shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
+    shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
   show "wf_mask_simple (get_mh_total_full \<omega>def')"
@@ -1583,7 +1593,7 @@ proof (intro conjI)
     using state_rel0_wf_mask_simple[OF StateRel] OnlyStoreAffectedVpr    
     by fastforce
 
-  show "store_rel A \<Lambda> (var_translation Tr') \<omega>' ns'"
+  show "store_rel A \<Lambda> (var_translation Tr') (get_store_total \<omega>') ns'"
     using StoreRel \<open>Tr' = _\<close>
     by simp
 
@@ -1756,16 +1766,16 @@ qed (insert StateRel WellDefSame Consistent, unfold state_rel0_def, auto)
 lemmas state_rel_store_update = state_rel0_state_rel[OF state_rel0_store_update[OF state_rel_state_rel0]]
 
 lemma state_rel0_store_update_same_tr:
-  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns" and
-          WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'" and
-     Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'" and
-     OnlyStoreAffectedVpr: 
-           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"  and
-     OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran (var_translation Tr) \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)" and
-     StoreRel: "store_rel A \<Lambda> (var_translation Tr) \<omega>' ns'" and
-     ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x" and
-     OldStateEq: "old_global_state ns' = old_global_state ns" and
-     BinderEmpty: "binder_state ns' = Map.empty"
+  assumes StateRel: "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
+      and WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'"
+      and Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'"
+      and OnlyStoreAffectedVpr: 
+           "get_total_full \<omega> = get_total_full \<omega>' \<and> get_trace_total \<omega> = get_trace_total \<omega>'"
+      and OnlyStoreAffectedBpl: "(\<And>x. x \<notin> ran (var_translation Tr) \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x)"
+      and StoreRel: "store_rel A \<Lambda> (var_translation Tr) (get_store_total \<omega>') ns'"
+      and ShadowedGlobalsEq: "\<And>x. map_of (snd \<Lambda>) x \<noteq> None \<Longrightarrow> global_state ns' x = global_state ns x"
+      and OldStateEq: "old_global_state ns' = old_global_state ns"
+      and BinderEmpty: "binder_state ns' = Map.empty"
    shows "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def' \<omega>' ns'"
   apply (rule state_rel0_store_update[where ?Tr = Tr and ?f = "(var_translation Tr)", OF StateRel])
   using assms apply simp_all
@@ -1789,14 +1799,14 @@ lemma state_rel_store_update_2:
         apply simp
        apply simp
       using VarCtxt VarTr ranI 
+      apply fastforce
+      using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
      apply fastforce
-     using state_rel0_store_rel[OF state_rel_state_rel0[OF StateRel]] assms store_rel_update
-    apply blast
-   apply (metis VarCtxt global_state_update_local global_state_update_other option.exhaust)
+    apply (metis VarCtxt global_state_update_local global_state_update_other option.exhaust)
    apply (simp add: update_var_old_global_same)
- using state_rel0_state_well_typed[OF state_rel_state_rel0[OF StateRel]]
- unfolding state_well_typed_def
-  apply (simp add: update_var_binder_same)   
+  using state_rel0_state_well_typed[OF state_rel_state_rel0[OF StateRel]]
+  unfolding state_well_typed_def
+  apply (simp add: update_var_binder_same)
   done
 
 lemma state_rel_new_auxvar:
@@ -1820,7 +1830,7 @@ proof -
   show ?thesis
     unfolding state_rel_def state_rel0_def
   proof (intro conjI)
-    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega> (update_var (var_context ctxt) ns aux_var aux_val)"
+    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) (get_store_total \<omega>) (update_var (var_context ctxt) ns aux_var aux_val)"
       using store_rel_stable[OF state_rel0_store_rel[OF StateRel0]] AuxVarFresh
       by fastforce
   next
@@ -1958,7 +1968,7 @@ lemma state_rel0_heap_update:
       using state_rel0_wf_mask_simple[OF StateRel] \<open>\<omega>' = _\<close>
       by simp
   next
-    show "store_rel TyInterp \<Lambda> (var_translation Tr') \<omega>' ns'"
+    show "store_rel TyInterp \<Lambda> (var_translation Tr') (get_store_total \<omega>') ns'"
     proof (simp add: \<open>Tr' = _\<close>, rule store_rel_stable[OF state_rel0_store_rel[OF StateRel]])
       show "get_store_total \<omega> = get_store_total \<omega>'"  
         using \<open>\<omega>' = _\<close>
@@ -2411,7 +2421,7 @@ lemma state_rel0_mask_update:
         shows "state_rel0 Pr StateCons TyInterp \<Lambda> TyRep Tr' AuxPred \<omega>def' \<omega>' ns'"
   unfolding state_rel0_def
 proof (intro conjI)
-  show "store_rel TyInterp \<Lambda> (var_translation Tr') \<omega>' ns'"
+  show "store_rel TyInterp \<Lambda> (var_translation Tr') (get_store_total \<omega>') ns'"
   proof (simp add: \<open>Tr' = _\<close>, rule store_rel_stable[OF state_rel0_store_rel[OF StateRel]])
     show "get_store_total \<omega> = get_store_total \<omega>'"  
       using \<open>\<omega>' = _\<close>
@@ -2879,6 +2889,62 @@ next
     using state_rel_state_well_typed[OF StateRel, simplified state_well_typed_def]
     by blast   
 qed (insert MaskVarRel, insert state_rel_state_rel0[OF StateRel, simplified state_rel0_def], simp_all)    
+
+subsubsection \<open>Labeled state adjustments\<close>
+
+lemma state_rel_label_mask_update:
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t" 
+      and StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega> \<omega> ns"
+      and "\<omega>' = update_trace_label_total \<omega> lbl (get_total_full \<omega>)"
+      and "label_tr = label_hm_translation Tr"     
+      and HeapLabelStable: "\<And>h. fst label_tr lbl = Some h \<Longrightarrow> get_trace_total \<omega> lbl = Some (get_total_full \<omega>)"
+      and "Tr' = (Tr \<lparr> label_hm_translation := (fst label_tr, (snd label_tr)(lbl \<mapsto> m)) \<rparr>)"  
+      and MaskVarRel: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total_full \<omega>) ns" 
+      and Disj: "m \<notin> {heap_var Tr, heap_var_def Tr, mask_var Tr, mask_var_def Tr} \<union> ran (var_translation Tr)
+                       \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred"
+    shows "state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>' \<omega>' ns"
+  unfolding state_rel_def state_rel0_def
+  unfolding \<open>Tr' = _\<close> \<open>\<omega>' = _\<close>
+proof(simp, intro conjI)
+  show "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow>
+    StateCons (\<omega>\<lparr>get_trace_total := get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)\<rparr>)"
+    using WfConsistency state_rel_consistent[OF StateRel]
+    unfolding wf_total_consistency_def
+    by auto
+next
+  have SubAux: "vars_label_hm_tr (fst label_tr, (snd label_tr)(lbl \<mapsto> m)) \<subseteq> vars_label_hm_tr label_tr \<union> {m}"   
+    unfolding vars_label_hm_tr_def ran_def
+    by auto
+
+  have "disjoint_list
+         ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr),
+           ran (field_translation Tr), range (const_repr Tr), dom AuxPred]@
+          [vars_label_hm_tr label_tr \<union> {m}])"
+    apply (rule disjoint_list_add)
+    using state_rel_disjoint[OF StateRel] 
+    unfolding \<open>label_tr = _\<close>
+     apply simp
+    using Disj
+    by fastforce
+    
+  thus "disjoint_list
+       [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr),
+        ran (field_translation Tr), range (const_repr Tr), dom AuxPred,
+        vars_label_hm_tr (fst label_tr, snd label_tr(lbl \<mapsto> m))]"
+    apply (rule disjoint_list_subset_list_all2)
+    using SubAux
+    by simp_all
+next
+  note StateRelLabel = state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def label_rel_def]
+  
+  show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (fst label_tr, snd label_tr(lbl \<mapsto> m))
+                        (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) ns"
+    unfolding label_hm_rel_def label_rel_def
+    using StateRelLabel HeapLabelStable MaskVarRel
+    unfolding \<open>label_tr = _\<close>
+    by fastforce      
+qed(insert StateRel[simplified state_rel_def state_rel0_def], auto)              
+
 
 subsection \<open>Adjust state relation options\<close>
 

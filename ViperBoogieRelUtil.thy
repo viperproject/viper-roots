@@ -516,7 +516,7 @@ lemma state_rel_upd_trace_subset:
       and StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
           \<comment>\<open>the active (i.e., tracked by \<^const>\<open>label_hm_translation\<close>) labels tracked by the new trace 
              must match the previous trace\<close>
-      and ActiveLabels: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
+      and ActiveLabels: "\<And>lbl. lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
 proof - 
   from assms have ConsistencyUpd: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_trace_total \<omega>def t) \<and> StateCons (update_trace_total \<omega> t)"
@@ -526,8 +526,8 @@ proof -
   have LabelRel: 
     "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
     using ActiveLabels state_rel_label_hm_rel[OF StateRel]
-    unfolding label_hm_rel_def
-    by fastforce
+    unfolding label_hm_rel_def active_labels_hm_tr_def label_rel_def
+    by force
 
   show ?thesis
     unfolding state_rel_def state_rel0_def
@@ -947,13 +947,20 @@ proof -
     by simp
 qed
 
+lemma state_rel_active_label_exists:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)"
+    shows "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi>"
+  using state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def label_rel_def] \<open>lbl \<in> _\<close>[simplified active_labels_hm_tr_def]
+  by blast
+
 lemma post_framing_propagate_aux:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>0 \<omega>0 ns" and
           WfTyRep: "wf_ty_repr_bpl TyRep" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
           OldStateSame: "get_trace_total \<omega>1 old_label = get_trace_total \<omega>0 old_label" and
-          DomLabelMap: "dom (label_hm_translation Tr) \<subseteq> {old_label}" and
+          DomLabelMap: "active_labels_hm_tr (label_hm_translation Tr) \<subseteq> {old_label}" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>1)" and
           Consistent: "StateCons \<omega>1" and
           HeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>1)" and
@@ -1012,9 +1019,10 @@ proof -
   have
     StateRel4: "state_rel Pr StateCons TyRep (?Tr'\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) AuxPred ctxt ?\<omega>'' ?\<omega>'' ns''"
   proof -
-    have *: "\<And>lbl. lbl \<in> dom (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>0 lbl = Some \<phi>"
-      using DomLabelMap state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def] OldStateSame
-      by fastforce
+    have *: "\<And>lbl. lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<and> get_trace_total \<omega>0 lbl = Some \<phi>"
+      using DomLabelMap state_rel_active_label_exists[OF StateRel] OldStateSame
+      by auto
+
     show ?thesis
     apply (rule state_rel_upd_trace_subset[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]])
       by (simp_all add: *)       

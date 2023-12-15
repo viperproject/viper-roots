@@ -304,7 +304,7 @@ lemma post_framing_rel_aux:
       and LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)"
       and LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
       and ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var"
-      and DomLabelMap: "dom (label_hm_translation Tr) = {old_label}"
+      and DomLabelMap: "active_labels_hm_tr (label_hm_translation Tr) = {old_label}"
       and Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
                               {mask_var Tr, mask_var_def Tr} \<union>
                               (ran (var_translation Tr)) \<union>
@@ -359,7 +359,7 @@ proof (rule allI | rule impI)+
     using StateRelInst OldState
     by argo
 
-  have DomLabelMap2: "dom (label_hm_translation Tr) \<subseteq> {old_label}"
+  have DomLabelMap2: "active_labels_hm_tr (label_hm_translation Tr) \<subseteq> {old_label}"
     using DomLabelMap
     by blast
 
@@ -1480,7 +1480,7 @@ lemma init_state_in_state_relation:
 
           "heap_var Tr = heap_var_def Tr" and
           "mask_var Tr = mask_var_def Tr" and          
-          NoTrackedLabeledStates: "label_hm_translation Tr = Map.empty" and
+          NoTrackedLabeledStates: "label_hm_translation Tr = (Map.empty, Map.empty)" and
 
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
@@ -1888,7 +1888,7 @@ qed
 lemma disj_vars_state_relation_initialI:
   assumes "heap_var Tr = heap_var_def Tr"
       and "mask_var Tr = mask_var_def Tr"
-      and "label_hm_translation Tr = Map.empty"
+      and "label_hm_translation Tr = (Map.empty, Map.empty)"
       and Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
                                ran (field_translation Tr), range (const_repr Tr)]"
     shows "disjoint_list (state_rel0_disj_list Tr Map.empty)"  

@@ -1709,7 +1709,7 @@ lemma method_call_stmt_rel_inst:
       and "var_tr' = [[0..<length es] [\<mapsto>] xs_bpl]"
       and "label_vars_bpl = vars_label_hm_tr (label_hm_translation Tr)"
       and ProgressToOldRel: "\<And> fpred. rel_general 
-                                         (state_rel_def_same Pr StateCons TyRep (Tr \<lparr> label_hm_translation := Map.empty \<rparr>) (map_upd_set AuxPred label_vars_bpl fpred) ctxt)
+                                         (state_rel_def_same Pr StateCons TyRep (Tr \<lparr> label_hm_translation := (Map.empty,Map.empty) \<rparr>) (map_upd_set AuxPred label_vars_bpl fpred) ctxt)
                                          (state_rel_def_same Pr StateCons TyRep (Tr \<lparr> label_hm_translation := label_tr \<rparr>) (map_upd_set AuxPred label_vars_bpl fpred) ctxt) 
                        (\<lambda>\<omega> \<omega>'. \<omega>' = update_trace_total \<omega> [old_label \<mapsto> get_total_full \<omega>]) (\<lambda>_.False)
                        P ctxt \<gamma> \<gamma>_exh_in"
@@ -1986,7 +1986,7 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome ArgsAreVars,
 
     let ?\<omega>_old = "update_trace_total \<omega> [old_label \<mapsto> get_total_full \<omega>]"
 
-    from StateRelConcrete[OF R0] have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>label_hm_translation := Map.empty\<rparr>)
+    from StateRelConcrete[OF R0] have "state_rel_def_same Pr StateCons TyRep (Tr\<lparr>label_hm_translation := (Map.empty,Map.empty)\<rparr>)
        (map_upd_set AuxPred label_vars_bpl ?fpred) ctxt \<omega> ns"
       sorry
     with rel_success_elim[OF ProgressToOldRel] obtain ns'

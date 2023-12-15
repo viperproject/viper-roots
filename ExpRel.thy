@@ -285,6 +285,14 @@ proof (rule exp_rel_vpr_bpl_intro_2)
   qed
 qed
 
+lemma exp_rel_oldexp:
+  assumes "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> ROld (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>) 
+                                             (\<omega> \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>) 
+                                             ns"
+      and "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
+    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
+
+
 subsubsection \<open>Binary Operations\<close>
 
 lemma exp_rel_binop:
