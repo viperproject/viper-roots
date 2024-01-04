@@ -1,11 +1,10 @@
-section \<open>Semantic relationship between basic Viper and Boogie constructs\<close>
+section \<open>Relation between basic Viper and Boogie states\<close>
 theory ViperBoogieBasicRel
 imports TotalExpressions TotalSemantics ViperBoogieAbsValueInst BoogieInterface "HOL-Library.Disjoint_Sets" 
 begin
 
-text \<open>
-  In this section, we provide definitions that semantically relate Viper and Boogie constructs.
-\<close>
+text \<open>This section defines the relation between Viper and Boogie states, and proves some properties 
+      of the relation.\<close>
 
 type_synonym viper_expr = ViperLang.pure_exp
 type_synonym boogie_expr = Lang.expr

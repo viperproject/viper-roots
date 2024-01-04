@@ -405,6 +405,8 @@ proof -
     by blast
 qed
 
+subsection \<open>Main helper lemma for final theorem\<close>
+
 lemma end_to_end_vpr_method_correct_partial:
   assumes 
           \<comment>\<open>The Boogie procedure is correct. Note that we need to explicitly provide the types such that
