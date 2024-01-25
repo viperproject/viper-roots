@@ -132,7 +132,7 @@ text \<open>Construct the set of states that can be reached after inhaling a fie
       permission is added and otherwise the added permission is just required to be positive without
       any further constraints (useful to model adding wildcard permission).\<close>
 
-definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+definition inhale_perm_single :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> preal option \<Rightarrow> 'a full_total_state set"
   where "inhale_perm_single R \<omega> lh p_opt =
       {\<omega>'| \<omega>' q. R \<omega>' \<and>
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
@@ -160,7 +160,7 @@ lemma inhale_perm_single_elem:
 text \<open>Construct the set of states that can be reached after inhaling a predicate permission.
       \<^term>\<open>p_opt\<close> plays the same role as in \<^const>\<open>inhale_perm_single\<close>\<close>
 
-definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat option \<Rightarrow> 'a full_total_state set"
+definition inhale_perm_single_pred :: "('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> preal option \<Rightarrow> 'a full_total_state set"
   where "inhale_perm_single_pred R \<omega> lp p_opt = 
       {\<omega>'| \<omega>' q. R \<omega>' \<and>  
                option_fold ((=) q) (q \<noteq> pnone) p_opt \<and>
@@ -209,7 +209,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
   ("_, _, _ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>]\<^sub>t _)" [51,51,51,0,51,51] 81) and
    red_pure_exps_total :: "'a total_context \<Rightarrow>  ('a full_total_state \<Rightarrow> bool) \<Rightarrow> 'a full_total_state option \<Rightarrow> pure_exp list \<Rightarrow> 'a full_total_state \<Rightarrow> (('a val) list) option \<Rightarrow> bool" and
    red_inhale :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool" and
-   unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a total_state \<Rightarrow> 'a total_state \<Rightarrow> bool"
+   unfold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> preal \<Rightarrow> 'a total_state \<Rightarrow> 'a total_state \<Rightarrow> bool"
   for ctxt :: "'a total_context" and R :: "'a full_total_state \<Rightarrow> bool"
   where
 
@@ -297,7 +297,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | RedPerm: 
    "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a));
       get_mh_total_full \<omega> (a, f) = v \<rbrakk> \<Longrightarrow> 
-      ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_prat v))"
+      ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm (Rep_preal v))"
 
 \<comment>\<open>Unfolding\<close> 
 | RedUnfolding: "\<lbrakk> ctxt, R, None \<turnstile> \<langle>ubody; \<omega>\<rangle> [\<Down>]\<^sub>t v \<rbrakk> \<Longrightarrow>   
@@ -336,13 +336,13 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | InhAcc: 
     "\<lbrakk> ctxt, R, Some \<omega> \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r); 
        ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p); 
-       W' = (if r = Null then {\<omega>} else inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_prat p)));
+       W' = (if r = Null then {\<omega>} else inhale_perm_single R \<omega> (the_address r,f) (Some (Abs_preal p)));
        th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res \<rbrakk> \<Longrightarrow>
        red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
 | InhAccPred:
     "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
        ctxt, R, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);      
-       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p));
+       W' = inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_preal p));
        th_result_rel (p \<ge> 0) (W' \<noteq> {}) W' res \<rbrakk> \<Longrightarrow>       
        red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega> res"
 | InhAccWildcard: 
@@ -399,7 +399,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
      q \<noteq> pnone;
      m' = m( (pred_id,vs) := (m (pred_id,vs)) - q );
      \<omega> = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = update_mp_total \<phi> m' \<rparr>;
-     red_inhale ctxt R (syntactic_mult (Rep_prat q) pred_body) \<omega> (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
+     red_inhale ctxt R (syntactic_mult (Rep_preal q) pred_body) \<omega> (RNormal \<omega>') \<rbrakk> \<Longrightarrow> 
      unfold_rel ctxt R pred_id vs q \<phi> (get_total_full \<omega>')"
 
 lemmas red_exp_inhale_unfold_inducts = red_pure_exp_total_red_pure_exps_total_red_inhale_unfold_rel.inducts
@@ -730,7 +730,7 @@ fun extract_address_from_val :: "'a val \<Rightarrow> address"
   | "extract_address_from_val _ = undefined"
 
 (* TODO: duplicate? *)
-fun extract_perm_from_val :: "'a val \<Rightarrow> rat"
+fun extract_perm_from_val :: "'a val \<Rightarrow> real"
   where 
     "extract_perm_from_val (VPerm r) = r"
   | "extract_perm_from_val _ = undefined"
@@ -805,8 +805,8 @@ inductive total_heap_consistent :: "'a total_context \<Rightarrow> 'a full_total
                  total_heap_consistent ctxt \<omega>"
 \<close>
 
-inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state \<Rightarrow> bool"
-  for ctxt :: "'a total_context" and m :: "mask \<times> 'a predicate_mask"
+inductive total_heap_consistent_wrt_mask :: "'a total_context \<Rightarrow> preal mask \<times> 'a predicate_mask \<Rightarrow> 'a total_state \<Rightarrow> bool"
+  for ctxt :: "'a total_context" and m :: "preal mask \<times> 'a predicate_mask"
   where 
   \<comment>\<open>If a state does contain any permission to non-abstract predicates, then the state is trivially consistent.\<close>
   ConsistentNoPred: 

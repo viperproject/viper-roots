@@ -36,7 +36,7 @@ lemma exh_if_total_failure:
   using assms
   by (auto elim: exh_if_total.elims)
 
-definition exhale_perm_single :: "mask \<Rightarrow> heap_loc \<Rightarrow> prat option \<Rightarrow> mask set"
+definition exhale_perm_single :: "preal mask \<Rightarrow> heap_loc \<Rightarrow> preal option \<Rightarrow> (preal mask) set"
   where "exhale_perm_single m lh p_opt =
       {m'| m' q. 
                (p_opt = None \<longrightarrow> pgt q pnone) \<and>
@@ -55,8 +55,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p);
      a = the_address r \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> 
-                          ( exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (mh (a,f)) (Abs_prat p)))
-                                         (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((mh (a,f)) - (Abs_prat p)))
+                          ( exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (mh (a,f)) (Abs_preal p)))
+                                         (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((mh (a,f)) - (Abs_preal p)))
                           )"
 
 \<comment>\<open>Exhaling wildcard removes some non-zero permission that is less than the current permission held.\<close>
@@ -77,8 +77,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      red_pure_exps_total ctxt R (Some \<omega>0) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>
-            (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_prat p)) 
-                          (update_mp_loc_total_full \<omega> (pred_id, v_args) (mp (pred_id, v_args) - (Abs_prat p))))"
+            (exh_if_total (p \<ge> 0 \<and> pgte (mp(pred_id, v_args)) (Abs_preal p)) 
+                          (update_mp_loc_total_full \<omega> (pred_id, v_args) (mp (pred_id, v_args) - (Abs_preal p))))"
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>0) e_args \<omega> (Some v_args);
@@ -203,14 +203,14 @@ proof -
     by simp
 qed
 
-inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> prat \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
+inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> predicate_ident \<Rightarrow> ('a val list) \<Rightarrow> preal \<Rightarrow> 'a full_total_state \<Rightarrow> 'a stmt_result_total \<Rightarrow> bool"
   where 
     FoldRelNormal: 
       "\<lbrakk> ViperLang.predicates (program_total ctxt) pred_id = Some pred_decl;
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
        \<omega>0 = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = get_total_full \<omega> \<rparr>;
-       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_prat q) pred_body) \<omega>0 (RNormal \<omega>1);
+       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_preal q) pred_body) \<omega>0 (RNormal \<omega>1);
        \<omega>' = \<lparr> get_store_total = get_store_total \<omega>, 
               get_trace_total = get_trace_total \<omega>,
               get_total_full = update_mp_loc_total (get_total_full \<omega>1) (pred_id,vs) (padd (get_mp_total (get_total_full \<omega>1) (pred_id, vs)) q)
@@ -221,7 +221,7 @@ inductive fold_rel :: "'a total_context \<Rightarrow> ('a full_total_state \<Rig
        ViperLang.predicate_decl.body pred_decl = Some pred_body;
        q \<noteq> pnone;
        \<omega>0 = \<lparr> get_store_total = nth_option vs, get_trace_total = Map.empty, get_total_full = get_total_full \<omega> \<rparr>;
-       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_prat q) pred_body) \<omega>0 RFailure \<rbrakk> \<Longrightarrow> 
+       red_exhale ctxt R \<omega>0 (syntactic_mult (Rep_preal q) pred_body) \<omega>0 RFailure \<rbrakk> \<Longrightarrow> 
        fold_rel ctxt R pred_id vs q \<omega> RFailure"    
 
 inductive_cases FoldRelNormalCase: "fold_rel ctxt R pred_id vs q \<omega> (RNormal \<omega>')"
@@ -344,8 +344,8 @@ always has at least one failure transition. This is in-sync with the recent Carb
 | RedUnfold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     W' = {\<omega>'. \<exists>\<phi>'. \<omega>' = \<omega>\<lparr> get_total_full := \<phi>' \<rparr> \<and> unfold_rel ctxt R pred_id v_args (Abs_prat v_p) (get_total_full \<omega>) \<phi>' \<and> R \<omega>'};
-     th_result_rel (v_p > 0 \<and> v_p \<le> Rep_prat (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
+     W' = {\<omega>'. \<exists>\<phi>'. \<omega>' = \<omega>\<lparr> get_total_full := \<phi>' \<rparr> \<and> unfold_rel ctxt R pred_id v_args (Abs_preal v_p) (get_total_full \<omega>) \<phi>' \<and> R \<omega>'};
+     th_result_rel (v_p > 0 \<and> v_p \<le> Rep_preal (get_mp_total_full \<omega> (pred_id, v_args))) True W' res \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Unfold pred_id e_args (PureExp e_p)) \<omega> res"
 
 \<comment>\<open>\<^const>\<open>unfold_rel\<close> constrains permission \<^term>\<open>p\<close> to be strictly positive\<close>
@@ -367,7 +367,7 @@ always has at least one failure transition. This is in-sync with the recent Carb
 | RedFold:
   "\<lbrakk> red_pure_exps_total ctxt R (Some \<omega>) e_args \<omega> (Some v_args);
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm v_p);     
-     fold_rel ctxt R pred_id v_args (Abs_prat v_p) \<omega> res
+     fold_rel ctxt R pred_id v_args (Abs_preal v_p) \<omega> res
  \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Fold pred_id e_args (PureExp e_p)) \<omega> res"
 
@@ -573,8 +573,8 @@ lemma red_exhale_acc_normalI:
   assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
       and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
       and "a = the_address r"
-      and "p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_prat p))" (is "?Success")
-      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p)))" (is "\<omega>' = ?\<omega>def")
+      and "p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_preal p))" (is "?Success")
+      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_preal p)))" (is "\<omega>' = ?\<omega>def")
     shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> (RNormal \<omega>')"
 proof -
   have Eq: "RNormal \<omega>' = exh_if_total ?Success ?\<omega>def"

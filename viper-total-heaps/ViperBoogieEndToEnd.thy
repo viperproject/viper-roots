@@ -1570,7 +1570,7 @@ proof -
       show "mask_rel (program_total ctxt_vpr) (field_translation Tr) (get_mh_total_full \<omega>) zero_mask_bpl"
         using \<open>is_empty_total_full \<omega>\<close>
         unfolding mask_rel_def is_empty_total_full_def is_empty_total_def zero_mask_def      
-        by (simp add: zero_prat.rep_eq)
+        by (simp add: zero_preal.rep_eq)
     qed
   
     thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) \<omega> ns"

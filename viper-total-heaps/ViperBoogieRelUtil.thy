@@ -67,93 +67,16 @@ lemma store_temporary_perm_rel:
          EmptyRtype: "rtype_interp ctxt = []" 
   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign temp_var e_bpl # cs) s tr), cont), Normal ns)
                                    ((BigBlock name cs s tr, cont), Normal ns') \<and>
-                (state_rel Pr StateCons TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>def \<omega> ns')"
+                (state_rel Pr StateCons TyRep Tr (AuxPred(temp_var \<mapsto> pred_eq (RealV p))) ctxt \<omega>def \<omega> ns')"
            (is "\<exists>ns'. ?red ns' \<and> ?R' \<omega> ns'")
    using store_vpr_exp_to_temporary_var[OF StateRel TyInterp EmptyRtype DisjAux LookupTyTemp RedPerm ExpRel]
    by simp
 
-subsection \<open>Store well-definedness state in fresh variables\<close>
-
-(*
-lemma store_new_mask_def:
-  assumes
-  StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
-         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
-         DisjAux: "mvar_def' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
-                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
-         LookupTy: "lookup_var_ty (var_context ctxt) mvar_def' = Some (TConSingle (TMaskId TyRep))" and
-                  "mvar_def = mask_var_def Tr"
-   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign mvar_def' (Var mvar_def) # cs) s tr), cont), Normal ns)
-                                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
-                (state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns')"
-proof -
-  from state_rel_mask_var_def_rel[OF StateRel] obtain m where 
-    LookupMaskVarDef: "lookup_var (var_context ctxt) ns (mask_var_def Tr) = Some (AbsV (AMask m))"    
-    unfolding mask_var_rel_def
-    by blast
-
-  let ?ns' = "(update_var (var_context ctxt) ns mvar_def' (AbsV (AMask m)))"
-
-  have StateRelUpd: "state_rel Pr StateCons TyRep (Tr\<lparr>mask_var_def := mvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
-    using state_rel_mask_var_def_update[OF StateRel DisjAux LookupTy LookupMaskVarDef]
-    by blast
-
-  show ?thesis
-    apply (rule exI)
-    apply (rule conjI)
-     apply (rule red_ast_bpl_one_assign)
-       apply (rule LookupTy)
-      apply (fastforce intro: RedVar LookupMaskVarDef simp: \<open>mvar_def = _\<close>)
-     apply (simp add: TyInterp)
-    apply (rule StateRelUpd)
-    done
-qed
-
-lemma store_new_heap_def:
-  assumes
-  StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
-         TyInterp:  "type_interp ctxt = vbpl_absval_ty TyRep" and
-         DisjAux: "hvar_def' \<notin> {heap_var Tr, mask_var Tr, heap_var_def Tr, mask_var_def Tr} \<union> ran (var_translation Tr) \<union> 
-                     ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred" and
-         LookupTy: "lookup_var_ty (var_context ctxt) hvar_def' = Some (TConSingle (THeapId TyRep))" and
-                  "hvar_def = heap_var_def Tr"
-   shows "\<exists>ns'. red_ast_bpl P ctxt (((BigBlock name (Lang.Assign hvar_def' (Var hvar_def) # cs) s tr), cont), Normal ns)
-                                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
-                (state_rel Pr StateCons TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns')"
-proof -
-  from state_rel_heap_var_def_rel[OF StateRel] obtain h where 
-    LookupMaskVarDef: "lookup_var (var_context ctxt) ns (heap_var_def Tr) = Some (AbsV (AHeap h))"  and
-                      "vbpl_absval_ty_opt TyRep (AHeap h) = Some (THeapId TyRep, [])"
-    unfolding heap_var_rel_def
-    by blast
-
-  hence HeapType: "type_of_val (type_interp ctxt) (AbsV (AHeap h)) = TConSingle (THeapId TyRep)"
-    using TyInterp
-    by simp
-
-  let ?ns' = "(update_var (var_context ctxt) ns hvar_def' (AbsV (AHeap h)))"
-
-  have StateRelUpd: "state_rel Pr StateCons TyRep (Tr\<lparr>heap_var_def := hvar_def'\<rparr>) AuxPred ctxt \<omega>def \<omega> ?ns'"
-    using state_rel_heap_var_def_update[OF StateRel DisjAux LookupTy LookupMaskVarDef]
-    by blast
-
-  show ?thesis
-    apply (rule exI)
-    apply (rule conjI)
-     apply (rule red_ast_bpl_one_assign)
-       apply (rule LookupTy)
-      apply (fastforce intro: RedVar LookupMaskVarDef simp: \<open>hvar_def = _\<close>)
-     apply (simp only: instantiate_nil)
-     apply (rule HeapType)
-    apply (rule StateRelUpd)
-    done
-qed
-*)
 subsection \<open>Permission checks\<close>
 
 lemma pos_perm_rel_nontrivial:
   assumes "zero_perm = const_repr Tr CNoPerm" and
-          StateRelImpl:"\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega>def \<omega> ns" and
+          StateRelImpl:"\<And> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt \<omega>def \<omega> ns" and
           SuccessCond:"\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> \<omega> = \<omega>' \<and> p \<ge> 0" and
           FailCond: "\<And> \<omega>. Fail \<omega> \<Longrightarrow> p < 0"
 shows "rel_general (uncurry R) 
@@ -166,10 +89,10 @@ proof (rule assert_single_step_rel[where ?cond="\<lambda>_. p \<ge> 0"])
   fix \<omega>def_\<omega> ns
   
   assume "uncurry R \<omega>def_\<omega> ns" 
-  hence StateRel: "state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns"
+  hence StateRel: "state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns"
     using StateRelImpl
     by simp
-  let ?p_bpl = "RealV (real_of_rat p)"
+  let ?p_bpl = "RealV p"
   
   have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some ?p_bpl"
     using state_rel_aux_pred_sat_lookup_2[OF StateRel]
@@ -180,9 +103,9 @@ proof (rule assert_single_step_rel[where ?cond="\<lambda>_. p \<ge> 0"])
              intro: LookupTempPerm
                     boogie_const_rel_lookup[OF state_rel0_boogie_const_rel[OF state_rel_state_rel0[OF StateRel]]]
              simp: \<open>zero_perm = _\<close> )
-    qed (insert assms, auto)
+qed (insert assms, auto)
 
-    subsection \<open>Mask Update\<close>
+subsection \<open>Mask Update\<close>
 
 lemma mask_upd_rel:
   assumes
@@ -199,12 +122,12 @@ lemma mask_upd_rel:
     SuccessUpdState: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow>
                          fst \<omega>' = (if mask_var_def Tr = mask_var Tr \<and> r \<noteq> Null then snd \<omega>' else fst \<omega>) \<and>
                          snd \<omega>' = (if r = Null then (snd \<omega>) else 
-                                      update_mh_loc_total_full (snd \<omega>) (the_address r,f_vpr) (p_prat \<omega>))" and
+                                      update_mh_loc_total_full (snd \<omega>) (the_address r,f_vpr) (p_preal \<omega>))" and
     RedRcvBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" and
     RedPermBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> 
                    red_expr_bpl ctxt new_perm_bpl ns 
-                               (if r = Null then RealV 0 else (RealV (real_of_rat (Rep_prat (p_prat \<omega>))))) \<and>
-                   (r \<noteq> Null \<longrightarrow> pgte pwrite (p_prat \<omega>))"
+                               (if r = Null then RealV 0 else (RealV (Rep_preal (p_preal \<omega>)))) \<and>
+                   (r \<noteq> Null \<longrightarrow> pgte pwrite (p_preal \<omega>))"
   shows "rel_general R 
                   (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt))
                   Success
@@ -239,7 +162,7 @@ proof (rule rel_intro)
     using state_rel_obtain_mask[OF StateRelInst]
     by blast
 
-  let ?p' = "if r = Null then 0 else real_of_rat (Rep_prat (p_prat \<omega>))"
+  let ?p' = "if r = Null then 0 else Rep_preal (p_preal \<omega>)"
   let ?mb' = "mb ( (r, ?f_bpl_val) := ?p' )"
         
   have RedMaskUpdBpl:
@@ -256,7 +179,7 @@ proof (rule rel_intro)
     using TyTr
     by simp
     
-  let ?\<omega>' = "(if r = Null then (snd \<omega>) else update_mh_loc_total_full (snd \<omega>) (the_address r,f_vpr) (p_prat \<omega>))"
+  let ?\<omega>' = "(if r = Null then (snd \<omega>) else update_mh_loc_total_full (snd \<omega>) (the_address r,f_vpr) (p_preal \<omega>))"
 
   let ?ns' = "update_var (var_context ctxt) ns m_bpl (AbsV (AMask ?mb'))"
 
@@ -285,11 +208,11 @@ proof (rule rel_intro)
     case False
     from this obtain a where "r = Address a" 
       using ref.exhaust by auto
-    hence "snd \<omega>' = update_mh_loc_total_full (snd \<omega>) (a,f_vpr) (p_prat \<omega>)"
+    hence "snd \<omega>' = update_mh_loc_total_full (snd \<omega>) (a,f_vpr) (p_preal \<omega>)"
       using SuccessUpdState[OF \<open>R \<omega> ns\<close> Success] False
       by simp
    
-    have "?mb' = mask_bpl_upd_normal_field mb (Address a) f_bpl \<tau>_vpr (real_of_rat (Rep_prat (p_prat \<omega>)))"
+    have "?mb' = mask_bpl_upd_normal_field mb (Address a) f_bpl \<tau>_vpr (Rep_preal (p_preal \<omega>))"
       unfolding mask_bpl_upd_normal_field_def
       by (simp add: \<open>r = _\<close>)      
 
@@ -340,12 +263,12 @@ lemma mask_upd_rel_2:
     FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
     SuccessUpdState: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow>
                          \<omega>' = (if r = Null then \<omega> else 
-                                      update_mh_loc_total_full \<omega> (the_address r,f_vpr) (p_prat \<omega>))" and
+                                      update_mh_loc_total_full \<omega> (the_address r,f_vpr) (p_preal \<omega>))" and
     RedRcvBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))" and
     RedPermBpl: "\<And> \<omega> \<omega>' ns. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> 
                    red_expr_bpl ctxt new_perm_bpl ns 
-                               (if r = Null then RealV 0 else (RealV (real_of_rat (Rep_prat (p_prat \<omega>))))) \<and>
-                   (r \<noteq> Null \<longrightarrow> pgte pwrite (p_prat \<omega>))"
+                               (if r = Null then RealV 0 else (RealV (Rep_preal (p_preal \<omega>)))) \<and>
+                   (r \<noteq> Null \<longrightarrow> pgte pwrite (p_preal \<omega>))"
   shows "rel_general R 
                   (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)
                   Success
@@ -353,7 +276,7 @@ lemma mask_upd_rel_2:
                   (BigBlock name ((Assign m_bpl m_upd_bpl) # cs) str tr, cont) 
                   (BigBlock name cs str tr, cont)"
   apply (rule rel_general_convert, rule rel_general_conseq_fail, rule rel_general_conseq_output, 
-         rule mask_upd_rel[where ?p_prat="p_prat \<circ> snd" and r=r])
+         rule mask_upd_rel[where ?p_preal="p_preal \<circ> snd" and r=r])
   using assms
   by fastforce+
 

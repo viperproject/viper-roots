@@ -2,7 +2,7 @@ section \<open>Helper lemmas, instantiations, definitions for the total state\<c
 
 theory TotalStateUtil
 imports ViperCommon.SepAlgebra TotalViperUtil TotalViperState ViperCommon.DeBruijn
-begin
+begin                                    
 
 subsection \<open>update_store_total\<close>
 
@@ -31,22 +31,22 @@ lemma update_trace_total_mask_same: "get_mh_total_full (update_trace_total \<ome
 
 subsection \<open>heap and mask in total state\<close>
 
-fun get_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> mask \<times> 'a predicate_mask"
+fun get_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> field_mask \<times> 'a predicate_mask"
   where "get_m_total \<omega> = (get_mh_total \<omega>, get_mp_total \<omega>)"
 
-fun update_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> mask \<times> 'a predicate_mask \<Rightarrow> ('a, 'b) total_state_scheme"
+fun update_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> field_mask \<times> 'a predicate_mask \<Rightarrow> ('a, 'b) total_state_scheme"
   where "update_m_total \<omega> m = \<omega>\<lparr> get_mh_total := fst m, get_mp_total := snd m \<rparr>"
 
 fun update_hh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> 'a val \<Rightarrow> 'a total_state"
   where "update_hh_loc_total \<omega> l v = \<omega>\<lparr>get_hh_total := (get_hh_total \<omega>)(l := v)\<rparr>"
 
-fun update_mh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
+fun update_mh_loc_total :: "'a total_state \<Rightarrow> heap_loc \<Rightarrow> preal \<Rightarrow> 'a total_state"
   where "update_mh_loc_total \<omega> l p = \<omega>\<lparr>get_mh_total := (get_mh_total \<omega>)(l := p)\<rparr>"
 
-fun update_mp_loc_total :: "'a total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat \<Rightarrow> 'a total_state"
+fun update_mp_loc_total :: "'a total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> preal \<Rightarrow> 'a total_state"
   where "update_mp_loc_total \<omega> lp p = \<omega>\<lparr>get_mp_total := (get_mp_total \<omega>)(lp := p)\<rparr>"
 
-fun update_mh_total :: "'a total_state \<Rightarrow> mask \<Rightarrow> 'a total_state"
+fun update_mh_total :: "'a total_state \<Rightarrow> field_mask \<Rightarrow> 'a total_state"
   where "update_mh_total \<omega> mh = \<omega>\<lparr>get_mh_total := mh\<rparr>"
 
 fun update_mp_total :: "'a total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a total_state"
@@ -79,24 +79,24 @@ fun update_hh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Ri
   where "update_hh_loc_total_full \<omega> l v = 
         \<omega>\<lparr> get_total_full := update_hh_loc_total (get_total_full \<omega>) l v \<rparr>"
 
-fun get_m_total_full :: "'a full_total_state \<Rightarrow> mask \<times> 'a predicate_mask"
+fun get_m_total_full :: "'a full_total_state \<Rightarrow> field_mask \<times> 'a predicate_mask"
   where "get_m_total_full \<omega> = (get_mh_total_full \<omega>, get_mp_total_full \<omega>)"
 
-fun update_m_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a,'b) full_total_state_scheme"
+fun update_m_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> field_mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a,'b) full_total_state_scheme"
   where "update_m_total_full \<omega> m pm = 
               \<omega>\<lparr> get_total_full := update_mp_total (update_mh_total (get_total_full \<omega>) m) pm \<rparr>"
 
-fun update_mh_total_full :: "'a full_total_state \<Rightarrow> mask \<Rightarrow> 'a full_total_state"
+fun update_mh_total_full :: "'a full_total_state \<Rightarrow> field_mask \<Rightarrow> 'a full_total_state"
   where "update_mh_total_full \<omega> mh = \<omega>\<lparr> get_total_full :=  update_mh_total (get_total_full \<omega>) mh \<rparr>"
 
 fun update_mp_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_mask \<Rightarrow> 'a full_total_state"
   where "update_mp_total_full \<omega> mp = \<omega>\<lparr> get_total_full := update_mp_total (get_total_full \<omega>) mp \<rparr>"
 
-fun update_mh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> prat \<Rightarrow> 'a full_total_state"
+fun update_mh_loc_total_full :: "'a full_total_state \<Rightarrow> heap_loc \<Rightarrow> preal \<Rightarrow> 'a full_total_state"
   where "update_mh_loc_total_full \<omega> l p = 
         \<omega>\<lparr> get_total_full := update_mh_loc_total (get_total_full \<omega>) l p \<rparr>"
 
-fun update_mp_loc_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> prat \<Rightarrow> 'a full_total_state"
+fun update_mp_loc_total_full :: "'a full_total_state \<Rightarrow> 'a predicate_loc \<Rightarrow> preal \<Rightarrow> 'a full_total_state"
   where "update_mp_loc_total_full \<omega> lp p = 
         \<omega>\<lparr> get_total_full := update_mp_loc_total (get_total_full \<omega>) lp p \<rparr>"
 
@@ -208,76 +208,75 @@ lemma less_eq_add_masks: "m1 \<le> add_masks m1 m2"
   unfolding add_masks_def le_fun_def
 proof
   fix x
-  show "m1 x \<le> padd (m1 x) (m2 x)"
-    by (transfer) simp
+  show "m1 x \<le> (m1 x) + (m2 x)"
+    by (simp add: padd_pgte)
 qed  
 
 subsection \<open>General helper lemmas\<close>
 
 lemma add_masks_minus:
-  assumes "m1 = add_masks m2 m3"
+  assumes "m1 = add_masks (m2 :: ('a, preal) abstract_mask) m3"
   shows "m3 = m1 - m2"
   unfolding fun_diff_def
 proof
   fix x
 
-  have "m1 x = padd (m2 x) (m3 x)"
+  have "m1 x = (m2 x) + (m3 x)"
     using assms
     by (simp add: add_masks_def)
 
   thus "m3 x = m1 x - m2 x"
-    unfolding minus_prat_def
-    by (simp add: Rep_prat_inverse plus_prat.rep_eq)
+    unfolding minus_preal_def
+    by (simp add: Rep_preal_inverse plus_preal.rep_eq)    
 qed
 
 lemma minus_masks_empty:
- "m - m = zero_mask"
+ "m - (m :: ('a, preal) abstract_mask) = zero_mask"
   unfolding fun_diff_def
 proof
   fix x
   show "m x - m x = zero_mask x"
-    unfolding minus_prat_def zero_mask_def
-    by (simp add: zero_prat_def)
+    unfolding minus_preal_def zero_mask_def
+    by (simp add: zero_preal_def)
 qed
 
-lemma minus_prat_gte:
-  assumes "pgte p q" 
+lemma minus_preal_gte:
+  assumes "p \<ge> (q :: preal)" 
   shows "p - (p - q) = q"
 proof -
-  have "p - q = Abs_prat (Rep_prat p - Rep_prat q)" (is "_ = ?pminusq")
-    by (simp add: minus_prat_def)
+  have "p - q = Abs_preal (Rep_preal p - Rep_preal q)" (is "_ = ?pminusq")
+    by (simp add: minus_preal_def)
 
-  have "Rep_prat p \<ge> Rep_prat q"
+  have "Rep_preal p \<ge> Rep_preal q"
     using assms
     apply transfer
     by simp
 
-  hence "Rep_prat ?pminusq = (Rep_prat p - Rep_prat q)"
-    by (metis Rep_prat_inverse \<open>p - q = _\<close> of_rat_diff of_rat_eq_iff of_rat_less_eq prat_non_negative psub_aux)
+  hence "Rep_preal ?pminusq = (Rep_preal p - Rep_preal q)"
+    by (metis Rep_preal_inverse add_diff_cancel_left' assms plus_preal.rep_eq pperm_gte_padd)
 
-  hence "Rep_prat p - Rep_prat ?pminusq = Rep_prat q"
+  hence "Rep_preal p - Rep_preal ?pminusq = Rep_preal q"
     by simp
 
   thus ?thesis
-    unfolding minus_prat_def
-    by (simp add: Rep_prat_inverse)
+    unfolding minus_preal_def
+    by (simp add: Rep_preal_inverse)
 qed
 
 lemma mask_plus_Some:
-  shows "m1 \<oplus> m2 = Some (add_masks m1 m2)"
+  shows "(m1 :: ('a, preal) abstract_mask) \<oplus> m2 = Some (add_masks m1 m2)"
   unfolding plus_fun_def add_masks_def
-  by (simp split: if_split add: SepAlgebra.plus_prat_def compatible_fun_def)
+  by (simp split: if_split add: SepAlgebra.plus_preal_def compatible_fun_def)
 
 lemma add_masks_self_zero_mask:
   assumes "m1 = add_masks m1 m2"
   shows "m2 = zero_mask"
   using assms
   unfolding add_masks_def
-  (* TODO: faster proof *)
-  by (metis add.commute add_0 le_fun_def order_class.order_eq_iff padd_cancellative zero_mask_def zero_mask_less_eq_mask)
+  by (metis (full_types) add.commute add_0 le_fun_def order_class.order_eq_iff pos_perm_class.padd_cancellative zero_mask_def)
 
 lemma succ_maskI:
-  assumes "(m :: 'a abstract_mask) \<ge> m'"
+  assumes "(m :: ('a, preal) abstract_mask) \<ge> m'"
   shows "m \<succeq> m'"
   unfolding greater_def
 proof
@@ -292,26 +291,26 @@ proof
       by (simp add: le_funD)
 
     from this obtain p where "m l = padd (m' l) p"
-      using prat_gte_padd
+      using preal_gte_padd
       by blast
       
     hence "Some (m l) = (m' l) \<oplus> p"
-      unfolding plus_prat_def
+      unfolding plus_preal_def
       by simp
 
     thus "m l = padd (m' l) (m l \<ominus> m' l)"
-      by (metis SepAlgebra.plus_prat_def add.commute greater_equiv minus_equiv_def option.inject)
+      by (metis SepAlgebra.plus_preal_def add.commute greater_equiv minus_equiv_def option.inject)
   qed
 
   thus "Some m = m' \<oplus> ?\<Delta>"
-    by (simp add: mask_plus_Some)
+    by (metis (mono_tags, lifting) SepAlgebra.plus_preal_def add_masks_def plus_funI)
 qed
 
 subsection \<open>Partial commutative monoid instantiation\<close>
 
-lemma plus_masks_defined: "(m1 :: 'a abstract_mask) ## m2"
+lemma plus_masks_defined: "(m1 :: ('a, preal) abstract_mask) ## m2"
   unfolding defined_def
-  by (simp add: SepAlgebra.plus_prat_def compatible_funI plus_fun_def)
+  by (simp add: SepAlgebra.plus_preal_def compatible_funI plus_fun_def)
 
 instantiation total_state_ext :: (type,type) pcm
 begin
@@ -377,11 +376,6 @@ instance proof
     unfolding plus_total_state_ext_def
     by (clarsimp simp: * ** MEqAB MEqBC split: if_split if_split_asm)
   qed
-(*
-  show "a \<oplus> b = None \<and> b \<oplus> c = Some bc \<Longrightarrow> a \<oplus> bc = None"
-  unfolding plus_total_state_ext_def
-  by (clarsimp split: if_split if_split_asm)
-*)
 
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
   unfolding plus_total_state_ext_def
@@ -487,12 +481,6 @@ proof
       by (auto split: if_split if_split_asm)
   qed
 
-(*
-  show "a \<oplus> b = None \<and> b \<oplus> c = Some bc \<Longrightarrow> a \<oplus> bc = None"
-    unfolding plus_full_total_state_ext_def
-    by (metis (no_types, lifting) Some_Some_ifD asso3 defined_def full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) option.exhaust_sel option.inject)
-*)
-
   show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a" (is "?A \<Longrightarrow> ?B \<Longrightarrow> _")
   proof -
     let ?at = "get_total_full a"
@@ -522,22 +510,22 @@ end
 
 subsubsection \<open>Lemmas\<close>
 
-lemma plus_mask_zero_mask_neutral: "m \<oplus> zero_mask = Some m"
+lemma plus_mask_zero_mask_neutral: "(m :: ('a, preal) abstract_mask) \<oplus> zero_mask = Some m"
 proof -
   have "compatible_fun m zero_mask"
-    by (simp add: SepAlgebra.plus_prat_def compatible_funI)
+    by (simp add: SepAlgebra.plus_preal_def compatible_funI)
 
   thus ?thesis
   unfolding plus_fun_def
-  by (simp add: SepAlgebra.plus_prat_def zero_mask_def)
+  by (simp add: SepAlgebra.plus_preal_def zero_mask_def)
 qed
 
-lemma core_mask_zero_mask: "zero_mask = |m :: 'a abstract_mask|"
+lemma core_mask_zero_mask: "zero_mask = |m :: ('a, preal) abstract_mask|"
 proof 
   fix x
   show "zero_mask x = |m| x"
     unfolding zero_mask_def
-    by (simp add: core_fun core_prat_def)
+    by (simp add: core_fun core_preal_def)
 qed
 
 lemma total_state_plus_defined: 
@@ -730,8 +718,8 @@ next
     by (simp add: le_funD)
 
     thus "get_mh_total \<omega> hl = padd (get_mh_total \<omega>' hl) (get_mh_total \<omega> hl - get_mh_total \<omega>' hl)"
-      unfolding minus_prat_def
-      by (metis Rep_prat_inverse add.commute add_diff_cancel plus_prat.rep_eq prat_gte_padd)
+      unfolding minus_preal_def
+      by (metis Rep_preal_inverse add.commute add_diff_cancel plus_preal.rep_eq preal_gte_padd)
   qed
 
   have MpEq: "get_mp_total \<omega> = add_masks (get_mp_total \<omega>') ?mp2"
@@ -743,8 +731,8 @@ next
     by (simp add: le_funD)
 
     thus "get_mp_total \<omega> hl = padd (get_mp_total \<omega>' hl) (get_mp_total \<omega> hl - get_mp_total \<omega>' hl)"
-      unfolding minus_prat_def
-      by (metis Rep_prat_inverse add.commute add_diff_cancel plus_prat.rep_eq prat_gte_padd)
+      unfolding minus_preal_def
+      by (metis Rep_preal_inverse add.commute add_diff_cancel plus_preal.rep_eq preal_gte_padd)
   qed  
 
   have "Some \<omega> = \<omega>' \<oplus> (\<omega> \<lparr> get_mh_total := ?mh2, get_mp_total := ?mp2 \<rparr>)"
@@ -1128,7 +1116,7 @@ lemma mono_prop_downward_ord_implies_mono_prop_downward:
 
 subsection \<open>valid mask (TODO: move to ViperLang?)\<close>
 
-abbreviation valid_heap_mask :: "mask \<Rightarrow> bool"
+abbreviation valid_heap_mask :: "preal mask \<Rightarrow> bool"
   where "valid_heap_mask \<equiv> wf_mask_simple"
 
 lemma valid_heap_maskD:
@@ -1136,6 +1124,7 @@ lemma valid_heap_maskD:
   shows "pgte pwrite (m l)"
   using assms
   unfolding wf_mask_simple_def
+  apply transfer
   by blast
 
 lemma valid_heap_mask_downward_mono:
@@ -1155,9 +1144,9 @@ proof -
       using \<open>m0 = _\<close>
       by (simp add: add_masks_def)
 
-    thus "pgte pwrite (m1 l)"
-      using valid_heap_maskD[of m0 l, OF assms(1)]
-      by (metis pgte_transitive sum_larger)
+    thus "pwrite \<ge> (m1 l)"
+      using valid_heap_maskD[of m0 l, OF assms(1)] \<open>m0 = add_masks m1 m2\<close> assms(1) wf_mask_simple_def wf_mask_simple_false_preserved 
+      by blast
   qed
 qed
 

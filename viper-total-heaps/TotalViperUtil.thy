@@ -1,7 +1,7 @@
 section \<open>Utility functions and lemmas for Viper\<close>
 
 theory TotalViperUtil
-imports ViperCommon.ValueAndBasicState ViperCommon.DeBruijn ViperCommon.ViperUtil TotalUtil
+imports ViperCommon.ValueAndBasicState ViperCommon.DeBruijn ViperCommon.ViperUtil ViperCommon.PosReal TotalUtil
 begin
 
 fun get_address_opt :: "'a val \<Rightarrow> address option"
@@ -14,54 +14,27 @@ fun f_None :: "'a \<Rightarrow> 'b option"
 
 subsection \<open>Positive rationals (TODO: move to Viper theory?)\<close>
 
-lemma prat_non_negative: "\<And>q. Rep_prat q \<ge> 0"
+lemma prat_non_negative: "\<And>q. Rep_preal q \<ge> 0"
   by (transfer) simp
 
-lemma padd_aux:
-  assumes "p_rat \<ge> 0"
-      and "q_real = real_of_rat (Rep_prat q)"
-    shows "q_real + real_of_rat p_rat = real_of_rat (Rep_prat (padd q (Abs_prat p_rat)))"
-  using assms 
-  by (simp add: Abs_prat_inverse of_rat_add plus_prat.rep_eq)
-
-lemma psub_aux:
-  assumes "p_rat \<ge> 0"
-      and "real_of_rat p_rat \<le> q_real"
-      and "q_real = real_of_rat (Rep_prat q)"
-        shows "q_real - real_of_rat p_rat = real_of_rat (Rep_prat (q - (Abs_prat p_rat)))"
-  using assms
-  apply (subst \<open>q_real = _\<close>)
-  apply (unfold minus_prat_def)
-  apply (simp add: Abs_prat_inverse of_rat_diff)
-  using add.group_left_neutral add_le_imp_le_diff leD leI of_rat_add of_rat_diff of_rat_less  padd_aux 
-  by (metis add_0 zero_prat.rep_eq)  
-
-lemma prat_positive_transfer:
-  assumes "real_of_rat (Rep_prat qpos) = r" and
-          "pgt qpos pnone"
-        shows "r > 0"
-  using assms
-  apply transfer
-  by simp
-
 lemma psub_smaller:
-  assumes "pgte p q"
-  shows "pgte p (p - q)"
-  unfolding minus_prat_def
+  assumes "(p :: preal) \<ge> q"
+  shows "p \<ge> (p - q)"
+  unfolding minus_preal_def
 proof -
-  from assms have DiffNonNegative: "Rep_prat p - Rep_prat q \<ge> 0"
+  from assms have DiffNonNegative: "Rep_preal p - Rep_preal q \<ge> 0"
     by (transfer) simp
 
-  have "Rep_prat p \<ge> Rep_prat p - Rep_prat q"
+  have "Rep_preal p \<ge> Rep_preal p - Rep_preal q"
     by (transfer) simp
   
 
-  hence "(Rep_prat p) \<ge> Rep_prat (Abs_prat (Rep_prat p - Rep_prat q))"
-    using Abs_prat_inverse DiffNonNegative
+  hence "(Rep_preal p) \<ge> Rep_preal (Abs_preal (Rep_preal p - Rep_preal q))"
+    using Abs_preal_inverse DiffNonNegative
     by fastforce
     
-  thus "pgte p (Abs_prat (Rep_prat p - Rep_prat q))"    
-    by (simp add: pgte.rep_eq)
+  thus "p \<ge> (Abs_preal (Rep_preal p - Rep_preal q))"    
+    by (simp add: less_eq_preal.rep_eq)
 qed
 
 subsection \<open>Recursive predicates on assertions\<close>

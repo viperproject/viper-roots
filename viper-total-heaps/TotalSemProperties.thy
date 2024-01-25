@@ -57,7 +57,7 @@ proof -
 
     hence "pgt (?m' lh) pnone"
       using \<open>?m \<le> ?m'\<close>
-      by (metis le_fun_def padd_pos prat_gte_padd prat_pnone_pgt)
+      by (metis le_fun_def padd_pos preal_gte_padd preal_pnone_pgt)
     thus "lh \<in> get_valid_locs \<omega>'"
       by (simp add: get_valid_locs_def)
   qed
@@ -623,7 +623,7 @@ proof
       apply blast
     apply (rule PermConstraint)
     using AtMostWrite *
-    by (metis pgte_transitive prat_gte_padd sum_larger)
+    by (metis (no_types, opaque_lifting) PosReal.pgte_antisym PosReal.sum_larger dual_order.trans nle_le preal_gte_padd)
 
   ultimately show "\<exists>\<omega>0'\<le>\<omega>1'. \<omega>0' \<in> inhale_perm_single R \<omega>0 lh p_opt"
     by blast   
@@ -1056,10 +1056,10 @@ next
               by fastforce              
           next
             case False
-            hence "\<omega>' \<in> inhale_perm_single R \<omega> (the_address r, f) (Some (Abs_prat p))"
+            hence "\<omega>' \<in> inhale_perm_single R \<omega> (the_address r, f) (Some (Abs_preal p))"
               using InhAcc \<open>\<omega>' \<in> W'\<close>
               by presburger
-            from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single R \<omega>2 (the_address r, f) (Some (Abs_prat p))"
+            from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single R \<omega>2 (the_address r, f) (Some (Abs_preal p))"
               using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
               by blast
             have "red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal \<omega>'')"
@@ -1139,10 +1139,10 @@ next
           with InhAccPred.hyps obtain \<omega>' where "res = RNormal \<omega>'" and "\<omega>' \<in> W'"
             by (metis \<open>res \<noteq> RMagic\<close> th_result_rel.cases)                    
 
-          hence "\<omega>' \<in> inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_prat p))"
+          hence "\<omega>' \<in> inhale_perm_single_pred R \<omega> (pred_id, v_args) (Some (Abs_preal p))"
             using InhAccPred \<open>\<omega>' \<in> W'\<close>
             by presburger
-          from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single_pred R \<omega>2 (pred_id, v_args) (Some (Abs_prat p))"
+          from this obtain \<omega>'' where "\<omega>'' \<le> \<omega>'" and "\<omega>'' \<in> inhale_perm_single_pred R \<omega>2 (pred_id, v_args) (Some (Abs_preal p))"
             using \<open>\<omega>2 \<le> \<omega>\<close>  inhale_perm_single_pred_leq ConsistencyDownwardMono[simplified mono_prop_downward_ord_def]
             by metis
           have "red_inhale ctxt R (Atomic (AccPredicate pred_id e_args (PureExp e_p))) \<omega>2 (RNormal \<omega>'')"
@@ -1504,17 +1504,17 @@ lemma mask_update_greater_aux:
 proof (simp add: le_fun_def)
   show "m l - p \<le> m l"
     unfolding minus_prat_def
-  proof (simp add: less_eq_prat.rep_eq)
-    have "Rep_prat (m l) - Rep_prat p \<le> Rep_prat (m l)" (is "?lhs \<le> ?rhs")
+  proof (simp add: less_eq_preal.rep_eq)
+    have "Rep_preal (m l) - Rep_preal p \<le> Rep_preal (m l)" (is "?lhs \<le> ?rhs")
       by (simp add: prat_non_negative)
 
     moreover have "?lhs \<ge> 0"
       using assms
       by (simp add: pgte.rep_eq)
 
-    ultimately show "Rep_prat (Abs_prat ?lhs) \<le> ?rhs"
-      using Abs_prat_inverse[of ?lhs]
-      by simp
+    ultimately show "Rep_preal (m l - p) \<le> ?rhs"
+      using Abs_preal_inverse[of ?lhs] minus_preal_def 
+      by auto
   qed
 qed
 
@@ -1523,7 +1523,7 @@ lemma mask_update_greater_aux_2:
   shows "m \<ge> m(l := q)"
   using assms
   apply (simp add: le_fun_def)
-  by (simp add: less_eq_prat.rep_eq pgte.rep_eq)
+  by (metis PosReal.pgte_antisym PosReal.sum_larger nle_le preal_gte_padd)
 
 lemmas mask_update_succ_aux = succ_maskI[OF mask_update_greater_aux]
 lemmas mask_update_succ_aux_2 = succ_maskI[OF mask_update_greater_aux_2]
@@ -1543,14 +1543,14 @@ proof (induction arbitrary: \<omega>')
       by (auto elim: exh_if_total.elims simp: succ_refl) 
   next
     case False
-    with ExhAcc have SufficientPerm: "pgte (mh (a, f)) (Abs_prat p)" and
-                     "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p)"
+    with ExhAcc have SufficientPerm: "pgte (mh (a, f)) (Abs_preal p)" and
+                     "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_preal p)"
       by (auto elim: exh_if_total.elims)
 
     show ?thesis
     proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
         from SufficientPerm
-        show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p))"
+        show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_preal p))"
           using mask_update_succ_aux
           unfolding \<open>mh = _\<close>
          by fastforce
@@ -1562,7 +1562,7 @@ next
     by (auto elim: exh_if_total.elims)
 
   have "pgt (mh (a, f)) q" 
-    using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF \<open>mh (a, f) \<noteq> pnone\<close>]]
+    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mh (a, f) \<noteq> pnone\<close>]]
     by blast
 
   show ?case 
@@ -1575,14 +1575,14 @@ next
   qed (simp_all add: succ_refl)
 next
   case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id)
-  hence SufficientPerm: "pgte (mp (pred_id, v_args)) (Abs_prat p)" and
-        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_prat p))"
+  hence SufficientPerm: "pgte (mp (pred_id, v_args)) (Abs_preal p)" and
+        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_preal p))"
     by (auto elim: exh_if_total.elims)
 
   show ?case 
   proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
     from SufficientPerm
-    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_prat p)))"
+    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := mp (pred_id, v_args) - Abs_preal p)))"
       using mask_update_succ_aux
       unfolding \<open>mp = _\<close>
       by fastforce
@@ -1594,7 +1594,7 @@ next
     by (auto elim: exh_if_total.elims)
 
   hence SufficientPerm: "pgt (mp (pred_id, v_args)) q"
-    using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF *]]
+    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF *]]
     by blast
 
   show ?case
@@ -1843,17 +1843,17 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
     from this obtain a where "r = Address a"
       using ref.exhaust by blast    
 
-    hence PermConditions: "0 \<le> p \<and> pgte (mh (a, f)) (Abs_prat p)" and
-                          "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_prat p)"
+    hence PermConditions: "0 \<le> p \<and> pgte (mh (a, f)) (Abs_preal p)" and
+                          "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_preal p)"
       using \<open>r = Address a\<close> ExhAcc
       by (auto elim: exh_if_total.elims)
 
     let ?loc = "(a,f)"
-    let ?p' = "padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_prat p)"
+    let ?p' = "padd (get_mh_total_full \<omega>_inh (a,f)) (Abs_preal p)"
     have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh ?loc ?p'" (is "_ = ?upd_\<omega>_inh")        
     proof -
       let ?mh_af = "(get_mh_total_full \<omega> (a, f))"
-      have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh ?loc (padd (get_mh_total_full \<omega>_inh ?loc) (?mh_af - (?mh_af - Abs_prat p)))"
+      have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh ?loc (padd (get_mh_total_full \<omega>_inh ?loc) (?mh_af - (?mh_af - Abs_preal p)))"
         using plus_diff_full_total_state_upd_aux_1[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close> \<open>\<omega>' = _\<close> \<open>\<omega> \<succeq> \<omega>'\<close>]
               \<open>mh = _\<close>
         by blast
@@ -1861,18 +1861,18 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
       thus ?thesis
         using PermConditions
         unfolding \<open>mh = _\<close>
-        by (simp add: minus_prat_gte)
+        by (simp add: PosReal.pgte.rep_eq less_eq_preal.rep_eq minus_preal_gte)
     qed
         
-    hence "get_mh_total_full \<omega>_inh' ?loc = padd (get_mh_total_full \<omega>_inh ?loc) (Abs_prat p)"
+    hence "get_mh_total_full \<omega>_inh' ?loc = padd (get_mh_total_full \<omega>_inh ?loc) (Abs_preal p)"
       by simp
 
-    hence PermConstraint': "pgte pwrite (padd (get_mh_total_full \<omega>_inh ?loc) (Abs_prat p))"
+    hence PermConstraint': "pgte pwrite (padd (get_mh_total_full \<omega>_inh ?loc) (Abs_preal p))"
       using ExhAcc.prems(6)
       unfolding wf_mask_simple_def
-      by metis
+      by (metis ExhAcc.prems(6) valid_heap_maskD)
       
-    let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc (Some (Abs_prat p))"
+    let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc (Some (Abs_preal p))"
 
     from ExhAcc have "StateCons \<omega>_inh'"
       by simp      
@@ -1901,7 +1901,7 @@ next
     by blast
 
   have "pgt (mh ?loc) q" 
-    using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF \<open>mh ?loc \<noteq> pnone\<close>]]
+    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mh ?loc \<noteq> pnone\<close>]]
     by blast
 
   let ?A = "Acc e_r f Wildcard"
@@ -1939,8 +1939,8 @@ next
       by simp
 
     from \<open>pgt (mh ?loc) q\<close> have "get_mh_total_full \<omega> ?loc - q \<noteq> pnone"
-        unfolding minus_prat_def \<open>mh = _\<close>
-        by (simp add: pgt.rep_eq positive_rat_prat)
+        unfolding minus_preal_def \<open>mh = _\<close>
+        by (simp add: pgt.rep_eq positive_real_preal)
       
     let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc None"
 
@@ -2001,34 +2001,32 @@ next
   show ?case
   proof -
     let ?loc = "(pred_id, v_args)"
-    have PermConditions: "0 \<le> p \<and> pgte (mp ?loc) (Abs_prat p)" and
-                         "\<omega>' = update_mp_loc_total_full \<omega> (pred_id, v_args) (mp ?loc - Abs_prat p)"
+    have PermConditions: "0 \<le> p \<and> pgte (mp ?loc) (Abs_preal p)" and
+                         "\<omega>' = update_mp_loc_total_full \<omega> (pred_id, v_args) (mp ?loc - Abs_preal p)"
       using ExhAccPred
       by (auto elim: exh_if_total.elims)
 
-    let ?p' = "padd (get_mp_total_full \<omega>_inh ?loc) (Abs_prat p)"
+    let ?p' = "padd (get_mp_total_full \<omega>_inh ?loc) (Abs_preal p)"
     have "\<omega>_inh' = update_mp_loc_total_full \<omega>_inh ?loc ?p'" (is "_ = ?upd_\<omega>_inh")        
     proof -
-      thm plus_diff_full_total_state_upd_aux_2[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close>]
       let ?mp_loc = "(get_mp_total_full \<omega> ?loc)"
-      have "\<omega>_inh' = update_mp_loc_total_full \<omega>_inh ?loc (padd (get_mp_total_full \<omega>_inh ?loc) (?mp_loc - (?mp_loc - Abs_prat p)))"
+      have "\<omega>_inh' = update_mp_loc_total_full \<omega>_inh ?loc (padd (get_mp_total_full \<omega>_inh ?loc) (?mp_loc - (?mp_loc - Abs_preal p)))"
         using plus_diff_full_total_state_upd_aux_2[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close> \<open>\<omega>' = _\<close> \<open>\<omega> \<succeq> \<omega>'\<close>]
               \<open>mp = _\<close>
         by blast
-
       thus ?thesis
         using PermConditions
         unfolding \<open>mp = _\<close>
-        by (simp add: minus_prat_gte)
+        by (metis PosReal.pgte_antisym PosReal.sum_larger linorder_le_cases minus_preal_gte preal_gte_padd)
     qed
         
-    hence "get_mp_total_full \<omega>_inh' ?loc = padd (get_mp_total_full \<omega>_inh ?loc) (Abs_prat p)"
+    hence "get_mp_total_full \<omega>_inh' ?loc = padd (get_mp_total_full \<omega>_inh ?loc) (Abs_preal p)"
       by simp
       
     from ExhAccPred have "StateCons \<omega>_inh'"
       by simp      
 
-    let ?W = "inhale_perm_single_pred StateCons \<omega>_inh ?loc (Some (Abs_prat p))"
+    let ?W = "inhale_perm_single_pred StateCons \<omega>_inh ?loc (Some (Abs_preal p))"
 
     have "\<omega>_inh' \<in> ?W"
       unfolding inhale_perm_single_pred_def
@@ -2083,12 +2081,12 @@ next
       by blast
 
     have "pgt (mp ?loc) q" 
-      using \<open>q = _\<close> someI_ex[OF prat_exists_stricly_smaller_nonzero[OF \<open>mp ?loc \<noteq> pnone\<close>]]
+      using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mp ?loc \<noteq> pnone\<close>]]
       by blast
 
     hence "get_mp_total_full \<omega> ?loc - q \<noteq> pnone"
-        unfolding minus_prat_def \<open>mp = _\<close>
-        by (simp add: pgt.rep_eq positive_rat_prat)
+        unfolding minus_preal_def \<open>mp = _\<close>
+        by (simp add: pgt.rep_eq positive_real_preal)
 
     from ExhAccPredWildcard have "StateCons \<omega>_inh'"
       by simp
@@ -2644,10 +2642,10 @@ lemma th_result_rel_convert:
   by (metis map_stmt_result_total.simps(1) map_stmt_result_total.simps(2) map_stmt_result_total.simps(3) th_result_rel.simps)
 
 lemma inhale_perm_single_similar:
-  assumes "\<omega> \<in> inhale_perm_single R \<omega>0 (a, f) (Some (Abs_prat p))"
+  assumes "\<omega> \<in> inhale_perm_single R \<omega>0 (a, f) (Some (Abs_preal p))"
       and "get_total_full \<omega> = get_total_full \<omega>'"
       and "get_store_total \<omega>' = get_store_total \<omega>1 \<and> get_trace_total \<omega>' = get_trace_total \<omega>1"
-    shows "\<omega>' \<in> inhale_perm_single R \<omega>1 (a, f) (Some (Abs_prat p))"
+    shows "\<omega>' \<in> inhale_perm_single R \<omega>1 (a, f) (Some (Abs_preal p))"
   using assms
   unfolding inhale_perm_single_def
   oops
@@ -2838,7 +2836,7 @@ next
       using InhAcc
       by simp
   next
-    let ?W2' = "if r = Null then {\<omega>2} else inhale_perm_single R \<omega>2 (the_address r, f) (Some (Abs_prat p))"
+    let ?W2' = "if r = Null then {\<omega>2} else inhale_perm_single R \<omega>2 (the_address r, f) (Some (Abs_preal p))"
     show "?W2' = ?W2'"
       by simp
 
@@ -2849,8 +2847,8 @@ next
     proof (rule th_result_rel_convert)
       let ?f = "get_store_total_update (\<lambda>_. get_store_total \<omega>2)"
 
-      let ?InhSet1 = "\<lambda>a. (inhale_perm_single R \<omega> (a, f) (Some (Abs_prat p)))"
-      let ?InhSet2 = "\<lambda>a. (inhale_perm_single R \<omega>2 (a, f) (Some (Abs_prat p)))"
+      let ?InhSet1 = "\<lambda>a. (inhale_perm_single R \<omega> (a, f) (Some (Abs_preal p)))"
+      let ?InhSet2 = "\<lambda>a. (inhale_perm_single R \<omega>2 (a, f) (Some (Abs_preal p)))"
 
       show "(W' \<noteq> {} \<and> (0 < p \<longrightarrow> r \<noteq> Null)) \<longleftrightarrow> (?W2' \<noteq> {} \<and> (0 < p \<longrightarrow> r \<noteq> Null))"
       proof (cases r)
@@ -2883,27 +2881,27 @@ next
       proof (cases r)
         case (Address a)       
         with \<open>\<omega>Elem \<in> W'\<close> inhale_perm_single_nonempty have 
-         "\<omega>Elem = update_mh_loc_total_full \<omega> (a,f) (padd (get_mh_total_full \<omega> (a,f)) (Abs_prat p))"
+         "\<omega>Elem = update_mh_loc_total_full \<omega> (a,f) (padd (get_mh_total_full \<omega> (a,f)) (Abs_preal p))"
           unfolding \<open>W' = _\<close>
           by fastforce
 
         from \<open>r = _\<close> 
         show ?thesis
         proof (simp)
-          show "\<omega>Elem\<lparr>get_store_total := get_store_total \<omega>2\<rparr> \<in> inhale_perm_single R \<omega>2 (a, f) (Some (Abs_prat p))"
+          show "\<omega>Elem\<lparr>get_store_total := get_store_total \<omega>2\<rparr> \<in> inhale_perm_single R \<omega>2 (a, f) (Some (Abs_preal p))"
           proof (rule inhale_perm_single_elem)
-            show "\<omega>Elem\<lparr>get_store_total := get_store_total \<omega>2\<rparr> = update_mh_loc_total_full \<omega>2 (a, f) (padd (get_mh_total_full \<omega>2 (a, f)) ((Abs_prat p)))"
+            show "\<omega>Elem\<lparr>get_store_total := get_store_total \<omega>2\<rparr> = update_mh_loc_total_full \<omega>2 (a, f) (padd (get_mh_total_full \<omega>2 (a, f)) ((Abs_preal p)))"
               unfolding \<open>\<omega>Elem = _\<close>
             proof -
-              have "update_mh_loc_total_full \<omega> (a, f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_prat p))\<lparr>get_store_total := get_store_total \<omega>2\<rparr> = 
-                    update_mh_loc_total_full (\<omega>\<lparr>get_store_total := get_store_total \<omega>2\<rparr>) (a,f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_prat p))"
+              have "update_mh_loc_total_full \<omega> (a, f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_preal p))\<lparr>get_store_total := get_store_total \<omega>2\<rparr> = 
+                    update_mh_loc_total_full (\<omega>\<lparr>get_store_total := get_store_total \<omega>2\<rparr>) (a,f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_preal p))"
                 by force
               moreover have "(\<omega>\<lparr>get_store_total := get_store_total \<omega>2\<rparr>) = \<omega>2"
                 apply (rule full_total_state.equality)
                 by (auto simp: TraceSame InhAcc)
               ultimately show 
-                "update_mh_loc_total_full \<omega> (a, f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_prat p))\<lparr>get_store_total := get_store_total \<omega>2\<rparr> =
-                 update_mh_loc_total_full \<omega>2 (a, f) (padd (get_mh_total_full \<omega>2 (a, f)) (Abs_prat p))"
+                "update_mh_loc_total_full \<omega> (a, f) (padd (get_mh_total_full \<omega> (a, f)) (Abs_preal p))\<lparr>get_store_total := get_store_total \<omega>2\<rparr> =
+                 update_mh_loc_total_full \<omega>2 (a, f) (padd (get_mh_total_full \<omega>2 (a, f)) (Abs_preal p))"
                 using InhAcc
                 by force
             qed
@@ -2918,10 +2916,10 @@ next
                 by auto
             qed
           next
-            show "pgte pwrite (padd (get_mh_total_full \<omega>2 (a, f)) (Abs_prat p))"
+            show "pgte pwrite (padd (get_mh_total_full \<omega>2 (a, f)) (Abs_preal p))"
             proof -
               from \<open>\<omega>Elem \<in> _\<close>
-              have "pgte pwrite (padd (get_mh_total_full \<omega> (a, f)) (Abs_prat p))"
+              have "pgte pwrite (padd (get_mh_total_full \<omega> (a, f)) (Abs_preal p))"
                 unfolding \<open>W' = _\<close> inhale_perm_single_def \<open>r = _\<close>
                 by simp
               thus ?thesis
@@ -3060,8 +3058,8 @@ lemma red_exhale_accI:
   assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
       and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
       and "a = the_address r"      
-      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_prat p)))" (is "\<omega>' = ?\<omega>def")      
-      and "res = exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_prat p))) \<omega>'" 
+      and "\<omega>' = (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_preal p)))" (is "\<omega>' = ?\<omega>def")      
+      and "res = exh_if_total (p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_preal p))) \<omega>'" 
     shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> res"
   unfolding \<open>res = _\<close> \<open>\<omega>' = _\<close>
   apply (rule TotalSemantics.ExhAcc)
@@ -3091,10 +3089,10 @@ proof (induction arbitrary: \<omega>2 res2)
     using red_pure_exp_inhale_store_same_on_free_var(1)  ExhAcc
     by blast+
 
-  let ?\<omega>' = " (if r = Null then \<omega>2 else update_mh_loc_total_full \<omega>2 (the_address r, f) (get_mh_total_full \<omega>2 (the_address r, f) - Abs_prat p))"
+  let ?\<omega>' = " (if r = Null then \<omega>2 else update_mh_loc_total_full \<omega>2 (the_address r, f) (get_mh_total_full \<omega>2 (the_address r, f) - Abs_preal p))"
   show ?case
   proof (rule red_exhale_accI[OF RedRef RedPerm], simp, simp)
-    show "res2 = exh_if_total (0 \<le> p \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_prat p))) ?\<omega>'"
+    show "res2 = exh_if_total (0 \<le> p \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_preal p))) ?\<omega>'"
     proof (cases r)
       case (Address a')
       hence "r = Address a"
@@ -3109,8 +3107,8 @@ proof (induction arbitrary: \<omega>2 res2)
           by simp
 
         show "\<omega>2\<lparr>get_total_full := get_total_full \<omega>2
-         \<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>2))((a, f) := get_mh_total (get_total_full \<omega>2) (a, f) - Abs_prat p)\<rparr>\<rparr> =
-                \<omega>\<lparr>get_total_full := get_total_full \<omega>\<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>))((a, f) := mh (a, f) - Abs_prat p)\<rparr>,
+         \<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>2))((a, f) := get_mh_total (get_total_full \<omega>2) (a, f) - Abs_preal p)\<rparr>\<rparr> =
+                \<omega>\<lparr>get_total_full := get_total_full \<omega>\<lparr>get_mh_total := (get_mh_total (get_total_full \<omega>))((a, f) := mh (a, f) - Abs_preal p)\<rparr>,
                   get_store_total := get_store_total \<omega>2\<rparr>"
           unfolding Eq1 \<open>mh = _\<close>
           apply (rule full_total_state.equality)

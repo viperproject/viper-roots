@@ -31,6 +31,7 @@ fun val_of_lit :: "lit \<Rightarrow> 'a val" where
   "val_of_lit (LBool b) = VBool b"
 | "val_of_lit (LInt n) = VInt n"
 | "val_of_lit (LPerm r) = VPerm r"
+| "val_of_lit LNull = VRef Null"
 
 
 text \<open>Predicate location\<close>

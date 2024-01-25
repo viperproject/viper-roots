@@ -682,7 +682,7 @@ subsection \<open>Field access predicate rule\<close>
 definition exhale_field_acc_rel_perm_success
   where "exhale_field_acc_rel_perm_success ctxt_vpr StateCons \<omega> r p f \<equiv>
           p \<ge> 0 \<and>
-         (if r = Null then p = 0 else (Rep_prat (get_mh_total_full \<omega> (the_address r,f))) \<ge> p)"
+         (if r = Null then p = 0 else (Rep_preal (get_mh_total_full \<omega> (the_address r,f))) \<ge> p)"
 
 definition exhale_field_acc_rel_assms
   where "exhale_field_acc_rel_assms ctxt StateCons e_r f e_p r p \<omega>0 \<omega>  \<equiv>
@@ -709,7 +709,7 @@ definition exhale_acc_normal_premise
        exhale_field_acc_rel_perm_success ctxt StateCons \<omega> r p f \<and>
        (if r = Null then \<omega>' = \<omega> else
           let mh = get_mh_total_full \<omega> in 
-              \<omega>' = update_mh_loc_total_full \<omega> (the_address r,f) ((mh (the_address r,f)) - (Abs_prat p))
+              \<omega>' = update_mh_loc_total_full \<omega> (the_address r,f) ((mh (the_address r,f)) - (Abs_preal p))
        )"
 
 lemma exhale_acc_normal_red_exhale:
@@ -720,7 +720,7 @@ lemma exhale_acc_normal_red_exhale:
       apply blast
      apply blast
     apply simp
-   apply (metis Abs_prat_inverse mem_Collect_eq pgte.rep_eq)
+   apply (metis Abs_preal_inverse mem_Collect_eq pgte.rep_eq)
   by presburger
 
 lemma exhale_rel_field_acc:
@@ -765,11 +765,11 @@ proof (rule exhale_rel_intro_2)
       \<comment>\<open>Normal case\<close>
       fix \<omega>'
       assume "res = RNormal \<omega>'"
-      with ExhAcc have PermCorrect: "0 \<le> p \<and> (if (r = Null) then (p = 0) else (pgte (mh (a, f)) (Abs_prat p)))"
+      with ExhAcc have PermCorrect: "0 \<le> p \<and> (if (r = Null) then (p = 0) else (pgte (mh (a, f)) (Abs_preal p)))"
         using exh_if_total_failure by fastforce \<comment>\<open>using exh_if_total_normal seems to be surprisingly slower\<close>
       hence PermSuccess: "exhale_field_acc_rel_perm_success ctxt_vpr StateCons \<omega> r p f"
         unfolding exhale_field_acc_rel_perm_success_def
-        using \<open>mh = _\<close> \<open>a = _\<close> pgte.rep_eq Abs_prat_inverse
+        using \<open>mh = _\<close> \<open>a = _\<close> pgte.rep_eq Abs_preal_inverse
         by auto
       from this obtain ns3 where Red3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and R3: "R' r p (\<omega>0, \<omega>) ns3"
         using BasicAssms rel_success_elim[OF CorrectPermRel R2_conv] red_ast_bpl_transitive[OF Red2]
@@ -787,11 +787,11 @@ proof (rule exhale_rel_intro_2)
     next 
       \<comment>\<open>Failure case\<close>
       assume "res = RFailure"
-      with ExhAcc have PermCorrect: "\<not> (0 \<le> p \<and> (if (r = Null) then (p = 0) else (pgte (mh (a, f)) (Abs_prat p))))"
+      with ExhAcc have PermCorrect: "\<not> (0 \<le> p \<and> (if (r = Null) then (p = 0) else (pgte (mh (a, f)) (Abs_preal p))))"
         using exh_if_total_failure by fastforce \<comment>\<open>using exh_if_total_normal seems to be surprisingly slower\<close>
       thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
         using ExhAcc BasicAssms rel_failure_elim[OF CorrectPermRel R2_conv] red_ast_bpl_transitive[OF Red2]
-              Abs_prat_inverse pgte.rep_eq
+              Abs_preal_inverse pgte.rep_eq
         unfolding exhale_field_acc_rel_perm_success_def        
         by (metis fst_conv mem_Collect_eq snd_conv)
     qed
@@ -806,7 +806,7 @@ qed
   
 lemma exhale_rel_field_acc_upd_rel:
 assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longrightarrow>                            
-                           state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) ns" and
+                           state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) ns" and
         StateRelOutput: "\<And> \<omega>0_\<omega> ns. (uncurry (state_rel Pr StateCons TyRep Tr AuxPred ctxt)) \<omega>0_\<omega> ns \<Longrightarrow> R' \<omega>0_\<omega> ns"
         "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
@@ -819,7 +819,7 @@ assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longr
                    "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Sub\<guillemotright> (Var temp_perm)" and
     MaskVar: "m_bpl = mask_var Tr " and
     FieldRelSingle: "field_rel_single Pr TyRep Tr f e_f_bpl \<tau>_bpl" and
-    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
 shows "rel_general R R' 
                       (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. fst \<omega>0_\<omega> = fst \<omega>0_\<omega>' \<and> exhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f e_p p r (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>) (snd \<omega>0_\<omega>'))
                       (\<lambda>_. False)
@@ -833,7 +833,7 @@ proof (rule rel_general_conseq_output,
   thus "fst \<omega>' = (if (mask_var_def Tr = mask_var Tr \<and> r \<noteq> Null) then (snd \<omega>') else (fst \<omega>0_\<omega>def)) \<and>
 
          snd \<omega>' = (if (r = Null) then (snd \<omega>0_\<omega>def) else (update_mh_loc_total_full (snd \<omega>0_\<omega>def) (the_address r, f)
-                                                   ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) - (Abs_prat p))))"
+                                                   ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) - (Abs_preal p))))"
     using MaskDefDifferent
     unfolding exhale_acc_normal_premise_def 
     by presburger
@@ -854,26 +854,27 @@ next
 
   note StateRelInst = StateRel[OF R]
  
-  have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV (real_of_rat p))"
-       using state_rel_aux_pred_sat_lookup_2[OF StateRelInst]
-       unfolding pred_eq_def      
-       by (metis (full_types) fun_upd_same)
+  have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV p)"
+    using state_rel_aux_pred_sat_lookup_2[OF StateRelInst]
+    unfolding pred_eq_def      
+    by (metis (full_types) fun_upd_same)
   
   from ExhPremise have 
     "p \<ge> 0" and
     RedRcvVpr: "ctxt_vpr, StateCons, Some (fst \<omega>0_\<omega>def) \<turnstile> \<langle>e_rcv_vpr; snd \<omega>0_\<omega>def\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
-    EnoughPerm: "(if r = Null then p = 0 else (Rep_prat (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f))) \<ge> p)"
+    EnoughPerm: "(if r = Null then p = 0 else (Rep_preal (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f))) \<ge> p)"
     unfolding exhale_acc_normal_premise_def exhale_field_acc_rel_perm_success_def exhale_field_acc_rel_assms_def
     by blast+
 
   hence PermAtMostOne: "pgte pwrite (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f))"
     using state_rel_wf_mask_simple[OF StateRelInst]
     unfolding wf_mask_simple_def
-    by simp
+    using \<open>valid_heap_mask (get_mh_total_full (snd \<omega>0_\<omega>def))\<close> valid_heap_maskD 
+    by presburger
 
   have "red_expr_bpl ctxt new_perm ns
         (if (r = Null) then (RealV 0) else 
-                            (RealV (real_of_rat (Rep_prat ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p))))))"
+                            (RealV (Rep_preal ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p)))))"
         (is ?conjunct1)
     apply (subst \<open>new_perm = _\<close>)
     apply (rule RedBinOp)
@@ -888,26 +889,26 @@ next
      apply simp
 
     apply simp
-    using \<open>p \<ge> 0\<close> psub_aux Abs_prat_inverse
-    by (metis EnoughPerm get_mh_total_full.simps of_rat_less_eq) 
+    using \<open>p \<ge> 0\<close> Abs_preal_inverse EnoughPerm minus_preal_def 
+    by auto
 
-  moreover have "(r \<noteq> Null \<longrightarrow> pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p)))" 
+  moreover have "(r \<noteq> Null \<longrightarrow> pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p)))" 
         (is ?conjunct2)
   proof (rule impI)
     assume "r \<noteq> Null"
-    hence "pgte (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) (Abs_prat p)"
-      using \<open>p \<ge> 0\<close> Abs_prat_inverse EnoughPerm
+    hence "pgte (get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r,f)) (Abs_preal p)"
+      using \<open>p \<ge> 0\<close> Abs_preal_inverse EnoughPerm
       by (simp add: pgte.rep_eq)
-    thus "pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_prat p))"
-      using PermAtMostOne psub_smaller PermAtMostOne pgte_transitive
-      by blast
+    thus "pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p))"
+      using PermAtMostOne psub_smaller PermAtMostOne pgte_transitive PosReal.pgte.rep_eq less_eq_preal.rep_eq
+      by fastforce
   qed
 
   ultimately show "?conjunct1 \<and> ?conjunct2"
     by blast
 next
   fix \<omega>0_\<omega>def' ns
-  assume "uncurry (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) \<omega>0_\<omega>def' ns"
+  assume "uncurry (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV  p))) ctxt) \<omega>0_\<omega>def' ns"
   thus "R' \<omega>0_\<omega>def' ns"
     using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove StateRelOutput map_add_upd_left map_le_def 
     by fastforce

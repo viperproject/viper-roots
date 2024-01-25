@@ -863,7 +863,7 @@ proof (rule wf_rel_intro)
   next
     case False
     from this obtain p where "v2 = VPerm p" using IntOrPerm by auto
-    hence "v2_bpl = RealV (real_of_rat p)" and "p \<noteq> 0" using RedBpl ValRel \<open>v2 = _\<close> NonZero by auto
+    hence "v2_bpl = RealV p" and "p \<noteq> 0" using RedBpl ValRel \<open>v2 = _\<close> NonZero by auto
 
     have "bop = PermDiv"
       apply (insert Bop EvalBinop \<open>v2 = _\<close>)
@@ -1342,7 +1342,7 @@ proof (rule wf_rel_intro)
     by (auto simp: vpr_to_bpl_ty_closed[OF TyRepWf FieldTyBpl] FieldTyBpl EmptyRunTypeContext)
   
   from MaskRel have MaskRelLoc:"\<And>a. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a))) \<Longrightarrow> 
-                               real_of_rat (Rep_prat ((get_mh_total_full \<omega>def) (a, f))) = (m_bpl (Address a, NormalField f_bpl \<tau>))"
+                                Rep_preal ((get_mh_total_full \<omega>def) (a, f)) = m_bpl (Address a, NormalField f_bpl \<tau>)"
       using FieldTy FieldRel 
       unfolding mask_rel_def
       using if_SomeD by fastforce
@@ -1368,9 +1368,8 @@ proof (rule wf_rel_intro)
     from ValidLoc have VprHasPerm: "pgt (get_mh_total_full \<omega>def (a,f)) pnone"
       by (simp add: get_valid_locs_def)
   
-    with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) > 0"    
-      using prat_positive_transfer
-      by blast
+    with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) > 0" 
+      by (simp add: PosReal.pgt.rep_eq zero_preal.rep_eq)
   
     have "red_ast_bpl P ctxt
               ((BigBlock name (cmd.Assert (FunExp has_perm_name ts [e_m_bpl, e_r_bpl, e_f_bpl]) # cs) str tr, cont), Normal ns)
@@ -1412,7 +1411,7 @@ proof (rule wf_rel_intro)
       then show ?thesis 
         using MaskRel MaskRelLoc ExpRel
         unfolding mask_rel_def get_valid_locs_def        
-        by (metis  R RedRcv exp_rel_vpr_bpl_elim mem_Collect_eq of_rat_0 zero_prat.rep_eq prat_pnone_pgt val_rel_vpr_bpl.simps(3))
+        by (metis R RedRcv exp_rel_vpr_bpl_elim mem_Collect_eq zero_preal.rep_eq preal_pnone_pgt val_rel_vpr_bpl.simps(3))
     qed
 
     have "red_ast_bpl P ctxt
@@ -1487,7 +1486,7 @@ proof (rule wf_rel_intro)
     by (auto intro: Semantics.RedVar)
   
   from MaskRel have MaskRelLoc:"\<And>a. red_expr_bpl ctxt e_r_bpl ns (AbsV (ARef (Address a))) \<Longrightarrow> 
-                               real_of_rat (Rep_prat ((get_mh_total_full \<omega>def) (a, f))) = (m_bpl (Address a, NormalField f_bpl \<tau>))"
+                                    Rep_preal ((get_mh_total_full \<omega>def) (a, f)) = m_bpl (Address a, NormalField f_bpl \<tau>)"
       using FieldTy FieldRel 
       unfolding mask_rel_def
       by (simp add: if_Some_iff)
@@ -1514,7 +1513,7 @@ proof (rule wf_rel_intro)
       by (simp add: get_writeable_locs_def)
   
     with MaskRelLoc[OF RedRcvBpl] have BplHasPerm: "m_bpl (Address a, NormalField f_bpl \<tau>) = 1"    
-      by (simp add: one_prat.rep_eq)
+      by (simp add: one_preal.rep_eq)
   
     have "red_ast_bpl P ctxt
               ((BigBlock name (cmd.Assert (expr.Var writePermConst \<guillemotleft>Lang.binop.Eq\<guillemotright> mask_lookup) # cs) str tr, cont), Normal ns)
@@ -1556,7 +1555,7 @@ proof (rule wf_rel_intro)
       then show ?thesis 
         using MaskRel MaskRelLoc ExpRel
         unfolding mask_rel_def get_writeable_locs_def  
-        using RedRcvBpl Rep_prat_inject one_prat.rep_eq by fastforce
+        using RedRcvBpl Rep_preal_inject one_preal.rep_eq by fastforce
     qed
 
     have "red_ast_bpl P ctxt
