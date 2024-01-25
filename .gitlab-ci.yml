@@ -14,6 +14,5 @@ setup_isabelle:
     - tar -xzf isabelle.tar.gz -C isabelle --strip-components=1
     - ./isabelle/bin/isabelle components -u foundational_boogie/BoogieLang
     - ./isabelle/bin/isabelle components -u vipersemcommon
-    - ./isabelle/bin/isabelle build -j4 -D .
-  only:
-    - merge_requests
+    - ./isabelle/bin/isabelle components -u viper-total-heaps
+    - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps

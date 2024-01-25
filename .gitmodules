@@ -2,7 +2,3 @@
 	path = foundational_boogie
 	url = https://github.com/gauravpartha/foundational_boogie/
 	branch = adjust_interface
-[submodule "vipersemcommon"]
-	path = vipersemcommon
-	url = https://gitlab.inf.ethz.ch/tdardini/vipersemcommon/
-	branch = cpg

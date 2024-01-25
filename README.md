@@ -1,8 +1,7 @@
-# Viper Total Heap Semantics and Metatheory for Viper-to-Boogie Proofs
+# Viper Roots
 
-This repository contains the total heap semantics formalization for the [Viper intermediate
-verification language](https://www.pm.inf.ethz.ch/research/viper.html) and the metatheory
-supporting the generation of proofs for the Viper-to-Boogie implementation.
+This repository contains the Viper Roots formalization for the [Viper intermediate
+verification language](https://www.pm.inf.ethz.ch/research/viper.html).
 The formalization is done using the [Isabelle theorem prover](https://isabelle.in.tum.de/).
 
 ## Installation
@@ -12,88 +11,20 @@ The formalization has been tested on Isabelle 2022 (which is not the latest one)
 which you can download from [here](https://isabelle.in.tum.de/website-Isabelle2022/dist/)
 (there are executables for Linux, Mac, Windows).
 
-Before the Isabelle files can be checked and explored, there are two Isabelle dependencies that 
-must be installed:
-* The formalization of the Boogie semantics (in the directory `foundational_boogie`).
-* Common files used for the formalization of the Viper language (in the directory `vipersemcommon`), 
-  which includes the syntax of the Viper language.
-
-To install these dependencies run the following commands at the root of the repository:
+This repository is split into separate subpackages linked via Isabelle sessions. To setup the development, you have to register these sessions with Isabelle 
 
 ```
-isabelle components -u foundational_boogie/BoogieLang
 isabelle components -u vipersemcommon
+isabelle components -u viper-total-heaps
 ```
-
 where `isabelle` is the Isabelle executable. On Windows, the commands need to be
 run in the Isabelle cygwin instance (TODO: show commands for Windows).
 
+Additionally, some parts of `viper-total-heaps` depend on a [formalization of the Boogie semantics](https://github.com/gauravpartha/foundational_boogie/). This semantics is included in this repository as a submodule and should be added as an isabelle component via the following command:
+```
+isabelle components -u foundational_boogie/BoogieLang
+```
+
 You can explore the files in the Isabelle IDE. To just check that the proofs succeed,
-run `isabelle build -j4 -D .` at the root of the repository (`j4` tells Isabelle to 
+run `isabelle build -j4 -D viper-total-heaps` at the root of the repository (`j4` tells Isabelle to 
 use 4 cores; you may use any suitable number).
-
-## Viper Total Heap Semantics
-
-The total heap semantics is formalized in:
-
-* `TotalViperState.thy`: Viper states
-* `TotalExpressions.thy`: Expression evaluation and inhale reduction
-* `TotalSemantics.thy`: Statement reduction
-
-Note that the semantics already contains some preliminary support for predicates.
-The semantics needs to still be adjusted to accurately model predicates.
-
-## Boogie semantics
-
-The Boogie semantics is in the Boogie folder `foundational_boogie` (via a submodule).
-`BoogieInterface.thy` at the root contains some useful definitions and 
-lemmas to interface with the Boogie semantics.
-
-## Metatheory for Viper-to-Boogie proofs
-
-### Relational rules for deriving forward simulation judgements
-
-The generic forward simulation between Viper and Boogie is defined in `Simulation.thy`, 
-which includes all the instantiation-independent rules.
-
-The common instantiations of the forward simulation and the corresponding relational rules
-are given in:
-
-* `ExpWfRel.thy`: the expression well-definedness check instantiation
-* `InhaleRel.thy`: the inhale simulation instantiation
-* `ExhaleRel.thy`: the remcheck simulation instantiation 
-* `StmtRel.thy`: the statement simulation instantiation 
-  * lemma `exhale_rel_star` shows the rule for the separating conjunction derived via the instantiation-independent composition rule and consequence rule.
-
-The relational rules defined in these files often rely on a judgement relating 
-the evaluation of Viper and Boogie expressions, which is defined in `ExpRel.thy`. 
-`ExpRel.thy` also contains relational rules for deriving expression relation 
-judgements.
-
-### Viper and Boogie Connection Setup
-
-There are various theory files that set up the connection between Viper and Boogie.
-These include:
-
-* `ViperBoogieAbsValueInst.thy`: The interpretation of the uninterpreted Boogie types.
-  This includes an instantiation of the polymorphic heap.
-* `ViperBoogieBasicRel.thy`: The concrete state relation between Viper and Boogie states.
-* `ViperBoogieFunctionInst.thy`: Concrete interpretations of uninterpreted Boogie functions 
-  emitted by the Viper-to-Boogie implementation.
-
-### Metatheory for the Final Theorem
-
-`ViperBoogieEndToEnd.thy` includes lemmas that help with generating a proof of the final
-theorem under the assumption that the forward simulation results hold. 
-
-### Custom Tactics for the Generation of Proofs
-
-Files that end with `ML.thy` contain Isabelle tactics for automatically
-proving goals. The generation of proofs between Viper and Boogie 
-programs makes use of these tactics. One of the the main tactics is defined in 
-`StmtRelML.thy` to automatically prove a forward simulation.
-Many of the tactics take hints as input, which are provided by our instrumentation 
-of the Viper-to-Boogie implementation.
-
-The implementation language for most tactics is Standard ML, which is the implementation
-language of Isabelle. Some simple tactics are written in [Eisbach](https://isabelle.in.tum.de/dist/Isabelle2023/doc/eisbach.pdf), which is a language specifically designed for tactics.
