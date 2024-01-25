@@ -1,7 +1,7 @@
 section \<open>A state model for the Viper total heap semantics\<close>
 
 theory TotalViperState
-imports ViperCommon.ValueAndBasicState
+imports ViperCommon.ValueAndBasicState ViperCommon.PosReal
 begin
 
 text \<open> We use the following naming scheme:
@@ -20,7 +20,8 @@ lp: predicate location
 
 
 type_synonym 'a total_heap = "heap_loc \<Rightarrow> 'a val"
-type_synonym 'a predicate_mask = "'a predicate_loc \<Rightarrow> prat"
+type_synonym field_mask = "preal mask"
+type_synonym 'a predicate_mask = "'a predicate_loc \<Rightarrow> preal"
 
 text \<open>For each predicate instance, the state tracks the heap snapshot represented as a subset of
 heap locations and predicate locations. The values of the heap locations are given by the 
@@ -37,7 +38,7 @@ fun get_lpset_pheap :: "'a predicate_heap \<Rightarrow> 'a predicate_loc \<Right
 record 'a total_state =
    get_hh_total :: "'a total_heap"
    get_hp_total :: "'a predicate_heap"
-   get_mh_total :: "mask"
+   get_mh_total :: "field_mask"
    get_mp_total :: "'a predicate_mask"
 
 type_synonym 'a total_trace = "label \<rightharpoonup> 'a total_state"
@@ -54,8 +55,8 @@ subsection \<open>Order\<close>
 
 lemma zero_mask_less_eq_mask: "zero_mask \<le> m"
   unfolding  zero_mask_def le_fun_def
-  apply transfer
-  by simp
+  by (simp add: all_pos)
+  
 
 instantiation total_state_ext :: (type,type) order
 begin
@@ -298,7 +299,7 @@ fun get_hh_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a total
 fun get_hp_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a predicate_heap"
   where "get_hp_total_full \<omega> = get_hp_total (get_total_full \<omega>)"
 
-fun get_mh_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> mask"
+fun get_mh_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> field_mask"
   where "get_mh_total_full \<omega> = get_mh_total (get_total_full \<omega>)"
 
 fun get_mp_total_full :: "('a,'b) full_total_state_scheme \<Rightarrow> 'a predicate_mask"

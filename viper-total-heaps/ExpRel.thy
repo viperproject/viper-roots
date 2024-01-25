@@ -172,7 +172,7 @@ qed
 
 lemma exp_rel_lit:
   assumes LitRel: "\<And> \<omega>_def \<omega> ns. R \<omega>_def \<omega> ns \<Longrightarrow> lit_translation_rel ctxt ns litT" and
-                  "litT lit_vpr = e_bpl"
+                  "litT lit_vpr = Some e_bpl"
   shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.ELit lit_vpr) e_bpl"
 proof(rule exp_rel_vpr_bpl_intro)
   fix StateCons \<omega> \<omega>_def \<omega>_def_opt ns v1
@@ -183,7 +183,7 @@ proof(rule exp_rel_vpr_bpl_intro)
   show "\<exists>v2. red_expr_bpl ctxt e_bpl ns v2 \<and> val_rel_vpr_bpl v1 = v2"
     apply (rule exI[where ?x="val_rel_vpr_bpl v1"])    
     apply (rule conjI)
-    using LitRel[OF R] \<open>v1 = _\<close> \<open>litT lit_vpr = e_bpl\<close>
+    using LitRel[OF R] \<open>v1 = _\<close> \<open>litT lit_vpr = Some e_bpl\<close>
     unfolding lit_translation_rel_def    
     by auto
 qed
@@ -503,7 +503,7 @@ proof (rule exp_rel_vpr_bpl_intro_2)
               by blast
           next
             case 2
-            hence *: "val_rel_vpr_bpl v1 = RealV (real_of_rat r)"
+            hence *: "val_rel_vpr_bpl v1 = RealV r"
               by simp
             hence "type_of_val (type_interp ctxt) (val_rel_vpr_bpl v2) = TPrim TReal"
               using BplSameType'
@@ -537,7 +537,7 @@ proof (rule exp_rel_vpr_bpl_intro_2)
                 apply simp_all
             apply (cases bop)
                           apply simp_all
-            by (metis of_rat_mult val_rel_vpr_bpl.simps(5))
+            by (metis val_rel_vpr_bpl.simps(5))
         qed
       qed
     qed (insert assms, auto)
@@ -596,9 +596,9 @@ proof (rule exp_rel_vpr_bpl_intro_2)
             apply simp_all
         apply (cases bop)
                       apply simp_all
-         apply (metis of_rat_mult of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
-            apply (simp add: smt_real_div_def)
-        by (metis binop_result.distinct(5) binop_result.inject of_rat_divide of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+         apply (metis val_rel_vpr_bpl.simps(5))
+        apply (simp add: smt_real_div_def)
+        by (metis binop_result.distinct(5) binop_result.inject val_rel_vpr_bpl.simps(5))
     qed
   qed (insert assms, auto)
 qed
@@ -668,7 +668,7 @@ lemma exp_rel_perm_access:
        RedRcvBpl: "red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef r))"               
      shows "red_expr_bpl ctxt (mask_read_bpl (expr.Var (mask_var Tr)) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) 
                               ns 
-                              (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
+                              (RealV (if r = Null then 0 else Rep_preal (get_mh_total_full \<omega> (the_address r, f))))"
 proof -  
 
   from FieldRelSingle obtain f_tr \<tau> where
@@ -716,7 +716,7 @@ proof -
     from this obtain a where "r = Address a"
       by (auto elim: ref.exhaust)
 
-    let ?p = "real_of_rat (Rep_prat (get_mh_total_full \<omega> (a,f)))"
+    let ?p = "Rep_preal (get_mh_total_full \<omega> (a,f))"
     have MaskZeroPerm: "mb (Address a, (NormalField f_tr \<tau>)) = ?p" 
       using MaskRel FieldTy FieldRel
       unfolding mask_rel_def
@@ -756,7 +756,7 @@ lemma exp_rel_perm_access_2:
              "e_bpl = mask_read_bpl (expr.Var mvar) e_rcv_bpl e_f_bpl [f_ty_bpl, \<tau>_bpl]"
      shows "red_expr_bpl ctxt e_bpl 
                               ns 
-                              (RealV (if r = Null then 0 else real_of_rat (Rep_prat (get_mh_total_full \<omega> (the_address r, f)))))"
+                              (RealV (if r = Null then 0 else Rep_preal (get_mh_total_full \<omega> (the_address r, f))))"
   apply (subst \<open>e_bpl = _\<close>)
   apply (subst \<open>f_ty_bpl = _\<close>)
   apply (subst \<open>mvar = _\<close>)

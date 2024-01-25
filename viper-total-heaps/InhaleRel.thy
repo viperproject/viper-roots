@@ -302,7 +302,7 @@ definition inhale_acc_normal_premise
        ctxt, StateCons, Some \<omega> \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 
        p \<ge> 0 \<and>
        (p > 0 \<longrightarrow> r \<noteq> Null) \<and>
-       (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_prat p))) in
+       (let W' = (if r = Null then {\<omega>} else inhale_perm_single StateCons \<omega> (the_address r,f) (Some (Abs_preal p))) in
        (W' \<noteq> {} \<and> \<omega>' \<in> W'))" 
 
 lemma inhale_field_acc_rel_assm_perm_eval:
@@ -414,8 +414,8 @@ lemma pos_perm_rel_trivial_inh:
 
 lemma pos_perm_rel_nontrivial_inh:
 assumes "zero_perm = const_repr Tr CNoPerm"
-shows "rel_general (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
-                   (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)
+shows "rel_general (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt)
+                   (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt)
      (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> 0 \<le> p)
      (\<lambda>\<omega>. ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_p;\<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p) \<and> p < 0) P ctxt
      (BigBlock name (cmd.Assert (expr.Var temp_perm \<guillemotleft>Ge\<guillemotright> expr.Var zero_perm) # cs) s tr, cont)
@@ -439,9 +439,9 @@ lemma inhale_rcv_lookup:
   by (metis val_rel_vpr_bpl.simps(3))
 
 lemma inhale_field_acc_non_null_rcv_rel:
-  assumes  StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" (is "?R \<omega> ns") and
+  assumes  StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt \<omega> ns" (is "?R \<omega> ns") and
        InhAccNormal: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'" and
- RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt)) 
+ RcvRel: "exp_rel_vpr_bpl (state_rel_ext (state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt)) 
                           ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl" and
  NullConst: "null_const = const_repr Tr CNull" and
  NoPermConst: "no_perm_const = const_repr Tr CNoPerm"
@@ -455,7 +455,7 @@ proof (rule exI[where ?x="ns"])
     unfolding inhale_acc_normal_premise_def
     by (metis val_rel_vpr_bpl.simps(3))
 
-  from \<open>?R \<omega> ns\<close> have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV (real_of_rat p))"
+  from \<open>?R \<omega> ns\<close> have LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV p)"
     using state_rel_aux_pred_sat_lookup_2
     unfolding pred_eq_def      
     by (metis (full_types) fun_upd_same)
@@ -479,7 +479,7 @@ qed
 lemma inhale_rel_field_acc_upd_rel:
   assumes
     StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow>                            
-                           state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns" and
+                           state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt \<omega> ns" and
               "temp_perm \<notin> dom AuxPred" and
     WfTyRep:  "wf_ty_repr_bpl TyRep" and
     MaskVarDefSame: "mask_var_def Tr = mask_var Tr" and
@@ -490,7 +490,7 @@ lemma inhale_rel_field_acc_upd_rel:
                    "new_perm = (mask_read_bpl (Lang.Var m_bpl) e_rcv_bpl e_f_bpl [TConSingle (TNormalFieldId TyRep), \<tau>_bpl]) \<guillemotleft>Lang.Add\<guillemotright> (Var temp_perm)" and
     MaskVar: "m_bpl = mask_var Tr " and
     FieldRelSingle: "field_rel_single Pr TyRep Tr f_vpr e_f_bpl \<tau>_bpl" and
-    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
+    RcvRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt) ctxt_vpr ctxt e_rcv_vpr e_rcv_bpl"
   shows "rel_general R 
                   (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt)
                   (\<lambda> \<omega> \<omega>'. inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>')
@@ -508,12 +508,12 @@ next
   fix \<omega> \<omega>'
   assume InhPremise: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
   hence 
-    "\<omega>' \<in> (if (r = Null) then {\<omega>} else (inhale_perm_single StateCons \<omega> ?lh (Some (Abs_prat p))))"
+    "\<omega>' \<in> (if (r = Null) then {\<omega>} else (inhale_perm_single StateCons \<omega> ?lh (Some (Abs_preal p))))"
        (is "\<omega>' \<in> ?W'")
     unfolding inhale_acc_normal_premise_def
     by metis
 
-  show " \<omega>' = ite_vc (r = Null) \<omega> (update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_prat p)))"
+  show " \<omega>' = ite_vc (r = Null) \<omega> (update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_preal p)))"
    
   proof (cases "r = Null")
     case True
@@ -523,8 +523,8 @@ next
       by simp
   next
     case False
-    have "inhale_perm_single StateCons \<omega> ?lh (Some (Abs_prat p)) = 
-          {update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> ?lh) (Abs_prat p))}"
+    have "inhale_perm_single StateCons \<omega> ?lh (Some (Abs_preal p)) = 
+          {update_mh_loc_total_full \<omega> ?lh (padd (get_mh_total_full \<omega> ?lh) (Abs_preal p))}"
       apply (rule inhale_perm_single_nonempty)
       using \<open>\<omega>' \<in> _\<close> False
       by fastforce
@@ -549,7 +549,7 @@ next
   assume "R \<omega> ns" 
   note StateRelInst = StateRel[OF \<open>R \<omega> ns\<close>]
 
-  let ?p' = "(padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_prat p))"
+  let ?p' = "(padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_preal p))"
 
   assume InhPremise: "inhale_acc_normal_premise ctxt_vpr StateCons e_rcv_vpr f_vpr e_p p r \<omega> \<omega>'"
   hence RedRcvVpr: "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>e_rcv_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and "p \<ge> 0" and
@@ -562,14 +562,14 @@ next
     by force
 
   have
-       LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV (real_of_rat p))"
-      using state_rel_aux_pred_sat_lookup_2[OF StateRelInst]
-      unfolding pred_eq_def      
-      by (metis (full_types) fun_upd_same)
+       LookupTempPerm: "lookup_var (var_context ctxt) ns temp_perm = Some (RealV p)"
+    using state_rel_aux_pred_sat_lookup_2[OF StateRelInst]
+    unfolding pred_eq_def
+    by (metis (full_types) fun_upd_same)
 
   show "red_expr_bpl ctxt new_perm ns
-         (if (r = Null) then (RealV 0) else (RealV (real_of_rat (Rep_prat (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_prat p)))))) \<and>
-        (r \<noteq> Null \<longrightarrow> pgte pwrite ?p')"
+         (if (r = Null) then (RealV 0) else (RealV (Rep_preal (padd (get_mh_total_full \<omega> (the_address r, f_vpr)) (Abs_preal p))))) \<and>
+         (r \<noteq> Null \<longrightarrow> pgte pwrite ?p')"
     apply (rule conjI)
     apply (subst \<open>new_perm = _\<close>)
     apply (rule RedBinOp)
@@ -578,14 +578,18 @@ next
         apply simp
        apply (rule RcvRel)
     apply (simp add: \<open>m_bpl = _\<close>)
-     apply (fastforce intro: RedVar LookupTempPerm)
-    using \<open>p \<ge> 0\<close> \<open>p > 0 \<longrightarrow> r \<noteq> Null\<close> padd_aux
-     apply force
+      apply (fastforce intro: RedVar LookupTempPerm)
+     apply (simp)
+    apply (intro conjI)
+    using \<open>p \<ge> 0\<close> \<open>p > 0 \<longrightarrow> r \<noteq> Null\<close>
+      apply argo
+    using \<open>p \<ge> 0\<close>
+    apply (simp add: plus_preal.rep_eq Abs_preal_inverse)
     using AtMostWritePerm
     by simp
 next
   fix \<omega> ns
-  assume StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV (real_of_rat p)))) ctxt \<omega> ns"
+  assume StateRel: "state_rel_def_same Pr StateCons TyRep Tr (AuxPred(temp_perm \<mapsto> pred_eq (RealV p))) ctxt \<omega> ns"
   thus "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega> ns"    
     using \<open>temp_perm \<notin> _\<close> state_rel_aux_pred_remove[OF StateRel]
     by (metis fun_upd_None_if_notin_dom map_le_imp_upd_le upd_None_map_le)

@@ -888,12 +888,12 @@ proof -
         unfolding vpr_heap_locations_bpl_def
         by blast
 
-      hence "mb (r, (NormalField f t)) = real_of_rat (Rep_prat (get_mh_total_full \<omega> heap_loc))"
+      hence "mb (r, (NormalField f t)) = Rep_preal (get_mh_total_full \<omega> heap_loc)"
         using MaskRel
         unfolding mask_rel_def
         by blast
       hence "get_mh_total_full \<omega> heap_loc \<noteq> pnone"
-        using PermPos zero_prat.rep_eq by fastforce
+        using PermPos zero_preal.rep_eq by fastforce
 
       hence "get_hh_total_full \<omega> heap_loc = get_hh_total_full \<omega>' heap_loc"
         using \<open>\<omega>' \<in> _\<close> 

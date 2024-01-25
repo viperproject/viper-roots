@@ -66,7 +66,7 @@ fun val_rel_vpr_bpl :: "'a vpr_val \<Rightarrow> 'a vbpl_val"
   | "val_rel_vpr_bpl (VBool b) = (BoolV b)"
   | "val_rel_vpr_bpl (VRef r) = (AbsV (ARef r))"
   | "val_rel_vpr_bpl (VAbs a) = (AbsV (ADomainVal a))"
-  | "val_rel_vpr_bpl (VPerm r) = (RealV (real_of_rat r))"
+  | "val_rel_vpr_bpl (VPerm p) = (RealV p)"
 
 subsection \<open>expression relation\<close>
 
@@ -201,11 +201,11 @@ proof -
     by blast
 qed
 
-definition mask_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> mask \<Rightarrow> 'a bpl_mask_ty \<Rightarrow> bool"
+definition mask_rel :: "ViperLang.program \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> preal mask \<Rightarrow> 'a bpl_mask_ty \<Rightarrow> bool"
   where "mask_rel Pr tr_field m mb \<equiv> 
     (\<forall> l field_ty_vpr field_bpl. declared_fields Pr (snd l) = Some field_ty_vpr \<longrightarrow>
                       tr_field (snd l) = Some field_bpl \<longrightarrow>
-                      mb (Address (fst l), NormalField field_bpl field_ty_vpr) = real_of_rat (Rep_prat (m l)))
+                      mb (Address (fst l), NormalField field_bpl field_ty_vpr) = Rep_preal (m l))
  \<and>  (\<forall>f t. mb (Null, NormalField f t) = 0)
  \<and>  (\<forall>r f. mb (r,f) \<ge> 0 \<and> (is_bounded_field_bpl f \<longrightarrow> mb (r,f) \<le> 1))" 
 
@@ -213,7 +213,7 @@ lemma mask_rel_intro:
   assumes "\<And>l field_ty_vpr field_bpl. 
              declared_fields Pr (snd l) = Some field_ty_vpr \<Longrightarrow>
              tr_field (snd l) = Some field_bpl \<Longrightarrow> 
-             mb (Address (fst l), NormalField field_bpl field_ty_vpr) = real_of_rat (Rep_prat (m l))" and
+             mb (Address (fst l), NormalField field_bpl field_ty_vpr) = Rep_preal (m l)" and
           "\<And> f t. mb (Null, NormalField f t) = 0" and
           "\<And>r f. mb (r,f) \<ge> 0 \<and> (is_bounded_field_bpl f \<longrightarrow> mb (r,f) \<le> 1)"
   shows "mask_rel Pr tr_field m mb"
@@ -226,7 +226,7 @@ lemma mask_rel_elim:
           "(\<And>l field_ty_vpr field_bpl. 
                 declared_fields Pr (snd l) = Some field_ty_vpr \<Longrightarrow>
                 tr_field (snd l) = Some field_bpl \<Longrightarrow> 
-                mb (Address (fst l), NormalField field_bpl field_ty_vpr) = real_of_rat (Rep_prat (m l))) \<Longrightarrow> 
+                mb (Address (fst l), NormalField field_bpl field_ty_vpr) = Rep_preal (m l)) \<Longrightarrow> 
                 P"
         shows P
   using assms
@@ -388,7 +388,7 @@ abbreviation zero_mask_bpl :: "ref \<times> 'a vb_field \<Rightarrow> real"
 lemma zero_mask_rel:
   shows "mask_rel Pr F zero_mask zero_mask_bpl"
   unfolding  mask_rel_def
-  by (auto intro: if_SomeI simp: zero_prat.rep_eq zero_mask_def)
+  by (auto intro: if_SomeI simp: zero_preal.rep_eq zero_mask_def)
 
 lemma zero_mask_rel_2:
   assumes "is_empty_total_full \<omega>"
@@ -446,16 +446,16 @@ lemma boogie_const_rel_stable:
   unfolding boogie_const_rel_def
   by simp
 
-fun lit_vpr_to_expr_bpl :: "(boogie_const \<Rightarrow> Lang.vname) \<Rightarrow> ViperLang.lit \<Rightarrow> boogie_expr"
+fun lit_vpr_to_expr_bpl :: "(boogie_const \<Rightarrow> Lang.vname) \<Rightarrow> ViperLang.lit \<rightharpoonup> boogie_expr"
   where
-    "lit_vpr_to_expr_bpl C (ViperLang.LInt i) = Lit (Lang.LInt i)"
-  | "lit_vpr_to_expr_bpl C (ViperLang.LBool i) = Lit (Lang.LBool i)"
-  | "lit_vpr_to_expr_bpl C ViperLang.NoPerm = Var (C CNoPerm)"
-  | "lit_vpr_to_expr_bpl C ViperLang.WritePerm = Var (C CWritePerm)"
-  | "lit_vpr_to_expr_bpl C ViperLang.LNull = Var (C CNull)"
+    "lit_vpr_to_expr_bpl C (ViperLang.LInt i) = Some (Lit (Lang.LInt i))"
+  | "lit_vpr_to_expr_bpl C (ViperLang.LBool i) = Some (Lit (Lang.LBool i))"
+  | "lit_vpr_to_expr_bpl C (ViperLang.LPerm p) = (if p = 0 then Some (Var (C CNoPerm))
+                                                  else (if p = 1 then Some (Var (C CWritePerm)) else None))"
+  | "lit_vpr_to_expr_bpl C ViperLang.LNull = Some (Var (C CNull))"
 
-definition lit_translation_rel :: "'a econtext_bpl => ('a vbpl_absval) nstate \<Rightarrow> (ViperLang.lit \<Rightarrow> Lang.expr) \<Rightarrow> bool"
-  where "lit_translation_rel ctxt ns litT \<equiv> (\<forall>lit e. litT lit = e \<longrightarrow> red_expr_bpl ctxt e ns (val_rel_vpr_bpl (val_of_lit lit)))"
+definition lit_translation_rel :: "'a econtext_bpl => ('a vbpl_absval) nstate \<Rightarrow> (ViperLang.lit \<rightharpoonup> Lang.expr) \<Rightarrow> bool"
+  where "lit_translation_rel ctxt ns litT \<equiv> (\<forall>lit e. litT lit = Some e \<longrightarrow> red_expr_bpl ctxt e ns (val_rel_vpr_bpl (val_of_lit lit)))"
 
 lemma boogie_const_lit_rel:
   assumes "boogie_const_rel C (var_context ctxt) ns"
@@ -463,10 +463,10 @@ lemma boogie_const_lit_rel:
   unfolding lit_translation_rel_def
   apply ((rule allI | rule impI)+)
   apply (erule lit_vpr_to_expr_bpl.elims)
-      apply (insert assms)
-      apply (unfold boogie_const_rel_def)
-  by (auto intro: RedVar RedLit)
-
+     apply (insert assms)
+     apply (unfold boogie_const_rel_def)
+  by (auto intro: RedVar RedLit split: if_split_asm)
+ 
 definition store_rel :: "('a vbpl_absval) absval_ty_fun \<Rightarrow> var_context \<Rightarrow> (ViperLang.var \<rightharpoonup> Lang.vname) \<Rightarrow> 'a full_total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "store_rel A \<Lambda> var_rel \<omega> ns \<equiv> 
           inj_on var_rel (dom var_rel) \<and>
@@ -2581,7 +2581,7 @@ lemma state_rel_mask_update_4:
      FieldLookup: "declared_fields Pr f_vpr = Some ty_vpr" and
      FieldTranslation: "field_translation Tr f_vpr = Some f_bpl" and
      TyTranslation: "vpr_to_bpl_ty TyRep ty_vpr = Some ty_bpl" and
-                    "p_bpl = real_of_rat (Rep_prat p)"
+                    "p_bpl = Rep_preal p"
                   shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt 
                       \<omega>def'
                       (update_mh_loc_total_full \<omega> (addr, f_vpr) p) 
@@ -2611,14 +2611,14 @@ next
     unfolding wf_mask_simple_def
   proof (rule allI)
     fix hl
-    show "pgte pwrite (get_mh_total_full ?\<omega>' hl)"
+    show "pwrite \<ge> get_mh_total_full ?\<omega>' hl"
     proof (cases "hl = (addr, f_vpr)")
       case True
       hence "get_mh_total_full ?\<omega>' hl = p"
         by simp
       then show ?thesis 
         using \<open>pgte pwrite p\<close>
-        by argo
+        by (metis PosReal.pgte.rep_eq less_eq_preal.rep_eq)
     next
       case False       
       hence "get_mh_total_full ?\<omega>' hl = get_mh_total_full \<omega> hl"
@@ -2630,7 +2630,7 @@ next
     qed
   qed
 next
-  let ?mb'="mask_bpl_upd_normal_field mb (Address addr) f_bpl ty_vpr (real_of_rat (Rep_prat p))"
+  let ?mb'="mask_bpl_upd_normal_field mb (Address addr) f_bpl ty_vpr (Rep_preal p)"
 
   have MaskRel0:"mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb"
     using LookupMask state_rel0_mask_var_rel[OF state_rel_state_rel0[OF StateRel]]
@@ -2650,8 +2650,7 @@ next
     fix field_ty_vpr field_bpl
     assume FieldLookup2: "declared_fields Pr (snd l) = Some field_ty_vpr"
     assume FieldTranslation2: "field_translation Tr (snd l) = Some field_bpl"
-    show "?mb' (Address (fst l), NormalField field_bpl field_ty_vpr) =
-        real_of_rat (Rep_prat (get_mh_total_full ?\<omega>' l))"
+    show "?mb' (Address (fst l), NormalField field_bpl field_ty_vpr) = Rep_preal (get_mh_total_full ?\<omega>' l)"
     proof (cases "l = (addr, f_vpr)")
       case True
       then show ?thesis 
@@ -2690,7 +2689,7 @@ next
       proof (cases "(r,f) = (Address addr, NormalField f_bpl ty_vpr)")
         case True
         then show ?thesis 
-          using \<open>pgte pwrite p\<close> one_prat.rep_eq pgte.rep_eq prat_non_negative
+          using \<open>pgte pwrite p\<close> one_prat.rep_eq pgte.rep_eq prat_non_negative one_preal.rep_eq
           unfolding mask_bpl_upd_normal_field_def
           by auto
       next
