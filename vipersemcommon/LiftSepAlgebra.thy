@@ -1,22 +1,23 @@
 theory LiftSepAlgebra
-  imports SepAlgebra PartialMap
-begin                 
+  imports SepAlgebra PartialMap ViperLang
+begin
 
-type_synonym var = nat
-type_synonym 'v store = "(var \<rightharpoonup> 'v) agreement" (* De Bruijn indices? *)
+type_synonym 'v ag_store = "(var \<rightharpoonup> 'v) agreement"
+type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a) agreement"
 
-type_synonym ('c, 'v) state = "'v store \<times> 'c"
+type_synonym ('v, 'a) abs_state = "('v ag_store \<times> 'a ag_trace) \<times> 'a"
 
 (* all should come from the fact that 'v is agreement *)
 
 subsection \<open>Normal states\<close>
 
-definition get_store :: "('a, 'v) state \<Rightarrow> (var \<rightharpoonup> 'v)" where "get_store \<omega> = the_ag (fst \<omega>)"
-definition get_state :: "('a, 'v) state \<Rightarrow> 'a" where "get_state \<omega> = snd \<omega>"
+definition get_store :: "('v, 'a) abs_state \<Rightarrow> (var \<rightharpoonup> 'v)" where "get_store \<omega> = the_ag (fst (fst \<omega>))"
+definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
+definition get_state :: "('v, 'a) abs_state \<Rightarrow> 'a" where "get_state \<omega> = snd \<omega>"
 
 (*
 lemma pcm_agreement_compatible:
-  fixes a :: "('v  :: pcm_agreement) store"
+  fixes a :: "('v  :: pcm_agreement) ag_store"
   shows "a ## b \<longleftrightarrow> compatible_maps a b" (is "?A \<longleftrightarrow> ?B")
 proof
   assume ?B
@@ -39,7 +40,7 @@ next
 qed
 
 lemma pcm_agreement_sum:
-  fixes a :: "('v  :: pcm_agreement) store"
+  fixes a :: "('v  :: pcm_agreement) ag_store"
   assumes "Some x = a \<oplus> b"
   shows "x = a ++ b"
 proof (rule ext)
@@ -87,35 +88,35 @@ next
     using defined_def plus_prodI by fastforce
 qed    
 
-lemma get_store_comp:
-  "fst a ## fst b \<longleftrightarrow> get_store a = get_store b" (is "?A \<longleftrightarrow> ?B")
-  by (metis ag_comp agreement.expand get_store_def)
+lemma get_store_trace_comp:
+  "fst a ## fst b \<longleftrightarrow> get_store a = get_store b \<and> get_trace a = get_trace b" (is "?A \<longleftrightarrow> ?B")
+  by (simp add: ag_comp ag_the_ag_same comp_prod get_store_def get_trace_def)
 
 lemma plus_state_def:
   "\<omega>1 \<oplus> \<omega>2 = (let r = (get_state \<omega>1 \<oplus> get_state \<omega>2) in
-  (if get_store \<omega>1 = get_store \<omega>2 \<and> r \<noteq> None then Some (Ag (get_store \<omega>1), the r)
+  (if get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2 \<and> r \<noteq> None then Some ((Ag (get_store \<omega>1), Ag (get_trace \<omega>1)), the r)
   else None))" (is "?A = ?B")
 proof (cases "\<omega>1 \<oplus> \<omega>2")
   case None
-  then have "get_state \<omega>1 \<oplus> get_state \<omega>2 = None \<or> get_store \<omega>1 \<noteq> get_store \<omega>2"    
-    by (metis comp_prod defined_def get_state_def get_store_comp)
+  then have "get_state \<omega>1 \<oplus> get_state \<omega>2 = None \<or> get_store \<omega>1 \<noteq> get_store \<omega>2 \<or> get_trace \<omega>1 \<noteq> get_trace \<omega>2"
+    by (metis comp_prod defined_def get_state_def get_store_trace_comp)
   then show ?thesis
     using None by auto
 next
   case (Some x)
-  then have "get_store \<omega>1 = get_store \<omega>2 \<and> get_state \<omega>1 \<oplus> get_state \<omega>2 \<noteq> None"
-    by (metis comp_prod defined_def get_state_def get_store_comp option.simps(3))
+  then have asm0: "get_store \<omega>1 = get_store \<omega>2 \<and> get_state \<omega>1 \<oplus> get_state \<omega>2 \<noteq> None \<and> get_trace \<omega>1 = get_trace \<omega>2"
+    by (metis comp_prod defined_def get_store_trace_comp get_state_def option.simps(3))
   then obtain r where "Some r = get_state \<omega>1 \<oplus> get_state \<omega>2"
     by force
-  moreover have "fst \<omega>1 \<oplus> fst \<omega>2 = Some (Ag (get_store \<omega>1))"
-    by (metis \<open>get_store \<omega>1 = get_store \<omega>2 \<and> get_state \<omega>1 \<oplus> get_state \<omega>2 \<noteq> None\<close> ag_the_ag_same agreement.sel get_store_def plus_agreement_def)
+  moreover have "fst \<omega>1 \<oplus> fst \<omega>2 = Some (Ag (get_store \<omega>1), Ag (get_trace \<omega>1))"
+    by (metis (no_types, opaque_lifting) agreement.exhaust_sel asm0 core_is_smaller fst_conv get_store_def get_store_trace_comp get_trace_def greater_def smaller_compatible_core surjective_pairing)
   ultimately show ?thesis
-    by (smt (z3) \<open>get_store \<omega>1 = get_store \<omega>2 \<and> get_state \<omega>1 \<oplus> get_state \<omega>2 \<noteq> None\<close> get_state_def option.sel plus_prodI)
+    by (smt (z3) asm0 get_state_def option.sel plus_prodI)
 qed
 
 
 (*
-fun mult_state :: "'b \<Rightarrow> ('a, 'v) state \<Rightarrow> ('a, 'v) state option" (infixl "\<odot>" 70) where
+fun mult_state :: "'b \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state option" (infixl "\<odot>" 70) where
   "\<alpha> \<odot> \<omega> = (let r = (\<alpha> \<odot> get_state \<omega>) in if r = None then None else Some (get_store \<omega>, get_t \<omega>, the r))"
 *)
 (*
@@ -124,20 +125,20 @@ definition core_trace :: "'a trace \<Rightarrow> 'a trace" where
 *)
 
 lemma full_core_def:
-  "|\<omega>| = (fst \<omega>, |get_state \<omega>| )"
-  by (simp add: core_agreement_def core_def get_state_def)
+  "|\<omega>| = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)),  |get_state \<omega>| )"
+  by (smt (verit) agreement.exhaust_sel core_def core_is_smaller fst_conv get_state_def get_store_def get_trace_def option.discI plus_state_def snd_conv)
 
 (*
 lemma full_stable_def:
   "stable \<omega> \<longleftrightarrow> stable (get_state \<omega>)" (is "?A \<longleftrightarrow> ?B")
   sorry
 
-fun full_stabilize :: "('a, 'v) state \<Rightarrow> ('a, 'v) state" where
+fun full_stabilize :: "('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
   "full_stabilize \<omega> = (get_store \<omega>, stabilize (get_state \<omega>))"
 *)
 
 lemma full_add_defined:
-  "\<omega>1 \<oplus> \<omega>2 \<noteq> None \<longleftrightarrow> ((get_state \<omega>1) \<oplus> (get_state \<omega>2) \<noteq> None \<and> get_store \<omega>1 = get_store \<omega>2)"
+  "\<omega>1 \<oplus> \<omega>2 \<noteq> None \<longleftrightarrow> ((get_state \<omega>1) \<oplus> (get_state \<omega>2) \<noteq> None \<and> get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2)"
   using plus_state_def[of \<omega>1 \<omega>2] option.discI
   by (smt (verit, del_insts))
 
@@ -175,8 +176,9 @@ lemma sum_traces_asso:
 lemma full_state_ext:
   assumes "get_store a = get_store b"
       and "get_state a = get_state b"
+      and "get_trace a = get_trace b"
     shows "a = b"
-  by (metis agreement.exhaust_sel assms(1) assms(2) get_state_def get_store_def prod_eqI)
+  by (metis agreement.exhaust_sel assms get_state_def get_store_def get_trace_def prod_eqI)
 
 
 (*
@@ -198,8 +200,8 @@ lemma core_trace_invo:
 *)
 
 (*
-lemma add_stores:
-  fixes c :: "('v :: pcm_agreement) store"
+lemma add_ag_stores:
+  fixes c :: "('v :: pcm_agreement) ag_store"
   shows "Some c = c \<oplus> c"
 proof -
   have "compatible_fun c c"
@@ -219,7 +221,7 @@ qed
 *)
 
 lemma add_defined_lift:
-  fixes s :: "'v store"
+  fixes s :: "'v ag_store"
   assumes "Some c = a \<oplus> b"
   shows "Some (s, c) = (s, a) \<oplus> (s, b)"
 proof -
@@ -300,14 +302,27 @@ lemma larger_trace_equiv:
   sorry
 *)
 
-lemma store_greater:
-  fixes s :: "'v store"
+lemma ag_store_greater:
+  fixes s :: "'v ag_store"
+  shows "s' \<succeq> s \<longleftrightarrow> s = s'"
+  by (metis ag_comp smaller_compatible_core succ_refl)
+
+lemma ag_trace_greater:
+  fixes s :: "'v ag_trace"
   shows "s' \<succeq> s \<longleftrightarrow> s = s'"
   by (metis ag_comp smaller_compatible_core succ_refl)
 
 lemma greater_charact:
-  "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_state \<omega>' \<succeq> get_state \<omega>"
-  by (simp add: ag_the_ag_same get_state_def get_store_def greater_prod_eq store_greater)
+  "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_state \<omega>' \<succeq> get_state \<omega> \<and> get_trace \<omega> = get_trace \<omega>'" (is "?A \<longleftrightarrow> ?B")
+proof
+  show "?A \<Longrightarrow> ?B"
+    by (metis (no_types, opaque_lifting) get_state_def get_store_trace_comp greater_prod_eq smaller_compatible)
+  assume ?B
+  then have "Ag (get_store \<omega>') \<succeq> Ag (get_store \<omega>) \<and> get_state \<omega>' \<succeq> get_state \<omega> \<and> Ag (get_trace \<omega>') \<succeq> Ag (get_trace \<omega>)"
+    by (simp add: succ_refl)
+  then show ?A
+    by (simp add: get_state_def get_store_def get_trace_def greater_prod_eq)
+qed
 
 lemma core_charact:
   shows "get_store |\<omega>| = get_store \<omega>"
@@ -344,8 +359,8 @@ proof
     by (smt (verit, ccfv_threshold) Un_iff assms compatible_fun_def domIff option.distinct(1) option.sel plus_fun_def plus_option.elims subsetI)
 qed
 
-lemma stores_compatible:
-  fixes a :: "('v :: pcm_agreement) store"
+lemma ag_stores_compatible:
+  fixes a :: "('v :: pcm_agreement) ag_store"
   assumes "a ## b"
       and "a l = Some va"
       and "b l = Some vb"

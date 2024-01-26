@@ -1938,6 +1938,12 @@ begin
 definition stable :: "'a \<Rightarrow> bool" where
   "stable = stable_rel u"
 
+(*
+lemma stabilize_rel:
+  assumes "Some x = a \<oplus> b"
+  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def sorry
+*)
+
 definition stabilize :: "'a \<Rightarrow> 'a" where
   "stabilize = stabilize_rel u"
 

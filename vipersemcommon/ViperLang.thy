@@ -140,7 +140,7 @@ datatype stmt =
 | Apply assertion assertion
 
 \<comment>\<open>Misc\<close>
-| Label label | Scope "vtyp list" stmt | Skip
+| Label label | Scope vtyp stmt | Skip
 
 (* method m(x) returns y req P ens Q *)
 record method_decl =
@@ -227,7 +227,5 @@ fun n_forall :: "vtyp list \<Rightarrow> assertion \<Rightarrow> assertion" wher
 fun n_forall_pure :: "vtyp list \<Rightarrow> pure_exp \<Rightarrow> pure_exp" where
   "n_forall_pure [] e = e"
 | "n_forall_pure (t # q) e = PForall t (n_forall_pure q e)"
-
-
 
 end

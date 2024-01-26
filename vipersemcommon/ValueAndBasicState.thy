@@ -47,7 +47,7 @@ value. Failure represents one of the following:
 - Function calls that do not satisfy the precondition (abstract)
 - Function calls in general is just "reducing"?
 \<close>
-datatype 'a extended_val = Val "'a val" | VFailure
+datatype 'a extended_val = Val (the_val: "'a val") | VFailure
 
     
 subsection \<open>Masks\<close>
