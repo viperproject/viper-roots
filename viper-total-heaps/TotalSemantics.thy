@@ -378,12 +378,12 @@ always has at least one failure transition. This is in-sync with the recent Carb
 \<comment>\<open>TODO: fold acc(P(x),0)\<close>
 
 \<comment>\<open>Composite statements\<close>
-| RedScope: \<comment>\<open>TODO: lift to sets of types\<close>
+| RedScope:
     "\<lbrakk>  get_type (absval_interp_total ctxt) v = \<tau>;
        red_stmt_total ctxt R (shift_and_add \<Lambda> \<tau>) scopeBody (shift_and_add_state_total \<omega> v) res;
        res_unshift = map_stmt_result_total (unshift_state_total 1) res \<rbrakk> \<Longrightarrow>
 
-      red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
+      red_stmt_total ctxt R \<Lambda> (Scope \<tau> scopeBody) \<omega> res_unshift"
  | RedIfTrue: 
    "\<lbrakk> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e_b; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True);
       red_stmt_total ctxt R \<Lambda> s_thn \<omega> res \<rbrakk> \<Longrightarrow> 
@@ -421,7 +421,7 @@ inductive_cases RedExhaleNormal_case: "red_stmt_total ctxt R \<Lambda> (Exhale A
 inductive_cases RedExhaleFailure_case: "red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> RFailure"
 inductive_cases RedAssertNormal_case: "red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> (RNormal \<omega>')"
 inductive_cases RedAssertFailure_case: "red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
-inductive_cases RedScope_case: "red_stmt_total ctxt R \<Lambda> (Scope [\<tau>] scopeBody) \<omega> res_unshift"
+inductive_cases RedScope_case: "red_stmt_total ctxt R \<Lambda> (Scope \<tau> scopeBody) \<omega> res_unshift"
 
 lemmas red_stmt_total_inversion_thms =
    RedSkip_case

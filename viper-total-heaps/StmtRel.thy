@@ -2935,11 +2935,11 @@ lemma scoped_var_stmt_rel:
           "stmt_rel (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt) 
                     (state_rel_def_same Pr StateCons TyRep (Tr\<lparr> var_translation := var_tr' \<rparr>) AuxPred ctxt) 
                     ctxt_vpr StateCons (shift_and_add \<Lambda>_vpr \<tau>_vpr) P ctxt s_body (BigBlock name cs str tr, cont) \<gamma>'"
-    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Scope [\<tau>_vpr] s_body) \<gamma> \<gamma>'"
+    shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Scope \<tau>_vpr s_body) \<gamma> \<gamma>'"
 proof (rule stmt_rel_intro_2)
   fix \<omega> ns res
   assume "R \<omega> ns" and
-         RedStmtVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Scope [\<tau>_vpr] s_body) \<omega> res"    
+         RedStmtVpr: "red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr (Scope \<tau>_vpr s_body) \<omega> res"    
 
   from RedStmtVpr obtain res_body v where 
         NewValTy: "get_type (absval_interp_total ctxt_vpr) v = \<tau>_vpr"
@@ -3135,7 +3135,7 @@ lemma scoped_var_stmt_rel_simplify_tr:
           "stmt_rel (state_rel_def_same Pr StateCons TyRep Tr' AuxPred ctxt) 
                     (state_rel_def_same Pr StateCons TyRep Tr' AuxPred ctxt) 
                     ctxt_vpr StateCons (shift_and_add \<Lambda>_vpr \<tau>_vpr) P ctxt s_body (BigBlock name cs str tr, cont) \<gamma>'"
-        shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Scope [\<tau>_vpr] s_body) \<gamma> \<gamma>'"
+        shows "stmt_rel R (state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Scope \<tau>_vpr s_body) \<gamma> \<gamma>'"
   apply (rule scoped_var_stmt_rel)
   using assms
   by auto
