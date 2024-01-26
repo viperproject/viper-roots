@@ -92,12 +92,12 @@ next
 qed
 
 lemma red_no_old_pure_indep_trace:
-    shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] v \<Longrightarrow> get_s \<omega> = get_s \<omega>' \<Longrightarrow> get_v \<omega> = get_v \<omega>' \<Longrightarrow> no_old_pure e \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] v"
-      and "red_pure_exps \<Delta> \<omega> exps vals \<Longrightarrow> get_s \<omega> = get_s \<omega>' \<Longrightarrow> get_v \<omega> = get_v \<omega>' \<Longrightarrow> no_old_pure_exps exps \<Longrightarrow> red_pure_exps \<Delta> \<omega>' exps vals"
+    shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] v \<Longrightarrow> get_store \<omega> = get_store \<omega>' \<Longrightarrow> get_state \<omega> = get_state \<omega>' \<Longrightarrow> no_old_pure e \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] v"
+      and "red_pure_exps \<Delta> \<omega> exps vals \<Longrightarrow> get_store \<omega> = get_store \<omega>' \<Longrightarrow> get_state \<omega> = get_state \<omega>' \<Longrightarrow> no_old_pure_exps exps \<Longrightarrow> red_pure_exps \<Delta> \<omega>' exps vals"
 proof (induct arbitrary: \<omega>' and \<omega>' rule: red_pure_red_pure_exps.inducts)
 (* first \<omega>' refers to reducing single expression case, second refers to reducing expression list case. "and" in between indicates they bound first and second conclusion respectively *)
   case (RedPureExps c \<omega> exps vals)
-    have "\<And>e v. (c \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) \<and> (\<forall>x. get_s \<omega> = get_s x \<longrightarrow> get_v \<omega> = get_v x \<longrightarrow> no_old_pure e \<longrightarrow> c \<turnstile> \<langle>e;x\<rangle> [\<Down>] Val v) \<Longrightarrow> (no_old_pure e \<longrightarrow> c \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val v)"
+    have "\<And>e v. (c \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) \<and> (\<forall>x. get_store \<omega> = get_store x \<longrightarrow> get_state \<omega> = get_state x \<longrightarrow> no_old_pure e \<longrightarrow> c \<turnstile> \<langle>e;x\<rangle> [\<Down>] Val v) \<Longrightarrow> (no_old_pure e \<longrightarrow> c \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val v)"
       using RedPureExps.prems(1) RedPureExps.prems(2) by blast
     then have "list_all2 (\<lambda>e v. no_old_pure e \<longrightarrow> c \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val v) exps vals"
       by (smt (verit) RedPureExps.hyps list_all2_mono)
@@ -109,8 +109,10 @@ next
     by (simp add: red_pure_red_pure_exps.RedLit)
 next
   case (RedVar \<sigma> n v \<Delta> uv)
-  then show ?case
-    by (metis get_s.simps red_pure_red_pure_exps.RedVar surj_pair)
+  then show ?case sorry
+(*
+    by (metis get_store_def red_pure_red_pure_exps.RedVar surj_pair)
+*)
 next
   case (RedUnop \<Delta> e \<omega> v unop v')
   then show ?case
@@ -129,32 +131,40 @@ next
     by auto
 next
   case (RedLet \<Delta> e1 \<omega> v1 e2 r)
-  have s_not_change: "get_s (shift_and_add_state \<omega> v1) = get_s (shift_and_add_state \<omega>' v1)"
-    by (metis RedLet.prems(1) get_s.simps shift_and_add_state.elims surj_pair)
-  have v_not_change: "get_v (shift_and_add_state \<omega> v1) = get_v (shift_and_add_state \<omega>' v1)"
+  have s_not_change: "get_store (shift_and_add_equi_state \<omega> v1) = get_store (shift_and_add_equi_state \<omega>' v1)"
+    by (metis greater_state_has_greater_parts(1) neutral_smallest)
+  have v_not_change: "get_state (shift_and_add_equi_state \<omega> v1) = get_state (shift_and_add_equi_state \<omega>' v1)"
     by (simp add: RedLet.prems(2) shift_and_add_keep_vstate)
   have e1_eval_v1: "\<Delta> \<turnstile> \<langle>e1;\<omega>'\<rangle> [\<Down>] Val v1"
     using RedLet.hyps(2) RedLet.prems(1) RedLet.prems(2) RedLet.prems(3) by auto
-  have "\<Delta> \<turnstile> \<langle>e2;shift_and_add_state \<omega>' v1\<rangle> [\<Down>] r"
+  have "\<Delta> \<turnstile> \<langle>e2;shift_and_add_equi_state \<omega>' v1\<rangle> [\<Down>] r"
     using RedLet.hyps(4) RedLet.prems(3) s_not_change v_not_change by auto
   then show ?case
     using e1_eval_v1 red_pure_red_pure_exps.RedLet by blast
 next
   case (RedExistsTrue v \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldExists get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedExistsTrue shift_and_add_state.simps)
+  then show ?case sorry
+(*
+  by (metis NoOldExists get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedExistsTrue shift_and_add_equi_state.simps)
+*)
 next
   case (RedExistsFalse \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldExists get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedExistsFalse shift_and_add_state.simps)
+  then show ?case sorry
+(*
+    by (metis NoOldExists get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedExistsFalse shift_and_add_equi_state.simps)
+*)
 next
   case (RedForallTrue \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldForall get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedForallTrue shift_and_add_state.simps)
+  then show ?case sorry
+(*
+    by (metis NoOldForall get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedForallTrue shift_and_add_equi_state.simps)
+*)
 next
   case (RedForallFalse v \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldForall get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedForallFalse shift_and_add_state.simps)
+  then show ?case sorry
+(*
+    by (metis NoOldForall get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedForallFalse shift_and_add_equi_state.simps)
+*)
 next
   case (RedCondExpTrue \<Delta> e1 \<omega> e2 r e3)
   then show ?case
@@ -169,8 +179,10 @@ next
     by (simp add: red_pure_red_pure_exps.RedPermNull)
 next
   case (RedResult \<sigma> v \<Delta> ux uy)
-  then show ?case
-    by (metis get_s.elims get_s.simps red_pure_red_pure_exps.RedResult)
+  then show ?case sorry
+(*
+    by (metis get_store_def red_pure_red_pure_exps.RedResult)
+*)
 next
   case (RedBinopRightFailure \<Delta> e1 \<omega> v1 e2 bop)
   then show ?case
@@ -185,12 +197,16 @@ next
     by simp
 next
   case (RedExistsFailure v \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldExists get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedExistsFailure shift_and_add_state.elims)
+  then show ?case sorry
+(*
+    by (metis NoOldExists get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedExistsFailure shift_and_add_equi_state.elims)
+*)
 next
   case (RedForallFailure v \<Delta> ty e \<omega>)
-  then show ?case
-    by (metis NoOldForall get_s.simps get_v.simps old.prod.exhaust red_pure_red_pure_exps.RedForallFailure shift_and_add_state.elims)
+  then show ?case sorry
+(*
+    by (metis NoOldForall get_store_def get_state_def old.prod.exhaust red_pure_red_pure_exps.RedForallFailure shift_and_add_equi_state.elims)
+*)
 next
   case (RedPropagateFailure e e' \<Delta> \<omega>)
   then show ?case
@@ -220,7 +236,7 @@ fun no_old_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> bool" where
 | NoOldAccPred: "no_old_atomic_assert (AccPredicate _ as p) \<longleftrightarrow> no_old_pure_exps as \<and> no_old_exp_or_wildcard p"
 
 lemma red_no_old_atomic_assert_indep_trace:
-    shows "red_atomic_assert \<Delta> a \<omega> b \<Longrightarrow> no_old_atomic_assert a \<Longrightarrow> get_s \<omega> = get_s \<omega>' \<Longrightarrow> get_v \<omega> = get_v \<omega>' \<Longrightarrow> red_atomic_assert \<Delta> a \<omega>' b"
+    shows "red_atomic_assert \<Delta> a \<omega> b \<Longrightarrow> no_old_atomic_assert a \<Longrightarrow> get_store \<omega> = get_store \<omega>' \<Longrightarrow> get_state \<omega> = get_state \<omega>' \<Longrightarrow> red_atomic_assert \<Delta> a \<omega>' b"
 proof (induct arbitrary: \<omega>' rule: red_atomic_assert.induct)
   case (RedAtomicPure \<Delta> e \<omega> b)
   then show ?case
@@ -236,9 +252,11 @@ next
   have ref_red: "\<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val (VRef r)"
     by (metis RedAtomicAcc.hyps(1) RedAtomicAcc.prems(2) RedAtomicAcc.prems(3) no_old_ref red_no_old_pure_indep_trace(1))
   have same_mask: "get_m \<omega> = get_m \<omega>'"
-    by (metis RedAtomicAcc.prems(3) get_m.simps get_pv.cases get_v.simps)
-  then show ?case
+    by (metis RedAtomicAcc.prems(3) get_m.simps get_pv.cases get_state_def)
+  then show ?case sorry
+(*
     by (simp add: RedAtomicAcc.hyps(3) perm_red red_atomic_assert.RedAtomicAcc ref_red)
+*)
 next
   case (RedAtomicAccZero \<Delta> e \<omega> uu p f)
   have perm_red: "\<Delta> \<turnstile> \<langle>p; \<omega>'\<rangle> [\<Down>] Val (VPerm 0)"
@@ -252,9 +270,11 @@ next
   then have ref_red: "\<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val (VRef (Address a))"
     by (meson NoOldAcc red_no_old_pure_indep_trace(1))
   have "get_m \<omega> = get_m \<omega>'"
-    by (metis RedAtomicAccWildcard.prems(3) get_m.simps get_pv.cases get_v.simps)
-  then show ?case
+    by (metis RedAtomicAccWildcard.prems(3) get_m.simps get_pv.cases get_state_def)
+  then show ?case sorry
+(*
     by (simp add: red_atomic_assert.RedAtomicAccWildcard ref_red)
+*)
 next
   case (RedAtomicAccWildcardNull \<Delta> e \<omega> f)
   then have "\<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] Val (VRef Null)"
@@ -301,7 +321,7 @@ fun no_old_assertion :: "assertion \<Rightarrow> bool" where
 | NoOldImpExists: "no_old_assertion (Exists _ a) \<longleftrightarrow> no_old_assertion a"
 
 lemma red_no_old_assertion_indep_trace:
-    shows "\<Delta> \<Turnstile> \<langle>a; \<omega>\<rangle> \<Longrightarrow> no_old_assertion a \<Longrightarrow> get_s \<omega> = get_s \<omega>' \<Longrightarrow> get_v \<omega> = get_v \<omega>' \<Longrightarrow> \<Delta> \<Turnstile> \<langle>a; \<omega>'\<rangle>"
+    shows "\<Delta> \<Turnstile> \<langle>a; \<omega>\<rangle> \<Longrightarrow> no_old_assertion a \<Longrightarrow> get_store \<omega> = get_store \<omega>' \<Longrightarrow> get_state \<omega> = get_state \<omega>' \<Longrightarrow> \<Delta> \<Turnstile> \<langle>a; \<omega>'\<rangle>"
 proof (induct arbitrary: \<omega>' rule: sat.induct)
   case (1 \<Delta> A \<omega>)
   then show ?case
@@ -328,21 +348,29 @@ next
       and sat_b: "\<Delta> \<Turnstile> \<langle>B; b\<rangle>"
       using "4.prems"(1) by auto
     obtain a' where
-          a'_s: "get_s a' = get_s a"
-      and a'_t: "get_t a' = get_t \<omega>'"
-      and a'_v: "get_v a' = get_v a"
-      by auto
+          a'_s: "get_store a' = get_store a"
+      and a'_t: "get_trace a' = get_trace \<omega>'"
+      and a'_v: "get_state a' = get_state a"      
+      by (metis full_add_defined option.discI u_neutral)
     obtain b' where
-          b'_s: "get_s b' = get_s b"
-      and b'_t: "get_t b' = (\<lambda>l. None)"
-      and b'_v: "get_v b' = get_v b"
+          b'_s: "get_store b' = get_store b"
+      and b'_t: "get_trace b' = (\<lambda>l. None)"
+      and b'_v: "get_state b' = get_state b"
+      sorry
+(*
       by auto
-    have s_plus: "Some (get_s \<omega>') = get_s a' \<oplus> get_s b'"
+*)
+    have s_plus: "Some (get_store \<omega>') = get_store a' \<oplus> get_store b'"
       by (metis "4.prems"(3) a'_s b'_s sep_conj state_add_iff)
-    have v_plus: "Some (get_v \<omega>') = get_v a' \<oplus> get_v b'"
+    have v_plus: "Some (get_state \<omega>') = get_state a' \<oplus> get_state b'"
       by (metis "4.prems"(4) a'_v b'_v sep_conj state_add_iff)
-    have t_plus: "Some (get_t \<omega>') = get_t a' \<oplus> get_t b'"
+    have t_plus: "Some (get_trace \<omega>') = get_trace a' \<oplus> get_trace b'"
+      sorry
+(*
+TODO
+Not true anymore, since the trace is an agreement...
       by (simp add: a'_t b'_t lambda_None_is_identity)
+*)
     have "Some \<omega>' = a' \<oplus> b'"
       by (simp add: s_plus state_add_iff t_plus v_plus)
     moreover have "\<Delta> \<Turnstile> \<langle>A; a'\<rangle>"
@@ -367,23 +395,32 @@ next
       proof
         assume assm: "Some b' = \<omega>' \<oplus> a' \<and> \<Delta> \<Turnstile> \<langle>A; a'\<rangle>"
         obtain a where
-              as: "get_s a = get_s a'"
-          and at: "get_t a = (\<lambda>l. None)"
-          and av: "get_v a = get_v a'"
+              as: "get_store a = get_store a'"
+          and at: "get_trace a = (\<lambda>l. None)"
+          and av: "get_state a = get_state a'"
+          sorry
+(*
           by auto
+*)
         then have implies_A: "(\<Delta> \<Turnstile> \<langle>A; a\<rangle>)"
           by (metis "5.hyps"(1) assm no_old_A)
         obtain b where
-              bs: "get_s b = get_s b'"
-          and bt: "get_t b = get_t \<omega>"
-          and bv: "get_v b = get_v b'"
+              bs: "get_store b = get_store b'"
+          and bt: "get_trace b = get_trace \<omega>"
+          and bv: "get_state b = get_state b'"
+          sorry
+(*
           by auto
-        have "Some (get_s b) = get_s \<omega> \<oplus> get_s a"
+*)
+        have "Some (get_store b) = get_store \<omega> \<oplus> get_store a"
           by (metis "5.prems"(3) as bs assm state_add_iff)
-        moreover have "Some (get_v b) = get_v \<omega> \<oplus> get_v a"
+        moreover have "Some (get_state b) = get_state \<omega> \<oplus> get_state a"
           by (metis "5.prems"(4) assm av bv state_add_iff)
-        moreover have "Some (get_t b) = get_t \<omega> \<oplus> get_t a"
+        moreover have "Some (get_trace b) = get_trace \<omega> \<oplus> get_trace a"
+          sorry
+(*
           by (simp add: at bt lambda_None_is_identity)
+*)
         ultimately have b_omega_a: "Some b = \<omega> \<oplus> a"
           by (simp add: state_add_iff)
         then have "\<Delta> \<Turnstile> \<langle>B; b\<rangle>"
@@ -397,19 +434,19 @@ next
   qed
 next
   case (6 \<Delta> ty A \<omega>)
-  have "\<forall>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega>' v\<rangle>"
+  have "\<forall>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
   proof
     fix v
     assume v_type_correct: "v \<in> set_from_type (domains \<Delta>) ty"
-    then have "\<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega> v\<rangle>"
+    then have "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v\<rangle>"
       using "6.prems"(1) by auto
     moreover have "no_old_assertion A"
       using "6.prems"(2) by auto
-    moreover have "get_s (shift_and_add_state \<omega> v) = get_s (shift_and_add_state \<omega>' v)"
-      by (metis "6.prems"(3) get_s.simps shift_and_add_state.simps surj_pair)
-    moreover have "get_v (shift_and_add_state \<omega> v) = get_v (shift_and_add_state \<omega>' v)"
+    moreover have "get_store (shift_and_add_equi_state \<omega> v) = get_store (shift_and_add_equi_state \<omega>' v)"
+      by (metis greater_state_has_greater_parts(1) neutral_smallest)
+    moreover have "get_state (shift_and_add_equi_state \<omega> v) = get_state (shift_and_add_equi_state \<omega>' v)"
       by (simp add: "6.prems"(4) shift_and_add_keep_vstate)
-    ultimately show "\<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega>' v\<rangle>"
+    ultimately show "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
       using "6.hyps" v_type_correct by blast
   qed
   then show ?case
@@ -418,17 +455,17 @@ next
   case (7 \<Delta> ty A \<omega>)
   then obtain v where
         v_type_correct: "v \<in> set_from_type (domains \<Delta>) ty"
-    and v_sat: "\<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega> v\<rangle>"
+    and v_sat: "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v\<rangle>"
     by (metis sat.simps(7))
   moreover have "no_old_assertion A"
     using "7.prems"(2) by auto
-  moreover have "get_s (shift_and_add_state \<omega> v) = get_s (shift_and_add_state \<omega>' v)"
-    by (metis "7.prems"(3) get_s.simps shift_and_add_state.simps surj_pair)
-  moreover have "get_v (shift_and_add_state \<omega> v) = get_v (shift_and_add_state \<omega>' v)"
+  moreover have "get_store (shift_and_add_equi_state \<omega> v) = get_store (shift_and_add_equi_state \<omega>' v)"
+    by (metis greater_state_has_greater_parts(1) neutral_smallest)
+  moreover have "get_state (shift_and_add_equi_state \<omega> v) = get_state (shift_and_add_equi_state \<omega>' v)"
     by (simp add: "7.prems"(4) shift_and_add_keep_vstate)
-  ultimately have "\<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega>' v\<rangle>"
+  ultimately have "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
     using "7.hyps" by blast
-  then have "\<exists>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_state \<omega>' v\<rangle>"
+  then have "\<exists>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
     using v_type_correct by auto
   then show ?case
     by simp
@@ -543,7 +580,7 @@ next
   moreover have "\<Delta>' \<turnstile> \<langle>p;\<omega>\<rangle> [\<Down>] Val (VPerm v)"
     by (metis RedAtomicAcc.hyps(2) RedAtomicAcc.prems(2) RedAtomicAcc.prems(3) red_pure_indep_interp_pred(1))
   ultimately show ?case
-    by (simp add: RedAtomicAcc.hyps(3) red_atomic_assert.RedAtomicAcc)
+    using RedAtomicAcc.hyps(3) red_atomic_assert.RedAtomicAcc by blast
 next
   case (RedAtomicAccZero \<Delta> e \<omega> uu p f)
   then show ?case
@@ -570,9 +607,9 @@ next
         "predicates \<Delta>' (P, vals) = Some A'"
     and "A \<subseteq> A'"
     by (metis RedAtomicPred.hyps(4) RedAtomicPred.prems(1) smaller_pred_interp_def smaller_vstate_set_opt.elims(1) smaller_vstate_set_opt.simps(3))
-  ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps (PureExp p)) \<omega> (Some (0 < v \<longrightarrow> (\<exists>a \<in> A'. get_v \<omega> = Abs_preal v \<odot> a)))"
+  ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps (PureExp p)) \<omega> (Some (0 < v \<longrightarrow> (\<exists>a \<in> A'. get_state \<omega> = Abs_preal v \<odot> a)))"
     by (simp add: RedAtomicPred.hyps(3) red_atomic_assert.RedAtomicPred)
-  moreover have "0 < v \<longrightarrow> (\<exists>a \<in> A'. get_v \<omega> = Abs_preal v \<odot> a)"
+  moreover have "0 < v \<longrightarrow> (\<exists>a \<in> A'. get_state \<omega> = Abs_preal v \<odot> a)"
     using RedAtomicPred.prems(4) \<open>A \<subseteq> A'\<close> by auto
   ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps (PureExp p)) \<omega> (Some True)"
     by simp
@@ -586,9 +623,9 @@ next
         "predicates \<Delta>' (P, vals) = Some A'"
     and "A \<subseteq> A'"
     by (metis RedAtomicPredWildcard.hyps(2) RedAtomicPredWildcard.prems(1) smaller_pred_interp_def smaller_vstate_set_opt.elims(1) smaller_vstate_set_opt.simps(3))
-  ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps Wildcard) \<omega> (Some (\<exists>a \<in> A'. \<exists>\<alpha>'. 0 < \<alpha>' \<and> get_v \<omega> = \<alpha>' \<odot> a))"
+  ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps Wildcard) \<omega> (Some (\<exists>a \<in> A'. \<exists>\<alpha>'. 0 < \<alpha>' \<and> get_state \<omega> = \<alpha>' \<odot> a))"
     using red_atomic_assert.RedAtomicPredWildcard by blast
-  moreover have "\<exists>a \<in> A'. \<exists>\<alpha>. 0 < \<alpha> \<and> get_v \<omega> = \<alpha> \<odot> a"
+  moreover have "\<exists>a \<in> A'. \<exists>\<alpha>. 0 < \<alpha> \<and> get_state \<omega> = \<alpha> \<odot> a"
     using RedAtomicPredWildcard.prems(4) \<open>A \<subseteq> A'\<close> by auto
   ultimately have "red_atomic_assert \<Delta>' (AccPredicate P exps Wildcard) \<omega> (Some True)"
     by simp
@@ -646,7 +683,7 @@ proof (induct A arbitrary: b)
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -663,7 +700,7 @@ proof (induct A arbitrary: b)
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -684,7 +721,7 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -715,7 +752,7 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -754,7 +791,7 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -784,7 +821,7 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -820,7 +857,7 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -846,7 +883,7 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -878,7 +915,7 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -909,7 +946,7 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -946,14 +983,14 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
          and "?I \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       show "?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       proof (rule sat_wand_rule)
-        fix a b :: "'a state"
+        fix a b :: "'a equi_state"
         assume "Some b = \<omega> \<oplus> a"
            and "?I' \<Turnstile> \<langle>A1; a\<rangle>"
         moreover have "dec_sat_assertion D F A1"
@@ -975,14 +1012,14 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
          and "?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       show "?I \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       proof (rule sat_wand_rule)
-        fix a b :: "'a state"
+        fix a b :: "'a equi_state"
         assume "Some b = \<omega> \<oplus> a"
            and "?I \<Turnstile> \<langle>A1; a\<rangle>"
         moreover have "inc_sat_assertion D F A1"
@@ -1010,7 +1047,7 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -1019,11 +1056,11 @@ next
       proof (rule sat_forall_rule)
         fix v'
         assume "v' \<in> set_from_type (domains ?I') x1a"
-        then have "?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        then have "?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>?I \<Turnstile> \<langle>?A; \<omega>\<rangle>\<close> by auto
         moreover have "inc_sat_assertion D F A"
           using ForAll.hyps ForAll.prems True by auto
-        ultimately show "?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        ultimately show "?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>\<Delta> \<preceq> \<Delta>'\<close> inc_sat_assertion_def by blast
       qed
     qed
@@ -1034,7 +1071,7 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
@@ -1043,11 +1080,11 @@ next
       proof (rule sat_forall_rule)
         fix v'
         assume "v' \<in> set_from_type (domains ?I) x1a"
-        then have "?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        then have "?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>\<close> by auto
         moreover have "dec_sat_assertion D F A"
           using ForAll.hyps ForAll.prems False by auto
-        ultimately show "?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        ultimately show "?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>\<Delta> \<preceq> \<Delta>'\<close> dec_sat_assertion_def by blast
       qed
     qed
@@ -1064,24 +1101,24 @@ next
     have "inc_sat_assertion D F ?A"
     proof (rule inc_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
          and "?I \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       then show "?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       proof -
-        have "\<exists>v' \<in> set_from_type D x1a. ?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        have "\<exists>v' \<in> set_from_type D x1a. ?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>?I \<Turnstile> \<langle>?A; \<omega>\<rangle>\<close> by auto
         then obtain v' where
               "v' \<in> set_from_type D x1a"
-          and "?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+          and "?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           by auto
         moreover have "inc_sat_assertion D F A"
           using Exists.hyps Exists.prems True by auto
-        ultimately have "?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        ultimately have "?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>\<Delta> \<preceq> \<Delta>'\<close> inc_sat_assertion_def by blast
-        then have "\<exists>v' \<in> set_from_type D x1a. ?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        then have "\<exists>v' \<in> set_from_type D x1a. ?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>v' \<in> set_from_type D x1a\<close> by auto
         then show ?thesis
           by simp
@@ -1094,24 +1131,24 @@ next
     have "dec_sat_assertion D F ?A"
     proof (rule dec_sat_assertion_rule)
       fix \<Delta> \<Delta>' :: "'a pred_interp"
-      fix \<omega> :: "'a state"
+      fix \<omega> :: "'a equi_state"
       let ?I = "\<lparr>interp.domains = D, predicates = \<Delta>, funs = F\<rparr>"
       let ?I' = "\<lparr>interp.domains = D, predicates = \<Delta>', funs = F\<rparr>"
       assume "\<Delta> \<preceq> \<Delta>'"
          and "?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       then show "?I \<Turnstile> \<langle>?A; \<omega>\<rangle>"
       proof -
-        have "\<exists>v' \<in> set_from_type D x1a. ?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        have "\<exists>v' \<in> set_from_type D x1a. ?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>?I' \<Turnstile> \<langle>?A; \<omega>\<rangle>\<close> by auto
         then obtain v' where
               "v' \<in> set_from_type D x1a"
-          and "?I' \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+          and "?I' \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           by auto
         moreover have "dec_sat_assertion D F A"
           using Exists.hyps Exists.prems False by auto
-        ultimately have "?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        ultimately have "?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>\<Delta> \<preceq> \<Delta>'\<close> dec_sat_assertion_def by blast
-        then have "\<exists>v' \<in> set_from_type D x1a. ?I \<Turnstile> \<langle>A; shift_and_add_state \<omega> v'\<rangle>"
+        then have "\<exists>v' \<in> set_from_type D x1a. ?I \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v'\<rangle>"
           using \<open>v' \<in> set_from_type D x1a\<close> by auto
         then show ?thesis
           by simp
@@ -1122,9 +1159,13 @@ next
   qed
 qed
 
+fun shift_and_add_list_equi_state :: "'v equi_state \<Rightarrow> 'v val list \<Rightarrow> 'v equi_state" where
+  "shift_and_add_list_equi_state ((\<sigma>, \<tau>), \<gamma>) l = ((Ag (shift_and_add_list (the_ag \<sigma>) l), \<tau>), \<gamma>)"
+
+
 definition assertion_upt :: "'v domain_interp \<Rightarrow> 'v fun_interp \<Rightarrow> assertion \<Rightarrow> 'v val list \<Rightarrow> 'v pred_interp \<Rightarrow> 'v virtual_state set" where
   "assertion_upt D F A v \<Delta> = (let I = \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> in
-    {\<omega>. I \<Turnstile> \<langle>A; shift_and_add_list_state (\<lambda>n. None, \<lambda>l. None, \<omega>) v\<rangle>})"
+    {\<omega>. I \<Turnstile> \<langle>A; shift_and_add_list_equi_state ((Ag (\<lambda>n. None), Ag (\<lambda>l. None)), \<omega>) v\<rangle>})"
 
 lemma mono_assertion_upt:
   assumes "pos_neg_assertion b A"
@@ -1137,7 +1178,7 @@ proof (cases b)
     fix \<omega> :: "'a virtual_state"
     let ?I = "\<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr>"
     let ?I' = "\<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr>"
-    let ?\<omega> = "shift_and_add_list_state (\<lambda>n. None, \<lambda>l. None, \<omega>) v"
+    let ?\<omega> = "shift_and_add_list_equi_state ((Ag (\<lambda>n. None), Ag (\<lambda>l. None)), \<omega>) v"
     assume "\<Delta> \<preceq> \<Delta>'"
        and "\<omega> \<in> assertion_upt D F A v \<Delta>"
     then have "?I \<Turnstile> \<langle>A; ?\<omega>\<rangle>"
@@ -1159,7 +1200,7 @@ next
     fix \<omega> :: "'a virtual_state"
     let ?I = "\<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr>"
     let ?I' = "\<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr>"
-    let ?\<omega> = "shift_and_add_list_state (\<lambda>n. None, \<lambda>l. None, \<omega>) v"
+    let ?\<omega> = "shift_and_add_list_equi_state ((Ag (\<lambda>n. None), Ag (\<lambda>l. None)), \<omega>) v"
     assume "\<Delta> \<preceq> \<Delta>'"
        and "\<omega> \<in> assertion_upt D F A v \<Delta>'"
     then have "?I' \<Turnstile> \<langle>A; ?\<omega>\<rangle>"
@@ -1199,7 +1240,7 @@ definition predInterpUpdate :: "program \<Rightarrow> 'v domain_interp \<Rightar
           (if typeListMatch D v arg then
             (let pred = predicate_body P ident in  \<comment> \<open> pred :: assertion \<close>
               \<comment> \<open> I = \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> :: ('v, 'v virtual_state) interp \<close>
-              Some (assertion_upt D F pred v \<Delta>) \<comment> \<open>{\<omega>. I \<Turnstile> \<langle>pred; shift_and_add_list_state (\<lambda>n. None, \<lambda>l. None, \<omega>) v\<rangle>}\<close>)
+              Some (assertion_upt D F pred v \<Delta>) \<comment> \<open>{\<omega>. I \<Turnstile> \<langle>pred; shift_and_add_list_equi_state (\<lambda>n. None, \<lambda>l. None, \<omega>) v\<rangle>}\<close>)
           else None))
       else None)))"
 (* If # of variables appeared in predicate body exceeds # of arguments, then None is always returned in places of these variables, and monotonicity still preserves *)

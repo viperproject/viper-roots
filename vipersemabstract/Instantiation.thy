@@ -34,12 +34,6 @@ record ('v, 'a) interp =
   domains :: "'v \<Rightarrow> abs_type"
 *)
 
-(*
-fun scope_list :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarrow> ('a equi_state, 'a val, ref \<times> field_ident) abs_stmt \<Rightarrow> ('a equi_state, 'a val, ref \<times> field_ident) abs_stmt" where
-  "scope_list _ [] C = C"
-| "scope_list \<Delta> (ty#q) C = abs_stmt.Scope (make_semantic_vtyp \<Delta> ty) (scope_list \<Delta> q C)"
-*)
-
 fun compile :: "('a, 'a virtual_state) interp \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, address \<times> field_ident) abs_stmt"
   where
   "compile \<Delta> stmt.Skip = abs_stmt.Skip"
@@ -83,11 +77,6 @@ definition has_value :: "'a virtual_state \<Rightarrow> (address \<times> field_
 definition set_value :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" where
   "set_value \<phi> hl v = Abs_virtual_state (get_vm \<phi>, (get_vh \<phi>)(hl := Some v))"
 
-(*
-typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_virtual_state \<phi> }"
-  using wf_uuu by blast
-*)
-
 global_interpretation ConcreteSemantics: semantics has_value has_write_perm_only set_value
 proof
   fix x a b :: "'a virtual_state"
@@ -102,13 +91,6 @@ proof
     sorry
 qed
 
-(*
-definition ver_executable :: "program \<Rightarrow> 'v type_context \<Rightarrow> (('a, 'v) state, 'v, 'r) abs_stmt \<Rightarrow> ('a, 'v) state \<Rightarrow> bool" where
-  "ver_executable Pr \<Delta> s \<omega> \<longleftrightarrow> (\<forall>n. \<exists>S. red_stmt Pr \<Delta> (Executable n) s \<omega> S)"
-
-definition ver_modular :: "program \<Rightarrow> 'v type_context \<Rightarrow> (('a, 'v) state, 'v, 'r) abs_stmt \<Rightarrow> ('a, 'v) state \<Rightarrow> bool" where
-  "ver_modular Pr \<Delta> s \<omega> \<longleftrightarrow> (\<exists>S. red_stmt Pr \<Delta> Modular s \<omega> S)"
-*)
 
 definition viper_prog_verifies where
   "viper_prog_verifies Pr \<Delta> ty C \<omega> \<longleftrightarrow> ConcreteSemantics.verifies ty (compile \<Delta> C) \<omega>"
