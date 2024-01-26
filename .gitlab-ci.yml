@@ -16,3 +16,4 @@ setup_isabelle:
     - ./isabelle/bin/isabelle components -u vipersemcommon
     - ./isabelle/bin/isabelle components -u viper-total-heaps
     - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps
+    - ./isabelle/bin/isabelle build -j4 -D vipersemabstract
