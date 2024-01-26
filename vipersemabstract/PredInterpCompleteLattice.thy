@@ -28,7 +28,7 @@ lemma smaller_pred_interp_rule:
 section \<open>Monotonicity\<close>
 
 definition inc_sat_assertion :: "'v domain_interp \<Rightarrow> 'v fun_interp \<Rightarrow> assertion \<Rightarrow> bool" where
-  "inc_sat_assertion D F A \<longleftrightarrow> (\<forall>\<Delta> \<Delta>' :: 'v pred_interp. \<forall>\<omega> :: 'v state. \<Delta> \<preceq> \<Delta>' \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>)"
+  "inc_sat_assertion D F A \<longleftrightarrow> (\<forall>\<Delta> \<Delta>' :: 'v pred_interp. \<forall>\<omega> :: 'v equi_state. \<Delta> \<preceq> \<Delta>' \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>)"
 
 lemma inc_sat_assertion_rule:
   assumes "\<And>\<Delta> \<Delta>' \<omega>. \<Delta> \<preceq> \<Delta>' \<Longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<Longrightarrow> \<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>"
@@ -36,7 +36,7 @@ lemma inc_sat_assertion_rule:
   by (simp add: assms inc_sat_assertion_def)
 
 definition dec_sat_assertion :: "'v domain_interp \<Rightarrow> 'v fun_interp \<Rightarrow> assertion \<Rightarrow> bool" where
-  "dec_sat_assertion D F A \<longleftrightarrow> (\<forall>\<Delta> \<Delta>' :: 'v pred_interp. \<forall>\<omega> :: 'v state. \<Delta> \<preceq> \<Delta>' \<longrightarrow> (\<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>))"
+  "dec_sat_assertion D F A \<longleftrightarrow> (\<forall>\<Delta> \<Delta>' :: 'v pred_interp. \<forall>\<omega> :: 'v equi_state. \<Delta> \<preceq> \<Delta>' \<longrightarrow> (\<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>))"
 
 lemma dec_sat_assertion_rule:
   assumes "\<And>\<Delta> \<Delta>' \<omega>. \<Delta> \<preceq> \<Delta>' \<Longrightarrow> \<lparr> domains = D, predicates = \<Delta>', funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle> \<Longrightarrow> \<lparr> domains = D, predicates = \<Delta>, funs = F \<rparr> \<Turnstile> \<langle>A; \<omega>\<rangle>"
