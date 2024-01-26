@@ -17,3 +17,4 @@ setup_isabelle:
     - ./isabelle/bin/isabelle components -u viper-total-heaps
     # paper-results has viper-total-heaps as a parent session
     - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps/paper-results
+    - ./isabelle/bin/isabelle build -j4 -D vipersemabstract
