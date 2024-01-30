@@ -97,14 +97,48 @@ fun eval_perm_int :: "real \<Rightarrow> binop \<Rightarrow> int \<Rightarrow> (
 | "eval_perm_int _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now 
                                              (also not permitted by the Viper type checker)\<close>
 
+fun eval_ref_ref :: "ref \<Rightarrow> binop \<Rightarrow> ref \<Rightarrow> ('a val) binop_result" where
+  "eval_ref_ref a Eq b =  BinopNormal (VBool (a = b))"
+| "eval_ref_ref a Neq b = BinopNormal (VBool (a \<noteq> b))"
+| "eval_ref_ref _ _ _ = BinopTypeFailure"
+
+fun eval_abs_abs :: "'a \<Rightarrow> binop \<Rightarrow> 'a \<Rightarrow> ('a val) binop_result" where
+  "eval_abs_abs a Eq b =  BinopNormal (VBool (a = b))"
+| "eval_abs_abs a Neq b = BinopNormal (VBool (a \<noteq> b))"
+| "eval_abs_abs _ _ _ = BinopTypeFailure"
+
+text\<open>For \<^const>\<open>eval_abs_abs\<close>, we support equality and inequality of abstract values that potentially 
+have different domain types, which is more liberal than the Viper type checker and thus fine. 
+We could allow equality and inequality for all combinations of values, but for now we stay closer to 
+the type checker for the non-abstract values. 
+Side remark by Gaurav: In Ellen Arlt's MSc thesis there was a case where the more liberal equality in general
+made things simpler, but I don't remember the details. If we run into such a case again, we can 
+rethink how (in)equality is reduced).\<close>
+
 fun eval_binop :: "'a val \<Rightarrow> binop \<Rightarrow> 'a val \<Rightarrow> ('a val) binop_result" where
   "eval_binop (VInt a) op (VInt b) = eval_int_int a op b"
 | "eval_binop (VPerm a) op (VPerm b) = eval_perm_perm a op b"
 | "eval_binop (VBool a) op (VBool b) = eval_bool_bool a op b"
 | "eval_binop (VInt a) op (VPerm b) = eval_int_perm a op b"
 | "eval_binop (VPerm a) op (VInt b) = eval_perm_int a op b"
+| "eval_binop (VRef a) op (VRef b) = eval_ref_ref a op b"
+| "eval_binop (VAbs a) op (VAbs b) = eval_abs_abs a op b"
 | "eval_binop _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now 
                                              (also not permitted by the Viper type checker)\<close>
+
+lemma eval_binop_eq:
+  assumes "(is_VBool v1 \<and> is_VBool v2) \<or> (is_VInt v1 \<and> is_VInt v2) \<or> (is_VPerm v1 \<and> is_VPerm v2) \<or>
+           (is_VRef v1 \<and> is_VRef v2) \<or> (is_VAbs v1 \<and> is_VAbs v2)"
+  shows "eval_binop v1 Eq v2 = BinopNormal (VBool (v1 = v2))"
+  using assms
+  by (cases v1; cases v2; auto)
+            
+lemma eval_binop_neq:
+  assumes "(is_VBool v1 \<and> is_VBool v2) \<or> (is_VInt v1 \<and> is_VInt v2) \<or> (is_VPerm v1 \<and> is_VPerm v2) \<or>
+           (is_VRef v1 \<and> is_VRef v2) \<or> (is_VAbs v1 \<and> is_VAbs v2)"
+  shows "eval_binop v1 Neq v2 = BinopNormal (VBool (v1 \<noteq> v2))"
+  using assms
+  by (cases v1; cases v2; auto)
 
 lemma eval_binop_failure: "eval_binop v1 bop v2 = BinopOpFailure \<Longrightarrow> bop \<in> {IntDiv, PermDiv, Mod}"  
   by (erule eval_binop.elims; simp_all; cases bop; auto)
