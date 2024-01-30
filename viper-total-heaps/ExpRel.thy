@@ -75,20 +75,35 @@ lemma binop_nonlazy_rel_correct:
    \<comment>\<open>operator between two reals\<close>
    apply (cases bop_vpr)
                   apply (simp_all add: of_rat_add of_rat_diff of_rat_mult smt_real_div_def of_rat_less of_rat_less_eq)
-\<comment>\<open>operator between two booleans\<close>
   using real_divide_code apply auto[1]
+  
+  \<comment>\<open>operator between two booleans\<close>
   apply (cases bop_vpr) 
-                  apply simp_all
+                    apply simp_all
+
+  \<comment>\<open>operator between integer and reals\<close>
    apply (cases bop_vpr) 
                  apply simp_all
    apply (cases bop_vpr) 
                  apply simp_all
        apply (unfold Semantics.smt_real_div_def)
-   apply (metis (mono_tags, opaque_lifting) binop_result.distinct(5) binop_result.inject of_rat_divide of_rat_eq_0_iff of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+     apply (metis (mono_tags, opaque_lifting) binop_result.distinct(5) binop_result.inject val_rel_vpr_bpl.simps(5))
+
+  \<comment>\<open>operator between reals and integers\<close>
+  apply (cases bop_vpr)
+                  apply simp_all
+       apply (unfold Semantics.smt_real_div_def)
+    apply (metis (mono_tags, lifting) binop_result.distinct(5) binop_result.inject of_int_eq_0_iff val_rel_vpr_bpl.simps(5))
+
+  \<comment>\<open>operator between references\<close>
+   apply (cases bop_vpr)
+                 apply simp_all
+
+  \<comment>\<open>operator between abstract values\<close>
   apply (cases bop_vpr)
                 apply simp_all
-       apply (unfold Semantics.smt_real_div_def)
-  by (metis (mono_tags, lifting) binop_result.distinct(5) binop_result.inject of_int_eq_0_iff of_rat_divide of_rat_of_int_eq val_rel_vpr_bpl.simps(5))
+  done
+
 
 subsection \<open>Semantic approach\<close>
 
