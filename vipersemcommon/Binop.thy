@@ -112,7 +112,7 @@ have different domain types, which is more liberal than the Viper type checker a
 We could allow equality and inequality for all combinations of values, but for now we stay closer to 
 the type checker for the non-abstract values. 
 Side remark: There was a case where the more liberal equality made things simpler. If we run into 
-such a case again, we can rethink how (in)equality is reduced).\<close>
+such a case again, we can rethink how (in)equality is reduced.\<close>
 
 fun eval_binop :: "'a val \<Rightarrow> binop \<Rightarrow> 'a val \<Rightarrow> ('a val) binop_result" where
   "eval_binop (VInt a) op (VInt b) = eval_int_int a op b"
