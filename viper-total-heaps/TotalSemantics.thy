@@ -396,9 +396,10 @@ always has at least one failure transition. This is in-sync with the recent Carb
    "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> (RNormal \<omega>');
       red_stmt_total ctxt R \<Lambda> s2 \<omega>' res \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> res"
- | RedSeqFailure:
-   "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> RFailure \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
+ | RedSeqFailureOrMagic:
+   "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> res; 
+      res = RFailure \<or> res = RMagic \<rbrakk> \<Longrightarrow>
+      red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> res"
 (* TODO while loops *)
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
@@ -411,7 +412,7 @@ inductive_cases RedLocalAssign_case:
 
 inductive_cases RedSkip_case: "red_stmt_total ctxt R \<Lambda> Skip \<omega> res"
 inductive_cases RedSeqNormal_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> (RNormal \<omega>')"
-inductive_cases RedSeqFailure_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
+inductive_cases RedSeqFailureOrMagic_case: "red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> RFailure"
 inductive_cases RedIfNormal_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> (RNormal \<omega>')"
 inductive_cases RedIfFailure_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> RFailure"
 inductive_cases RedIf_case: "red_stmt_total ctxt R \<Lambda> (If e_b s_thn s_els) \<omega> res"
@@ -428,7 +429,7 @@ lemmas red_stmt_total_inversion_thms =
    RedLocalAssign_case
    RedIf_case
    RedSeqNormal_case
-   RedSeqFailure_case
+   RedSeqFailureOrMagic_case
    RedInhale_case
    RedExhale_case
    RedExhaleNormal_case
