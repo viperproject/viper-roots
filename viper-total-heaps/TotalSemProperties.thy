@@ -2431,7 +2431,7 @@ next
   case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
   then show ?case by blast
 next
-  case (RedSeqFailure \<Lambda> s1 \<omega> s2)
+  case (RedSeqFailureOrMagic \<Lambda> s1 \<omega> s2)
   then show ?case by blast
 qed (auto)
 
