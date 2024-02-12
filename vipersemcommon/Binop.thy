@@ -228,13 +228,7 @@ lemma eval_binop_typing_agree:
   shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> val_type Pr v ty3)"
   using assms
   apply (cases ty1; cases ty2; safe elim!:binop_type_elim; clarsimp split:if_splits)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  apply (cases op; auto split:if_splits intro:binop_type.intros)
-  done
+  by (cases op; auto split:if_splits intro:binop_type.intros)+
 
 lemma binop_type_non_fail_exists :
   assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
@@ -242,20 +236,14 @@ lemma binop_type_non_fail_exists :
   shows "\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure"
   using assms
   apply (induction rule:binop_type.induct; clarsimp)
-  apply (safe; rule exI[where ?x="VInt _"]; clarsimp; fail)
-  apply (safe; rule exI[where ?x="VInt _"]; clarsimp split:if_splits; fail)
-  apply (safe; rule exI[where ?x="VInt _"]; clarsimp split:if_splits; fail)
-  apply (safe; rule exI[where ?x="VPerm _"]; clarsimp split:if_splits; fail)
-  apply (safe; (rule exI[where ?x="VPerm _"]; clarsimp split:if_splits; fail |
-                rule exI[where ?x="VInt _"]; clarsimp split:if_splits; fail))
-  apply (safe; (rule exI[where ?x="VPerm _"]; clarsimp split:if_splits; fail |
-                rule exI[where ?x="VInt _"]; clarsimp split:if_splits; fail  |
-                rule exI[where ?x="VBool _"]; clarsimp split:if_splits; fail))
-  apply (safe; cases \<tau>1; (rule exI[where ?x="VPerm _"]; clarsimp split:if_splits; fail |
-                rule exI[where ?x="VInt _"]; clarsimp split:if_splits; fail  |
-                rule exI[where ?x="VBool _"]; clarsimp split:if_splits; fail |
-                rule exI[where ?x="VRef _"]; clarsimp split:if_splits; fail))
-  done
+  apply (safe; (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
+                solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
+                solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close>))+
+  by (safe; cases \<tau>1;
+           (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
+            solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VRef _"]; clarsimp split:if_splits\<close>))
 
 lemma eval_binop_lazy_type_res :
   assumes "eval_binop_lazy v1 bop = Some v"
