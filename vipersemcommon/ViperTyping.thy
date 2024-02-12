@@ -189,7 +189,7 @@ inductive_cases stmt_typing_elim :
   "stmt_typing Pr \<Lambda> (stmt.If e C1 C2)"
   "stmt_typing Pr \<Lambda> (stmt.Seq C1 C2)"
   "stmt_typing Pr \<Lambda> (stmt.LocalAssign v e)"
-  "stmt_typing Pr \<Lambda> (stmt.FieldAssign e f e)"
+  "stmt_typing Pr \<Lambda> (stmt.FieldAssign e1 f e2)"
   "stmt_typing Pr \<Lambda> (stmt.Havoc v)"
   "stmt_typing Pr \<Lambda> (stmt.MethodCall ys f es)"
   "stmt_typing Pr \<Lambda> (stmt.While e I C)"
