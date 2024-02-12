@@ -223,39 +223,41 @@ lemma eval_binop_implies_eval_normal:
 
 
 lemma eval_binop_typing_agree:
-  assumes "val_type Pr a ty1" "val_type Pr b ty2"
+  assumes "has_type \<Delta> ty1 a" "has_type \<Delta> ty2 b"
   assumes "eval_binop a op b \<noteq> BinopOpFailure"
-  shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> val_type Pr v ty3)"
+  shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> has_type \<Delta> ty3 v)"
   using assms
   apply (cases ty1; cases ty2; safe elim!:binop_type_elim; clarsimp split:if_splits)
   by (cases op; auto split:if_splits intro:binop_type.intros)+
 
 lemma binop_type_non_fail_exists :
   assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
-  assumes "val_type Pr v1 \<tau>1"
+  assumes "has_type \<Delta> \<tau>1 v1"
   shows "\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure"
   using assms
   apply (induction rule:binop_type.induct; clarsimp)
   apply (safe; (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
                 solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
+                solves \<open>rule exI[where ?x="VAbs _"]; auto split:if_splits\<close>  |
                 solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close>))+
   by (safe; cases \<tau>1;
            (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
             solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
             solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VAbs _"]; clarsimp split:if_splits\<close> |
             solves \<open>rule exI[where ?x="VRef _"]; clarsimp split:if_splits\<close>))
 
 lemma eval_binop_lazy_type_res :
   assumes "eval_binop_lazy v1 bop = Some v"
   assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
-  assumes "val_type Pr v1 \<tau>1"
-  shows "val_type Pr v \<tau>"
+  assumes "has_type \<Delta> \<tau>1 v1"
+  shows "has_type \<Delta> \<tau> v"
   using assms by (simp add: eval_binop_lazy_iff[symmetric]; auto elim!:binop_type_elim)
 
 lemma eval_unop_typing_agree:
-  assumes "val_type Pr a ty1"
+  assumes "has_type \<Delta> ty1 a"
   shows "(unop_type op ty1 ty2) \<longleftrightarrow>
-    (\<exists> v. BinopNormal v = eval_unop op a \<and> val_type Pr v ty2)"
+    (\<exists> v. BinopNormal v = eval_unop op a \<and> has_type \<Delta> ty2 v)"
   using assms
   by (cases ty1; simp; safe elim!:unop_type_elim; cases op; auto intro:unop_type.intros)
 

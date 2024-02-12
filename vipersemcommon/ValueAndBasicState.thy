@@ -162,4 +162,50 @@ record ('v, 'a) interp =
 
 type_synonym type_context = "var \<rightharpoonup> vtyp"
 
+section \<open>Basic defintions for types\<close>
+
+fun set_from_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val set" where
+  "set_from_type \<Delta> TInt = {VInt n |n. True}"
+| "set_from_type \<Delta> TBool = {VBool True, VBool False}"
+| "set_from_type \<Delta> TPerm = {VPerm r |r. True}"
+| "set_from_type \<Delta> TRef = {VRef r |r. True}"
+| "set_from_type \<Delta> (TAbs t) = {VAbs v |v. \<Delta> v = t}"
+
+definition has_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val \<Rightarrow> bool" where
+  "has_type \<Delta> t v \<longleftrightarrow> v \<in> set_from_type \<Delta> t"
+
+fun get_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> 'v val \<Rightarrow> vtyp" where
+  "get_type \<Delta> (VInt _) = TInt"
+| "get_type \<Delta> (VBool _) = TBool"
+| "get_type \<Delta> (VPerm _) = TPerm"
+| "get_type \<Delta> (VRef _) = TRef"
+| "get_type \<Delta> (VAbs v) = TAbs (\<Delta> v)"
+
+lemma has_type_get_type:
+  "has_type \<Delta> t v \<longleftrightarrow> get_type \<Delta> v = t"
+  unfolding has_type_def
+  by (cases t; cases v; auto)
+
+lemma has_type_simps [simp]:
+  "has_type \<Delta> ty (VInt n) \<longleftrightarrow> ty = TInt"
+  "has_type \<Delta> TInt v \<longleftrightarrow> (\<exists> n. v = VInt n)"
+  "has_type \<Delta> ty (VBool b) \<longleftrightarrow> ty = TBool"
+  "has_type \<Delta> TBool v \<longleftrightarrow> (\<exists> n. v = VBool n)"
+  "has_type \<Delta> ty (VPerm p) \<longleftrightarrow> ty = TPerm"
+  "has_type \<Delta> TPerm v \<longleftrightarrow> (\<exists> n. v = VPerm n)"
+  "has_type \<Delta> ty (VRef r) \<longleftrightarrow> ty = TRef"
+  "has_type \<Delta> TRef v \<longleftrightarrow> (\<exists> n. v = VRef n)"
+  "has_type \<Delta> ty (VAbs t) \<longleftrightarrow> (\<exists> a. ty = TAbs a \<and> \<Delta> t = a)"
+  "has_type \<Delta> (TAbs a) v \<longleftrightarrow> (\<exists> t. v = VAbs t \<and> \<Delta> t = a)"
+  by ((cases ty)?; auto simp add:has_type_def)+
+
+lemma has_type_val_of_lit [simp]:
+  "has_type \<Delta> ty (val_of_lit lit) \<longleftrightarrow> ty = type_of_lit lit"
+  by (cases lit; auto)
+
+(* Fields are well-typed *)
+(* Maybe say that a location is allocated or not *)
+definition well_typed_heap :: "program \<Rightarrow> ('v \<Rightarrow> abs_type) \<Rightarrow> 'v partial_heap \<Rightarrow> bool" where
+  "well_typed_heap Pr \<Delta> h \<longleftrightarrow> (\<forall>hl f. declared_fields Pr f \<noteq> None \<and> h (hl, f) \<noteq> None \<longrightarrow> has_type \<Delta> (the (declared_fields Pr f)) (the (h (hl, f))))"
+
 end

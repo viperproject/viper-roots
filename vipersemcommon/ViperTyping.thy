@@ -4,29 +4,6 @@ begin
 
 type_synonym type_env = "var \<rightharpoonup> vtyp"
 
-inductive val_type :: "program \<Rightarrow> 'a val \<Rightarrow> vtyp \<Rightarrow> bool" where
-  TypeVInt : "val_type _ (VInt _) TInt"
-| TypeVBool : "val_type _ (VBool _) TBool"
-| TypeVPerm : "val_type _ (VPerm _) TPerm"
-| TypeVRef : "val_type _ (VRef _) TRef"
-(* TODO: TAbs *)
-
-lemma val_type_simps [simp]:
-  "val_type Pr (VInt n) ty \<longleftrightarrow> ty = TInt"
-  "val_type Pr v TInt \<longleftrightarrow> (\<exists> n. v = VInt n)"
-  "val_type Pr (VBool b) ty \<longleftrightarrow> ty = TBool"
-  "val_type Pr v TBool \<longleftrightarrow> (\<exists> n. v = VBool n)"
-  "val_type Pr (VPerm p) ty \<longleftrightarrow> ty = TPerm"
-  "val_type Pr v TPerm \<longleftrightarrow> (\<exists> n. v = VPerm n)"
-  "val_type Pr (VRef r) ty \<longleftrightarrow> ty = TRef"
-  "val_type Pr v TRef \<longleftrightarrow> (\<exists> n. v = VRef n)"
-  "val_type Pr v (TAbs a) \<longleftrightarrow> False"
-  by (auto simp add:val_type.simps)
-
-lemma val_type_val_of_lit [simp]:
-  "val_type Pr (val_of_lit lit) ty \<longleftrightarrow> ty = type_of_lit lit"
-  by (cases lit; auto)
-
 \<comment>\<open>
 The Viper language formalization does not distinguish perm and integer addition/subtraction/multiplcation
 at the syntax level, while the Viper AST does. We might want to reconsider this.
@@ -50,6 +27,7 @@ inductive binop_type :: "binop \<Rightarrow> vtyp \<Rightarrow> vtyp \<Rightarro
   | Boolean: "\<lbrakk> bop \<in> {Or, And, BImp} \<rbrakk> \<Longrightarrow> binop_type bop TBool TBool TBool"
 
   \<comment>\<open>equality and inequality\<close>
+  | EqAndNeqAbs: "\<lbrakk> bop \<in> {Eq, Neq}; \<tau>1 = TAbs a1; \<tau>2 = TAbs a2 \<rbrakk> \<Longrightarrow> binop_type bop \<tau>1 \<tau>2 TBool"
   | EqAndNeq: "\<lbrakk> bop \<in> {Eq, Neq} \<rbrakk> \<Longrightarrow> binop_type bop \<tau> \<tau> TBool"
 
 inductive_cases binop_type_elim : "binop_type op ty1 ty2 ty3"
