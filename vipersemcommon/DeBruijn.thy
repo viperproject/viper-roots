@@ -2,33 +2,6 @@ theory DeBruijn
   imports Main ValueAndBasicState ViperLang
 begin
 
-fun set_from_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val set" where
-  "set_from_type \<Delta> TInt = {VInt n |n. True}"
-| "set_from_type \<Delta> TBool = {VBool True, VBool False}"
-| "set_from_type \<Delta> TPerm = {VPerm r |r. True}"
-| "set_from_type \<Delta> TRef = {VRef r |r. True}"
-| "set_from_type \<Delta> (TAbs t) = {VAbs v |v. \<Delta> v = t}"
-
-definition has_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val \<Rightarrow> bool" where
-  "has_type \<Delta> t v \<longleftrightarrow> v \<in> set_from_type \<Delta> t"
-
-fun get_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> 'v val \<Rightarrow> vtyp" where
-  "get_type \<Delta> (VInt _) = TInt"
-| "get_type \<Delta> (VBool _) = TBool"
-| "get_type \<Delta> (VPerm _) = TPerm"
-| "get_type \<Delta> (VRef _) = TRef"
-| "get_type \<Delta> (VAbs v) = TAbs (\<Delta> v)"
-
-lemma has_type_get_type:
-  "has_type \<Delta> t v \<longleftrightarrow> get_type \<Delta> v = t"
-  unfolding has_type_def
-  by (cases t; cases v; auto)
-
-(* Fields are well-typed *)
-(* Maybe say that a location is allocated or not *)
-definition well_typed_heap :: "program \<Rightarrow> ('v \<Rightarrow> abs_type) \<Rightarrow> 'v partial_heap \<Rightarrow> bool" where
-  "well_typed_heap Pr \<Delta> h \<longleftrightarrow> (\<forall>hl f. declared_fields Pr f \<noteq> None \<and> h (hl, f) \<noteq> None \<longrightarrow> has_type \<Delta> (the (declared_fields Pr f)) (the (h (hl, f))))"
-
 definition shift :: "nat \<Rightarrow> (var \<Rightarrow> 'a option) \<Rightarrow> var \<Rightarrow> 'a option"
   where "shift n f x \<equiv> if x < n then None else f (x-n)"
 

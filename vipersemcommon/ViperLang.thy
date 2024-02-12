@@ -1,5 +1,5 @@
 theory ViperLang
-  imports Main HOL.Real
+  imports Main HOL.Real "HOL-Eisbach.Eisbach_Tools"
 begin
 
 (* TODO:
@@ -162,7 +162,7 @@ record function_decl =
   body :: "pure_exp option" (* Abstract or concrete *)
 
 record program =
-  methods :: "method_ident \<rightharpoonup> method_decl"
+  "methods" :: "method_ident \<rightharpoonup> method_decl"
   predicates :: "predicate_ident \<rightharpoonup> predicate_decl"
   funs :: "function_ident \<rightharpoonup> function_decl"
   declared_fields :: "field_ident \<rightharpoonup> vtyp"
