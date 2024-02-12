@@ -1,4 +1,6 @@
 session ViperCommon = "HOL" +
+    sessions
+        "HOL-Eisbach"
     theories
         Binop
         DeBruijn
@@ -11,7 +13,7 @@ session ViperCommon = "HOL" +
         ViperUtil
         WellFormedness
 	theories [quick_and_dirty] (* these should be fixed *)
-        PosReal	
-        PartialMap	
+        PosReal
+        PartialMap
         SepAlgebra
         LiftSepAlgebra

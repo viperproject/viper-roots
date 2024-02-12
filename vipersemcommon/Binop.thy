@@ -1,8 +1,8 @@
 theory Binop
-imports ViperLang ValueAndBasicState 
+imports ViperLang ValueAndBasicState ViperTyping
 begin
 
-datatype (discs_sels) 'a binop_result = BinopTypeFailure | BinopOpFailure | BinopNormal 'a 
+datatype (discs_sels) 'a binop_result = BinopTypeFailure | BinopOpFailure | BinopNormal 'a
 text \<open>Binary operealion result, where \<^const>\<open>BinopTypeFailure\<close> indicates that one of the operands has an
 incorrect type, \<^const>\<open>BinopOpFailure\<close> indicates that the (well-typed) operealion failed and
 \<^term>\<open>BinopNormal res\<close> indicates that the operealion's result is \<^term>\<open>res\<close> \<close>
@@ -10,14 +10,14 @@ incorrect type, \<^const>\<open>BinopOpFailure\<close> indicates that the (well-
 subsection \<open>Euclidean division and modulo\<close>
 
 text \<open>Viper's division semantics is determined by SMTLIB's division semantics.
-For integer division SMTLIB's division semantics is given by the Euclidean division if the divisor is 
+For integer division SMTLIB's division semantics is given by the Euclidean division if the divisor is
 nonzero and undefined (but fixed) otherwise.
 The Euclidean division \<open>a eucl_div b\<close> is the value \<open>q\<close> such that \<open>a = q*b+r\<close> where \<open>0 \<le> r < |b|\<close>.
 Isabelle's built-in integer division is the flooring division (exact division and then rounded to
-infinity). 
+infinity).
 
 In the following, we give definitions that express the Euclidean division (and modulo)
-in terms of Isabelle's division. The following formulas were originally taken from Boogie's semantics. 
+in terms of Isabelle's division. The following formulas were originally taken from Boogie's semantics.
 
 Also, see the theory HOL.SMT, which uses similar equations to express the SMT division and modulo.
 \<close>
@@ -88,13 +88,13 @@ fun eval_bool_bool:: "bool \<Rightarrow> binop \<Rightarrow> bool \<Rightarrow> 
 fun eval_int_perm :: "int \<Rightarrow> binop \<Rightarrow> real \<Rightarrow> ('a val) binop_result" where
   "eval_int_perm a Mult b = BinopNormal (VPerm (a * b))"
 | "eval_int_perm a PermDiv b = (if b \<noteq> 0 then BinopNormal (VPerm (a / b)) else BinopOpFailure)"
-| "eval_int_perm _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now 
+| "eval_int_perm _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now
                                              (also not permitted by the Viper type checker)\<close>
 
 fun eval_perm_int :: "real \<Rightarrow> binop \<Rightarrow> int \<Rightarrow> ('a val) binop_result" where
   "eval_perm_int a Mult b = BinopNormal (VPerm (a * b))"
 | "eval_perm_int a PermDiv b = (if b \<noteq> 0 then BinopNormal (VPerm (a / (real_of_int b))) else BinopOpFailure)"
-| "eval_perm_int _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now 
+| "eval_perm_int _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now
                                              (also not permitted by the Viper type checker)\<close>
 
 fun eval_ref_ref :: "ref \<Rightarrow> binop \<Rightarrow> ref \<Rightarrow> ('a val) binop_result" where
@@ -107,11 +107,11 @@ fun eval_abs_abs :: "'a \<Rightarrow> binop \<Rightarrow> 'a \<Rightarrow> ('a v
 | "eval_abs_abs a Neq b = BinopNormal (VBool (a \<noteq> b))"
 | "eval_abs_abs _ _ _ = BinopTypeFailure"
 
-text\<open>For \<^const>\<open>eval_abs_abs\<close>, we support equality and inequality of abstract values that potentially 
-have different domain types, which is more liberal than the Viper type checker and thus fine. 
-We could allow equality and inequality for all combinations of values, but for now we stay closer to 
-the type checker for the non-abstract values. 
-Side remark: There was a case where the more liberal equality made things simpler. If we run into 
+text\<open>For \<^const>\<open>eval_abs_abs\<close>, we support equality and inequality of abstract values that potentially
+have different domain types, which is more liberal than the Viper type checker and thus fine.
+We could allow equality and inequality for all combinations of values, but for now we stay closer to
+the type checker for the non-abstract values.
+Side remark: There was a case where the more liberal equality made things simpler. If we run into
 such a case again, we can rethink how (in)equality is reduced.\<close>
 
 fun eval_binop :: "'a val \<Rightarrow> binop \<Rightarrow> 'a val \<Rightarrow> ('a val) binop_result" where
@@ -122,7 +122,7 @@ fun eval_binop :: "'a val \<Rightarrow> binop \<Rightarrow> 'a val \<Rightarrow>
 | "eval_binop (VPerm a) op (VInt b) = eval_perm_int a op b"
 | "eval_binop (VRef a) op (VRef b) = eval_ref_ref a op b"
 | "eval_binop (VAbs a) op (VAbs b) = eval_abs_abs a op b"
-| "eval_binop _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now 
+| "eval_binop _ _ _ = BinopTypeFailure" \<comment>\<open>we do not lift the remaining operealions for now
                                              (also not permitted by the Viper type checker)\<close>
 
 lemma eval_binop_eq:
@@ -131,7 +131,7 @@ lemma eval_binop_eq:
   shows "eval_binop v1 Eq v2 = BinopNormal (VBool (v1 = v2))"
   using assms
   by (cases v1; cases v2; auto)
-            
+
 lemma eval_binop_neq:
   assumes "(is_VBool v1 \<and> is_VBool v2) \<or> (is_VInt v1 \<and> is_VInt v2) \<or> (is_VPerm v1 \<and> is_VPerm v2) \<or>
            (is_VRef v1 \<and> is_VRef v2) \<or> (is_VAbs v1 \<and> is_VAbs v2)"
@@ -139,7 +139,7 @@ lemma eval_binop_neq:
   using assms
   by (cases v1; cases v2; auto)
 
-lemma eval_binop_failure: "eval_binop v1 bop v2 = BinopOpFailure \<Longrightarrow> bop \<in> {IntDiv, PermDiv, Mod}"  
+lemma eval_binop_failure: "eval_binop v1 bop v2 = BinopOpFailure \<Longrightarrow> bop \<in> {IntDiv, PermDiv, Mod}"
   by (erule eval_binop.elims; simp_all; cases bop; auto)
 
 lemma eval_binop_failure_int: "bop \<in> {IntDiv, Mod} \<Longrightarrow> eval_binop v1 bop v2 = BinopOpFailure \<Longrightarrow> v2 = VInt(0)"
@@ -148,7 +148,7 @@ lemma eval_binop_failure_int: "bop \<in> {IntDiv, Mod} \<Longrightarrow> eval_bi
 lemma eval_binop_failure_perm: "bop = PermDiv \<Longrightarrow> eval_binop v1 bop v2 = BinopOpFailure \<Longrightarrow> v2 = VPerm(0) \<or> v2 = VInt(0)"
   by (erule eval_binop.elims) (auto split: if_split_asm)
 
-lemma eval_binop_not_failure: " bop \<notin> {IntDiv, PermDiv, Mod} \<Longrightarrow> eval_binop v1 bop v2 \<noteq> BinopOpFailure"  
+lemma eval_binop_not_failure: " bop \<notin> {IntDiv, PermDiv, Mod} \<Longrightarrow> eval_binop v1 bop v2 \<noteq> BinopOpFailure"
   using eval_binop_failure
   by blast
 
@@ -158,7 +158,7 @@ lemma eval_binop_not_failure_2: "bop \<in> {IntDiv, Mod, PermDiv} \<Longrightarr
 text \<open>The result \<^term>\<open>Some (v1,v2)\<close> expresses that the binary operealor is lazy in the case where
 the first operand is \<^term>\<open>v1\<close> and the result of the binary operealor evaluation in this case is \<^term>\<open>v2\<close>.\<close>
 
-fun binop_lazy :: "binop \<Rightarrow> ('a val \<times> 'a val) option" where 
+fun binop_lazy :: "binop \<Rightarrow> ('a val \<times> 'a val) option" where
   "binop_lazy Or = Some (VBool True, VBool True)"
 | "binop_lazy And = Some (VBool False, VBool False)"
 | "binop_lazy BImp = Some (VBool False, VBool True)"
@@ -179,7 +179,7 @@ lemma eval_binop_lazy_iff: "binop_lazy bop = Some (v1,v2) \<longleftrightarrow> 
 lemma eval_binop_lazy_iff_2: "binop_lazy bop = None \<longleftrightarrow> (\<forall>v1. eval_binop_lazy v1 bop = None)"
   apply rule
   apply (erule binop_lazy.elims; simp)
-  apply (cases bop) 
+  apply (cases bop)
   apply simp_all
   by ( metis eval_binop_lazy.simps(1-3) option.distinct(1))+
 
@@ -194,7 +194,7 @@ lemma op_bimp_and_or_reduces_bool:
   assumes "op = Or \<or> op = And \<or> op = BImp"
       and "is_BinopNormal (eval_binop a op b)"
     shows "\<exists>b'. b = VBool b'"
-  apply (cases op)  
+  apply (cases op)
   using assms apply auto
   by (cases a; cases b, auto)+
 
@@ -205,15 +205,15 @@ lemma eval_binop_implies_eval_normal:
   apply (cases op)
   using assms(1) apply auto
     apply (insert assms(2))
-    apply (cases "a = VBool True")  
+    apply (cases "a = VBool True")
      apply (cases "\<exists>vb. b = VBool vb")
       apply fastforce
      apply (metis binop_result.disc(3) op_bimp_and_or_reduces_bool)
     apply (metis (full_types) eval_binop_lazy.simps(17) eval_binop_lazy_some_bool option.distinct(1))
    apply (cases "a = VBool False")
     apply (cases "\<exists>vb. b= VBool vb")
-     apply fastforce    
-    apply (metis binop_result.disc(3) op_bimp_and_or_reduces_bool)  
+     apply fastforce
+    apply (metis binop_result.disc(3) op_bimp_and_or_reduces_bool)
   using eval_binop_lazy_some_bool apply fastforce
   apply (cases "a = VBool False")
    apply (cases "\<exists>vb. b= VBool vb")
@@ -221,5 +221,44 @@ lemma eval_binop_implies_eval_normal:
    apply (metis assms(2) binop_result.disc(3) op_bimp_and_or_reduces_bool)
   using eval_binop_lazy_some_bool by fastforce
 
+
+lemma eval_binop_typing_agree:
+  assumes "has_type \<Delta> ty1 a" "has_type \<Delta> ty2 b"
+  assumes "eval_binop a op b \<noteq> BinopOpFailure"
+  shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> has_type \<Delta> ty3 v)"
+  using assms
+  apply (cases ty1; cases ty2; safe elim!:binop_type_elim; clarsimp split:if_splits)
+  by (cases op; auto split:if_splits intro:binop_type.intros)+
+
+lemma binop_type_non_fail_exists :
+  assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
+  assumes "has_type \<Delta> \<tau>1 v1"
+  shows "\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure"
+  using assms
+  apply (induction rule:binop_type.induct; clarsimp)
+  apply (safe; (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
+                solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
+                solves \<open>rule exI[where ?x="VAbs _"]; auto split:if_splits\<close>  |
+                solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close>))+
+  by (safe; cases \<tau>1;
+           (solves \<open>rule exI[where ?x="VPerm _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VInt _"]; clarsimp split:if_splits\<close>  |
+            solves \<open>rule exI[where ?x="VBool _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VAbs _"]; clarsimp split:if_splits\<close> |
+            solves \<open>rule exI[where ?x="VRef _"]; clarsimp split:if_splits\<close>))
+
+lemma eval_binop_lazy_type_res :
+  assumes "eval_binop_lazy v1 bop = Some v"
+  assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
+  assumes "has_type \<Delta> \<tau>1 v1"
+  shows "has_type \<Delta> \<tau> v"
+  using assms by (simp add: eval_binop_lazy_iff[symmetric]; auto elim!:binop_type_elim)
+
+lemma eval_unop_typing_agree:
+  assumes "has_type \<Delta> ty1 a"
+  shows "(unop_type op ty1 ty2) \<longleftrightarrow>
+    (\<exists> v. BinopNormal v = eval_unop op a \<and> has_type \<Delta> ty2 v)"
+  using assms
+  by (cases ty1; simp; safe elim!:unop_type_elim; cases op; auto intro:unop_type.intros)
 
 end
