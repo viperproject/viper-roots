@@ -46,14 +46,6 @@ proof (rule agreement.expand)
   show "the_ag \<sigma>1 = the_ag \<sigma>2" using ext assms by blast
 qed
 
-lemma upd_ag_partial_map_refl:
-  "upd_ag_partial_map \<sigma> x (the_ag \<sigma> x) = \<sigma>"
-  by (simp add: upd_ag_partial_map_def)
-
-lemma upd_ag_partial_map_invo:
-  "upd_ag_partial_map (upd_ag_partial_map \<sigma> x v1) x v2 = upd_ag_partial_map \<sigma> x v2"
-  by (simp add: upd_ag_partial_map_def)
-
 lemma rel_stable_assertionI:
   assumes "\<And>x a. \<omega> ## a \<Longrightarrow> pure_larger x (stabilize a) \<Longrightarrow> x \<succeq> |\<omega>| \<Longrightarrow> (A a \<longleftrightarrow> A x)"
   shows "rel_stable_assertion \<omega> A"
@@ -140,10 +132,10 @@ lemma red_stmt_induct_simple [consumes 3, case_names Inhale Exhale FieldAssign H
       and "\<omega>' \<in> S"
       and "\<And>(A :: ('v, 'a) abs_state assertion) \<omega>' \<omega> \<Delta>. rel_stable_assertion \<omega> A \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> \<omega>'\<in>{\<omega>} \<otimes> \<langle>A\<rangle> \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>a (A :: ('v, 'a) abs_state assertion) \<omega> \<omega>' \<Delta>. a \<in> \<langle>A\<rangle> \<Longrightarrow> Some \<omega> = \<omega>' \<oplus> a \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> \<omega>'"
-      and "\<And>\<Delta> r \<sigma> \<gamma> hl e v. r (\<sigma>, \<gamma>) = Some hl \<Longrightarrow> e (\<sigma>, \<gamma>) = Some v \<Longrightarrow> has_write_perm \<gamma> hl \<Longrightarrow> P \<Delta> (\<sigma>, \<gamma>) \<Longrightarrow> P \<Delta> (\<sigma>, set_value \<gamma> hl v)"
-      and "\<And>\<Delta> x ty \<sigma> \<gamma> v \<tau>. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> ((\<sigma>, \<tau>), \<gamma>) \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> ((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>)"
-      and "\<And>\<Delta> e \<sigma> \<gamma> v x \<tau>. e ((\<sigma>, \<tau>), \<gamma>) = Some v \<Longrightarrow> P \<Delta> ((\<sigma>, \<tau>), \<gamma>) \<Longrightarrow> P \<Delta> ((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>)"
-      and "\<And>\<Delta> l \<sigma> \<tau> \<gamma>. P \<Delta> ((\<sigma>, \<tau>), \<gamma>) \<Longrightarrow> P \<Delta> ((\<sigma>, upd_ag_partial_map \<tau> l (Some \<gamma>)), \<gamma>)"
+      and "\<And>\<Delta> r \<omega> hl e v. r \<omega> = Some hl \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> has_write_perm (get_state \<omega>) hl \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_state \<omega> (set_value (get_state \<omega>) hl v))"
+      and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
+      and "\<And>\<Delta> e \<omega> v x. e \<omega> = Some v \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
+      and "\<And>\<Delta> l \<omega>. P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_trace \<omega> ((get_trace \<omega>)(l:= Some (get_state \<omega>))))"
   shows "P \<Delta> \<omega>'"
   using assms(1)
 proof -
@@ -156,19 +148,19 @@ proof -
     case (RedExhale a A \<omega> \<omega>' \<Delta>)
     then show ?case using assms(5) by blast
   next
-    case (RedFieldAssign r \<sigma> \<gamma> hl e v \<Delta>)
+    case (RedFieldAssign r \<omega> hl e v \<Delta> ty)
     then show ?case
       using assms(6) by auto
   next
-    case (RedLocalAssign e \<sigma> \<gamma> v \<Delta> x)
+    case (RedLocalAssign \<Delta> x ty e \<omega> v)
     then show ?case
-      using assms(8) by force
+      using assms(8) by (simp)
   next
-    case (RedHavoc \<Delta> x ty \<sigma> \<gamma>)
+    case (RedHavoc \<Delta> x ty \<omega>)
     then show ?case
-      using assms(7) by force
+      by (auto simp add: assms(7))
   next
-    case (RedLabel \<Delta> l \<sigma> \<tau> \<gamma>)
+    case (RedLabel \<Delta> l \<omega>)
     then show ?case sorry
   qed (blast+)
   then show ?thesis
@@ -188,20 +180,23 @@ lemma red_stable:
     shows "stable \<omega>'"
   using assms
 proof (induct rule: red_stmt_induct_simple)
-  case (FieldAssign \<Delta> r \<sigma> \<gamma> hl e v)
+  case (FieldAssign \<Delta> r \<omega> hl e v)
   then show ?case sorry
 next
-  case (Havoc \<Delta> x ty \<sigma> \<gamma> v \<tau>)
-  then show "sep_algebra_class.stable ((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>)"
-    by (simp add: stable_snd)
+  case (Havoc \<Delta> x ty \<omega> v)
+  then show "sep_algebra_class.stable (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
+    apply (simp add: stable_snd)
+    sorry (* TODO *)
 next
-  case (LocalAssign \<Delta> e \<sigma> \<gamma> v x)
+  case (LocalAssign \<Delta> e \<omega> v x)
   then show ?case
-    by (simp add: stable_snd)
+    apply (simp add: stable_snd)
+    sorry (* TODO *)
 next
-  case (Label \<Delta> l \<sigma> \<tau> \<gamma>)
+  case (Label \<Delta> l \<omega>)
   then show ?case
-    by (simp add: stable_snd)
+    apply (simp add: stable_snd)
+    sorry (* TODO *)
 qed (blast)
 
 lemma typed_storeI:
@@ -229,24 +224,24 @@ next
     by (metis agreement.expand full_add_charact(1) get_store_def)
 *)
 next
-  case (Havoc \<Delta> x ty \<sigma> \<gamma> v \<tau>)
+  case (Havoc \<Delta> x ty \<omega> v)
   show ?case
   proof (rule typed_storeI)
-    show "dom (variables \<Delta>) = dom (get_store ((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>))"
-      by (metis Havoc.hyps(1) Havoc.hyps(2) agreement.sel dom_fun_upd fst_conv get_store_def insert_dom option.discI typed_store_def upd_ag_partial_map_def)
-    fix x' v' ty' assume asm0: "get_store ((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) x' = Some v'" "variables \<Delta> x' = Some ty'"
+    show "dom (variables \<Delta>) = dom (get_store (set_store \<omega> ((get_store \<omega>)(x := Some v))))"
+      using Havoc.hyps(1) Havoc.hyps(2) typed_store_def by auto
+    fix x' v' ty' assume asm0: "get_store (set_store \<omega> ((get_store \<omega>)(x := Some v))) x' = Some v'" "variables \<Delta> x' = Some ty'"
     then show "v' \<in> ty'"
-      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) agreement.sel fst_conv fun_upd_other fun_upd_same get_store_def option.sel typed_store_def upd_ag_partial_map_def)
+      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) fun_upd_other fun_upd_same get_store_set_store option.inject typed_store_def)
   qed
 next
-  case (LocalAssign \<Delta> e \<sigma> \<gamma> v x)
+  case (LocalAssign \<Delta> e \<omega> v x)
 (* TODO: Force typing! *)
   then show ?case sorry
 next
-  case (Label \<Delta> l \<sigma> \<tau> \<gamma>)
+  case (Label \<Delta> l \<omega>)
   then show ?case sorry
 next
-  case (FieldAssign \<Delta> r \<sigma> \<gamma> hl e v)
+  case (FieldAssign \<Delta> r \<omega> hl e v)
   then show ?case sorry
 qed
 
@@ -1256,15 +1251,15 @@ next
       by (simp add: \<open>Some \<omega>' = \<omega> \<oplus> a\<close> ag_store_add_keep_val)
   qed
 next
-  case (RedHavoc \<Delta> y ty \<sigma> \<tau> \<gamma>)
+  case (RedHavoc \<Delta> y ty \<omega>)
   then have "x \<noteq> y"
     by auto
-  then obtain v where "\<omega>' = ((upd_ag_partial_map \<sigma> y v, \<tau>), \<gamma>)"
+  then obtain v where "\<omega>' = set_store \<omega> ((get_store \<omega>)(y := Some v))"
     using RedHavoc.prems(2) by blast
-  then have "the_ag (upd_ag_partial_map \<sigma> y v) x = the_ag \<sigma> x"
-    by (simp add: \<open>x \<noteq> y\<close> upd_ag_partial_map_def)
-  then show "get_store ((\<sigma>, \<tau>), \<gamma>) x = get_store \<omega>' x"
-    by (simp add: \<open>\<omega>' = ((upd_ag_partial_map \<sigma> y v, \<tau>), \<gamma>)\<close> get_store_def)
+  then have "((get_store \<omega>)(y := Some v)) x = (get_store \<omega>) x"
+    by (simp add: \<open>x \<noteq> y\<close>)
+  then show "get_store \<omega> x = get_store \<omega>' x"
+    by (simp add: \<open>\<omega>' = set_store \<omega> ((get_store \<omega>)(y := Some v))\<close>)
 next
   case (SeqComp S \<Delta> C f S')
   then obtain \<omega>'' where "\<omega>'' \<in> S" "\<omega>' \<in> f \<omega>''"
@@ -1281,7 +1276,7 @@ next
 next
   case (RedLocalAssign e \<sigma> \<gamma> v \<Delta> x)
   then show ?case sorry
-qed (auto simp add: get_store_def)
+qed (auto)
 
 lemma only_modif_can_be_modified:
   assumes "red_stmt \<Delta> C \<omega> S"
@@ -1689,7 +1684,7 @@ proof (rule free_vars_upper_bound)
       proof (cases "xa = x")
         case True
         then show ?thesis
-          by (simp add: upd_ag_partial_map_def)
+          by (simp)
       next
         case False
         then show ?thesis
@@ -2199,7 +2194,7 @@ next
 
   then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow>
   (\<exists>\<sigma> hl v ptr \<gamma>. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> ptr \<and> has_write_perm_only ptr hl)"
-    using has_write_perm_def by fast
+    using has_write_perm_def sorry (* by fast *)
 
   define eval_r :: "('v, 'a) abs_state \<Rightarrow> 'r" where "eval_r = (\<lambda>\<omega>. SOME v. r \<omega> = Some v)"
   then have eval_r_prop: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> r (snd \<omega>) = Some (eval_r (snd \<omega>))"
@@ -2225,7 +2220,8 @@ next
 (* TODO: Add *)
 
         then show "\<exists>x \<sigma> \<gamma> hl v. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> x \<and> has_write_perm_only x hl \<and> sep_algebra_class.stable x"
-          by (metis (mono_tags, lifting) \<open>snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> x \<and> has_write_perm_only x hl\<close> max_projection_prop_def max_projection_prop_stable_stabilize succ_trans)
+          sorry
+          (* by (metis (mono_tags, lifting) \<open>snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> x \<and> has_write_perm_only x hl\<close> max_projection_prop_def max_projection_prop_stable_stabilize succ_trans) *)
       qed
     qed
     define get_rem where "get_rem = (\<lambda>\<omega>. SOME x. \<exists>\<sigma> \<gamma> hl v. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v
@@ -2488,8 +2484,8 @@ wf_set \<Delta> (snd ` SA)
 *)
   moreover obtain ty where "variables \<Delta> x = Some ty"
     using calculation(2) by auto
-  ultimately have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (\<exists>\<sigma> \<tau> \<gamma>. snd \<omega> = ((\<sigma>, \<tau>), \<gamma>) \<and> f \<omega> = {((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty})"
-    by fastforce
+  (* ultimately have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (\<exists>\<sigma> \<tau> \<gamma>. snd \<omega> = ((\<sigma>, \<tau>), \<gamma>) \<and> f \<omega> = {((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty})" *)
+    (* by fastforce *)
   let ?A = "assertify (snd ` SA)"
   have "\<Delta> \<turnstile> [?A] Havoc x [exists_assert \<Delta> x ?A]"
     by (simp add: RuleHavoc assertify_self_framing)
@@ -2506,15 +2502,14 @@ wf_set \<Delta> (snd ` SA)
       by (meson Havoc.prems(3) calculation(1) image_iff wf_set_def)
     then obtain v0 where "v0 \<in> ty" "get_store (snd xx) x = Some v0"
       by (metis (mono_tags, lifting) \<open>variables \<Delta> x = Some ty\<close> domD domI typed_store_def wf_state_def)
-    moreover obtain \<sigma> \<tau> \<gamma> where "snd xx = ((\<sigma>, \<tau>), \<gamma>) \<and> f xx = {((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty}"
-      using calculation(1) r by presburger
-    then obtain v where "v \<in> ty" "((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) = \<omega>"
-      using calculation(2) by auto
-    then have "assertify (snd ` SA) ((upd_ag_partial_map (upd_ag_partial_map \<sigma> x (Some v)) x (Some v0), \<tau>), \<gamma>)"
+    (* moreover obtain \<sigma> \<tau> \<gamma> where "snd xx = ((\<sigma>, \<tau>), \<gamma>) \<and> f xx = {((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty}" *)
+      (* using calculation(1) r by presburger *)
+    (* then obtain v where "v \<in> ty" "((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) = \<omega>" *)
+      (* using calculation(2) by auto *)
+    (* then have "assertify (snd ` SA) ((upd_ag_partial_map (upd_ag_partial_map \<sigma> x (Some v)) x (Some v0), \<tau>), \<gamma>)" *)
       (*
       by (metis (no_types, lifting) \<open>snd xx = ((\<sigma>, \<tau>), \<gamma>) \<and> f xx = {((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty}\<close> already_stable asm0(1) assertify_def calculation(1) calculation(4) fst_conv image_eqI snd_conv stable_snd upd_ag_partial_map_invo upd_ag_partial_map_refl)
 *)
-      sorry
 
 
     show "exists_assert \<Delta> x (assertify (snd ` SA)) \<omega>"
@@ -2522,13 +2517,17 @@ wf_set \<Delta> (snd ` SA)
       show "variables \<Delta> x = Some ty"
         by (simp add: \<open>variables \<Delta> x = Some ty\<close>)
       show "assertify (snd ` SA) ((Ag (get_store \<omega>(x \<mapsto> v0)), Ag (get_trace \<omega>)), snd \<omega>)"
-        by (metis \<open>((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) = \<omega>\<close> \<open>assertify (snd ` SA) ((upd_ag_partial_map (upd_ag_partial_map \<sigma> x (Some v)) x (Some v0), \<tau>), \<gamma>)\<close> agreement.collapse fst_eqD get_store_def get_trace_def semantics.upd_ag_partial_map_def semantics_axioms sndI)
+        sorry
+        (* by (metis \<open>((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) = \<omega>\<close> \<open>assertify (snd ` SA) ((upd_ag_partial_map (upd_ag_partial_map \<sigma> x (Some v)) x (Some v0), \<tau>), \<gamma>)\<close> agreement.collapse fst_eqD get_store_def get_trace_def semantics.upd_ag_partial_map_def semantics_axioms sndI) *)
       show "v0 \<in> ty"
-        by (simp add: calculation(3))
+        sorry
+        (* by (simp add: calculation(3)) *)
       show "get_store \<omega> x = Some v0"
-        by (metis calculation(4) full_add_defined option.distinct(1) u_neutral)
+        sorry
+        (* by (metis calculation(4) full_add_defined option.distinct(1) u_neutral) *)
       show "v0 \<in> ty"
-        by (simp add: calculation(3))
+        sorry
+        (* by (simp add: calculation(3)) *)
     qed
   next
     fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "exists_assert \<Delta> x (assertify (snd ` SA)) \<omega>"
@@ -2549,7 +2548,8 @@ wf_set \<Delta> (snd ` SA)
       using \<open>snd xx = (upd_ag_partial_map (fst \<omega>) x (Some v), snd \<omega>)\<close> calculation(1) by fastforce
 *)
     then have "\<omega> \<in> f xx"
-      by (smt (z3) \<open>v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> assertify (snd ` SA) ((Ag (get_store \<omega>(x \<mapsto> v)), Ag (get_trace \<omega>)), get_state \<omega>)\<close> agreement.exhaust_sel agreement.sel fst_conv fun_upd_triv fun_upd_upd get_state_def get_store_def get_trace_def mem_Collect_eq prod.collapse r snd_conv upd_ag_partial_map_def)
+      sorry
+      (* by (smt (z3) \<open>v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> assertify (snd ` SA) ((Ag (get_store \<omega>(x \<mapsto> v)), Ag (get_trace \<omega>)), get_state \<omega>)\<close> agreement.exhaust_sel agreement.sel fst_conv fun_upd_triv fun_upd_upd get_state_def get_store_def get_trace_def mem_Collect_eq prod.collapse r snd_conv upd_ag_partial_map_def) *)
     then show "assertify (\<Union> (f ` SA)) \<omega>"
       by (metis (no_types, opaque_lifting) UN_iff \<open>xx \<in> SA\<close> already_stable asm0(1) assertify_def)
   qed
