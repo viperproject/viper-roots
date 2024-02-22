@@ -348,7 +348,7 @@ next
 next
   case (RedVar \<sigma> n \<Delta> uv)
   then show ?case
-    by (metis Pair_inject RedVar2Val_case agreement.inject option.inject)
+    by (metis RedVar2Val_case option.inject)
 next
   case (RedUnop \<Delta> e \<omega> v unop)
   then show ?case

@@ -108,7 +108,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedLit)
 next
-  case (RedVar \<sigma> n v \<Delta> uv)
+  case (RedVar \<omega> n v \<Delta>)
   then show ?case sorry
 (*
     by (metis get_store_def red_pure_red_pure_exps.RedVar surj_pair)
@@ -126,7 +126,7 @@ next
   then show ?case
     by (meson NoOldBinop red_pure_red_pure_exps.RedBinop)
 next
-  case (RedOld t l \<phi> \<Delta> e \<sigma> v uw)
+  case (RedOld \<omega> l \<phi> \<Delta> e v)
   then show ?case
     by auto
 next
@@ -178,7 +178,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedPermNull)
 next
-  case (RedResult \<sigma> v \<Delta> ux uy)
+  case (RedResult \<omega> v \<Delta>)
   then show ?case sorry
 (*
     by (metis get_store_def red_pure_red_pure_exps.RedResult)

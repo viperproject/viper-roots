@@ -277,7 +277,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 
 \<comment>\<open>Independent of SA\<close>
 | RedLit: "\<Delta> \<turnstile> \<langle>ELit l; _\<rangle> [\<Down>] Val (val_of_lit l)"
-| RedVar: "\<lbrakk> \<sigma> n = Some v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Var n; ((Ag \<sigma>, _), _)\<rangle> [\<Down>] Val v"
+| RedVar: "\<lbrakk> get_store \<omega> n = Some v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Var n; \<omega>\<rangle> [\<Down>] Val v"
 
 | RedUnop: "\<lbrakk> \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v ; eval_unop unop v = BinopNormal v' \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Unop unop e; \<omega>\<rangle> [\<Down>] Val v'"
 
@@ -287,7 +287,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 | RedBinop: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v2 ; eval_binop v1 bop v2 = BinopNormal v \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] Val v"
 
-| RedOld: "\<lbrakk> t l = Some \<phi> ; \<Delta> \<turnstile> \<langle>e; ((\<sigma>, Ag t), \<phi>)\<rangle> [\<Down>] v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e; ((\<sigma>, Ag t), _)\<rangle> [\<Down>] v" (* Implicitly propagates failures *)
+| RedOld: "\<lbrakk> get_trace \<omega> l = Some \<phi> ; \<Delta> \<turnstile> \<langle>e; set_state \<omega> \<phi>\<rangle> [\<Down>] v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e; \<omega>\<rangle> [\<Down>] v" (* Implicitly propagates failures *)
 
 | RedLet: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; shift_and_add_equi_state \<omega> v1\<rangle> [\<Down>] r \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>] r"
 
@@ -311,7 +311,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>] r"
 | RedPermNull: "\<lbrakk> \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VRef Null) \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>] Val (VPerm 0)"
 
-| RedResult: "\<lbrakk> \<sigma> 0 = Some v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Result; ((Ag \<sigma>, _), _)\<rangle> [\<Down>] Val v"
+| RedResult: "\<lbrakk> get_store \<omega> 0 = Some v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Result; \<omega>\<rangle> [\<Down>] Val v"
 
 
 
@@ -368,7 +368,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedLit)
 next
-  case (RedVar \<sigma> n v \<Delta> uv)
+  case (RedVar \<omega> n v \<Delta>)
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedVar)
 next
@@ -384,7 +384,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedBinop)
 next
-  case (RedOld t l \<phi> \<Delta> e \<sigma> v uw)
+  case (RedOld \<omega> l \<phi> \<Delta> e v)
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedOld)
 next
@@ -420,7 +420,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedPermNull)
 next
-  case (RedResult \<sigma> v \<Delta> ux uy)
+  case (RedResult \<omega> v \<Delta>)
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedResult)
 next
