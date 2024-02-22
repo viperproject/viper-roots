@@ -9,8 +9,7 @@ definition make_semantic_bexp :: "('a, ('a virtual_state)) interp \<Rightarrow> 
   else None)"
 
 definition make_semantic_exp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> ('a equi_state, 'a val) exp" where
-  "make_semantic_exp \<Delta> b \<omega> = (if \<Delta> \<turnstile> \<langle>b; \<omega>\<rangle> [\<Down>] VFailure then None
-  else Some (SOME v. \<Delta> \<turnstile> \<langle>b; \<omega>\<rangle> [\<Down>] Val v))"
+  "make_semantic_exp \<Delta> e \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v then Some (SOME v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) else None)"
 
 definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> field_ident \<Rightarrow> ('a equi_state, address \<times> field_ident) exp" where
   "make_semantic_rexp \<Delta> r f \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v))

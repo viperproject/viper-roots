@@ -48,11 +48,11 @@ definition get_store :: "('v, 'a) abs_state \<Rightarrow> (var \<rightharpoonup>
 
 locale semantics =
 
-  fixes has_value :: "('a :: sep_algebra) \<Rightarrow> 'r \<Rightarrow> 'v \<Rightarrow> bool"  
+  fixes has_value :: "('a :: sep_algebra) \<Rightarrow> 'r \<Rightarrow> 'v \<Rightarrow> bool"
   fixes has_write_perm_only :: "'a \<Rightarrow> 'r \<Rightarrow> bool"
   fixes set_value :: "'a \<Rightarrow> 'r \<Rightarrow> 'v \<Rightarrow> 'a"
 
-(* Axioms 
+(* Axioms
 - TODO: Add smth about has_value
 *)
   assumes frame_preserving_writing_orig: "Some x = a \<oplus> b \<Longrightarrow> stable b \<Longrightarrow> has_write_perm_only a hl \<Longrightarrow> Some (set_value x hl v) = set_value a hl v \<oplus> b"
@@ -60,7 +60,7 @@ locale semantics =
   (* TODO: WRONG! Needs something about the value! *)
 
       and set_value_then_has_value: "has_write_perm_only a hl \<Longrightarrow> has_value (set_value a hl v) hl v"
-      
+
 begin
 
 
@@ -78,9 +78,6 @@ definition inh ("\<langle>_\<rangle>" [51] 81) where
 
 definition filter_dom where
   "filter_dom vars S = Set.filter (\<lambda>\<omega>. dom (get_store \<omega>) = vars) S"
-
-definition upd_ag_partial_map where
-  "upd_ag_partial_map \<sigma> x v = Ag ((the_ag \<sigma>)(x := v))"
 
 definition self_framing :: "(('v, 'a) abs_state \<Rightarrow> bool) \<Rightarrow> bool" where
   "self_framing A \<longleftrightarrow> (\<forall>\<omega>. A \<omega> \<longleftrightarrow> A (stabilize \<omega>))"
@@ -120,21 +117,23 @@ where
 | RedSeq: "\<lbrakk> red_stmt \<Delta> C1 \<omega> S1 ; sequential_composition \<Delta> S1 C2 S2 \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (C1 ;; C2) \<omega> S2"
 
 \<comment>\<open>No need to handle the case where the variable is not defined, since it is part of well-definedness of a program\<close>
-| RedLocalAssign: "\<lbrakk>variables \<Delta> x = Some ty; e ((\<sigma>, \<tau>), \<gamma>) = Some v; v \<in> ty \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (LocalAssign x e) ((\<sigma>, \<tau>), \<gamma>) ({((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>)})"
+| RedLocalAssign: "\<lbrakk>variables \<Delta> x = Some ty; e \<omega> = Some v; v \<in> ty \<rbrakk> \<Longrightarrow>
+   red_stmt \<Delta> (LocalAssign x e) \<omega> ({set_store \<omega> ((get_store \<omega>)(x := Some v)) })"
 
 
-| RedHavoc: "variables \<Delta> x = Some ty \<Longrightarrow> red_stmt \<Delta> (Havoc x) ((\<sigma>,  \<tau>), \<gamma>) ({((upd_ag_partial_map \<sigma> x (Some v), \<tau>), \<gamma>) |v. v \<in> ty})"
+| RedHavoc: "variables \<Delta> x = Some ty \<Longrightarrow>
+  red_stmt \<Delta> (Havoc x) \<omega> ({set_store \<omega> ((get_store \<omega>)(x := Some v)) |v. v \<in> ty})"
 
-| RedFieldAssign: "\<lbrakk> r ((\<sigma>, \<tau>), \<gamma>) = Some hl ; e ((\<sigma>, \<tau>), \<gamma>) = Some v ; has_write_perm \<gamma> hl; heap_locs \<Delta> hl = Some ty; v \<in> ty \<rbrakk>
-  \<Longrightarrow> red_stmt \<Delta> (FieldAssign r e) ((\<sigma>, \<tau>), \<gamma>) {((\<sigma>, \<tau>), set_value \<gamma> hl v)}"
+| RedFieldAssign: "\<lbrakk> r \<omega> = Some hl ; e \<omega> = Some v ; has_write_perm (get_state \<omega>) hl; heap_locs \<Delta> hl = Some ty; v \<in> ty \<rbrakk>
+  \<Longrightarrow> red_stmt \<Delta> (FieldAssign r e) \<omega> {set_state \<omega> (set_value (get_state \<omega>) hl v)}"
 
-| RedLabel: "red_stmt \<Delta> (Label l) ((\<sigma>, \<tau>), \<gamma>) {((\<sigma>, upd_ag_partial_map \<tau> l (Some \<gamma>)), \<gamma>)}"
+| RedLabel: "red_stmt \<Delta> (Label l) \<omega> {set_trace \<omega> ((get_trace \<omega>)(l:= Some (get_state \<omega>)))}"
 
 
 (*
 
 \<comment>\<open>Updated type context\<close>
-| RedScope: "\<lbrakk> sequential_composition Pr (shift_and_add_list T tys) E { (\<sigma>', \<tau>, \<phi>) |\<sigma>'. \<sigma>' \<in> declare_var_list (domains \<Delta>) tys \<sigma>} s r \<rbrakk> \<Longrightarrow> 
+| RedScope: "\<lbrakk> sequential_composition Pr (shift_and_add_list T tys) E { (\<sigma>', \<tau>, \<phi>) |\<sigma>'. \<sigma>' \<in> declare_var_list (domains \<Delta>) tys \<sigma>} s r \<rbrakk> \<Longrightarrow>
   red_stmt \<Delta> (Scope ty s) (\<sigma>, \<tau>, \<phi>) ((unshift_state 1 ` r))"
 *)
 
@@ -148,7 +147,7 @@ where
 (* r is the "frame" *)
 
 (* Two things to verify:
-- exhale I ; havoc l ; inhale I ; assume not(b) 
+- exhale I ; havoc l ; inhale I ; assume not(b)
 - havoc l ; assume b ; inhale I ; s \<longrightarrow> satisfies I
 *)
 
@@ -315,7 +314,7 @@ Because there is not frame rule, it can be used to express leak checks, or absen
 | RuleFieldAssignHeapIndep:
   "\<lbrakk> self_framing A; framed_by_exp A r; framed_by_exp A e; depends_on_ag_store_only r; depends_on_ag_store_only e \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A && points_to r] FieldAssign r e [A && points_to_value r e]"
-  
+
 
 | RuleFieldAssign: "\<lbrakk> self_framing (A && points_to_value r e') ; framed_by_exp (A && points_to r) e \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A && points_to_value r e'] FieldAssign r e [A && points_to_value r e]"
@@ -356,7 +355,7 @@ State acc(x.f) && x.f == x.f.f
 
 A fixes x
 x = 0 && x.f \<mapsto> x.f.f
-x = 0 && (\<exists>v. x.f \<mapsto> v /\ v 
+x = 0 && (\<exists>v. x.f \<mapsto> v /\ v
 
 (x = 0 && 0.f \<mapsto> 0.f.f)
 
@@ -367,7 +366,7 @@ acc(x.f) && x.f = x
 
 Might need an entailment...
 
-Otherwise: 
+Otherwise:
 \<close>
 
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile> [A] C1 [R] ; \<Delta> \<turnstile> [R] C2 [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Seq C1 C2 [B]"
