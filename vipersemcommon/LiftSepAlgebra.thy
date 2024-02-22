@@ -11,9 +11,49 @@ type_synonym ('v, 'a) abs_state = "('v ag_store \<times> 'a ag_trace) \<times> '
 
 subsection \<open>Normal states\<close>
 
+(* TODO: rename get_ into abs_? *)
+(* TODO: Should state be renamed to heap? get_state on abs_state sounds like the identity *)
+(* TODO: define this via record instead of getter and setter functions? This would require proving the
+class instances for the record (via isomorphism?), but one would get nice getters and setters automatically *)
 definition get_store :: "('v, 'a) abs_state \<Rightarrow> (var \<rightharpoonup> 'v)" where "get_store \<omega> = the_ag (fst (fst \<omega>))"
 definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
 definition get_state :: "('v, 'a) abs_state \<Rightarrow> 'a" where "get_state \<omega> = snd \<omega>"
+definition set_store :: "('v, 'a) abs_state \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> ('v, 'a) abs_state" where
+  "set_store \<omega> s = ((Ag s, Ag (get_trace \<omega>)), get_state \<omega>)"
+definition set_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a) \<Rightarrow> ('v, 'a) abs_state" where
+  "set_trace \<omega> t = ((Ag (get_store \<omega>), Ag t), get_state \<omega>)"
+definition set_state :: "('v, 'a) abs_state \<Rightarrow> 'a \<Rightarrow> ('v, 'a) abs_state" where
+  "set_state \<omega> s = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)), s)"
+
+lemma get_store_set_store [simp] :
+  "get_store (set_store \<omega> st) = st"
+  by (simp add:get_store_def set_store_def)
+lemma get_store_set_trace [simp] :
+  "get_store (set_trace \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_trace_def)
+lemma get_store_set_state [simp] :
+  "get_store (set_state \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_state_def)
+
+lemma get_trace_set_store [simp] :
+  "get_trace (set_store \<omega> st) = get_trace \<omega>"
+  by (simp add:get_trace_def set_store_def)
+lemma get_trace_set_trace [simp] :
+  "get_trace (set_trace \<omega> t) = t"
+  by (simp add:get_trace_def set_trace_def)
+lemma get_trace_set_state [simp] :
+  "get_trace (set_state \<omega> st) = get_trace \<omega>"
+  by (simp add:get_trace_def set_state_def)
+
+lemma get_state_set_store [simp] :
+  "get_state (set_store \<omega> st) = get_state \<omega>"
+  by (simp add:get_state_def set_store_def)
+lemma get_state_set_trace [simp] :
+  "get_state (set_trace \<omega> st) = get_state \<omega>"
+  by (simp add:get_state_def set_trace_def)
+lemma get_state_set_state [simp] :
+  "get_state (set_state \<omega> st) = st"
+  by (simp add:get_state_def set_state_def)
 
 (*
 lemma pcm_agreement_compatible:
