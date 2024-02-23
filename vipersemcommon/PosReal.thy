@@ -416,37 +416,37 @@ proof -
   then show ?thesis by auto
 qed
 
-
-(*
-class pos_perm = zero_neq_one + comm_semiring + comm_monoid_mult + inverse
-  + comm_monoid_add + linorder + distrib_lattice + dense_linorder +
-  assumes field_inverse: "a \<noteq> 0 \<Longrightarrow> inverse a * a = 1"
-      and field_divide_inverse: "a / b = a * inverse b"
-      and field_inverse_zero: "inverse 0 = 0"
-      and all_pos: "a \<ge> 0"
-      and padd_mono: "p1 \<le> p2 \<and> q1 \<le> q2 \<Longrightarrow> p1 + q1 \<le> p2 + q2"
-      and pperm_gte_padd: "p \<ge> q \<Longrightarrow> (\<exists>r. p = q + r)"
-      and pinv_inverts: "a \<ge> b \<and> b > 0 \<Longrightarrow> inverse b \<ge> inverse a"
-      and two_larger_one: "1 + 1 > 1"
-      and padd_cancellative: "a = x + b \<Longrightarrow> a = y + b \<Longrightarrow> x = y"
-*)
-
-
 instantiation preal :: pos_perm
 begin
 
 instance proof
   fix x y a b p1 p2 q1 q2 :: preal
-  show "x < y \<Longrightarrow> \<exists>z>x. z < y" sorry
-  show "\<And>a. a \<noteq> PosReal.pnone \<Longrightarrow> pmult (pinv a) a = PosReal.pwrite" sorry
-  show "\<And>a b. pdiv a b = pmult a (pinv b)" sorry
-  show "pinv PosReal.pnone = PosReal.pnone" sorry
-  show "\<And>a. PosReal.pnone \<le> a" sorry
-  show "\<And>p1 p2 q1 q2. p1 \<le> p2 \<and> q1 \<le> q2 \<Longrightarrow> padd p1 q1 \<le> padd p2 q2" sorry
-  show "\<And>q p. q \<le> p \<Longrightarrow> \<exists>r. p = padd q r" sorry
-  show "\<And>b a. b \<le> a \<and> PosReal.pnone < b \<Longrightarrow> pinv a \<le> pinv b" sorry
-  show "PosReal.pwrite < padd PosReal.pwrite PosReal.pwrite" sorry
-  show "\<And>a x b y. a = padd x b \<Longrightarrow> a = padd y b \<Longrightarrow> x = y" sorry
+  show "x < y \<Longrightarrow> \<exists>z>x. z < y" 
+    by (transfer) (metis dense dual_order.trans less_eq_real_def mem_Collect_eq)
+  show "a \<noteq> PosReal.pnone \<Longrightarrow> pmult (pinv a) a = PosReal.pwrite" 
+    apply (cases a)
+    apply (cases b)
+    by (simp add: PosReal.field_inverse)
+  show "pdiv a b = pmult a (pinv b)" 
+    apply (cases a)
+    apply (cases b)
+    by (simp add: PosReal.field_divide_inverse)
+  show "pinv PosReal.pnone = PosReal.pnone" 
+    by (simp add: PosReal.field_inverse_zero)
+  show "PosReal.pnone \<le> a" 
+    by (metis PosReal.not_pgte_charact PosReal.sum_larger nle_le preal_gte_padd preal_pnone_pgt)
+  show "p1 \<le> p2 \<and> q1 \<le> q2 \<Longrightarrow> padd p1 q1 \<le> padd p2 q2" 
+    by (simp add: PosReal.padd_mono)
+  show "p1 \<le> p2 \<Longrightarrow> \<exists>r. p2 = padd p1 r"
+    by (simp add: preal_gte_padd)
+  show "b \<le> a \<and> PosReal.pnone < b \<Longrightarrow> pinv a \<le> pinv b" 
+    apply (cases a)
+    apply (cases b)
+    by (metis PosReal.pinv_inverts less_eq_preal.rep_eq less_preal.rep_eq pgte.rep_eq ppos.rep_eq zero_preal.rep_eq)    
+  show "PosReal.pwrite < padd PosReal.pwrite PosReal.pwrite"
+    by (transfer) simp
+  show "\<And>a x b y. a = padd x b \<Longrightarrow> a = padd y b \<Longrightarrow> x = y" 
+    by (transfer) simp
 qed
 
 end
