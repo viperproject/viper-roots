@@ -80,8 +80,28 @@ proof (rule ext)
 qed
 
 lemma compatible_maps_asso:
-  "compatible_maps a b \<and> compatible_maps (a ++ b) c \<longleftrightarrow> compatible_maps b c \<and> compatible_maps a (b ++ c)"
-  sorry
+  "compatible_maps a b \<and> compatible_maps (a ++ b) c \<longleftrightarrow> compatible_maps b c \<and> compatible_maps a (b ++ c)" (is "?LHS \<longleftrightarrow> ?RHS")
+proof (rule iffI)
+  assume "?LHS"
+
+  show "?RHS"
+  proof (rule conjI)
+    show "compatible_maps b c"
+      apply (rule compatible_mapsI)
+      using \<open>?LHS\<close>[simplified compatible_maps_def]
+      by (metis compatible_options.simps(1) map_add_find_right)
+  next
+    show "compatible_maps a (b ++ c)"
+      apply (rule compatible_mapsI)
+      by (metis \<open>?LHS\<close> compatible_maps_def compatible_maps_same compatible_options.simps(1) map_add_SomeD)
+  qed
+next
+  assume "?RHS"
+
+  show "?LHS"
+    unfolding compatible_maps_def
+    by (metis \<open>?RHS\<close> compatible_maps_def commut_charact compatible_options.simps(3) domIff map_add_dom_app_simps(1) map_add_dom_app_simps(3))
+qed
 
 lemma positivity_maps:
   assumes "a ++ b = Map.empty"
@@ -90,6 +110,6 @@ lemma positivity_maps:
 
 lemma map_included_equiv:
   "map_included b a \<longleftrightarrow> (\<exists>c. compatible_maps b c \<and> a = b ++ c)"
-  sorry
+  by (metis commut_charact included_then_compatible_maps map_add_find_right map_includedI map_included_then_sum)
 
 end
