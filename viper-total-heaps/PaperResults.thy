@@ -41,17 +41,24 @@ text \<open>Both formalised ASTs includes a larger subset than presented in the 
 
 subsection \<open>2.2: Boogie Semantics\<close>
 
-text \<open> \<^item> Statement single step reduction is defined via \<^const>\<open>red_bigblock_small\<close>
-       \<^item> Statement multistep reduction is defined via \<^const>\<open>red_ast_bpl\<close>
+paragraph \<open>Outcomes\<close>
+text \<open>Boogie outcomes are defined in \<^typ>\<open>'a state\<close> and Boogie states are defined in \<^typ>\<open>'a nstate\<close>.
+      \<^typ>\<open>'a nstate\<close> defines the mapping of variables to values via different mappings (local variable mapping,
+      global variable mapping etc.); the details are not essential here.\<close>
 
-  The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
-  0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>,N(\<sigma>\<^sub>b)) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
-  where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.
- \<close>
+paragraph \<open>Semantics for Boogie statements\<close>
+text \<open>The single step execution of a Boogie statement is expressed via \<^const>\<open>red_bigblock_small\<close>, which 
+      makes sure that at most one simple command is executed in each step.
+      A lot of the semantics was taken directly \<comment>\<open>TODO\<close>.
+      
+      The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
+      0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
+      where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.
+\<close>
 
 subsection \<open>2.3 Viper Semantics\<close>
 
-paragraph \<open>Viper states\<close>
+paragraph \<open>Outcomes\<close>
 text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<close>.
       Viper states are defined via the record type \<^typ>\<open>'a full_total_state\<close>. The type parameter
       \<^typ>\<open>'a\<close> is not relevant for the Viper subset in the paper.
@@ -149,20 +156,40 @@ text \<open>The generic forward simulation judgement \<open>sim\<close> in the p
 
 paragraph \<open>Three common instantiations of \<open>sim\<close>\<close>
 text \<open>For the three common instantiations shown at the bottom of figure 4, in the formalisation,
-      the Boogie context \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>, the Viper context \<open>\<Gamma>\<^sub>v\<close> captures 
-      both \<^term>\<open>ctxt_vpr\<close> and \<^term>\<open>\<Lambda>\<close>, and \<^term>\<open>StateCons\<close> corresponds to parameter \<^term>\<open>R\<close> discussed
-      above for the statement and expression reduction and is always instantiated to be \<^term>\<open>\<lambda>_.True\<close>
-      in our generated proofs.\<close>
+      the Boogie context \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>, and \<^term>\<open>StateCons\<close> corresponds 
+      to parameter \<^term>\<open>R\<close> discussed above for the statement and expression reduction and is always
+      instantiated to be \<^term>\<open>\<lambda>_.True\<close> in our generated proofs.
 
-text \<open>The statement simulation is defined in \<^const>\<open>stmt_rel\<close>. The notation
-     \<open>stmSim\<^sub>\<Gamma>\<^sub>v,\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, s, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
-     \<^prop>\<open>stmt_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons \<Lambda> P ctxt s \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.\<close>
+      The \<^emph>\<open>statement simulation\<close> is defined in \<^const>\<open>stmt_rel\<close>. 
+      The notation \<open>stmSim\<^sub>\<Gamma>\<^sub>v,\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, s, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
+      \<^prop>\<open>stmt_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons \<Lambda> P ctxt s \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
+      The Viper context \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>ctxt_vpr\<close> and \<^term>\<open>\<Lambda>\<close>.
 
-text \<open>The remcheck simulation is defined in \<^const>\<open>exhale_rel0\<close>. The notation
-     \<open>rcSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
+      The \<^emph>\<open>expression well-definedness simulation\<close> is defined in \<^const>\<open>exprs_wf_rel_2\<close>.
+      The notation \<open>wfSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, es, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to
+      \<^prop>\<open>exprs_wf_rel_2 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+      \<^term>\<open>ctxt_vpr\<close> is not relevant here for subset presented in the paper.
+     
+      Since the expression evaluation takes two states as input in the formalisation (see above),
+      \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> also are defined in terms of both states. For convenience, they are both 
+      in curried form and thus the instantiation via \<^const>\<open>rel_general\<close> uncurries them.
+     
+      For convenience, we usually work with \<^const>\<open>exprs_wf_rel\<close>, where the input and output
+      state relation are the same, which is sufficient for our use case. That is, we have:
+\<close>
+
+lemma exprs_wf_rel_with_2_equiv: 
+  "exprs_wf_rel_2 R R ctxt_vpr StateCons P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t \<longleftrightarrow>
+   exprs_wf_rel R ctxt_vpr StateCons P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t"
+  by (simp add: exprs_wf_rel_2_def exprs_wf_rel_def)    
+
+text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined in \<^const>\<open>exhale_rel0\<close>. The notation
+      \<open>rcSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
       \<^prop>\<open>exhale_rel0 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
-     For convenience reasons, \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> are curried, and thus the instantiation via
-     \<^const>\<open>rel_general\<close> uncurries them.
+      \<^term>\<open>ctxt_vpr\<close> is not relevant here for subset presented in the paper.
+      For convenience, \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> are curried, and thus the instantiation via
+      \<^const>\<open>rel_general\<close> uncurries them.
+
      In our formalisation, we always directly work with a remcheck simulation that additionally takes
      a predicate \<open>Q\<close> on assertions as a parameter as described in Section 3.5 of the paper.
      The notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper (Figure 7) corresponds to 
@@ -179,7 +206,43 @@ lemma exhale_rel_exhale_rel0_inst_equiv:
   unfolding exhale_rel_def exhale_rel0_def
   by simp
 
+subsection \<open>3.3 Instantiation-Independent Rules\<close>
 
+text \<open>The generic composition rule COMP is given by:\<close>
+
+lemmas COMP_paper = rel_general_comp
+
+text \<open>The sequential composition rule for statements is given by (the proof uses the generic composition
+rule):\<close>
+
+lemmas SEQ_SIM = stmt_rel_seq
+
+text \<open>Additional rules derived from the generic composition rule (only mentioned but not shown in paper) are:\<close>
+
+lemmas COMP_derived = 
+  exhale_rel_star \<comment>\<open>remcheck A1*A2\<close>
+  inhale_rel_star \<comment>\<open>inhale A1*A2\<close>
+
+text \<open>The propagation rule BPROP is given by\<close>
+
+\<comment>\<open>TODO: prove bSim in terms of rel_general\<close>
+
+subsection \<open>3.4 Examples: Generic Decomposition in Action\<close>
+
+subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
+
+
+section \<open>4 Putting the Methodology to Work\<close>
+
+subsection \<open>4.1 State Relation\<close>
+
+subsection \<open>4.2 Non-Locality\<close>
+
+subsection \<open>4.3 Proof Automation\<close>
+
+subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
+
+subsection \<open>4.5 Generating A Proof of the Final Theorem\<close>
 
 end
 

@@ -55,6 +55,12 @@ abbreviation expr_wf_rel :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarr
   "expr_wf_rel R ctxt_vpr StateCons P ctxt e_vpr \<gamma> \<gamma>' \<equiv>
    wf_rel R R (\<lambda>\<omega>def \<omega>. \<exists>v. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v )) (\<lambda>\<omega>def \<omega>. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e_vpr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure)) P ctxt \<gamma> \<gamma>'"
 
+definition exprs_wf_rel_2 :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 
+                              ('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> ('a vpr_state \<Rightarrow> bool) \<Rightarrow>  ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
+       viper_expr list \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
+  where "exprs_wf_rel_2 R R' ctxt_vpr StateCons P ctxt es \<equiv>
+           wf_rel R R' (\<lambda>\<omega>def \<omega>. \<exists>vs. red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> (Some vs)) 
+                       (\<lambda>\<omega>def \<omega>. red_pure_exps_total ctxt_vpr StateCons (Some \<omega>def) es \<omega> None) P ctxt"
 
 definition exprs_wf_rel :: "('a vpr_state \<Rightarrow> 'a vpr_state \<Rightarrow>  ('a vbpl_absval) nstate \<Rightarrow> bool) \<Rightarrow> 'a total_context \<Rightarrow> ('a vpr_state \<Rightarrow> bool) \<Rightarrow>  ast \<Rightarrow> 'a econtext_bpl \<Rightarrow>
        viper_expr list \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> (Ast.bigblock \<times> cont) \<Rightarrow> bool"
