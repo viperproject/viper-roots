@@ -2,23 +2,36 @@ theory PaperResults
 imports ViperBoogieEndToEnd
 begin
 
-text \<open>The following Isabelle theory file contains references to all the results explicitly mentioned in
+text \<open>The following Isabelle theory file contains references to all the formalised results explicitly mentioned in
 the paper. The Isabelle sections and subsections match those from the paper except if mentioned otherwise.
 In the Isabelle IDE, you can ctrl-and-click on the original definitions (highlighted in black everywhere
 except for constants where it has the same orange color as this text). Clickable definitions in the
 Isabelle documentation (i.e., within text \<open>...\<close> annotations) can be contained in
   \<^item> types (for example, \<^typ>\<open>ViperLang.stmt\<close>)
-  \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>)
-  \<^item> constants (for example, \<^const>\<open>red_stmt_total\<close>; notice that here the clickable constant is in orange)
+  \<^item> constants (for example, \<^const>\<open>red_stmt_total\<close>; note that here the clickable constant is in orange)
+  \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
+  \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just boolean terms
+
+To refer to specific rules or proved theorems, we use Isabelle's \<open>lemmas\<close> keyword. For example:
 \<close>
+
+lemmas example_for_rule = RedExhale RedExhaleFailure
+ \<comment>\<open>you can ctrl-click on the rules \<open>RedExhale\<close> and \<open>RedExhaleFailure\<close>\<close>
+
+lemmas example_for_a_proved_theorem = exhale_inhale_normal
+\<comment>\<open>you can ctrl-click on the proved theorem \<open>exhale_inhale_normal\<close>\<close>
+
+text \<open>Whenever a ctrl-click takes you to another theory, you can use the green arrow buttons at the top 
+      of the Isabelle IDE to jump back (or forward) to the previous position.
+      You can also use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a section or 
+      subsection.\<close>
 
 section \<open>2: "Viper and Boogie: Background and Semantics"\<close>
 
 subsection \<open>2.1: The Viper and Boogie languages\<close>
 
-text \<open>The Viper AST for statements is defined in \<^typ>\<open>ViperLang.stmt\<close>.\<close>
-
-text \<open>The Boogie AST for statements is defined in \<^typ>\<open>Ast.bigblock\<close>\<close>
+text \<open>The Viper AST for statements is defined in \<^typ>\<open>ViperLang.stmt\<close>.
+      The Boogie AST for statements is defined in \<^typ>\<open>Ast.bigblock\<close>\<close>
 
 text \<open>Both formalised ASTs includes a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is relevant. 
@@ -32,34 +45,95 @@ text \<open> \<^item> Statement single step reduction is defined via \<^const>\<
        \<^item> Statement multistep reduction is defined via \<^const>\<open>red_ast_bpl\<close>
 
   The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
-  0 or more steps) corresponds to \<^term>\<open>red_ast_bpl P ctxt (\<gamma>,N(\<sigma>\<^sub>b)) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
+  0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>,N(\<sigma>\<^sub>b)) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
   where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.
  \<close>
 
 subsection \<open>2.3: Viper Semantics\<close>
 
+paragraph \<open>Viper states\<close>
+text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<close>.
+      Viper states are defined via the record type \<^typ>\<open>'a full_total_state\<close>. The type parameter
+      \<^typ>\<open>'a\<close> is not relevant for the Viper subset in the paper.
+
+      Given a Viper state \<^term>\<open>\<sigma>\<^sub>v :: 'a full_total_state\<close>, its components are:
+        \<^item> the store: \<^term>\<open>get_store_total \<sigma>\<^sub>v\<close>
+        \<^item> the heap: \<^term>\<open>get_hh_total_full \<sigma>\<^sub>v\<close> 
+        \<^item> the permission mask: \<^term>\<open>get_mh_total_full \<sigma>\<^sub>v\<close>
+
+      The state has more components, which are not relevant for features outside of the Viper subset 
+      presented in the paper.
+\<close>
+
 paragraph \<open>Semantics for Viper statements\<close> 
 text \<open>The big-step judgement for Viper statements is defined via \<^const>\<open>red_stmt_total\<close>.     
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>s, \<sigma>\<^sub>v\<rangle> \<rightarrow> r\<^sub>v\<close> in the paper (the execution of statement \<open>s\<close>
-      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^term>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close> in the formalisation,
-      where \<^term>\<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>ctxt\<close> and \<^term>\<open>\<Lambda>\<close>
+      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close> in the formalisation,
+      where the Viper context \<^term>\<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>ctxt\<close> and \<^term>\<open>\<Lambda>\<close>
 
-      The parameter \<^term>\<open>R\<close> is not relevant for the Viper subset in the paper. In our proofs, 
-      it is always instantiated to be \<open>\<lambda>_. True\<close>.
+      The parameter \<^term>\<open>R\<close> is not required for the Viper subset in the paper. In our proofs, 
+      it is always instantiated as \<open>\<lambda>_. True\<close>.
 \<close>
 
 paragraph \<open>Viper expression evaluation\<close>
 text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_exp_total\<close>.
-      The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> V(v)\<close> in the paper (expression evaluation of expression \<open>e\<close> in state 
-      \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^term>\<open>ctxt, R, Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t Val v\<close> in the formalisation (here,
-      we have special notation for \<^const>\<open>red_pure_exp_total\<close>). 
+      The notation \<open>\<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> V(v)\<close> in the paper (expression evaluation of expression \<open>e\<close> to value \<open>v\<close> 
+      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>ctxt, R, Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t Val v\<close> in the formalisation (here,
+      we defined special notation in Isabelle for \<^const>\<open>red_pure_exp_total\<close>). 
+      The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> <lightning_symbol>\<close> in the paper(expression \<open>e\<close> is ill-defined in \<open>\<sigma>\<^sub>v\<close>) 
+      corresponds to \<^prop>\<open>ctxt, R, Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t VFailure\<close>.
 
-      As for the statements, the \<^term>\<open>R\<close> is not relevant for the Viper subset in the paper.
-      \<close>
+      As for the statement reduction, \<^term>\<open>R\<close> is not required for the Viper subset in the paper and is always
+      instantiated as \<open>\<lambda>_. True\<close> in our proofs. \<^term>\<open>ctxt\<close> is the same as for the statement reduction
+      but is redundant for the Viper subset in the paper and thus was omitted in the presentation.      
 
+      One difference to the paper, is that the expression evaluation in the formalisation takes two 
+      Viper states as input instead of just one. Having two states is only required for Viper features
+      outside of the subset of the paper and that's why in the paper we present the evaluation just with one 
+      state to ease the presentation.
+       
+      In almost all cases of the semantics, these two states are chosen to be the same one and thus 
+      directly correspond to the paper. The only case where the two states differ is during \<open>remcheck\<close> operations, 
+      where one state is instantiated to be the \<^emph>\<open>reduction state\<close> and the other the \<^emph>\<open>expression evaluation state\<close>
+      (introduced on lines 312-317 in the paper). The expression evaluation checks whether there
+      is nonzero permission to fields in the expression evaluation state (as in the paper), but 
+      the other lookups (e.g. heap, store) are performed in the reduction state. This is done, because 
+      there is a Viper feature outside of the subset in the paper that allows looking up the current 
+      permission in the \<^emph>\<open>reduction state\<close> during a \<open>remcheck\<close> operation. Since in the subset of the paper,
+      the expressions allow only looking up heap values and store values, instantiating both states to be the
+      expression evaluation state leads to the same result and thus directly corresponds to the paper
+      (because the reduction and expression evaluate state differ only on the permission mask).
+\<close>
 
+paragraph \<open>Exhale semantics\<close>
 
-text \<open>\<close>
+text \<open>The rule (EXH-SUCC) is given by:\<close>
+
+lemmas EXH_SUCC = RedExhale \<comment>\<open>Note: you can ctrl-click on \<open>RedExhale\<close> to jump to the rule\<close>
+
+text \<open>The rule (EXH-FAIL) is given by:\<close>
+
+lemmas EXH_FAIL = RedExhaleFailure
+
+text \<open>The \<open>remcheck\<close> reduction is defined in \<^const>\<open>red_exhale\<close>.
+      The notation \<open>\<sigma>0\<^sub>v \<turnstile> \<langle>A, \<sigma>\<^sub>v\<rangle> \<rightarrow>\<^sub>r\<^sub>c r\<^sub>v\<close> (remcheck reduction of assertion \<open>A\<close> in expression evaluation
+      state \<open>\<sigma>0\<^sub>v\<close> and reduction state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_exhale ctxt R \<sigma>0\<^sub>v A \<sigma>\<^sub>v r\<^sub>v\<close> \<close>
+
+text \<open>The rule (RC-SEP) is given by:\<close>
+
+lemmas RC_SEP = ExhStarNormal
+
+text \<open>The rule (RC-ACC) is given by:\<close>
+                     
+lemmas RC_ACC = ExhAcc
+
+paragraph \<open>Inhale semantics\<close>
+
+text \<open>The statement reduction rule for \<open>inhale\<close> is given by:\<close>
+
+lemmas red_inhale = RedInhale
+
+text \<open>This rule is defined via a helper definition \<^const>\<open>red_inhale\<close>.\<close>
 
 end
 
