@@ -17,16 +17,42 @@ definition exhale_rel ::
            (\<lambda> \<omega>0_\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) RFailure)
            P ctxt \<gamma> \<gamma>'"
 
-text \<open>The above definition directly introduces the invariant assertion \<^term>\<open>Q\<close>. The definition 
-without the invariant assertion is the same where \<^term>\<open>Q\<close> is instantiated to be \<^term>\<open>\<lambda>_ _ _. True\<close>.
-The following lemma shows that one can express the version with the invariant assertion as an instantiation
-of the version without the invariant assertion.\<close>
+subsection \<open>Definition without additional predicate\<close>
 
-lemma exhale_rel_without_inv_to_with_inv:
-  "exhale_rel R R' Q ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<longleftrightarrow>
-   exhale_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q assertion_vpr \<omega>def \<omega>) R' (\<lambda> _ _ _. True) ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
-  unfolding exhale_rel_def rel_general_def
-  by auto
+text \<open>We work directly with \<^const>\<open>exhale_rel\<close>, which introduces a predicate \<^term>\<open>Q\<close> to track conditions
+      on assertions separately.
+      Alternatively, it would be possible to first provide a base definition 
+      that does not introduce \<^term>\<open>Q\<close> and then to use an instantiation to obtain the version \<^term>\<open>Q\<close>. 
+
+      Concretely, we could define the following base definition:\<close>
+
+definition exhale_rel0
+    where "exhale_rel0 R R' ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<equiv> 
+             rel_general (uncurry R) (uncurry R')
+             \<comment>\<open>The well-definedness state remains the same\<close>
+             (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. (fst \<omega>0_\<omega>) = (fst \<omega>0_\<omega>') \<and> red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) (RNormal (snd \<omega>0_\<omega>')))
+             (\<lambda> \<omega>0_\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>0_\<omega>) assertion_vpr (snd \<omega>0_\<omega>) RFailure)
+             P ctxt \<gamma> \<gamma>'"
+
+text \<open>Then, the original definition is equivalent to a specific instantiation of \<^const>\<open>exhale_rel0\<close>:\<close>
+
+lemma exhale_rel_exhale_rel0_inst_equiv: 
+  "exhale_rel R R' Q ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>' \<longleftrightarrow>
+   exhale_rel0 (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A \<omega>def \<omega>) R' ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>'"
+  unfolding exhale_rel_def exhale_rel0_def
+  by simp
+
+text \<open>The following lemma shows that we can do the reverse as well. We can express the base definition
+      \<^const>\<open>exhale_rel0\<close> in terms of the original definition by instantiating \<^term>\<open>Q\<close> to be the \
+      predicate that is always true.\<close>
+
+lemma exhale_rel0_rel_equiv: 
+  "exhale_rel0 R R' ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>' \<longleftrightarrow>
+   exhale_rel R R' (\<lambda> _ _ _. True) ctxt_vpr StateCons P ctxt assertion_vpr \<gamma> \<gamma>'"
+  unfolding exhale_rel_def exhale_rel0_def
+  by presburger
+
+subsection \<open>Basic rules\<close>
 
 lemma exhale_rel_intro:
   assumes "\<And> \<omega>0 \<omega> \<omega>' ns. R \<omega>0 \<omega> ns \<Longrightarrow>
