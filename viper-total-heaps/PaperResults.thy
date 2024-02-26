@@ -18,14 +18,21 @@ Clickable definitions in the Isabelle documentation (i.e., within text \<open>..
   \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
   \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just boolean terms
 
-To refer to specific rules or proved theorems, we use Isabelle's \<open>lemmas\<close> keyword. For example:
+To refer to specific rules or proved theorems, we use Isabelle's \<open>lemmas\<close> keyword. 
+
+TODO: alternative would be to use @{thm [source] RedExhale RedExhaleFailure}, which one is better?
+
+For example:
 \<close>
 
 lemmas example_for_rule = RedExhale RedExhaleFailure
- \<comment>\<open>you can ctrl-click on the rules \<open>RedExhale\<close> and \<open>RedExhaleFailure\<close>\<close>
 
 lemmas example_for_a_proved_theorem = exhale_inhale_normal
-\<comment>\<open>you can ctrl-click on the proved theorem \<open>exhale_inhale_normal\<close>\<close>
+
+\<comment>\<open>You can ctrl-click on \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
+  You can also inspect the rules and lemmas by clicking anywhere right after the \<open>lemmas\<close> keyword
+  and then looking at the resulting Isabelle statement in the output panel.\<close>
+
 
 text \<open>Whenever a ctrl-click takes you to another theory, you can use the green arrow buttons at the top 
       of the Isabelle IDE to jump back (or forward) to the previous position.
@@ -258,7 +265,7 @@ text \<open>As also mentioned above in section 3.3., the notation \<open>rcSim\<
 
       Test: @{thm [source] exhale_rel0_def}
       Test2: @{thm [source] exhale_rel0_def exhale_rel_star stmt_rel_seq}
-      Test3: @{thm exhale_rel0_def exhale_rel_star stmt_rel_seq}
+      Test3: @{thm exhale_rel0_def exhale_rel_star stmt_rel_seq}    
 \<close>
 
 lemmas RSEP_SIM = exhale_rel_star
@@ -267,6 +274,19 @@ lemmas RSEP_SIM = exhale_rel_star
 section \<open>4 Putting the Methodology to Work\<close>
 
 subsection \<open>4.1 State Relation\<close>
+
+text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>. The presented conjuncts in the paper are
+      represented as follows in the formalisation:
+      
+      \<^item> State consistency: The conjunct \<open>consistent(\<sigma>\<^sub>v)\<close> corresponds to \<^term>\<open>wf_mask_simple (get_mh_total_full \<sigma>\<^sub>v)\<close>.
+      \<^item> Field relation: The conjunct \<open>fieldRel\<^sub>\<Gamma>\<^sub>b(field(Tr), \<sigma>\<^sub>b)\<close> corresponds to
+                        \<^term>\<open>field_rel Pr \<Lambda> (field_translation Tr) \<sigma>\<^sub>b\<close>.
+      \<^item> Store relation: The conjunct \<open>stRel\<^sub>\<Gamma>\<^sub>b(var(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to 
+                        \<^term>\<open>store_rel A \<Lambda> (var_translation Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
+      \<^item> Heap and permission mask relation: The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(HM(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
+          \<^term>\<open> heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b \<and>
+                mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close> 
+\<close>
 
 subsection \<open>4.2 Non-Locality\<close>
 
