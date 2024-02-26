@@ -686,6 +686,25 @@ next
   qed (simp)
 qed
 
+lemma exhale0_stmt_rel:
+  assumes WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and Consistent: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> StateCons \<omega>"
+      and ExhaleRel: "exhale_rel0 (rel_ext_eq R) Rexh ctxt_vpr StateCons P ctxt A \<gamma> \<gamma>2"
+      and UpdHavoc: "rel_general (uncurry Rexh) (\<lambda>\<omega> ns. R_out (snd \<omega>) ns) 
+               (\<lambda>\<omega> \<omega>'. \<comment>\<open>the current evaluation state was reached by exhaling A from the current well-definedness state\<close>
+                       red_exhale ctxt_vpr StateCons (fst \<omega>) A (fst \<omega>) (RNormal (snd \<omega>)) \<and> 
+                       \<comment>\<open>the updated state is a havoc of the current evaluation state\<close>
+                       snd \<omega>' \<in> havoc_locs_state ctxt_vpr (snd \<omega>) ({loc. get_mh_total_full (fst \<omega>) loc > 0 \<and> get_mh_total_full (snd \<omega>) loc = 0}) \<and>
+                       StateCons (snd \<omega>')
+                ) (\<lambda>_. False) P ctxt \<gamma>2 \<gamma>'"
+    shows "stmt_rel R R_out ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale A) \<gamma> \<gamma>'"
+  apply (rule exhale_stmt_rel[OF WfConsistency Consistent])
+     apply assumption
+  using ExhaleRel exhale_rel0_rel_equiv
+    apply blast
+   apply simp
+  by (rule UpdHavoc)  
+
 text \<open>The following theorem is the same as exhale_stmt_rel except that Rext has been instantiated.
       It seems cumbersome to instantiate Rext properly during the proof generation (with a naive approach
       Isabelle picks a version that ignores the well-definedness state)\<close>

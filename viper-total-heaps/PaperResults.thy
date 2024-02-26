@@ -3,10 +3,16 @@ imports ViperBoogieEndToEnd
 begin
 
 text \<open>The following Isabelle theory file contains references to all the formalised results explicitly mentioned in
-the paper. The Isabelle sections and subsections match those from the paper except if mentioned otherwise.
+the paper. The theory file is structured using Isabelle sections and subsections, which match those from 
+the paper. You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a 
+section or  subsection.
+
 In the Isabelle IDE, you can ctrl-and-click on the original definitions (highlighted in black everywhere
-except for constants where it has the same orange color as this text). Clickable definitions in the
-Isabelle documentation (i.e., within text \<open>...\<close> annotations) can be contained in
+except for constants where it has the same orange color as this text). You can use the green arrow buttons
+at the top of the Isabelle IDE to jump back (or forward) to the previous position after ctrl-clicking
+on a definition.
+
+Clickable definitions in the Isabelle documentation (i.e., within text \<open>...\<close> annotations) can be contained in
   \<^item> types (for example, \<^typ>\<open>ViperLang.stmt\<close>)
   \<^item> constants (for example, \<^const>\<open>red_stmt_total\<close>; note that here the clickable constant is in orange)
   \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
@@ -208,28 +214,50 @@ lemma exhale_rel_exhale_rel0_inst_equiv:
 
 subsection \<open>3.3 Instantiation-Independent Rules\<close>
 
-text \<open>The generic composition rule COMP is given by:\<close>
+text \<open>The generic composition rule COMP (Figure 5) is given by:\<close>
 
 lemmas COMP_paper = rel_general_comp
 
-text \<open>The sequential composition rule for statements is given by (the proof uses the generic composition
-rule):\<close>
+text \<open>The sequential composition rule SEQ-SIM (Figure 5) is given by:\<close>
 
-lemmas SEQ_SIM = stmt_rel_seq
+lemmas SEQ_SIM = stmt_rel_seq \<comment>\<open>Note that the proof uses the generic composition rule\<close>
 
-text \<open>Additional rules derived from the generic composition rule (only mentioned but not shown in paper) are:\<close>
+text \<open>Additional rules derived from the generic composition rule are:\<close>
 
 lemmas COMP_derived = 
   exhale_rel_star \<comment>\<open>remcheck A1*A2\<close>
   inhale_rel_star \<comment>\<open>inhale A1*A2\<close>
 
-text \<open>The propagation rule BPROP is given by\<close>
+text \<open>The propagation rule BPROP (Figure 5) is given by:\<close>
 
 \<comment>\<open>TODO: prove bSim in terms of rel_general\<close>
 
 subsection \<open>3.4 Examples: Generic Decomposition in Action\<close>
 
+text \<open>The rule EXH-SIM (Figure 6) is given by:\<close>
+
+lemmas EXH_SIM = exhale0_stmt_rel
+
+\<comment>\<open>TODO: maybe show havocLocs corresponds to nonDet definition\<close>
+
+text \<open>As discussed above in section 3.3, instead of working with \<open>rcInv\<close> we always work with 
+     \<open>rcInvSim\<close> (see Figure 7), which takes an additional predicate \<open>Q\<close> on assertions.
+     The EXH-SIM rule generalised to \<open>rcInvSim\<close> is given by:\<close>
+
+lemmas EXH_SIM_rcInvSim = exhale_stmt_rel \<comment>\<open>the rule for EXH-SIM is proved via this rule\<close>
+
+\<comment>\<open>TODO: second example appendix B --> put it here or later?\<close>
+ 
 subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
+
+text \<open>As also mentioned above in section 3.3., the notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
+      in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr StateCons P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+
+      The rule RSEP-SIM is given by: \<^theory>\<open>TotalViper.ViperBoogieEndToEnd\<close> 
+      @{thm exhale_rel0_def}
+\<close>
+
+lemmas RSEP_SIM = exhale_rel_star
 
 
 section \<open>4 Putting the Methodology to Work\<close>
@@ -243,6 +271,12 @@ subsection \<open>4.3 Proof Automation\<close>
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
 
 subsection \<open>4.5 Generating A Proof of the Final Theorem\<close>
+
+section \<open>Appendix\<close>
+
+subsection \<open>A Inhale Semantics\<close>
+
+subsection \<open>B Another Simulation Rule Example\<close>
 
 end
 
