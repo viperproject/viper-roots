@@ -255,6 +255,10 @@ text \<open>As also mentioned above in section 3.3., the notation \<open>rcSim\<
 
       The rule RSEP-SIM is given by: \<^theory>\<open>TotalViper.ViperBoogieEndToEnd\<close> 
       @{thm exhale_rel0_def}
+
+      Test: @{thm [source] exhale_rel0_def}
+      Test2: @{thm [source] exhale_rel0_def exhale_rel_star stmt_rel_seq}
+      Test3: @{thm exhale_rel0_def exhale_rel_star stmt_rel_seq}
 \<close>
 
 lemmas RSEP_SIM = exhale_rel_star
