@@ -203,7 +203,7 @@ lemma exprs_wf_rel_with_2_equiv:
 
 text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined in \<^const>\<open>exhale_rel0\<close>. The notation
       \<open>rcSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
-      \<^prop>\<open>exhale_rel0 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
+      \<^prop>\<open>exhale_rel0 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
       \<^term>\<open>ctxt_vpr\<close> is not relevant here for subset presented in the paper.
       For convenience, \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> are curried, and thus the instantiation via
       \<^const>\<open>rel_general\<close> uncurries them.
@@ -211,7 +211,7 @@ text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined in \<^cons
      In our formalisation, we always directly work with a remcheck simulation that additionally takes
      a predicate \<open>Q\<close> on assertions as a parameter as described in Section 3.5 of the paper.
      The notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper (Figure 7) corresponds to 
-     \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr StateCons P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+     \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
     
      \<^const>\<open>exhale_rel\<close> is directly defined in terms of the generic simulation judgement, but the following
      lemma shows that this is equivalent to defining \<^const>\<open>exhale_rel\<close> in terms \<^const>\<open>exhale_rel0\<close>
@@ -263,7 +263,7 @@ lemmas EXH_SIM_rcInvSim = exhale_stmt_rel \<comment>\<open>the rule for EXH-SIM 
 subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
 
 text \<open>As also mentioned above in section 3.3., the notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
-      in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr StateCons P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+      in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
 
       The rule RSEP-SIM is given by: \<^theory>\<open>TotalViper.ViperBoogieEndToEnd\<close> 
       @{thm exhale_rel0_def}
@@ -347,10 +347,55 @@ text \<open>Our custom tactic to prove the forward simulation of Viper statement
 
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
 
-paragraph \<open>Boogie procedure correctness\<close>
-text \<open>test\<close>
+paragraph \<open>Boogie procedure correctness (top of Figure 8)\<close>
+text\<open>The correctness of a Boogie procedure is defined in \<^const>\<open>proc_is_correct\<close>. The final parameter of 
+the definition abstracts over the type of a procedure body and its associated operational semantics,
+which allows reusing the same definition for Boogie abstract syntax trees and control-flow graphs.
+
+The notation \<open>Correct\<^sub>b\<^sup>G(p)\<close> in the paper corresponds to 
+
+\<^prop>\<open>\<forall>T. proc_is_correct T fun_decls constants unique_consts global_vars axioms p Ast.proc_body_satisfies_spec\<close>
+
+where the universally quantified \<^term>\<open>T\<close> corresponds to the type interpretation. The global declarations \<^term>\<open>G\<close> 
+captures \<^term>\<open>fun_decls\<close> (function declarations), \<^term>\<open>constants\<close> (constant declarations),
+\<^term>\<open>unique_consts\<close> (subset of constant declarations that are marked as unique),
+\<^term>\<open>global_vars\<close> (global variable declarations) and \<^term>\<open>axioms\<close> (axioms).
+The final argument \<^const>\<open>Ast.proc_body_satisfies_spec\<close> concretely specifies when a body represented by a 
+Boogie AST has no failing executions. \<^const>\<open>Ast.proc_body_satisfies_spec\<close> also takes the procedure pre- 
+and postcondition into account, which are not relevant for the paper, since the Viper-to-Boogie 
+translation does not emit any pre- and postconditions in the Boogie program.
+\<close>
+
+paragraph \<open>Polymorphic maps\<close>
+text \<open>The type \<^typ>\<open>'a vbpl_absval\<close> defines our instantiation of the uninterpreted Boogie types
+generated by the Viper-to-Boogie translation. In this type definition, \<open>HType\<close> is instantiated via
+\<^term>\<open>AHeap h\<close>, where \<^term>\<open>h\<close> is a partial mapping (represented by a function that maps to the option type;
+note that \<^typ>\<open>'a \<rightharpoonup> 'b\<close> is syntactic sugar for \<^typ>\<open>'a \<Rightarrow> 'b option\<close>) as presented in the paper. 
+The function \<^const>\<open>vbpl_absval_ty_opt\<close> is the main building block for constructing the corresponding
+type interpretation for the Viper-to-Boogie translation (i.e. mapping values of type
+\<^typ>\<open>'a vbpl_absval\<close> to Boogie types).
+
+The instantiations for the \<open>upd\<close> and \<open>read\<close> functions of \<open>HType\<close> are provided by \<^const>\<open>store_heap\<close>
+and \<^const>\<open>select_heap\<close>, respectively.
+\<close>
 
 subsection \<open>4.5 Generating A Proof of the Final Theorem\<close>
+
+
+paragraph \<open>Correctness of a Viper method\<close>
+text \<open>The correctness of a Viper method is defined in \<^const>\<open>vpr_method_correct_total_partial\<close>.
+The notation \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close> corresponds to \<^prop>\<open>vpr_method_correct_total_partial ctxt_vpr (\<lambda>_.True) m\<close>
+where F,M capture \<^term>\<open>ctxt_vpr\<close>.
+
+\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close> is slightly stronger than \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close>,
+because, in addition to \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close>, it includes a well-definedness condition on the postcondition.
+The definition is also expressed a bit differently than in the presentation. To show that correctness
+\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close> 
+
+
+\<close>
+
+paragraph \<open>Main helper lemma to prove final theorem\<close>
 
 section \<open>Appendix\<close>
 

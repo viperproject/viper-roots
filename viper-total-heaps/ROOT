@@ -26,7 +26,4 @@ session TotalViper = ViperCommon +
     StmtRelML
     ViperBoogieEndToEnd
     ViperBoogieEndToEndML
-  theories [document = true]
-	PaperResults 
-  document_files
-    "root.tex"
+	PaperResults
