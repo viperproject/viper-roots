@@ -26,3 +26,4 @@ session TotalViper = ViperCommon +
     StmtRelML
     ViperBoogieEndToEnd
     ViperBoogieEndToEndML
+	PaperResults [document=true]
