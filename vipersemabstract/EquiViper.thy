@@ -137,8 +137,8 @@ typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_vir
 
 setup_lifting type_definition_virtual_state
 
-fun get_vh :: "'a virtual_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = (let (_, h) = Rep_virtual_state \<phi> in h)"
-fun get_vm :: "'a virtual_state \<Rightarrow> preal mask" where "get_vm \<phi> = (let (\<pi>, _) = Rep_virtual_state \<phi> in \<pi>)"
+definition get_vh :: "'a virtual_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = snd (Rep_virtual_state \<phi>)"
+definition get_vm :: "'a virtual_state \<Rightarrow> preal mask" where "get_vm \<phi> = fst (Rep_virtual_state \<phi>)"
 
 definition uu :: "'a virtual_state" where "uu = Abs_virtual_state uuu"
 
