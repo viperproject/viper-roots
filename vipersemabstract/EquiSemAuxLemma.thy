@@ -231,9 +231,9 @@ proof -
   then have "?h2 hl \<succeq> ?h1 hl"
     by (simp add: greaterE)
   moreover have "read_field \<phi>1 hl = ?h1 hl"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   moreover have "read_field \<phi>2 hl = ?h2 hl"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   ultimately have "read_field \<phi>2 hl \<succeq> read_field \<phi>1 hl"
     by simp
   then obtain vo where "Some (read_field \<phi>2 hl) = vo \<oplus> Some v"
@@ -261,7 +261,7 @@ proof -
   let ?wm = "fst ?w"
   let ?wh = "snd ?w"
   have "get_vm \<omega> = ?wm"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   moreover assume "get_vm \<omega> hl > 0"
   ultimately have "ppos (?wm hl)"
     by (simp add: gr_0_is_ppos)
@@ -272,7 +272,7 @@ proof -
   ultimately have "?wh hl \<noteq> None"
     by (metis wf_pre_virtual_state.simps)
   moreover have "get_vh \<omega> = ?wh"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   ultimately show "get_vh \<omega> hl \<noteq> None"
     by simp
 qed
@@ -404,7 +404,7 @@ next
 next
   case (RedField \<Delta> e \<omega> a f v)
   then obtain a' where "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VRef (Address a'))" "read_field (get_state \<omega>) (a', f) = Some v2" using RedAccField2Val_case
-    by (metis get_vh.simps read_field.elims)
+    by (metis read_field.elims)
   moreover have "a' = a"
     using RedField.hyps(2) calculation(1) by auto
   ultimately show ?case
@@ -535,17 +535,17 @@ proof
   then have "Some (Rep_virtual_state c) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
     by (simp add: compatible_virtual_state_implies_pre_virtual_state)
   moreover have "\<And>\<omega> :: 'v virtual_state. get_vh \<omega> = snd (Rep_virtual_state \<omega>)"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   moreover have "\<And>\<omega> :: 'v virtual_state. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   ultimately show ?PART
     by (metis plus_prodE)
 next
   assume ?PART
   moreover have "\<And>\<omega> :: 'v virtual_state. get_vh \<omega> = snd (Rep_virtual_state \<omega>)"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   moreover have "\<And>\<omega> :: 'v virtual_state. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   ultimately have "Some (Rep_virtual_state c) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
     using plus_prodI by fastforce
   then show ?FULL
@@ -672,11 +672,11 @@ proof -
   have "Some ?a = ?b \<oplus> ?c"
     by (simp add: assms compatible_virtual_state_implies_pre_virtual_state)
   moreover have "get_vm a = fst ?a"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   moreover have "get_vm b = fst ?b"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   moreover have "get_vm c = fst ?c"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   ultimately show ?thesis
     by (metis (no_types, lifting) plus_prodE)
 qed
@@ -800,7 +800,7 @@ proof -
   obtain h where "h = get_vh \<omega>"
     by simp
   then have "h = snd (Rep_virtual_state \<omega>)"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   then obtain \<pi> where "(\<pi>, h) = Rep_virtual_state \<omega>"
     using prod.collapse by blast
   then have "Rep_virtual_state (p \<odot> \<omega>) = (p \<odot> \<pi>, p \<odot> h)"
@@ -810,7 +810,7 @@ proof -
   ultimately have "Rep_virtual_state (p \<odot> \<omega>) = (p \<odot> \<pi>, h)"
     by simp
   then have "get_vh (p \<odot> \<omega>) = h"
-    by simp
+    by (simp add: get_vh_def)
   then show ?thesis
     by (simp add: \<open>h = get_vh \<omega>\<close>)
 qed
@@ -825,7 +825,7 @@ proof -
   obtain \<pi> where "\<pi> = get_vm \<phi>"
     by simp
   moreover have "get_vm (p \<odot> \<phi>) = p \<odot> \<pi>"
-    by (simp add: calculation fst_def mult_prod_def mult_virtual_state.rep_eq)
+    by (simp add: calculation get_vm_def mult_prod_def mult_virtual_state.rep_eq)
   ultimately show ?thesis
     by simp
 qed
@@ -1205,7 +1205,7 @@ proof -
   ultimately have "Rep_virtual_state |x| = ( |xm|, |xh| )"
     by (simp add: core_virtual_state.rep_eq)
   then have "get_vm |x| = |xm|"
-    by simp
+    by (simp add:get_vm_def)
   show "get_vm |x| = zero_mask"
   proof (rule ext)
     fix hl
@@ -1215,7 +1215,7 @@ proof -
       by (metis \<open>get_vm |x| = |xm|\<close> zero_mask_def)
   qed
   have "get_vh |x| = |xh|"
-    by (metis \<open>Rep_virtual_state |x| = ( |xm|, |xh| )\<close> get_vh.simps snd_conv split_beta)
+    by (metis \<open>Rep_virtual_state |x| = ( |xm|, |xh| )\<close> eq_snd_iff get_vh_def)
   moreover have "|xh| = xh"
   proof (rule ext)
     fix hl
@@ -1231,7 +1231,7 @@ proof -
     have "xh = snd (Rep_virtual_state x)"
       by (metis \<open>(xm, xh) = Rep_virtual_state x\<close> snd_conv)
     then show ?thesis
-      by (simp add: snd_def)
+      by (simp add: get_vh_def)
   qed
   ultimately show "get_vh |x| = get_vh x"
     by simp
@@ -1363,11 +1363,11 @@ proof -
       obtain \<pi>x hx where "Rep_virtual_state x = (\<pi>x, hx)"
         using wf_pre_virtual_state.cases by blast
       then have "\<pi>x = \<pi>"
-        by (simp add: calculation(2))
+        by (simp add: calculation(2) get_vm_def)
       then have "hx hl \<noteq> None"
         by (metis Rep_virtual_state \<open>Rep_virtual_state x = (\<pi>x, hx)\<close> \<open>ppos (\<pi> hl)\<close> mem_Collect_eq wf_pre_virtual_state.simps)
       moreover have "get_vh x = hx" using \<open>Rep_virtual_state x = (\<pi>x, hx)\<close>
-        by simp
+        by (simp add:get_vh_def)
       ultimately show ?thesis
         by simp
     qed
@@ -1385,13 +1385,13 @@ lemma vstate_stabilize_structure:
     and "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
 proof -
   have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   moreover have "Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x"
     by (simp add: Abs_virtual_state_inverse stabilize_wf)
   ultimately show "get_vm (stabilize_rel a x) = get_vm x"
-    by (simp add: stabilize2pre_def stabilize_rel_virtual_state_def)
+    by (simp add: get_vm_def stabilize2pre_def stabilize_rel_virtual_state_def)
   show "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)" using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x\<close>
-    by (simp add: stabilize2pre_def stabilize_rel_virtual_state_def)
+    by (simp add: get_vh_def stabilize2pre_def stabilize_rel_virtual_state_def)
 qed
 
 lemma vstate_u_structure:
@@ -1401,11 +1401,11 @@ proof -
   have "Rep_virtual_state (Abs_virtual_state uuu) = uuu" using wf_uuu
     using Abs_virtual_state_inverse uuu_def by blast
   moreover have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: fst_def)
+    by (simp add: get_vm_def)
   ultimately show "get_vm sep_algebra_class.u = zero_mask"
     by (smt (verit) fst_conv u_virtual_state_def uuu_def)
   have "\<And>\<omega>. get_vh \<omega> = snd (Rep_virtual_state \<omega>)"
-    by (simp add: snd_def)
+    by (simp add: get_vh_def)
   then show "get_vh sep_algebra_class.u = empty_heap" using \<open>Rep_virtual_state (Abs_virtual_state uuu) = uuu\<close>
     by (smt (verit) snd_conv u_virtual_state_def uuu_def)
 qed
@@ -1495,10 +1495,10 @@ next
         by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>get_vh x hl = Some v\<close> not_gr_0)
     qed
   qed
-  moreover have "\<And>a x. stabilize2pre a x = (get_vm (stabilize_rel a x), get_vh (stabilize_rel a x))"
-    using stabilize2pre_def vstate_stabilize_structure(1) vstate_stabilize_structure(2) by auto
+  moreover have "\<And> (a :: 'v virtual_state) x. stabilize2pre a x = (get_vm (stabilize_rel a x), get_vh (stabilize_rel a x))"
+    by (simp add: EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) stabilize2pre_def)
   ultimately have "stabilize2pre a x \<succeq> stabilize2pre b x" using greater_two_comp
-    by (smt (verit, ccfv_threshold) Abs_virtual_state_inverse EquiSemAuxLemma.vstate_stabilize_structure(1) get_vh.simps mem_Collect_eq prod.simps(2) stabilize2pre_def stabilize_rel_virtual_state_def stabilize_wf)
+    by fastforce
   then show "stabilize_rel a x \<succeq> stabilize_rel b x"
     by (simp add: stabilize_rel_virtual_state_def stabilize_wf wf_greater_preserve)
 next
