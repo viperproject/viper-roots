@@ -2,7 +2,7 @@ session TotalViper = ViperCommon +
   sessions
     "HOL-Eisbach"
     Boogie_Lang
-  theories [document = false]
+  theories     
     TotalViperState
     TotalStateUtil
     TotalExpressions
@@ -26,4 +26,3 @@ session TotalViper = ViperCommon +
     StmtRelML
     ViperBoogieEndToEnd
     ViperBoogieEndToEndML
-	PaperResults
