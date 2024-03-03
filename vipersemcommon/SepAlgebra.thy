@@ -965,35 +965,6 @@ lemma result_sum_partial_functions:
   apply (smt (verit) assms option.discI option.sel plus_fun_def plus_option.elims)
   by (smt (verit, ccfv_SIG) assms compatible_funE option.discI option.sel plus_fun_def plus_option.simps(3))
 
-subsection \<open>Sum\<close>
-
-instantiation sum :: (pcm, pcm) pcm
-begin
-
-fun plus_sum :: "'a + 'b \<Rightarrow> 'a + 'b \<Rightarrow> ('a + 'b) option" where
-  "plus_sum (Inl a) (Inl b) = (let r = a \<oplus> b in if r = None then None else Some (Inl (the r)))"
-| "plus_sum (Inr a) (Inr b) = (let r = a \<oplus> b in if r = None then None else Some (Inr (the r)))"
-| "plus_sum _ _ = None"
-
-instance proof
-
-  fix a b c ab bc :: "('a :: pcm) + ('b :: pcm)"
-  show "a \<oplus> b = b \<oplus> a"
-    apply (cases a)
-    apply (cases b)
-      apply (simp_all add: commutative)
-    apply (cases b)
-     apply (simp_all add: commutative)
-    done
-
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc" sorry
-
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" sorry
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a" sorry
-qed
-
-end
-
 
 section \<open>PCM with core\<close>
 
@@ -1611,46 +1582,6 @@ qed
 
 end
 
-subsection \<open>Sum\<close>
-
-instantiation sum :: (pcm_with_core, pcm_with_core) pcm_with_core
-begin
-
-fun core_sum where
-  "core_sum (Inl x) = Inl |x|"
-| "core_sum (Inr x) = Inr |x|"
-
-instance proof
-  fix x y a b c :: "'a + 'b"
-  show "Some x = x \<oplus> |x|"
-    by (smt (verit) Inr_not_Inl core_is_smaller core_sum.simps(1) core_sum.simps(2) option.discI option.sel plus_sum.elims sum.sel(1) sum.sel(2))
-  show "Some |x| = |x| \<oplus> |x|"
-  proof (cases x)
-    case (Inl a)
-    then have "Some |a| = |a| \<oplus> |a|"
-      by (simp add: core_is_pure)
-    then show ?thesis
-      using Inl option.discI by fastforce
-  next
-    case (Inr b)
-    then have "Some |b| = |b| \<oplus> |b|"
-      by (simp add: core_is_pure)
-    then show ?thesis
-      using Inr option.discI by fastforce
-  qed
-
-  show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
-    sorry
-
-  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|" sorry
-
-  show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-    sorry
-qed
-
-end
-
-
 lemma padd_pnone:
   "padd x pnone = x"
   by simp
@@ -1869,17 +1800,6 @@ end
 
 
 
-instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
-begin
-
-fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
-  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
-| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
-
-(* TODO *)
-instance sorry
-
-end
 
 instantiation agreement :: (type) pcm_mult
 begin
@@ -1938,11 +1858,6 @@ begin
 definition stable :: "'a \<Rightarrow> bool" where
   "stable = stable_rel u"
 
-(*
-lemma stabilize_rel:
-  assumes "Some x = a \<oplus> b"
-  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def sorry
-*)
 
 definition stabilize :: "'a \<Rightarrow> 'a" where
   "stabilize = stabilize_rel u"
@@ -2000,51 +1915,12 @@ lemma stable_sum:
     shows "stable x"
   by (metis already_stable assms(1) assms(2) assms(3) option.sel stabilize_is_stable stabilize_sum)
 
-(* Should hold in practice, maybe more axioms? *)
-(*
-lemma stability_cancellative:
-  assumes "stable a"
-      and "stable b"
-      and "Some x = a \<oplus> r"
-      and "Some x = b \<oplus> r"
-    shows "a = b"
-proof (rule cancellative)
-  show "Some x = r \<oplus> a"
-    by (simp add: assms(3) local.commutative)
-  show "Some x = r \<oplus> b"
-    by (simp add: assms(4) local.commutative)
-  show "|a| = |b|"
-    sorry
-
-(*      and cancellative: "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-*)
-qed
-*)
-
-
 lemma stabilize_rel_invo:
   "stabilize_rel x (stabilize_rel x a) = stabilize_rel x a"
   using local.already_stable_rel local.stabilize_rel_is_stable_rel by blast
 
 definition pure_larger where
   "pure_larger a b \<longleftrightarrow> (\<exists>r. pure r \<and> Some a = b \<oplus> r)"
-
-lemma pure_larger_trans:
-  assumes "pure_larger a b"
-      and "pure_larger b c"
-    shows "pure_larger a c"
-  sorry
-
-lemma pure_larger_stabilize_same:
-  assumes "pure_larger a b"
-  shows "stabilize a = stabilize b"
-  sorry
-
-lemma pure_larger_sum:
-  assumes "Some x = a \<oplus> b"
-      and "pure_larger x' x"
-    shows "\<exists>a'. pure_larger a' a \<and> Some x' = a' \<oplus> b"
-  sorry
 
 lemma pure_larger_stabilize:
   "pure_larger x (stabilize_rel y x)"
@@ -2075,97 +1951,13 @@ lemma neutral_smallest:
   "\<omega> \<succeq> u"
   using greater_equiv u_neutral by blast
 
-lemma pure_larger_stabilize_rel:
-  assumes "\<omega>' \<succeq> \<omega>"
-  shows "pure_larger (stabilize_rel \<omega>' x) (stabilize_rel \<omega> x)"
-proof -
-  have "stabilize_rel \<omega>' x \<succeq> stabilize_rel \<omega> x"
-    by (simp add: assms local.stabilize_rel_mono_left)
-  moreover have "Some x = stabilize_rel \<omega>' x \<oplus> |x|"
-    by (simp add: local.stabilize_rel_sum_pure)
-  moreover have "Some x = stabilize_rel \<omega> x \<oplus> |x|"
-    by (simp add: local.stabilize_rel_sum_pure)
-  ultimately have "Some (stabilize_rel \<omega>' x) = stabilize_rel \<omega> x \<oplus> |stabilize_rel \<omega>' x|"
-    sorry
-  show ?thesis sorry
-qed
-
 lemma obtain_pure_remainder:
   assumes "a \<succeq> b"
   shows "\<exists>r. Some a = r \<oplus> b \<and> |r| = |a|"
   using assms local.commutative local.minus_core local.minus_equiv_def by auto
-(*
-(* TODO EXPLORE more *)
-definition is_minimum_sat where
-  "is_minimum_sat P \<omega> \<longleftrightarrow> P \<omega> \<and> (\<forall>\<omega>' x. \<omega>' \<succeq> \<omega> \<and> \<omega>' \<succeq> x \<and> P x \<longrightarrow> x \<succeq> \<omega>)"
-
-lemma is_minimum_satI:
-  assumes "A \<omega>"
-      and "\<And>x. \<omega>' \<succeq> x \<and> A x \<Longrightarrow> x \<succeq> \<omega>"
-    shows "is_minimum_sat A \<omega>' \<omega>"
-  using assms(1) assms(2) is_minimum_sat_def by blast
-
-lemma is_minimum_satE:
-  assumes "is_minimum_sat A \<omega>' \<omega>"
-      and "A x"
-      and "\<omega>' \<succeq> x"
-    shows "x \<succeq> \<omega>"
-  by (metis assms is_minimum_sat_def)
-*)
 
 end
 
-
-
-section \<open>Instantiations\<close>
-
-
-subsection \<open>Agreement\<close>
-
-instantiation "agreement" :: (type) sep_algebra
-begin
-
-definition stable_rel_agreement :: "'a agreement \<Rightarrow> 'a agreement \<Rightarrow> bool" where
-  "stable_rel_agreement x y \<longleftrightarrow> True"
-
-definition stabilize_rel_agreement :: "'a agreement \<Rightarrow> 'a agreement \<Rightarrow> 'a agreement" where
-  "stabilize_rel_agreement _ x = x"
-
-instance sorry
-(*
-  fix a b x y :: "'a agreement"
-
-  show "sep_algebra_class.stable (stabilize x)"
-    by (simp add: stable_agreement_def)
-
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    by (simp add: stabilize_agreement_def)
-
-  show "x \<succeq> stabilize_rel a x \<and> stabilize_rel a x \<succeq> stabilize x"
-    by (simp add: stabilize_agreement_def stabilize_rel_agreement_def succ_refl)
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
-    using stabilize_agreement_def stabilize_rel_agreement_def by presburger
-  show "stable_rel a (stabilize_rel a x)"
-    by (simp add: stable_rel_agreement_def)
-  show "Some x = stabilize x \<oplus> |x|"
-    by (simp add: core_is_smaller stabilize_agreement_def)
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    by (simp add: stabilize_agreement_def)
-  show "stable_rel a x \<Longrightarrow> stabilize_rel a x = x"
-    by (simp add: stabilize_rel_agreement_def)
-  show "x \<succeq> a \<Longrightarrow> stabilize_rel b x \<succeq> stabilize_rel b a"
-    by (simp add: stabilize_rel_agreement_def)
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    sorry
-qed
-*)
-
-
-end
-
-lemma stabilize_ag:
-  "stabilize (Ag x) = Ag x"
-  by (simp add: stabilize_def stabilize_rel_agreement_def)
 
 
 subsection \<open>Product\<close>
@@ -2184,33 +1976,7 @@ definition u_prod :: "'a \<times> 'b" where
   "u_prod = (u, u)"
 
 instance
-(*
-  fix x y a b :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
 
-  show "sep_algebra_class.stable (stabilize x)"
-    by (simp add: SepAlgebra.stable_prod_def stabilize_is_stable stabilize_prod_def)
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    by (simp add: SepAlgebra.stabilize_prod_def SepAlgebra.stable_prod_def already_stable)
-  show "stable_rel a x \<Longrightarrow> stabilize_rel a x = x"
-    by (simp add: SepAlgebra.stabilize_rel_prod_def already_stable_rel stable_rel_prod_def)
-  show "x \<succeq> a \<Longrightarrow> stabilize_rel b x \<succeq> stabilize_rel b a"
-    by (simp add: greater_prod_eq stabilize_rel_mono stabilize_rel_prod_def)
-  show "x \<succeq> stabilize_rel a x \<and> stabilize_rel a x \<succeq> stabilize x"
-    by (simp add: greater_prod_eq stabilize_order stabilize_prod_def stabilize_rel_prod_def)
-  show "stable_rel a (stabilize_rel a x)"
-    by (simp add: SepAlgebra.stable_rel_prod_def stabilize_rel_is_stable_rel stabilize_rel_prod_def)
-
-  show "Some x = stabilize x \<oplus> |x|"
-    sorry
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
-    sorry
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    sorry
-
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    sorry
-qed
-*)
 proof
   fix x a :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
   show "Some x = stabilize_rel a x \<oplus> |x|"
@@ -2291,13 +2057,6 @@ next
   then show "stabilize_rel a x \<succeq> stabilize_rel b x"
     by (simp add: greaterE greaterI stabilize_rel_fun stabilize_rel_mono_left)
 qed
-
-end
-
-instantiation "option" :: (sep_algebra) sep_algebra
-begin
-
-instance sorry
 
 end
 
