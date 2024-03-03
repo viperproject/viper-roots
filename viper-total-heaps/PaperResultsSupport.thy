@@ -25,31 +25,108 @@ definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_de
               )
             )"
 
+fun exp_in_paper_subset_no_rec :: "pure_exp \<Rightarrow> bool"
+  where 
+  "exp_in_paper_subset_no_rec (pure_exp.Var x) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.ELit lit) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.Unop uop e) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.Binop e1 bop e2) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.CondExp cond e1 e2) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.FieldAcc e f) \<longleftrightarrow> True"
+| "exp_in_paper_subset_no_rec (pure_exp.Old lbl e) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.Perm e f) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.PermPred pname es) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.FunApp f es) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec pure_exp.Result \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.Unfolding pname es e) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.Let e e_body) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.PExists ty e) \<longleftrightarrow> False"
+| "exp_in_paper_subset_no_rec (pure_exp.PForall ty e) \<longleftrightarrow> False"
+
+abbreviation exp_in_paper_subset
+  where "exp_in_paper_subset \<equiv> pure_exp_pred exp_in_paper_subset_no_rec"
+
+fun atomic_assert_in_paper_subset :: "pure_exp atomic_assert \<Rightarrow> bool"
+  where
+    "atomic_assert_in_paper_subset (Pure e) = True"
+  | "atomic_assert_in_paper_subset (Acc e f (PureExp p)) = True"
+  | "atomic_assert_in_paper_subset (Acc e f Wildcard) = False"
+  | "atomic_assert_in_paper_subset (AccPredicate pred es q) = False"
+
+fun assert_in_paper_subset_no_rec :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
+  where
+  "assert_in_paper_subset_no_rec (assert.Atomic A_atm) \<longleftrightarrow> True"
+| "assert_in_paper_subset_no_rec (assert.Imp e A) \<longleftrightarrow> True"
+| "assert_in_paper_subset_no_rec (assert.CondAssert e A B) \<longleftrightarrow> True"
+| "assert_in_paper_subset_no_rec (A && B) \<longleftrightarrow> True"
+| "assert_in_paper_subset_no_rec (assert.ImpureAnd A B) \<longleftrightarrow> False"
+| "assert_in_paper_subset_no_rec (assert.ImpureOr A B) \<longleftrightarrow> False"
+| "assert_in_paper_subset_no_rec (assert.ForAll _ A) \<longleftrightarrow> False"
+| "assert_in_paper_subset_no_rec (assert.Exists _ A) \<longleftrightarrow> False"
+| "assert_in_paper_subset_no_rec (assert.Wand A B) \<longleftrightarrow> False"
+
+abbreviation assertion_in_paper_subset :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
+  where 
+    "assertion_in_paper_subset \<equiv> assert_pred assert_in_paper_subset_no_rec atomic_assert_in_paper_subset exp_in_paper_subset_no_rec "
+
+fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
+  where
+  "stmt_in_paper_subset_no_rec (Inhale A) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (Exhale A) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (ViperLang.Assert A) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (ViperLang.Assume A) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (LocalAssign x e) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (FieldAssign e1 f e2) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (ViperLang.Havoc x) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (If e s1 s2) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (Seq s1 s2) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (MethodCall ys m es) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (While e A s) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (Unfold pred es p) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (Fold pred es p) \<longleftrightarrow> False" 
+| "stmt_in_paper_subset_no_rec (Package A B) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (Apply A B) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (Label lbl) \<longleftrightarrow> False"
+| "stmt_in_paper_subset_no_rec (Scope vty s) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec Skip \<longleftrightarrow> True"
+
+abbreviation stmt_in_paper_subset
+  where "stmt_in_paper_subset \<equiv> stmt_pred_rec stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
+
+
 abbreviation states_differ_only_on_trace :: "'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
   where "states_differ_only_on_trace \<omega>1 \<omega>2 \<equiv> get_store_total \<omega>1 = get_store_total \<omega>2 \<and> 
                                               get_total_full \<omega>1 = get_total_full \<omega>2"
 
+thm th_result_rel.cases
+
+lemma states_differ_trace_update_trace_eq:
+  assumes "states_differ_only_on_trace \<omega>1 \<omega>2"
+  shows "update_trace_total \<omega>2 (get_trace_total \<omega>1) =  \<omega>1"
+  using assms
+  sorry
+
+ 
 lemma exp_eval_inh_no_old_exp_trace_indep:
   shows "ctxt, R, \<omega>_def1 \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow> 
-        no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<and> no_old_pure_exp e \<Longrightarrow>
+        exp_in_paper_subset e \<Longrightarrow>
         states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow> 
         \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow> 
         (\<omega>_def2 \<noteq> None \<and> \<omega>_def1 \<noteq> None \<Longrightarrow> states_differ_only_on_trace (the \<omega>_def1) (the \<omega>_def2)) \<Longrightarrow>        
          ctxt, R, \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE" and
         "red_pure_exps_total ctxt R \<omega>_def1 es \<omega>1 resES \<Longrightarrow> 
-         list_all (\<lambda>e. no_perm_pure_exp e \<and> no_unfolding_pure_exp e \<and> no_old_pure_exp e) es \<Longrightarrow>
+         list_all (\<lambda>e. exp_in_paper_subset e) es \<Longrightarrow>
         states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow> 
         \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow> 
         (\<omega>_def2 \<noteq> None \<and> \<omega>_def1 \<noteq> None \<Longrightarrow> states_differ_only_on_trace (the \<omega>_def1) (the \<omega>_def2)) \<Longrightarrow>
         red_pure_exps_total ctxt R \<omega>_def2 es \<omega>2 resES" and
         "red_inhale ctxt R A \<omega>1 res1 \<Longrightarrow> 
-              no_perm_assertion A \<and> no_unfolding_assertion A  \<and> no_old_assertion A \<Longrightarrow>
-              states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow>  res1 \<noteq> RMagic \<Longrightarrow> 
+              assertion_in_paper_subset A \<Longrightarrow>
+              states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow>
               (res1 = RFailure \<longrightarrow> red_inhale ctxt R A \<omega>2 RFailure) \<and>
               (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
-                    (red_inhale ctxt R A \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
-              )
-        )" and
+                     red_inhale ctxt R A \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
+              )" and
         "unfold_rel ctxt R x12 x13 x14 x15 x16 \<Longrightarrow> True"
 proof (induction arbitrary: \<omega>2 \<omega>_def2 and \<omega>2 \<omega>_def2 and \<omega>2 rule: red_exp_inhale_unfold_inducts)
   case (RedLit \<omega>_def l uu)
@@ -171,8 +248,8 @@ next
 next
   case (RedSubFailure e' \<omega>_def \<omega>)
   hence "red_pure_exps_total ctxt R \<omega>_def2 (sub_pure_exp_total e') \<omega>2 None"
-    using Ball_set_list_all pure_exp_pred_subexp
-    by (metis (mono_tags, lifting))
+    using pure_exp_pred_subexp
+    by presburger
   thus ?case 
     using RedSubFailure
     by (auto intro!: TotalExpressions.RedSubFailure)
@@ -193,22 +270,75 @@ next
     by metis
 next
   case (InhAcc \<omega> e_r r e_p p W' f res)  
-  hence "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+  hence RcvRed: "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
     by auto
-  moreover from InhAcc have "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_p;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+  moreover from InhAcc have PermRed: "ctxt, R, Some \<omega>2 \<turnstile> \<langle>e_p;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
     by auto
-  ultimately show ?case
-    using InhAcc
-    sorry  
+
+  from \<open>th_result_rel _ _ _ _\<close>
+  show ?case
+  proof (cases rule: th_result_rel.cases)
+    case (THResultNormal \<omega>')
+    show ?thesis
+    proof (cases "r = Null")
+      case True
+      hence "res = RNormal \<omega>"
+        using THResultNormal \<open>W' = _\<close>
+        by simp
+      have RedInh2: "red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal \<omega>2)"
+        apply (rule TotalExpressions.InhAcc[OF RcvRed PermRed])
+        using \<open>r = Null\<close> THResultNormal
+        by (auto intro: THResultNormal_alt)
+      show ?thesis
+        apply (simp add: \<open>res = RNormal \<omega>\<close>)
+        using RedInh2 \<open>states_differ_only_on_trace \<omega> \<omega>2\<close> states_differ_trace_update_trace_eq             
+        by (metis update_trace_total.elims)
+    next
+      case False
+      hence "\<omega>' = update_mh_loc_total_full \<omega> (the_address r, f) (padd (get_mh_total_full \<omega> (the_address r, f)) (Abs_preal p))"
+        using THResultNormal inhale_perm_single_nonempty \<open>W' = _\<close>
+        by fastforce
+
+      let ?W2' = "(if r = Null then {\<omega>2} else inhale_perm_single R \<omega>2 (the_address r,f) (Some (Abs_preal p)))"
+  
+      have "?W2' \<noteq> {}"
+        using THResultNormal \<open>W' = _\<close>
+        unfolding inhale_perm_single_def
+        sorry
+
+      let ?\<omega>2' = "update_mh_loc_total_full \<omega>2 (the_address r, f) (padd (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_preal p))"
+
+      have "red_inhale ctxt R (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal ?\<omega>2')"
+        apply (rule TotalExpressions.InhAcc[where ?W' = ?W2',OF RcvRed PermRed])
+         apply (rule HOL.refl)
+        apply (rule THResultNormal_alt)
+        using inhale_perm_single_nonempty \<open>?W2' \<noteq> {}\<close> \<open>r \<noteq> Null\<close>
+          apply fastforce
+        using THResultNormal \<open>?W2' \<noteq> {}\<close>
+        by auto
+
+      thus ?thesis
+        using \<open>\<omega>' = _\<close> \<open>res = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+        sorry
+      qed
+  next
+    case THResultMagic
+    then show ?thesis by simp
+  next
+    case THResultFailure
+    then show ?thesis 
+      using RcvRed PermRed TotalExpressions.InhAcc th_result_rel.THResultFailure 
+      by fastforce
+  qed
 next
   case (InhAccPred \<omega> e_args v_args e_p p W' pred_id res)
-  then show ?case sorry
+  then show ?case by simp
 next
   case (InhAccWildcard \<omega> e_r r W' f res)
-  then show ?case sorry
+  then show ?case by simp
 next
   case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
-  then show ?case sorry
+  then show ?case by simp
 next
   case (InhPure \<omega> e b)
   then show ?case sorry

@@ -262,7 +262,7 @@ lemmas EXH_SIM_rcInvSim = exhale_stmt_rel \<comment>\<open>the rule for EXH-SIM 
  
 subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
 
-text \<open>As also mentioned above in section 3.3., the notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
+text \<open>As also mentioned above in section 3.3., the notation \<open>rcSimInv\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
       in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
 
       The rule RSEP-SIM is given by: \<^theory>\<open>TotalViper.ViperBoogieEndToEnd\<close> 
