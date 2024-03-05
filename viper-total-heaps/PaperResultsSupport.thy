@@ -409,13 +409,60 @@ next
     by (metis InhImpFalse.prems(2) states_differ_trace_update_trace_eq stmt_result_total.distinct(5) stmt_result_total.inject)
 next
   case (InhCondAssertTrue \<omega> e A res B)
-  then show ?case sorry
+  hence RedCond: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    by simp
+
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_inhale ctxt (\<lambda>_. True) A \<omega>2 RFailure"
+      using InhCondAssertTrue
+      by auto    
+    then show ?thesis 
+      using RedCond RFailure
+      by (auto intro: TotalExpressions.InhCondAssertTrue)
+  next
+    case (RNormal \<omega>1')
+    hence "red_inhale ctxt (\<lambda>_. True) A \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))"
+      using InhCondAssertTrue
+      by auto
+    then show ?thesis 
+      using RedCond RNormal
+      by (auto intro: TotalExpressions.InhCondAssertTrue)
+  qed simp
 next
   case (InhCondAssertFalse \<omega> e B res A)
-  then show ?case sorry
+  hence RedCond: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    by simp
+
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_inhale ctxt (\<lambda>_. True) B \<omega>2 RFailure"
+      using InhCondAssertFalse
+      by auto    
+    then show ?thesis 
+      using RedCond RFailure
+      by (auto intro: TotalExpressions.InhCondAssertFalse)
+  next
+    case (RNormal \<omega>1')
+    hence "red_inhale ctxt (\<lambda>_. True) B \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))"
+      using InhCondAssertFalse
+      by auto
+    then show ?thesis 
+      using RedCond RNormal
+      by (auto intro: TotalExpressions.InhCondAssertFalse)
+  qed simp
 next
   case (InhSubExpFailure A \<omega>)
-  then show ?case sorry
+  hence "list_all exp_in_paper_subset (direct_sub_expressions_assertion A)"
+    using assert_pred_subexp by presburger
+  hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (direct_sub_expressions_assertion A) \<omega>2 None"
+    using InhSubExpFailure
+    by fastforce
+  thus ?case
+    using InhSubExpFailure 
+    by (auto intro!: TotalExpressions.InhSubExpFailure)
 next
   case (UnfoldRelStep pred_id pred_decl pred_body m \<phi> vs q m' \<omega> \<omega>')
   then show ?case by simp
@@ -1014,7 +1061,7 @@ next
     by (auto intro: TotalSemantics.RedSubExpressionFailure)
 qed
 
-lemma correctness_stronger:
+lemma method_correctness_stronger_than_paper:
   assumes "vpr_method_correct_total ctxt (\<lambda>_.True) m"
       and "method_decl.body m = Some mbody"
       and MethodInPaperSubset: "assertion_in_paper_subset (method_decl.pre m) \<and>
