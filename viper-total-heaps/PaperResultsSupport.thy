@@ -91,7 +91,7 @@ fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
 | "stmt_in_paper_subset_no_rec Skip \<longleftrightarrow> True"
 
 abbreviation stmt_in_paper_subset
-  where "stmt_in_paper_subset \<equiv> stmt_pred_rec stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
+  where "stmt_in_paper_subset \<equiv> stmt_pred stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
 
 
 abbreviation states_differ_only_on_trace :: "'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
@@ -421,19 +421,128 @@ next
   then show ?case by simp
 qed
 
+lemma red_exh_trace_indep:
+  assumes "red_exhale ctxt (\<lambda>_. True) \<omega>def1 A \<omega>1 res1"
+      and "assertion_in_paper_subset A"
+      and "states_differ_only_on_trace \<omega>1 \<omega>2"
+      and "states_differ_only_on_trace \<omega>def1 \<omega>def2"
+    shows "(res1 = RFailure \<longrightarrow> red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 RFailure) \<and>
+           (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
+                     red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
+           )"
+  sorry
+
+
+definition all_methods_in_paper_subset
+  where "all_methods_in_paper_subset ctxt \<equiv>
+             (\<forall>mname m. methods (program_total ctxt) mname = Some m \<longrightarrow>
+                      assertion_in_paper_subset (method_decl.pre m) \<and>
+                      assertion_in_paper_subset (method_decl.post m))"
+
+lemma red_stmt_trace_indep:
+  assumes "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> stmt \<omega>1 res1"
+      and "stmt_in_paper_subset stmt"
+      and MethodSpecsInSubset:"all_methods_in_paper_subset ctxt"
+      and "states_differ_only_on_trace \<omega>1 \<omega>2"
+    shows "(res1 = RFailure \<longrightarrow> red_stmt_total ctxt  (\<lambda>_. True) \<Lambda> stmt \<omega>2 RFailure) \<and>
+           (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
+                     red_stmt_total ctxt  (\<lambda>_. True) \<Lambda> stmt \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
+           )"
+  using assms
+proof induction
+  case (RedSkip \<Lambda> \<omega>)
+  then show ?case 
+    using TotalSemantics.RedSkip
+    by (metis states_differ_trace_update_trace_eq stmt_result_total.distinct(5) stmt_result_total.inject)
+next
+  case (RedInhale A \<omega> res \<Lambda>)
+  then show ?case sorry
+next
+  case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
+  then show ?case sorry
+next
+  case (RedExhaleFailure \<omega> A \<Lambda>)
+  then show ?case sorry
+next
+  case (RedAssert \<omega> A \<omega>_exh \<Lambda>)
+  then show ?case sorry
+next
+  case (RedAssertFailure \<omega> A \<Lambda>)
+  then show ?case sorry
+next
+  case (RedHavoc \<Lambda> x ty v \<omega>)
+  then show ?case by simp
+next
+  case (RedLocalAssign \<omega> e v \<Lambda> x ty)
+  then show ?case sorry
+next
+  case (RedFieldAssign \<omega> e_r addr f e v ty \<Lambda>)
+  then show ?case sorry
+next
+  case (RedFieldAssignFailure \<omega> e_r r e v f \<Lambda>)
+  then show ?case sorry
+next
+  case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
+  then show ?case sorry
+next
+  case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
+  then show ?case by simp
+next
+  case (RedUnfold \<omega> e_args v_args e_p v_p W' pred_id res \<Lambda>)
+  then show ?case by simp
+next
+  case (RedUnfoldWildcard \<omega> e_args v_args pred_id p \<phi>' \<omega>' \<Lambda>)
+  then show ?case by simp
+next
+  case (RedUnfoldWildcardFailure \<omega> e_args v_args pred_id \<Lambda>)
+  then show ?case by simp
+next
+  case (RedFold \<omega> e_args v_args e_p v_p pred_id res \<Lambda>)
+  then show ?case by simp
+next
+  case (RedFoldWildcard \<omega> e_args v_args pred_id p res \<Lambda>)
+  then show ?case by simp
+next
+  case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
+  then show ?case sorry
+next
+  case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
+  then show ?case sorry
+next
+  case (RedIfFalse \<omega> e_b \<Lambda> s_els res s_thn)
+  then show ?case sorry
+next
+  case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
+  then show ?case sorry
+next
+  case (RedSeqFailureOrMagic \<Lambda> s1 \<omega> res s2)
+  then show ?case sorry
+next
+  case (RedSubExpressionFailure s \<omega> \<Lambda>)
+  then show ?case sorry
+qed
+
 lemma correctness_stronger:
   assumes "vpr_method_correct_total ctxt (\<lambda>_.True) m"
       and "method_decl.body m = Some mbody"
+      and MethodInPaperSubset: "assertion_in_paper_subset (method_decl.pre m) \<and>
+                                assertion_in_paper_subset (method_decl.post m) \<and>
+                                stmt_in_paper_subset mbody"
+      and AllMethodSpecsInPaperSubset: "all_methods_in_paper_subset ctxt"
     shows "vpr_method_correct_paper ctxt m"
   unfolding vpr_method_correct_paper_def
 proof (rule allI | rule impI)+
-  fix \<sigma>\<^sub>v r\<^sub>v mbody
+  fix \<sigma>\<^sub>v r\<^sub>v mbody'
   assume StoreWt: "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args m @ rets m)) (get_store_total \<sigma>\<^sub>v)"
      and HeapWt: "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<sigma>\<^sub>v)"
      and EmptyInit: "is_empty_total_full \<sigma>\<^sub>v"
-     and SomeBody: "method_decl.body m = Some mbody"
+     and SomeBody: "method_decl.body m = Some mbody'"
      and RedStmt: "red_stmt_total ctxt (\<lambda>_. True) (nth_option (method_decl.args m @ rets m))
-          (Seq (Inhale (method_decl.pre m)) (Seq mbody (Exhale (method_decl.post m)))) \<sigma>\<^sub>v r\<^sub>v"
+          (Seq (Inhale (method_decl.pre m)) (Seq mbody' (Exhale (method_decl.post m)))) \<sigma>\<^sub>v r\<^sub>v"
+
+  hence "mbody' = mbody"
+    using \<open>method_decl.body m = Some mbody\<close>
+    by simp
 
   let ?\<Lambda> = "(nth_option (method_decl.args m @ rets m))"
 
@@ -447,24 +556,34 @@ proof (rule allI | rule impI)+
       by (auto elim: RedInhale_case)
 
     with Aux StoreWt HeapWt EmptyInit
-    have "(\<forall>mbody. method_decl.body m = Some mbody \<longrightarrow> vpr_method_body_correct ctxt (\<lambda>_. True) m \<sigma>1)"
+    have BodyCorrect: "(\<forall>mbody. method_decl.body m = Some mbody \<longrightarrow> vpr_method_body_correct ctxt (\<lambda>_. True) m \<sigma>1)"
       by blast
-    hence AuxBody: "\<forall>r. red_stmt_total ctxt (\<lambda>_.True) ?\<Lambda>
+    let ?\<sigma>1' = "update_trace_total \<sigma>1 (Map.empty(old_label \<mapsto> get_total_full \<sigma>1))"
+    from BodyCorrect have AuxBody: "\<forall>r. red_stmt_total ctxt (\<lambda>_.True) ?\<Lambda>
                                 (Seq mbody (Exhale (method_decl.post m)))
-                                (update_trace_total \<sigma>1 (Map.empty(old_label \<mapsto> get_total_full \<sigma>1))) 
+                                ?\<sigma>1' 
                                 r \<longrightarrow> r \<noteq> RFailure"
-      using SomeBody
+      using SomeBody \<open>method_decl.body m = Some mbody\<close>
       unfolding vpr_method_body_correct_def 
       by auto
+
+    have DifferOnlyOnTrace: "states_differ_only_on_trace \<sigma>1 ?\<sigma>1'"
+      by simp
+
+    have *: "stmt_in_paper_subset (Seq mbody (Exhale (method_decl.post m)))"
+      using MethodInPaperSubset
+      unfolding all_methods_in_paper_subset_def
+      by simp
 
     show "r\<^sub>v \<noteq> RFailure"
     proof 
       assume "r\<^sub>v = RFailure"
-      with RedSeq(2) have "red_stmt_total ctxt (\<lambda>_.True) ?\<Lambda>
+      hence "red_stmt_total ctxt (\<lambda>_.True) ?\<Lambda>
                                 (Seq mbody (Exhale (method_decl.post m)))
-                                (update_trace_total \<sigma>1 (Map.empty(old_label \<mapsto> get_total_full \<sigma>1))) 
-                                RFailure"
-        sorry
+                                ?\<sigma>1' 
+                                RFailure"        
+        using red_stmt_trace_indep[OF RedSeq(2)[simplified \<open>mbody' = mbody\<close>] * AllMethodSpecsInPaperSubset DifferOnlyOnTrace]  
+        by blast
       thus False
         using AuxBody
         by blast
