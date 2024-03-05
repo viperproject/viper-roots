@@ -464,14 +464,16 @@ qed
 lemma red_stmt_trace_indep:
   assumes "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> stmt \<omega>1 res1"
       and "stmt_in_paper_subset stmt"
-      and MethodSpecsInSubset:"all_methods_in_paper_subset ctxt"
+      \<comment>\<open>Note we do not need the method pre- and postconditions in \<^term>\<open>program.methods (program_total ctxt)\<close>
+         to be restricted, because during method calls the old state is given by the current state before 
+         the call, which is the same in in both states\<close>
       and "states_differ_only_on_trace \<omega>1 \<omega>2"
     shows "(res1 = RFailure \<longrightarrow> red_stmt_total ctxt  (\<lambda>_. True) \<Lambda> stmt \<omega>2 RFailure) \<and>
            (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
                      red_stmt_total ctxt  (\<lambda>_. True) \<Lambda> stmt \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
            )"
   using assms
-proof induction
+proof (induction arbitrary: \<omega>2)
   case (RedSkip \<Lambda> \<omega>)
   then show ?case 
     using TotalSemantics.RedSkip
@@ -609,11 +611,11 @@ next
       by blast                 
   next
     case (RNormal \<omega>Pre)
-    let ?res = "map_stmt_result_total (reset_state_after_call ys v_rets \<omega>2) resPost"
+    let ?res2 = "map_stmt_result_total (reset_state_after_call ys v_rets \<omega>2) resPost"
     have RedInhPost: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Inhale (method_decl.post mdecl)) (state_during_inhale_post_call \<omega>2 \<omega>Pre v_args v_rets) resPost"
       using RNormal RedMethodCall
       by simp
-    have RedCall: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (MethodCall ys m es) \<omega>2 ?res"
+    have RedCall: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (MethodCall ys m es) \<omega>2 ?res2"
       apply (rule TotalSemantics.RedMethodCall[OF RedArgs])
       using RedMethodCall RNormal 
             apply (solves \<open>simp\<close>)+
@@ -632,14 +634,20 @@ next
         using RedCall[simplified reset_state_after_call_def] RedMethodCall RNormal
         by auto
     next
-      case (RNormal x3)
-      then show ?thesis sorry
+      case (RNormal \<omega>Post)
+      hence "res = RNormal (reset_state_after_call ys v_rets \<omega> \<omega>Post)"
+        using RedMethodCall \<open>resPre = RNormal \<omega>Pre\<close>
+        by auto
+      moreover have "?res2 = RNormal (reset_state_after_call ys v_rets \<omega> \<omega>Post\<lparr>get_trace_total := get_trace_total \<omega>2\<rparr>)"
+        apply (simp add: \<open>resPost = _\<close> reset_state_after_call_def)
+        using \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+        by simp
+
+      ultimately show ?thesis
+        using RedCall
+        by auto
     qed
   qed
-
-  thm TotalSemantics.RedMethodCall
-
-  then show ?case sorry
 next
   case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
   then show ?case by simp
@@ -660,7 +668,41 @@ next
   then show ?case by simp
 next
   case (RedScope v \<tau> \<Lambda> scopeBody \<omega> res res_unshift)
-  then show ?case sorry
+  show ?case 
+  proof (cases res)
+    case RMagic
+    then show ?thesis 
+      using RedScope
+      by simp
+  next
+    case RFailure
+    hence "red_stmt_total ctxt (\<lambda>_. True) (shift_and_add \<Lambda> \<tau>) scopeBody (shift_and_add_state_total \<omega>2 v) RFailure"
+      using RedScope  
+      by simp      
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Scope \<tau> scopeBody) \<omega>2 RFailure"
+      using TotalSemantics.RedScope RedScope
+      by (metis map_stmt_result_total.simps(3))
+    thus ?thesis
+      using RFailure RedScope
+      by simp
+  next
+    case (RNormal \<omega>Body)
+    let ?\<omega>Body2 = "(update_trace_total \<omega>Body (get_trace_total (shift_and_add_state_total \<omega>2 v)))"
+    have "red_stmt_total ctxt (\<lambda>_. True) (shift_and_add \<Lambda> \<tau>) scopeBody (shift_and_add_state_total \<omega>2 v) (RNormal ?\<omega>Body2)"
+      using RNormal RedScope.IH[where ?\<omega>2.0="(shift_and_add_state_total \<omega>2 v)"] RedScope
+      by auto
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Scope \<tau> scopeBody) \<omega>2 (RNormal (unshift_state_total 1 ?\<omega>Body2))"
+      using TotalSemantics.RedScope RedScope
+      by (metis map_stmt_result_total.simps(1))
+    moreover have "res_unshift = RNormal (unshift_state_total 1 \<omega>Body)"
+      using RNormal RedScope
+      by simp
+    moreover have "update_trace_total (unshift_state_total 1 \<omega>Body) (get_trace_total \<omega>2) = (unshift_state_total 1 ?\<omega>Body2)"
+      apply (rule full_total_state.equality)
+      by auto
+    ultimately show ?thesis     
+      by (metis stmt_result_total.distinct(5) stmt_result_total.inject)
+  qed
 next
   case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
   then show ?case sorry
@@ -684,7 +726,6 @@ lemma correctness_stronger:
       and MethodInPaperSubset: "assertion_in_paper_subset (method_decl.pre m) \<and>
                                 assertion_in_paper_subset (method_decl.post m) \<and>
                                 stmt_in_paper_subset mbody"
-      and AllMethodSpecsInPaperSubset: "all_methods_in_paper_subset ctxt"
     shows "vpr_method_correct_paper ctxt m"
   unfolding vpr_method_correct_paper_def
 proof (rule allI | rule impI)+
@@ -726,7 +767,7 @@ proof (rule allI | rule impI)+
     have DifferOnlyOnTrace: "states_differ_only_on_trace \<sigma>1 ?\<sigma>1'"
       by simp
 
-    have *: "stmt_in_paper_subset (Seq mbody (Exhale (method_decl.post m)))"
+    have BodyExhalePostInSubset: "stmt_in_paper_subset (Seq mbody (Exhale (method_decl.post m)))"
       using MethodInPaperSubset
       unfolding all_methods_in_paper_subset_def
       by simp
@@ -738,7 +779,7 @@ proof (rule allI | rule impI)+
                                 (Seq mbody (Exhale (method_decl.post m)))
                                 ?\<sigma>1' 
                                 RFailure"        
-        using red_stmt_trace_indep[OF RedSeq(2)[simplified \<open>mbody' = mbody\<close>] * AllMethodSpecsInPaperSubset DifferOnlyOnTrace]  
+        using red_stmt_trace_indep[OF RedSeq(2)[simplified \<open>mbody' = mbody\<close>] BodyExhalePostInSubset DifferOnlyOnTrace]  
         by blast
       thus False
         using AuxBody
