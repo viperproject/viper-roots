@@ -461,6 +461,13 @@ proof -
     by blast
 qed
 
+lemma stmt_in_paper_subset_sub_expressions:
+  assumes "stmt_in_paper_subset s"
+  shows "list_all exp_in_paper_subset (sub_expressions s)"
+  using assms
+  apply (induction s)
+  by simp_all
+
 lemma red_stmt_trace_indep:
   assumes "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> stmt \<omega>1 res1"
       and "stmt_in_paper_subset stmt"
@@ -705,19 +712,115 @@ next
   qed
 next
   case (RedIfTrue \<omega> e_b \<Lambda> s_thn res s_els)
-  then show ?case sorry
+  hence RedCond2: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e_b;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF RedIfTrue(1)]
+    by simp
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s_thn \<omega>2 RFailure"
+      using RedIfTrue
+      by auto
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.If e_b s_thn s_els) \<omega>2 RFailure"
+      using RedCond2 TotalSemantics.RedIfTrue
+      by metis
+    thus ?thesis 
+      using RFailure
+      by blast
+  next
+    case (RNormal \<omega>')
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s_thn \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using RedIfTrue
+      by auto
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.If e_b s_thn s_els) \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using RedCond2 TotalSemantics.RedIfTrue
+      by metis
+    thus ?thesis
+      using RNormal RedCond2 TotalSemantics.RedIfTrue RedIfTrue
+      by blast
+  qed simp
 next
   case (RedIfFalse \<omega> e_b \<Lambda> s_els res s_thn)
-  then show ?case sorry
+  hence RedCond2: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e_b;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF RedIfFalse(1)]
+    by simp
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s_els \<omega>2 RFailure"
+      using RedIfFalse
+      by auto
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.If e_b s_thn s_els) \<omega>2 RFailure"
+      using RedCond2 TotalSemantics.RedIfFalse 
+      by metis
+    thus ?thesis 
+      using RFailure
+      by blast
+  next
+    case (RNormal \<omega>')
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s_els \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using RedIfFalse
+      by auto
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.If e_b s_thn s_els) \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using RedCond2 TotalSemantics.RedIfFalse
+      by metis
+    thus ?thesis
+      using RNormal RedCond2 TotalSemantics.RedIfTrue RedIfTrue
+      by blast
+  qed simp
 next
   case (RedSeq \<Lambda> s1 \<omega> \<omega>' s2 res)
-  then show ?case sorry
+  hence RedS1: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s1 \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+    by simp
+  let ?\<omega>2' = "(update_trace_total \<omega>' (get_trace_total \<omega>2))"
+  show ?case
+  proof (cases res)
+    case RFailure
+    with RedSeq.IH(2)[where ?\<omega>2.0 = ?\<omega>2']
+    have "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s2 ?\<omega>2' RFailure"
+      using RedSeq
+      by auto
+    with RedS1 TotalSemantics.RedSeq RFailure
+    show ?thesis
+      by fast      
+  next
+    case (RNormal \<omega>'')
+    with RedSeq.IH(2)[where ?\<omega>2.0 = ?\<omega>2']
+    have "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s2 ?\<omega>2' (RNormal (update_trace_total \<omega>'' (get_trace_total ?\<omega>2')))"
+      using RedSeq
+      by auto    
+    then show ?thesis 
+      using RedS1 TotalSemantics.RedSeq RNormal
+      by fastforce
+  qed simp
 next
   case (RedSeqFailureOrMagic \<Lambda> s1 \<omega> res s2)
-  then show ?case sorry
+  show ?case 
+  proof (cases res)
+    case RFailure
+    hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s1 \<omega>2 RFailure"
+      using RedSeqFailureOrMagic
+      by auto
+    then show ?thesis 
+      using RFailure TotalSemantics.RedSeqFailureOrMagic
+      by blast
+  next
+    case (RNormal \<omega>')
+    then show ?thesis 
+      using RedSeqFailureOrMagic
+      by simp
+  qed simp
 next
   case (RedSubExpressionFailure s \<omega> \<Lambda>)
-  then show ?case sorry
+  hence ExpsInSubset: "list_all exp_in_paper_subset (sub_expressions s)"
+    using stmt_in_paper_subset_sub_expressions
+    by blast
+  hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (sub_expressions s) \<omega> None"
+    using RedSubExpressionFailure exp_eval_inh_no_old_exp_trace_indep(2)
+    by fastforce    
+  thus ?case 
+    using RedSubExpressionFailure TotalSemantics.RedSubExpressionFailure
+    by (metis ExpsInSubset exp_eval_inh_no_old_exp_trace_indep(2) stmt_result_total.distinct(5))
 qed
 
 lemma correctness_stronger:
