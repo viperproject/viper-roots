@@ -439,6 +439,28 @@ definition all_methods_in_paper_subset
                       assertion_in_paper_subset (method_decl.pre m) \<and>
                       assertion_in_paper_subset (method_decl.post m))"
 
+lemma havoc_locs_state_trace_indep:
+  assumes "\<omega> \<in> havoc_locs_state ctxt \<omega>_exh locs"
+  shows "update_trace_total \<omega> t \<in> havoc_locs_state ctxt (update_trace_total \<omega>_exh t) locs" 
+        (is "?\<omega>' \<in> havoc_locs_state ctxt ?\<omega>_exh' locs")
+proof -
+  from assms obtain hh' where
+      "\<omega> = update_hh_total_full \<omega>_exh hh'"
+  and HeapWellTyped: "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'"
+  and "hh' \<in> havoc_locs_heap (get_hh_total_full \<omega>_exh) locs"
+    unfolding havoc_locs_state_def
+    by blast
+
+  hence "?\<omega>' = update_hh_total_full ?\<omega>_exh' hh'"
+    by simp
+  moreover from \<open>hh' \<in> _\<close> have "hh' \<in> havoc_locs_heap (get_hh_total_full ?\<omega>_exh') locs"
+    by simp
+  ultimately show ?thesis 
+    using HeapWellTyped
+    unfolding havoc_locs_state_def
+    by blast
+qed
+
 lemma red_stmt_trace_indep:
   assumes "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> stmt \<omega>1 res1"
       and "stmt_in_paper_subset stmt"
@@ -456,33 +478,167 @@ proof induction
     by (metis states_differ_trace_update_trace_eq stmt_result_total.distinct(5) stmt_result_total.inject)
 next
   case (RedInhale A \<omega> res \<Lambda>)
-  then show ?case sorry
+  note Aux = TotalSemantics.RedInhale exp_eval_inh_no_old_exp_trace_indep(3)[OF RedInhale(1)]
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_inhale ctxt (\<lambda>_. True) A \<omega>2 RFailure"
+      using Aux RedInhale
+      by auto
+    then show ?thesis 
+      using TotalSemantics.RedInhale RFailure
+      by blast
+  next
+    case (RNormal \<omega>')
+    hence "red_inhale ctxt (\<lambda>_. True) A \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using Aux RedInhale
+      by auto
+    then show ?thesis 
+      using TotalSemantics.RedInhale RNormal
+      by blast
+  qed simp
 next
   case (RedExhale \<omega> A \<omega>_exh \<omega>' \<Lambda>)
-  then show ?case sorry
+  hence RedExh2: "red_exhale ctxt (\<lambda>_. True) \<omega>2 A \<omega>2 (RNormal (update_trace_total \<omega>_exh (get_trace_total \<omega>2)))"
+    using red_exh_trace_indep[OF RedExhale(1)]
+    by auto
+  have *: "{loc. PosReal.pnone < get_mh_total_full \<omega> loc \<and> get_mh_total_full \<omega>_exh loc = PosReal.pnone} =
+        {loc.
+         PosReal.pnone < get_mh_total_full \<omega>2 loc \<and> get_mh_total_full (update_trace_total \<omega>_exh (get_trace_total \<omega>2)) loc = PosReal.pnone}"
+    using \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+    by simp
+  show ?case 
+    apply simp
+    apply (rule TotalSemantics.RedExhale[OF RedExh2])
+    using  havoc_locs_state_trace_indep[OF \<open>\<omega>' \<in> _\<close>, simplified *]
+    by simp
 next
   case (RedExhaleFailure \<omega> A \<Lambda>)
-  then show ?case sorry
+  hence "red_exhale ctxt (\<lambda>_. True) \<omega>2 A \<omega>2 RFailure"
+    using red_exh_trace_indep
+    by fastforce
+  thus ?case 
+    by (auto intro!: TotalSemantics.RedExhaleFailure)
 next
   case (RedAssert \<omega> A \<omega>_exh \<Lambda>)
-  then show ?case sorry
+  hence RedExh2: "red_exhale ctxt (\<lambda>_. True) \<omega>2 A \<omega>2 (RNormal (update_trace_total \<omega>_exh (get_trace_total \<omega>2)))"
+    using red_exh_trace_indep[OF RedAssert(1)]
+    by auto
+  thus ?case
+    using TotalSemantics.RedAssert RedAssert
+    by (metis states_differ_trace_update_trace_eq stmt_result_total.distinct(5) stmt_result_total.inject)
 next
   case (RedAssertFailure \<omega> A \<Lambda>)
-  then show ?case sorry
+  hence "red_exhale ctxt (\<lambda>_. True) \<omega>2 A \<omega>2 RFailure"
+    using red_exh_trace_indep
+    by fastforce
+  thus ?case 
+    by (auto intro!: TotalSemantics.RedAssertFailure)
 next
   case (RedHavoc \<Lambda> x ty v \<omega>)
   then show ?case by simp
 next
   case (RedLocalAssign \<omega> e v \<Lambda> x ty)
-  then show ?case sorry
+  hence "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val v"
+    using exp_eval_inh_no_old_exp_trace_indep(1)
+    by fastforce
+  hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (LocalAssign x e) \<omega>2 (RNormal (update_var_total \<omega>2 x v))"
+    using RedLocalAssign
+    by (blast intro!: TotalSemantics.RedLocalAssign)
+  moreover have "update_var_total \<omega>2 x v = (update_trace_total (update_var_total \<omega> x v) (get_trace_total \<omega>2))"
+    apply (rule full_total_state.equality)
+    using \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+    by auto
+  ultimately show ?case
+    by auto        
 next
   case (RedFieldAssign \<omega> e_r addr f e v ty \<Lambda>)
-  then show ?case sorry
+  hence RedRef: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef (Address addr))" and
+        RedRHS: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val v"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF RedFieldAssign.hyps(1)]
+          exp_eval_inh_no_old_exp_trace_indep(1)[OF RedFieldAssign.hyps(3)]
+    by simp_all
+
+  have "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (FieldAssign e_r f e) \<omega>2 (RNormal (update_hh_loc_total_full \<omega>2 (addr,f) v))"
+    apply (rule TotalSemantics.RedFieldAssign)
+    using RedFieldAssign
+    unfolding get_writeable_locs_def
+    by (auto intro: RedRef RedRHS)    
+  moreover have "update_hh_loc_total_full \<omega>2 (addr,f) v = 
+                 update_trace_total (update_hh_loc_total_full \<omega> (addr, f) v) (get_trace_total \<omega>2)"
+    apply (rule full_total_state.equality)
+    using \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+    by auto
+  ultimately show ?case 
+    by simp
 next
   case (RedFieldAssignFailure \<omega> e_r r e v f \<Lambda>)
-  then show ?case sorry
+  hence RedRef: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)" and
+        RedRHS: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val v"    
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF RedFieldAssignFailure(1)]
+          exp_eval_inh_no_old_exp_trace_indep(1)[OF RedFieldAssignFailure(2)]
+    by simp_all
+  then show ?case 
+    using RedFieldAssignFailure
+    unfolding get_writeable_locs_def
+    by (simp add: get_writeable_locs_def red_stmt_total.RedFieldAssignFailure)
 next
   case (RedMethodCall \<omega> es v_args m mdecl \<Lambda> ys v_rets resPre res resPost)
+  hence RedArgs: "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) es \<omega>2 (Some v_args)"
+    using exp_eval_inh_no_old_exp_trace_indep(2)[OF RedMethodCall(1)]
+    by auto
+
+  have RedExhPre: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Exhale (method_decl.pre mdecl)) (state_during_exhale_pre_call \<omega>2 v_args) resPre"
+    using RedMethodCall
+    by auto
+
+  show ?case
+  proof (cases resPre)
+    case RMagic
+    then show ?thesis 
+      using RedMethodCall
+      by simp
+  next
+    case RFailure
+    have "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (MethodCall ys m es) \<omega>2 RFailure"
+      apply (rule TotalSemantics.RedMethodCall[OF RedArgs])
+      using RFailure RedMethodCall
+      by auto
+    then show ?thesis 
+      using RFailure RedMethodCall
+      by blast                 
+  next
+    case (RNormal \<omega>Pre)
+    let ?res = "map_stmt_result_total (reset_state_after_call ys v_rets \<omega>2) resPost"
+    have RedInhPost: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Inhale (method_decl.post mdecl)) (state_during_inhale_post_call \<omega>2 \<omega>Pre v_args v_rets) resPost"
+      using RNormal RedMethodCall
+      by simp
+    have RedCall: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (MethodCall ys m es) \<omega>2 ?res"
+      apply (rule TotalSemantics.RedMethodCall[OF RedArgs])
+      using RedMethodCall RNormal 
+            apply (solves \<open>simp\<close>)+
+      using RedInhPost
+      by auto    
+
+    show ?thesis 
+    proof (cases resPost)
+      case RMagic
+      then show ?thesis 
+        using RNormal RedMethodCall
+        by simp
+    next
+      case RFailure
+      then show ?thesis 
+        using RedCall[simplified reset_state_after_call_def] RedMethodCall RNormal
+        by auto
+    next
+      case (RNormal x3)
+      then show ?thesis sorry
+    qed
+  qed
+
+  thm TotalSemantics.RedMethodCall
+
   then show ?case sorry
 next
   case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
