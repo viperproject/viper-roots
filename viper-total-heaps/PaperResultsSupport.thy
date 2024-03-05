@@ -81,7 +81,7 @@ fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
 | "stmt_in_paper_subset_no_rec (If e s1 s2) \<longleftrightarrow> True"
 | "stmt_in_paper_subset_no_rec (Seq s1 s2) \<longleftrightarrow> True"
 | "stmt_in_paper_subset_no_rec (MethodCall ys m es) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (While e A s) \<longleftrightarrow> True"
+| "stmt_in_paper_subset_no_rec (While e A s) \<longleftrightarrow> False"
 | "stmt_in_paper_subset_no_rec (Unfold pred es p) \<longleftrightarrow> False"
 | "stmt_in_paper_subset_no_rec (Fold pred es p) \<longleftrightarrow> False" 
 | "stmt_in_paper_subset_no_rec (Package A B) \<longleftrightarrow> False"
@@ -430,7 +430,125 @@ lemma red_exh_trace_indep:
            (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
                      red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 (RNormal (update_trace_total \<omega>1' (get_trace_total \<omega>2)))
            )"
-  sorry
+  using assms
+proof (induction arbitrary: \<omega>2)
+  case (ExhAcc mh \<omega> e_r r e_p p a f)
+  hence RedRcv2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+    and RedPerm2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e_p;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhAcc(2)]
+          exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhAcc(3)]
+    by auto
+
+  let ?cond = "\<lambda>mh. 0 \<le> p \<and> ite_vc (r = Null) (p = 0) (PosReal.pgte (mh (a, f)) (Abs_preal p))"
+  let ?\<omega>' = "if (r = Null) then \<omega> else (update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_preal p))"
+  let ?res = "exh_if_total (?cond mh) ?\<omega>'"
+
+  show ?case
+  proof (cases ?res)
+    case RFailure
+    hence "\<not>(?cond mh)"
+      by (auto elim: exh_if_total.elims)
+    hence "\<not>(?cond (get_mh_total_full \<omega>2))"
+      using \<open>mh = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+      by auto
+    show ?thesis 
+      apply (simp add: RFailure)
+      apply (rule red_exhale_acc_failureI[OF RedRcv2 RedPerm2])
+       apply (rule \<open>a = _\<close>)
+      by (simp add: \<open>\<not>(?cond (get_mh_total_full \<omega>2))\<close>)
+  next
+    case (RNormal \<omega>')
+    hence "?cond mh" and
+          "\<omega>' = (if (r = Null) then \<omega> else (update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - Abs_preal p)))"
+      by (auto elim: exh_if_total.elims)
+    hence "?cond (get_mh_total_full \<omega>2)"
+      using \<open>mh = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+      by auto
+    show ?thesis
+      apply (simp add: RNormal)
+      apply (rule red_exhale_acc_normalI[OF RedRcv2 RedPerm2])
+        apply (rule \<open>a = _\<close>)
+      using \<open>?cond (get_mh_total_full \<omega>2)\<close>
+       apply blast
+      apply (cases "r = Null"; rule full_total_state.equality)
+      using \<open>\<omega>' = _\<close> \<open>mh = _\<close>
+      by (auto simp add: \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>)
+  qed simp
+next
+  case (ExhAccWildcard mh \<omega> e_r r a q f)
+  then show ?case by simp
+next
+  case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id)
+  then show ?case by simp
+next
+  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
+  then show ?case by simp
+next
+  case (ExhPure e \<omega> b)
+  hence RedExp2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool b)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhPure(1)]
+    by simp
+  show ?case
+  proof (cases b)
+    case True
+    then show ?thesis 
+      apply simp
+      using RedExp2 red_exhale.ExhPure ExhPure
+      by (metis (full_types) exh_if_total.simps(2) states_differ_trace_update_trace_eq update_trace_total.simps)
+  next
+    case False
+    then show ?thesis 
+      apply simp
+      using RedExp2 red_exhale.ExhPure ExhPure
+      by fastforce
+  qed    
+next
+  case (ExhStarNormal A \<omega> \<omega>' B res)
+  hence RedA2: "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2
+           (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+    by simp
+  let ?\<omega>2' = "(update_trace_total \<omega>' (get_trace_total \<omega>2))"
+  show ?case 
+  proof (cases res)
+    case RFailure
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 B ?\<omega>2' RFailure"
+      using ExhStarNormal
+      by auto      
+    then show ?thesis 
+      using ExhStarNormal RedA2 red_exhale.ExhStarNormal RFailure
+      by (metis stmt_result_total.distinct(5))      
+  next
+    case (RNormal \<omega>'')
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 B ?\<omega>2' (RNormal (update_trace_total \<omega>'' (get_trace_total ?\<omega>2')))"
+      using ExhStarNormal.IH(2)[where ?\<omega>2.0 = ?\<omega>2'] ExhStarNormal
+      by simp    
+    then show ?thesis 
+      using ExhStarNormal RedA2 red_exhale.ExhStarNormal RNormal
+      by fastforce
+  qed simp
+next
+  case (ExhStarFailure A \<omega> B)
+  hence RedA2: "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 RFailure"
+    by simp
+  then show ?case 
+    using red_exhale.ExhStarFailure
+    by fast    
+next
+  case (ExhImpTrue e \<omega> A res)
+  then show ?case sorry
+next
+  case (ExhImpFalse e \<omega> A)
+  then show ?case sorry
+next
+  case (ExhCondTrue e \<omega> A res B)
+  then show ?case sorry
+next
+  case (ExhCondFalse e \<omega> B res A)
+  then show ?case sorry
+next
+  case (ExhSubExpFailure A \<omega>)
+  then show ?case sorry
+qed
 
 
 definition all_methods_in_paper_subset

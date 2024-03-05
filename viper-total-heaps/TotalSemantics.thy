@@ -589,6 +589,23 @@ proof -
     by auto
 qed
 
+lemma red_exhale_acc_failureI:
+  assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+      and "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_p; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm p)"
+      and "a = the_address r"
+      and "\<not>(p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_preal p)))" (is "\<not>?Success")
+    shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> RFailure"
+proof -
+  have Eq: "RFailure = exh_if_total ?Success (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_preal p)))"
+    using assms
+    by auto
+  show ?thesis
+    apply (subst Eq)
+    apply (rule ExhAcc)
+    using assms
+    by auto
+qed
+
 subsection \<open>Well-formed state consistency\<close>
 
 text \<open>Many of the theorems are parametrized by the state consistency. Many of the theorems require
