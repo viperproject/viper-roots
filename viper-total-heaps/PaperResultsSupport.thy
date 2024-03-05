@@ -535,21 +535,94 @@ next
     by fast    
 next
   case (ExhImpTrue e \<omega> A res)
-  then show ?case sorry
+  hence RedCond2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhImpTrue(1)]
+    by simp
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 RFailure"
+      using ExhImpTrue
+      by simp
+    then show ?thesis 
+      using ExhImpTrue RedCond2 RFailure
+      by (auto intro: red_exhale.ExhImpTrue)
+  next
+    case (RNormal \<omega>')
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using ExhImpTrue
+      by simp
+    then show ?thesis 
+      using ExhImpTrue RedCond2 RNormal
+      by (auto intro: red_exhale.ExhImpTrue)
+  qed simp
 next
   case (ExhImpFalse e \<omega> A)
-  then show ?case sorry
+  hence RedCond2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhImpFalse(1)]
+    by simp
+  thus ?case
+    apply simp
+    using ExhImpFalse red_exhale.ExhImpFalse
+    by (metis states_differ_trace_update_trace_eq update_trace_total.simps)    
 next
   case (ExhCondTrue e \<omega> A res B)
-  then show ?case sorry
+  hence RedCond: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhCondTrue(1)]
+    by simp
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 RFailure"
+      using ExhCondTrue
+      by simp
+    then show ?thesis 
+      using RedCond RFailure
+      by (auto intro: red_exhale.ExhCondTrue)
+  next
+    case (RNormal \<omega>')
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using ExhCondTrue
+      by simp
+    then show ?thesis 
+      using RedCond RNormal
+      by (auto intro: red_exhale.ExhCondTrue)
+  qed simp
 next
   case (ExhCondFalse e \<omega> B res A)
-  then show ?case sorry
+  hence RedCond: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhCondFalse(1)]
+    by simp
+  show ?case
+  proof (cases res)
+    case RFailure
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 B \<omega>2 RFailure"
+      using ExhCondFalse
+      by simp
+    then show ?thesis 
+      using RedCond RFailure
+      by (auto intro: red_exhale.ExhCondFalse)
+  next
+    case (RNormal \<omega>')
+    hence "red_exhale ctxt (\<lambda>_. True) \<omega>def2 B \<omega>2 (RNormal (update_trace_total \<omega>' (get_trace_total \<omega>2)))"
+      using ExhCondFalse
+      by simp
+    then show ?thesis 
+      using RedCond RNormal
+      by (auto intro: red_exhale.ExhCondFalse)
+  qed simp
 next
   case (ExhSubExpFailure A \<omega>)
-  then show ?case sorry
+  hence SubexpInSubset: "list_all exp_in_paper_subset (direct_sub_expressions_assertion A)"
+    using assert_pred_subexp
+    by simp
+  hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>def2) (direct_sub_expressions_assertion A) \<omega>2 None"
+    using exp_eval_inh_no_old_exp_trace_indep(2)[OF ExhSubExpFailure(2)] ExhSubExpFailure
+    by fastforce
+  then show ?case 
+    using ExhSubExpFailure
+    by (auto intro: red_exhale.ExhSubExpFailure)    
 qed
-
 
 definition all_methods_in_paper_subset
   where "all_methods_in_paper_subset ctxt \<equiv>
@@ -933,12 +1006,12 @@ next
   hence ExpsInSubset: "list_all exp_in_paper_subset (sub_expressions s)"
     using stmt_in_paper_subset_sub_expressions
     by blast
-  hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (sub_expressions s) \<omega> None"
+  hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (sub_expressions s) \<omega>2 None"
     using RedSubExpressionFailure exp_eval_inh_no_old_exp_trace_indep(2)
     by fastforce    
   thus ?case 
-    using RedSubExpressionFailure TotalSemantics.RedSubExpressionFailure
-    by (metis ExpsInSubset exp_eval_inh_no_old_exp_trace_indep(2) stmt_result_total.distinct(5))
+    using RedSubExpressionFailure 
+    by (auto intro: TotalSemantics.RedSubExpressionFailure)
 qed
 
 lemma correctness_stronger:
