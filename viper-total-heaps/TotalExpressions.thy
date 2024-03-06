@@ -278,20 +278,9 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 | RedFieldNullFailure:
    "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
        ctxt, R, \<omega>_def \<turnstile> \<langle>FieldAcc e f; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
-\<comment>\<open>
-\<comment>\<open>Function application\<close>
-| RedFunApp: (* Should function application be expressed operationally? *)
-   "\<lbrakk> (fun_interp_total ctxt) fname = Some f;
-      red_pure_exps_total ctxt R \<omega>_def es \<omega> (Some vs);
-      \<comment>\<open>TODO: The precondition of a function needs to be checked w.r.t. the well-definedness state.
-               One could define two interpretations of the function, one that checks the precondition
-               and one that does not.\<close>
-      f vs \<omega> = Some res \<rbrakk> \<Longrightarrow> 
-      ctxt, R, \<omega>_def \<turnstile> \<langle>FunApp fname es; \<omega>\<rangle> [\<Down>] res"
-\<close>
 
 \<comment>\<open>Permission introspection\<close>
-| RedPermNull: (* TODO: should perm(null.f) reduce to failure? *)
+| RedPermNull:
     "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
      ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
 | RedPerm: 

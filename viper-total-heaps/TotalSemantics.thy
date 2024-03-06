@@ -122,7 +122,7 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
     red_exhale ctxt R \<omega>0 B \<omega> res \<rbrakk> \<Longrightarrow>
     red_exhale ctxt R \<omega>0 (CondAssert e A B) \<omega> res" 
 
-\<comment>\<open>If a \<^emph>\<open>direct\<close> subexpression is not well-defined, then this result in failure.\<close>
+\<comment>\<open>If a \<^emph>\<open>direct\<close> subexpression is not well-defined, then this results in failure.\<close>
 | ExhSubExpFailure: 
   "\<lbrakk> direct_sub_expressions_assertion A \<noteq> [];
      red_pure_exps_total ctxt R (Some \<omega>0) (direct_sub_expressions_assertion A) \<omega> None  \<rbrakk> \<Longrightarrow> 
@@ -137,23 +137,6 @@ lemma ExhPure_case:
     shows "P"
   using assms 
   by (cases) (auto elim: red_pure_exp_total_elims)
- 
-
-(* old version with predicate heap
-definition havoc_undef_locs :: "'a total_heap \<Rightarrow> 'a predicate_heap \<Rightarrow> mask \<Rightarrow> 'a predicate_mask \<Rightarrow> ('a total_heap \<times> 'a predicate_heap) set"
-  where "havoc_undef_locs hh hp mh mp = 
-           { (hh', hp') | hh' hp'. 
-                (\<forall>lh. mh lh \<noteq> pnone \<longrightarrow> hh' lh = hh lh) \<and>
-                (\<forall>lp. mp lp \<noteq> pnone \<longrightarrow> 
-                          hp' lp = hp lp \<and>
-                         (\<forall>lh \<in> get_lhset_pheap hp lp. hh' lh = hh lh) \<and>
-                         (\<forall>lp2 \<in> get_lpset_pheap hp lp. hp' lp2 = hp lp2)) }"
-
-text\<open>\<^term>\<open>havoc_undef_locs hh hp mh mp\<close> denotes the set of heaps that coincide with \<^term>\<open>(hh,hp)\<close> w.r.t.
-the permission masks \<^term>\<open>(mh,mp)\<close>. This means the heaps agree on all heap and predicate locations for 
-which direct permission is held in \<^term>\<open>(mh,mp)\<close> or which is part of a predicate snapshot in \<^term>\<open>hp\<close> 
-of a directly owned (w.r.t. \<^term>\<open>mp\<close>) predicate\<close>
-*)
 
 definition havoc_locs_heap :: "'a total_heap \<Rightarrow> heap_loc set \<Rightarrow> 'a total_heap set"
   where "havoc_locs_heap hh locs = { hh' | hh'. (\<forall>lh. lh \<notin> locs \<longrightarrow> hh' lh = hh lh) }"
@@ -261,14 +244,18 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
 | RedInhale: 
  "\<lbrakk> red_inhale ctxt R A \<omega> res \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Inhale A) \<omega> res"
+
+\<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
+always has at least one failure transition. This is in-sync with the Carbon implementation.\<close>
+
 | RedExhale:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> (RNormal \<omega>_exh);
     \<omega>' \<in> havoc_locs_state ctxt \<omega>_exh ({loc. get_mh_total_full \<omega> loc > 0 \<and> get_mh_total_full \<omega>_exh loc = 0})
     \<comment>\<open>We havoc all locations \<^term>\<open>l\<close> for which both of the following conditions hold:
         (1) there is no direct permission to \<^term>\<open>l\<close> after the exhale
         (2) the exhale removed nonzero permission to \<^term>\<open>l\<close>\<close>
-    \<comment>\<open>If predicates are used, then this exhale semantics is sound but incomplete, because locations that are folded 
-      under a predicate need not be havoced. Moreover, for predicates, we might need to ensure that \<^term>\<open>R \<omega>'\<close> holds.\<close> \<rbrakk> \<Longrightarrow>
+    \<comment>\<open>Once full support for Viper predicates are added, then this exhale semantics needs to also 
+      take \<^term>\<open>R\<close> into account.\<close> \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Exhale A) \<omega> (RNormal \<omega>')"
 | RedExhaleFailure:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
@@ -279,10 +266,6 @@ inductive red_stmt_total :: "'a total_context \<Rightarrow> ('a full_total_state
 | RedAssertFailure:
  "\<lbrakk> red_exhale ctxt R \<omega> A \<omega> RFailure \<rbrakk> \<Longrightarrow>
     red_stmt_total ctxt R \<Lambda> (Assert A) \<omega> RFailure"
-
-\<comment>\<open>Note that exhale is demonic here (even locally). For instance, exhale acc(x.f, wildcard) * acc(x.f, 1/2)
-always has at least one failure transition. This is in-sync with the recent Carbon upgrade.\<close>
-
 
 \<comment>\<open>TODO: Add semantics for \<^term>\<open>Assume A\<close>. \<close>
 
@@ -400,7 +383,7 @@ always has at least one failure transition. This is in-sync with the recent Carb
    "\<lbrakk> red_stmt_total ctxt R \<Lambda> s1 \<omega> res; 
       res = RFailure \<or> res = RMagic \<rbrakk> \<Longrightarrow>
       red_stmt_total ctxt R \<Lambda> (Seq s1 s2) \<omega> res"
-(* TODO while loops *)
+
 \<comment>\<open>Failure subexpression\<close>
 | RedSubExpressionFailure: 
   "\<lbrakk> sub_expressions s \<noteq> [];
@@ -744,45 +727,4 @@ definition predicate_obligations :: "'a total_context \<Rightarrow> ('a full_tot
           predicate_decl.body pdecl = Some e \<and>
           vals_well_typed (absval_interp_total ctxt) vs (predicate_decl.args pdecl) ) \<longrightarrow>
           assertion_self_framing_store ctxt StateCons e (nth_option vs)"
-
-(* TODO loops
-
-definition havoc_vars_state :: "'a full_total_state \<Rightarrow> var set \<Rightarrow> 'a full_total_state set"
-  where "havoc_vars_state \<omega> havoced_vars = { update_store_total \<omega> \<sigma>' | \<sigma>'. 
-                                      dom \<sigma>' = dom (get_store_total \<omega>) \<and>
-                                      (\<forall> x \<in> dom (get_store_total \<omega>) - havoced_vars. get_store_total \<omega> x = \<sigma>' x) }"
- | RedWhile:
-   "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh);
-      (\<And> \<omega>AfterHavoc \<omega>AfterInh \<omega>AfterBody res. havoc_vars \<omega>AfterExh (modif loop_body) \<omega>AfterHavoc \<Longrightarrow>
-          (ctxt, R, (Some \<omega>AfterHavoc) \<turnstile> \<langle>cond; \<omega>AfterHavoc\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<Longrightarrow>
-          red_inhale ctxt R invariant \<omega>AfterHavoc (RNormal \<omega>AfterInh) \<Longrightarrow>
-          red_stmt_total ctxt R \<Lambda> loop_body \<omega>AfterInh (RNormal \<omega>AfterBody) \<Longrightarrow>
-          red_stmt_total ctxt R \<Lambda> (Assert invariant) \<omega>AfterBody res \<Longrightarrow> 
-          res \<noteq> RFailure))      
-       \<rbrakk> \<Longrightarrow>
-      red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> \<omega>'"
-
- | RedWhileNormal:
-    "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh);
-       \<omega>AfterHavoc \<in> havoc_vars_state \<omega>AfterExh (modif loop_body);
-       red_inhale ctxt R invariant \<omega>AfterHavoc (RNormal \<omega>AfterInh);
-       ctxt, R, (Some \<omega>AfterInh) \<turnstile> \<langle>cond; \<omega>AfterInh\<rangle> [\<Down>]\<^sub>t Val (VBool False)
-     \<rbrakk> \<Longrightarrow> red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> (RNormal \<omega>AfterInh)"
-
-\<comment>\<open>TODO: intermediate failures\<close>
-  | RedWhileFailure:
-   "\<lbrakk> red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega> (RNormal \<omega>AfterExh); \<comment>\<open>failure option 1\<close>
-      \<omega>AfterHavoc \<in> havoc_vars_state \<omega>AfterExh (modif loop_body); 
-      red_inhale ctxt R invariant                                       \<comment>\<open>failure option 2\<close>
-            (empty_full_total_state 
-                        (get_store_total \<omega>AfterHavoc) 
-                        (get_trace_total \<omega>AfterHavoc)
-                        (get_h_total_full \<omega>AfterHavoc))
-            (RNormal \<omega>AfterInh);
-      ctxt, R, (Some \<omega>AfterInh) \<turnstile> \<langle>cond; \<omega>AfterInh\<rangle> [\<Down>]\<^sub>t Val (VBool True); \<comment>\<open>failure option 3\<close>
-      red_stmt_total ctxt R \<Lambda> loop_body \<omega> (RNormal \<omega>AfterInh);            \<comment>\<open>failure option 4\<close>
-      red_stmt_total ctxt R \<Lambda> (Exhale invariant) \<omega>AfterInh RFailure \<rbrakk> \<Longrightarrow> \<comment>\<open>failure option 5\<close>
-      red_stmt_total ctxt R \<Lambda> (While cond invariant loop_body) \<omega> RFailure"
-*)
-
 end
