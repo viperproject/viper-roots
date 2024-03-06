@@ -1,28 +1,58 @@
 theory PaperResults
-imports ViperBoogieEndToEnd StmtRelML
+imports ViperBoogieEndToEnd StmtRelML PaperResultsSupport
 begin
 
-text \<open>The following Isabelle theory file contains references to all the formalised results explicitly mentioned in
+section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
+
+text \<open>
+The following Isabelle theory file contains references to all the formalised results explicitly mentioned in
 the paper. The theory file is structured using Isabelle sections and subsections, which match those from 
 the paper. You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a 
-section or  subsection.
+section or subsection. 
 
-In the Isabelle IDE, you can ctrl-and-click on the original definitions (highlighted in black everywhere
-except for constants TODO where it has the same orange color as this text). You can use the green arrow buttons
-at the top of the Isabelle IDE to jump back (or forward) to the previous position after ctrl-clicking
-on a definition.
+When you first load this file, Isabelle will load and check all Isabelle files in the formalisation for the paper.
+This takes several minutes to finish. You can see the progress by clicking on the \<open>Theories\<close> panel on 
+the right. Make sure that the checkbox \<open>Continuous checking\<close> at the top of the \<open>Theories\<close> panel is selected,
+which should already be the case by default (otherwise Isabelle won't check the files).
+Wait until Isabelle finished checking all files (keep the current file open, otherwise Isabelle won't 
+continue with certain files). If the bars for all files on the right are fully white except the current
+ \<open>PaperResult\<close> one, then it is finished. There should be no red bars in the files of the theory panel (this would 
+indicate that Isabelle was not able to check a file).
 
-Clickable definitions in the Isabelle documentation (i.e., within text \<open>...\<close> annotations) can be contained in
+In the Isabelle IDE, you can ctrl-and-click on defined names, which takes you to the Isabelle source 
+where the constant is defined (for example, a standard definition or an Isabelle function). 
+Whenever you jump somewhere via ctrl-and-clicking (for example, by jumping to a section or a definition),
+you can use the two green arrow buttons at the top of the Isabelle IDE to jump back (or forward) to the 
+previous position.
+
+In this document, we make use of Isabelle's documentation features, which itself can contain Isabelle
+elements (and are checked via Isabelle), to walk you through the formalisation of the definitions and 
+rules in the paper. In particular, we use the following Isabelle document elements:
+
   \<^item> types (for example, \<^typ>\<open>ViperLang.stmt\<close>)
-  \<^item> constants (for example, \<^const>\<open>red_stmt_total\<close>; note that here the clickable constant is in orange)
+     --> you can click on defined names in types (i.e. \<open>ViperLang.stmt\<close> in the example)
+  \<^item> defined names (for example, \<^const>\<open>red_stmt_total\<close> --> you can click on defined names)
   \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
+    --> you can click on defined names in terms (i.e. \<open>red_stmt_total\<close> in the example)
   \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just boolean terms
+    --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> in the example)
   \<^item> Standard ML terms (for example, \<^ML>\<open>stmt_rel_tac\<close>) and types (for example, \<^ML_type>\<open>'a stmt_rel_hint\<close>);
-      we use Standard ML to define custom Isabelle tactics
+      we use Standard ML to define custom Isabelle tactics.
+    --> you can click on the ML definitions in ML terms and types 
+        (i.e., \<open>stmt_rel_tac\<close> and \<open>stmt_rel_hint\<close> in the examples)
 
-To refer to specific rules or proved theorems, we use Isabelle's \<open>lemmas\<close> keyword. 
+Make sure that you can click on the sections and subsections in this file (via Isabelle's sidekick on the
+right) and the document elements shown above in the bullet list.
+Make sure that doing so brings you to the source of the clicked element.
 
-TODO: alternative would be to use @{thm [source] RedExhale RedExhaleFailure}, which one is better?
+Make sure that you can use the green back arrow to jump back to this point in the document after clicking
+on an element.
+
+Note that you can also double-click on specific files via the \<open>Theories\<close> panel on the right to open them
+or open a specific active file by clicking on the bar with the current file name and downwards arrow at the top 
+of the Isabelle GUI (below the green arrows).
+
+To refer to specific lemmas proved in our Isabelle formalisation, we use Isabelle's \<open>lemmas\<close> keyword. 
 
 For example:
 \<close>
@@ -31,19 +61,23 @@ lemmas example_for_rule = RedExhale RedExhaleFailure
 
 lemmas example_for_a_proved_theorem = exhale_inhale_normal
 
-\<comment>\<open>You can ctrl-click on \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
-  You can also inspect the rules and lemmas by clicking anywhere right after the \<open>lemmas\<close> keyword
-  and then looking at the resulting Isabelle statement in the output panel.
-  However, we recommend ctrl-clicking to get to the source, which often gives names to the premises
-  and is easier to read.\<close>
+\<comment>\<open>You can ctrl-click on the lemmas \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
+  You can also inspect the lemmas by clicking anywhere right after the \<open>lemmas\<close> keyword
+  and then looking at the resulting Isabelle statement in the \<open>Output\<close> panel at the bottom of the Isabelle GUI.
+  Note that if multiple lemmas are listed (such as for \<open>example_for_rule\<close>), then the \<open>Output\<close> panel
+  shows both lemmas.
+  Make sure that you can do both of these things (ctrl-clicking and inspecting lemma in \<open>Output\<close> panel) 
+  for these three lemmas.
 
+  In general, we recommend ctrl-clicking to get to the source, where we have often provided names 
+  for the premises (sometimes we refer to these names explicitly) and is easier to read.
 
-text \<open>Whenever a ctrl-click takes you to another theory, you can use the green arrow buttons at the top 
-      of the Isabelle IDE to jump back (or forward) to the previous position.
-      You can also use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a section or 
-      subsection.\<close>
+  This marks the end of the Getting Started Guide for the Isabelle formalisation. The next section
+  starts with the Step-By-Step Instructions (ordered via Isabelle sections and subsections that match 
+  those in the paper as mentioned above).
+\<close>
 
-section \<open>2 Viper and Boogie: Background and Semantics\<close>
+section \<open>2 Viper and Boogie: Background and Semantics (Start of Step-by-Step Instructions)\<close>
 
 subsection \<open>2.1 The Viper and Boogie languages\<close>
 
@@ -381,27 +415,61 @@ and \<^const>\<open>select_heap\<close>, respectively.
 
 subsection \<open>4.5 Generating A Proof of the Final Theorem\<close>
 
+paragraph \<open>Correctness of a Viper method (Figure 8 at the bottom)\<close>
+text \<open>The correctness of a Viper method is defined in \<^const>\<open>vpr_method_correct_paper\<close>.
+The notation \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close> corresponds to \<^prop>\<open>vpr_method_correct_paper ctxt_vpr m\<close>
+where F,M capture \<^term>\<open>ctxt_vpr\<close>. 
 
-paragraph \<open>Correctness of a Viper method\<close>
-text \<open>The correctness of a Viper method is defined in \<^const>\<open>vpr_method_correct_total_partial\<close>.
-The notation \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close> corresponds to \<^prop>\<open>vpr_method_correct_total_partial ctxt_vpr (\<lambda>_.True) m\<close>
-where F,M capture \<^term>\<open>ctxt_vpr\<close>.
+In our generated proofs, we use a more general version of the correctness of a Viper method
+(defined in \<^const>\<open>vpr_method_correct_total\<close>) that is applicable to a larger subset of Viper than
+supported by the paper, where correctness of a method is expressed via 
+\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close>. 
 
-\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close> is slightly stronger than \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close>,
-because, in addition to \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close>, it includes a well-definedness condition on the postcondition.
-The definition is also expressed a bit differently than in the presentation. To show that correctness
-\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close> 
-
-
+The following lemma shows that the more general version implies the version of the paper for Viper 
+methods that lie withing the Viper subset presented in the paper:
 \<close>
 
+lemmas general_method_correctness_stronger = method_correctness_stronger_than_paper
+
+text \<open>Thus, our generated proofs prove the method correctness for each method as presented
+      in the paper.\<close>
+
 paragraph \<open>Main helper lemma to prove final theorem\<close>
+
+text \<open>To generate proofs for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> (Figure 9, bottom), we use a generic helper lemma 
+      that we prove once and for all and that reflects the strategy for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> as
+      described in Section 4.5 of  of the paper (starting at line 809 of the paper).
+      This generic helper lemmas is given by:\<close> 
+
+lemmas generic_helper_lemma_final_theorem = end_to_end_vpr_method_correct_partial
+
+text \<open>The lemma has lots of assumptions that are not relevant here (we prove the assumptions when we generate
+the proofs). There are three relevant assumptions directly mentioned in the paper:
+  \<^item> Assumption with name \<open>Boogie_correct\<close>: 
+    This expresses correctness of the Boogie procedures (corresponds to the left-hand side \<open>Correct\<^sub>b\<^sup>G(p)\<close>
+    of \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close>)
+  \<^item> Assumption with name \<open>VprMethodRel\<close> (defined via \<^const>\<open>method_rel\<close>): 
+    This assumption corresponds to the forward simulation statement on lines 818-820 in the paper. 
+    Note that the definition of \<^const>\<open>method_rel\<close> is more general than forward simulation shown in the paper. 
+    In particular, the conjunct \<^const>\<open>post_framing_rel\<close> is used to show the well-formedness of the method postcondition
+    (which we explicitly ignore in the paper as mentioned in line 810 of the paper).
+    Moreover, note that \<^const>\<open>method_rel\<close> includes a left-hand side \<^const>\<open>vpr_all_method_spec_correct_total\<close>,
+    which states each method specification in the program is well-formed (this directly corresponds
+    to \<open>\<forall>m' \<in> M. SpecWf(m')\<close> in the definition \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper (Figure 9 bottom).
+  \<^item> Assumption with name \<open>InitialStateRel\<close>:
+    This assumption requires one to choose an initial Boogie state that is related to the initial
+    Viper state as mentioned on lines 826-827 in the paper.
+\<close>
 
 section \<open>Appendix\<close>
 
 subsection \<open>A Inhale Semantics\<close>
 
+text \<open>TODO\<close>
+
 subsection \<open>B Another Simulation Rule Example\<close>
+
+text \<open>TODO\<close>
 
 end
 
