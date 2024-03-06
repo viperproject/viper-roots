@@ -1,5 +1,5 @@
 theory PaperResultsSupport
-imports ViperBoogieEndToEnd
+imports TotalViper.ViperBoogieEndToEnd
 begin
 
 definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_decl \<Rightarrow> bool" where

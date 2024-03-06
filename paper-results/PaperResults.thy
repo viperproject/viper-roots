@@ -1,5 +1,5 @@
 theory PaperResults
-imports ViperBoogieEndToEnd StmtRelML PaperResultsSupport
+imports TotalViper.ViperBoogieEndToEnd TotalViper.StmtRelML PaperResultsSupport
 begin
 
 section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
@@ -14,7 +14,7 @@ When you first load this file, Isabelle will load and check all Isabelle files i
 This takes several minutes to finish. You can see the progress by clicking on the \<open>Theories\<close> panel on 
 the right. Make sure that the checkbox \<open>Continuous checking\<close> at the top of the \<open>Theories\<close> panel is selected,
 which should already be the case by default (otherwise Isabelle won't check the files).
-Wait until Isabelle finished checking all files (keep the current file open, otherwise Isabelle won't 
+Wait until Isabelle successfully finished checking all files (keep the current file open, otherwise Isabelle won't 
 continue with certain files). If the bars for all files on the right are fully white except the current
  \<open>PaperResult\<close> one, then it is finished. There should be no red bars in the files of the theory panel (this would 
 indicate that Isabelle was not able to check a file).
@@ -61,7 +61,8 @@ lemmas example_for_rule = RedExhale RedExhaleFailure
 
 lemmas example_for_a_proved_theorem = exhale_inhale_normal
 
-\<comment>\<open>You can ctrl-click on the lemmas \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
+text \<open>
+  You can ctrl-click on the lemmas \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
   You can also inspect the lemmas by clicking anywhere right after the \<open>lemmas\<close> keyword
   and then looking at the resulting Isabelle statement in the \<open>Output\<close> panel at the bottom of the Isabelle GUI.
   Note that if multiple lemmas are listed (such as for \<open>example_for_rule\<close>), then the \<open>Output\<close> panel
@@ -81,11 +82,19 @@ section \<open>2 Viper and Boogie: Background and Semantics (Start of Step-by-St
 
 subsection \<open>2.1 The Viper and Boogie languages\<close>
 
-text \<open>The Viper AST for statements is defined in \<^typ>\<open>ViperLang.stmt\<close>.
-      The Boogie AST for statements is defined in \<^typ>\<open>Ast.bigblock\<close>\<close>
+text \<open>The Viper AST for statements (\<open>VStmt\<close> at the top of Figure 1) is defined in \<^typ>\<open>ViperLang.stmt\<close>.
+      The Boogie AST for statement blocks (\<open>BStmtBlock\<close>) is defined in \<^typ>\<open>Ast.bigblock\<close>\<close>
 
 text \<open>Both formalised ASTs includes a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is relevant. 
+      For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the paper subset.
+      It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>, \<^const>\<open>assert_in_paper_subset_no_rec\<close>,
+      \<^const>\<open>atomic_assert_in_paper_subset\<close>, and \<^const>\<open>exp_in_paper_subset_no_rec\<close>, which indicate
+      which statement, assertion, atomic assertion (accessibility predicates or Boolean expression), 
+      and expression constructors are in the paper subset.
+      Note that \<^term>\<open>Acc e f (PureExp ep)\<close> denotes the accessibilty predicate \<open>acc(e.f, ep)\<close> in the paper
+      and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.
+      
       Some of our definitions in the formalisations are generalised to also work for features outside
       the subset. These generalisations are not relevant here and throughout this file, we will make clear 
       which parts are relevant.\<close>
@@ -95,16 +104,20 @@ subsection \<open>2.2: Boogie Semantics\<close>
 paragraph \<open>Outcomes\<close>
 text \<open>Boogie outcomes are defined in \<^typ>\<open>'a state\<close> and Boogie states are defined in \<^typ>\<open>'a nstate\<close>.
       \<^typ>\<open>'a nstate\<close> defines the mapping of variables to values via different mappings (local variable mapping,
-      global variable mapping etc.); the details are not essential here.\<close>
+      global variable mapping etc.); the details are not relevant here.\<close>
 
 paragraph \<open>Semantics for Boogie statements\<close>
 text \<open>The single step execution of a Boogie statement is expressed via \<^const>\<open>red_bigblock_small\<close>, which 
       makes sure that at most one simple command is executed in each step.
-      A lot of the semantics was taken directly \<comment>\<open>TODO\<close>.
-      
+      The semantics is taken directly from an extension of the CAV21 paper \<open>Formally Validating a Practical 
+      Verification Condition Generator\<close>, which is developed in an an open source repository with the 
+      Mozilla license. The details of the semantics are thus not part of this artifact.
+
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
       0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
       where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.
+      Note that this semantics uses the semantics for simple commands (asserts, assumes, assignments, havocs)
+      defined in \<^const>\<open>red_cmd\<close>.
 \<close>
 
 subsection \<open>2.3 Viper Semantics\<close>
