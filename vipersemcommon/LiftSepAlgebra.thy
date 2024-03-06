@@ -125,7 +125,7 @@ next
   then obtain r1 r2 where "Some r1 = fst a \<oplus> fst b \<and> Some r2 = snd a \<oplus> snd b"
     by (metis defined_def option.exhaust_sel)
   then show ?A
-    using defined_def plus_prodI by fastforce
+    using defined_def plus_prodIAlt by fastforce
 qed    
 
 lemma get_store_trace_comp:
@@ -151,7 +151,7 @@ next
   moreover have "fst \<omega>1 \<oplus> fst \<omega>2 = Some (Ag (get_store \<omega>1), Ag (get_trace \<omega>1))"
     by (metis (no_types, opaque_lifting) agreement.exhaust_sel asm0 core_is_smaller fst_conv get_store_def get_store_trace_comp get_trace_def greater_def smaller_compatible_core surjective_pairing)
   ultimately show ?thesis
-    by (smt (z3) asm0 get_state_def option.sel plus_prodI)
+    by (smt (z3) asm0 get_state_def option.sel plus_prodIAlt)
 qed
 
 
@@ -267,7 +267,7 @@ lemma add_defined_lift:
 proof -
   have "Some s = s \<oplus> s"
     by (simp add: plus_agreement_def)
-  then show ?thesis using plus_prodI assms 
+  then show ?thesis using plus_prodIAlt assms 
     by fastforce
 qed
 
