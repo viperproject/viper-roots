@@ -38,8 +38,13 @@ lemma compatible_maps_empty:
   by (simp add: compatible_maps_def)
 
 lemma compatible_maps_comm:
-  "compatible_maps h1 h2 \<longleftrightarrow> compatible_maps h2 h1"
-  by (smt compatible_maps_def compatible_options.elims(3) compatible_options.simps(1))
+  "compatible_maps h1 h2 \<longleftrightarrow> compatible_maps h2 h1" (is "?A \<longleftrightarrow> ?B")
+proof
+  show "?A \<Longrightarrow> ?B"
+    by (metis compatible_mapsI compatible_maps_def compatible_options.simps(1))
+  show "?B \<Longrightarrow> ?A"
+    by (metis compatible_mapsI compatible_maps_def compatible_options.simps(1))
+qed
 
 lemma add_heaps_asso:
   "(h1 ++ h2) ++ h3 = h1 ++ (h2 ++ h3)"
@@ -62,8 +67,13 @@ lemma map_invo:
 lemma included_then_compatible_maps:
   assumes "map_included h1 h"
       and "map_included h2 h"
-    shows "compatible_maps h1 h2" 
-  by (smt assms(1) assms(2) compatible_maps_def compatible_options.elims(3) compatible_options.simps(1) map_included_def option.distinct(1))
+    shows "compatible_maps h1 h2"
+proof (rule compatible_mapsI)
+  fix x a b
+  assume "h1 x = Some a \<and> h2 x = Some b"
+  then show "a = b"
+    by (metis assms(1) assms(2) map_included_def option.discI option.inject)
+qed
 
 lemma map_included_then_sum:
   assumes "map_included h1 h2"
@@ -75,9 +85,11 @@ lemma commut_charact:
   shows "h1 ++ h2 = h2 ++ h1"
 proof (rule ext)
   fix x
-  show "(h1 ++ h2) x = (h2 ++ h1) x" 
-    by (smt compatible_maps_def assms compatible_options.simps(1) domD map_add_dom_app_simps(1) map_add_dom_app_simps(2) map_add_dom_app_simps(3))
+  show "(h1 ++ h2) x = (h2 ++ h1) x"
+    using assms(1) compatible_maps_def[of h1 h2]
+    by (metis compatible_maps_comm compatible_maps_same map_add_None map_add_find_right not_Some_eq)
 qed
+
 
 lemma compatible_maps_asso:
   "compatible_maps a b \<and> compatible_maps (a ++ b) c \<longleftrightarrow> compatible_maps b c \<and> compatible_maps a (b ++ c)" (is "?LHS \<longleftrightarrow> ?RHS")

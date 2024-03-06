@@ -152,8 +152,8 @@ instance proof
 
   show "sup x (inf y z) = inf (sup x y) (sup x z)"
     using Rep_preal_inject
-      inf_preal.rep_eq[of y z] inf_preal.rep_eq[of] sup_preal.rep_eq[of x y] sup_preal.rep_eq[of x z]
-    by (smt (verit, del_insts))
+      inf_preal.rep_eq[of y z] inf_preal.rep_eq[of "sup x y" "sup x z"] sup_preal.rep_eq[of x y] sup_preal.rep_eq[of x z]
+    by (metis max_min_distrib2 sup_preal.rep_eq)
 qed
 
 end
@@ -294,8 +294,16 @@ proof -
     using assms pgte.rep_eq plus_preal.rep_eq by auto
   then obtain x where "aa = bb + x" "x \<ge> cc"
     by (metis add.commute add_le_cancel_left diff_add_cancel)
-  then show ?thesis
-    by (smt (verit, ccfv_threshold) Rep_preal Rep_preal_inverse \<open>aa = Rep_preal a\<close> \<open>bb = Rep_preal b\<close> \<open>cc = Rep_preal c\<close> add_0_right dual_order.trans eq_onp_same_args le_add_same_cancel1 mem_Collect_eq pgte.abs_eq plus_preal.abs_eq zero_preal.rsp)
+  let ?a1 = "Abs_preal bb"
+  let ?a2 = "Abs_preal x"
+  have "a = padd ?a1 ?a2"
+    by (metis Rep_preal Rep_preal_inverse \<open>aa = Rep_preal a\<close> \<open>aa = bb + x\<close> \<open>bb = Rep_preal b\<close> \<open>cc = Rep_preal c\<close> \<open>cc \<le> x\<close> dual_order.trans eq_onp_same_args mem_Collect_eq plus_preal.abs_eq)
+  moreover have "?a1 \<ge> b"
+    by (simp add: Rep_preal_inverse \<open>bb = Rep_preal b\<close>)
+  moreover have "?a2 \<ge> c"
+    using Rep_preal_inverse \<open>aa = Rep_preal a\<close> \<open>bb + cc \<le> aa\<close> \<open>bb = Rep_preal b\<close> \<open>cc = Rep_preal c\<close> calculation(1) less_eq_preal.rep_eq plus_preal.rep_eq by force
+  ultimately show ?thesis
+    by (metis le_iff_sup pmax_smaller)
 qed
 
 
@@ -412,7 +420,12 @@ lemma decompose_smaller_than_one:
   shows "\<exists>r. r > 0 \<and> 1 = x + r"
 proof -
   have "Abs_preal (1 - Rep_preal x) > 0 \<and> 1 = x + (Abs_preal (1 - Rep_preal x))"
-    by (smt (verit, ccfv_threshold) Rep_preal Rep_preal_inverse assms eq_onp_same_args less_preal.abs_eq mem_Collect_eq one_preal.abs_eq plus_preal.abs_eq zero_preal.abs_eq)
+  proof
+    show "Abs_preal (1 - Rep_preal x) > 0"
+      using assms less_preal.rep_eq one_preal.rep_eq pgt.rep_eq positive_real_preal preal_pnone_pgt by force
+    show "PosReal.pwrite = padd x (Abs_preal (1 - Rep_preal x))"
+      by (metis Rep_preal Rep_preal_inverse assms diff_gt_0_iff_gt eq_onp_same_args le_add_diff_inverse less_preal.rep_eq mem_Collect_eq one_preal.rep_eq order_less_imp_le plus_preal.abs_eq)
+  qed
   then show ?thesis by auto
 qed
 

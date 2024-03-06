@@ -268,7 +268,11 @@ subsection \<open>Lifting to sets\<close>
 
 lemma add_set_commm:
   "A \<otimes> B = B \<otimes> A"
-  by (smt Collect_cong add_set_def commutative  )
+proof -
+  have "\<And>A B. A \<otimes> B \<subseteq> B \<otimes> A"
+    using add_set_def local.commutative by fastforce
+  then show ?thesis by blast
+qed
 
 lemma x_elem_set_product:
   "x \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. a \<in> A \<and> b \<in> B \<and> Some x = a \<oplus> b)"
@@ -438,12 +442,17 @@ proof -
 qed
 
 lemma setify_sum_image:
-  "setify P ((Set.image f A) \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({f x} \<otimes> B))"
-  by (smt imageE image_eqI setify_sum)
+  "setify P ((Set.image f A) \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({f x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
+proof
+  show "?A \<Longrightarrow> ?B"
+    by (meson image_eqI setify_sum)
+  show "?B \<Longrightarrow> ?A"
+    by (metis (mono_tags, lifting) imageE setify_sum)
+qed
 
 lemma equivI:
   assumes "A \<ggreater> B"
-      and "B \<ggreater> A"
+    and "B \<ggreater> A"
     shows "equiv A B"
   by (simp add: assms(1) assms(2) local.equiv_def)
 
@@ -605,7 +614,8 @@ proof -
     then have "{a} \<subseteq> {b} \<otimes> {c}"
       using add_set_elem by auto
     moreover have "{b} \<otimes> {c} \<subseteq> {a}" 
-      by (smt add_set_elem calculation insert_subset option.sel singleton_iff subsetI)
+      using add_set_elem[of _ "{b}" "{c}"] calculation insert_subset option.sel singleton_iff subsetI
+      by metis
     ultimately show ?thesis by blast
   qed
   moreover have "?B \<Longrightarrow> ?A" 
@@ -657,28 +667,79 @@ begin
 definition plus_prod where "plus_prod a b = (let x = fst a \<oplus> fst b in let y = snd a \<oplus> snd b in
   if x = None \<or> y = None then None else Some (the x, the y))"
 
-lemma plus_prodI:
+lemma plus_prodIAlt:
   assumes "Some x = fst a \<oplus> fst b"
       and "Some y = snd a \<oplus> snd b"
     shows "a \<oplus> b = Some (x, y)"
-  by (smt (verit) plus_prod_def assms(1) assms(2) option.distinct(1) option.sel)
+proof -
+  have "a \<oplus> b = Some (the (fst a \<oplus> fst b), the (snd a \<oplus> snd b))"
+    using assms(1) assms(2) option.discI[of "fst a \<oplus> fst b" x] option.discI[of "snd a \<oplus> snd b" y] plus_prod_def[of a b]    
+    by presburger
+  then show ?thesis
+    by (metis assms(1) assms(2) option.sel)
+qed
+
+lemma plus_prodI:
+  assumes "Some (fst x) = fst a \<oplus> fst b"
+      and "Some (snd x) = snd a \<oplus> snd b"
+    shows "Some x = a \<oplus> b"
+proof -
+  have "a \<oplus> b = Some (the (fst a \<oplus> fst b), the (snd a \<oplus> snd b))"
+    using assms(1) assms(2) option.discI[of "fst a \<oplus> fst b" "fst x"] option.discI[of "snd a \<oplus> snd b" "snd x"] plus_prod_def[of a b]    
+    by presburger
+  then show ?thesis
+    by (metis assms(1) assms(2) option.sel prod.collapse)
+qed
 
 lemma plus_prodE:
   assumes "a \<oplus> b = Some x"
   shows "fst a \<oplus> fst b = Some (fst x) \<and> snd a \<oplus> snd b = Some (snd x)"
-  by (smt (verit) assms fst_eqD option.discI option.exhaust_sel option.sel plus_prod_def snd_conv)
+proof -
+  have "fst a \<oplus> fst b \<noteq> None \<and> snd a \<oplus> snd b \<noteq> None"
+    using assms option.discI plus_prod_def[of a b] by fastforce
+  then have "a \<oplus> b = Some (the (fst a \<oplus> fst b), the (snd a \<oplus> snd b))"
+    by (simp add: SepAlgebra.plus_prodIAlt)
+  then show ?thesis
+    by (simp add: \<open>fst a \<oplus> fst b \<noteq> None \<and> snd a \<oplus> snd b \<noteq> None\<close> assms)
+qed
 
 instance proof
   fix a b c ab bc :: "'a :: pcm \<times> 'b :: pcm"
   show "a \<oplus> b = b \<oplus> a"
     by (simp add: commutative plus_prod_def)
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
-    by (smt (verit, del_insts) plus_prod_def asso2 option.discI option.exhaust_sel option.sel prod.sel(1) prod.sel(2))
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    by (smt (z3) plus_prod_def asso1 option.discI option.exhaust_sel option.sel prod.sel(1) prod.sel(2))
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
-    by (smt (verit, best) plus_prodE plus_prodI positivity prod.collapse)
+  assume "a \<oplus> b = Some ab \<and> b \<oplus> c = None"
+  show "ab \<oplus> c = None"
+  proof (cases "fst b \<oplus> fst c")
+    case None
+    then show ?thesis
+      by (metis (mono_tags, opaque_lifting) \<open>a \<oplus> b = Some ab \<and> b \<oplus> c = None\<close> asso2 option.exhaust option.simps(3) plus_prodE)
+  next
+    case (Some aa)
+    then have "snd b \<oplus> snd c = None"
+      by (metis \<open>a \<oplus> b = Some ab \<and> b \<oplus> c = None\<close> option.distinct(1) option.exhaust plus_prodIAlt)
+    then show ?thesis
+      by (metis (mono_tags, opaque_lifting) \<open>a \<oplus> b = Some ab \<and> b \<oplus> c = None\<close> asso2 not_None_eq plus_prodE)
+  qed
+next
+  fix a b c ab bc :: "'a :: pcm \<times> 'b :: pcm"
+  assume "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc"
+  then have "fst a \<oplus> fst b = Some (fst ab) \<and> fst b \<oplus> fst c = Some (fst bc) \<and> snd a \<oplus> snd b = Some (snd ab) \<and> snd b \<oplus> snd c = Some (snd bc)"
+    using SepAlgebra.plus_prodE by blast
+  then have "fst ab \<oplus> fst c = fst a \<oplus> fst bc \<and> snd ab \<oplus> snd c = snd a \<oplus> snd bc"
+    by (meson asso1)
+  then show "ab \<oplus> c = a \<oplus> bc"
+    by (simp add: plus_prod_def)
+next
+  fix a b c :: "'a :: pcm \<times> 'b :: pcm"
+
+  assume "a \<oplus> b = Some c" "Some c = c \<oplus> c"
+  then have "Some (fst a) = fst a \<oplus> fst a \<and> Some (snd a) = snd a \<oplus> snd a"
+    using plus_prodE[of a b] plus_prodE[of c c] positivity
+    by metis
+  then show "Some a = a \<oplus> a"
+    using SepAlgebra.plus_prodIAlt by fastforce
 qed
+
 
 lemma greater_prod_eq:
   "x \<succeq> y \<longleftrightarrow> (fst x \<succeq> fst y) \<and> (snd x \<succeq> snd y)" (is "?A \<longleftrightarrow> ?B")
@@ -695,7 +756,7 @@ next
   then obtain r1 r2 where "Some (fst x) = fst y \<oplus> r1 \<and> Some (snd x) = snd y \<oplus> r2"
     by (meson greater_def)
   then have "Some x = y \<oplus> (r1, r2)"
-    using SepAlgebra.plus_prodI by fastforce
+    using SepAlgebra.plus_prodIAlt by fastforce
   then show ?A
     using greater_def by auto
 qed
@@ -830,7 +891,8 @@ instance proof
       then obtain l where "ab l \<oplus> c l = None"
         by (metis compatible_fun_def option.discI plus_fun_def)
       then have "a l \<oplus> bc l = None"
-        by (smt (verit, del_insts) asm0 asso1 compatible_fun_def option.discI option.exhaust_sel option.sel plus_fun_def)
+        using SepAlgebra.plus_funE[of ab a b] plus_funE[of bc b c] asm0 asso1
+        by metis
       then show ?thesis
         by (metis None compatible_fun_def plus_fun_def)
     next
@@ -841,7 +903,8 @@ instance proof
         have "ab l \<oplus> c l \<noteq> None"
           by (metis Some compatible_funE option.discI plus_fun_def)
         then show "a l \<oplus> bc l \<noteq> None"
-          by (smt (verit, del_insts) asm0 asso1 compatible_fun_def option.discI option.exhaust_sel option.sel plus_fun_def)
+          using asso1[of "a l" "b l" "ab l" "c l" "bc l"]
+          by (metis asm0 plus_funE)
       qed
       then obtain f' where "Some f' = a \<oplus> bc"
         by (simp add: plus_fun_def)
@@ -849,7 +912,8 @@ instance proof
       proof (rule ext)
         fix l 
         have "ab l \<oplus> c l = a l \<oplus> bc l"
-          by (smt (verit) asm0 asso1 compatible_funE option.discI option.exhaust_sel option.sel plus_fun_def)
+          using asso1[of "a l" "b l" "ab l" "c l" "bc l"]
+          by (metis SepAlgebra.plus_funE asm0)
         then show "f l = f' l"
           by (metis (no_types, lifting) Some calculation option.discI option.sel plus_fun_def)
       qed
@@ -864,7 +928,9 @@ instance proof
   have "compatible_fun a a"
   proof (rule compatible_funI)
     fix l show "a l \<oplus> a l \<noteq> None"
-      by (smt (verit) asm0(1) asm0(2) asso2 commutative compatible_fun_def option.discI option.exhaust_sel option.sel plus_fun_def)
+      using asm0(1) asm0(2) asso2[of "b l" "a l" ]
+        commutative[of "a l"] plus_fun_def[of c c] plus_fun_def[of a b]
+      by (metis option.discI plus_funE)
   qed
   then obtain aa where "Some aa = a \<oplus> a"
     by (simp add: plus_fun_def)
@@ -909,6 +975,27 @@ fun plus_option where
 | "plus_option x None = Some x"
 | "plus_option (Some a) (Some b) = (let r = a \<oplus> b in if r = None then None else Some r)"
 
+lemma plus_optionI:
+  assumes "x = Some xx"
+      and "y = Some yy"
+      and "Some a = xx \<oplus> yy"
+    shows "Some (Some a) = x \<oplus> y"
+  using assms(1) assms(2) assms(3) option.discI by fastforce
+
+lemma plus_option_Some_None:
+  "Some x \<oplus> Some y = None \<longleftrightarrow> x \<oplus> y = None"
+  using option.discI by fastforce
+
+lemma plus_optionE:
+  assumes "x = Some xx"
+      and "a = Some aa"
+      and "b = Some bb"
+      and "Some x = a \<oplus> b"
+    shows "Some xx = aa \<oplus> bb"
+  using plus_option.simps(3)[of aa bb]
+  by (metis (mono_tags, lifting) assms(1) assms(2) assms(3) assms(4) option.discI option.inject)
+  
+
 instance proof
   fix a b c ab bc :: "('a :: pcm) option"
 
@@ -918,11 +1005,38 @@ instance proof
     by (metis commutative option.exhaust plus_option.simps(1) plus_option.simps(2) plus_option.simps(3))
 
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    by (smt (verit) asso1 option.discI option.sel plus_option.elims)
+    apply (cases a; cases b; cases c)
+           apply simp_all
+       apply fastforce+
+     apply (cases ab)
+        apply force
+       apply force
+    apply (cases ab; cases bc)
+    apply (metis (mono_tags) option.discI option.inject)
+    apply (metis (mono_tags, lifting) option.discI option.inject)
+     apply (metis (mono_tags, lifting) option.discI option.inject)
+  proof -
+    fix a' b' c' ab' bc'
+    assume "(let r = a' \<oplus> b' in if r = None then None else Some r) = Some ab \<and>
+       (let r = b' \<oplus> c' in if r = None then None else Some r) = Some bc"
+      "a = Some a'" "b = Some b'" "c = Some c'" "ab = Some ab'" "bc = Some bc'"
+    then have "ab' \<oplus> c' = a' \<oplus> bc'"
+      using asso1[of a' b' ab' c' bc']
+      by (metis (mono_tags, lifting) option.discI option.inject)
+    then show "ab \<oplus> Some c' = Some a' \<oplus> bc"
+      by (simp add: \<open>ab = Some ab'\<close> \<open>bc = Some bc'\<close>)
+  qed
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
-    by (smt (verit) asso2 option.distinct(1) option.inject plus_option.elims)
+    apply (cases a; cases b; cases c; cases ab)
+    apply auto[14]
+    using option.discI option.sel plus_option.simps(3)[of "the a" "the b"]
+    apply (metis (full_types))
+    by (metis SepAlgebra.plus_option_Some_None asso2 plus_optionE)
   show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
-    by (smt (verit, ccfv_threshold) option.discI option.sel plus_option.elims positivity)
+    apply (cases a; cases b; cases c)
+           apply auto[6]
+     apply (metis SepAlgebra.plus_optionI SepAlgebra.plus_option_Some_None not_Some_eq option.inject)
+    by (metis plus_optionE plus_optionI positivity)
 qed
 
 end
@@ -961,9 +1075,11 @@ lemma result_sum_partial_functions:
   shows "a l = None \<Longrightarrow> x l = b l"
     and "b l = None \<Longrightarrow> x l = a l"
     and "a l = Some va \<and> b l = Some vb \<Longrightarrow> x l = va \<oplus> vb"
-  apply (metis (no_types, lifting) assms option.discI option.sel plus_fun_def plus_option.elims)
-  apply (smt (verit) assms option.discI option.sel plus_fun_def plus_option.elims)
-  by (smt (verit, ccfv_SIG) assms compatible_funE option.discI option.sel plus_fun_def plus_option.simps(3))
+    apply (metis (no_types, lifting) assms option.discI option.sel plus_fun_def plus_option.elims)
+
+   apply (metis (mono_tags, opaque_lifting) assms commutative option.inject plus_funE plus_option.simps(1))
+  using assms option.discI option.inject plus_funE[of x a b] plus_option.simps(3)[of va vb]
+  by (metis (full_types))
 
 subsection \<open>Sum\<close>
 
@@ -1166,10 +1282,10 @@ lemma minus_unique:
       and "Some b = a \<oplus> y \<and> y \<succeq> |b|"
     shows "x = y"
 proof -
-  have "|x| = |b|" 
-    by (smt assms(1) asso1 core_is_pure core_sum max_projection_prop_pure_core mpp_invo smaller_than_core)
-  moreover have "|y| = |b|" 
-    by (smt assms(2) asso1 core_is_pure core_sum max_projection_prop_pure_core mpp_invo smaller_than_core)
+  have "|x| = |b|"
+    by (metis assms(1) local.commutative local.greater_equiv local.succ_trans smaller_than_core)
+  moreover have "|y| = |b|"
+    by (meson assms(2) local.greater_def local.greater_equiv local.succ_trans smaller_than_core)
   ultimately show ?thesis
     using assms(1) assms(2) cancellative by auto
 qed
@@ -1210,7 +1326,7 @@ proof (cases "a \<succeq> b")
   then have "Some a = b \<oplus> (a \<ominus> b) \<and> a \<ominus> b \<succeq> |a|"
     using minus_equiv_def by auto
   then show ?thesis 
-    by (smt asso1 core_is_pure core_sum max_projection_prop_pure_core mpp_invo smaller_than_core)
+    by (meson local.greater_def local.greater_equiv local.succ_trans smaller_than_core)
 next
   case False
   then show ?thesis by (simp add: minus_default)
@@ -1286,7 +1402,12 @@ lemma smaller_pure_sum_smaller:
       and "Some x = a \<oplus> b"
       and "pure b"
     shows "y \<succeq> x"
-  by (smt addition_bigger assms(1) assms(2) assms(3) assms(4) asso1 commutative minus_equiv_def pure_def)
+proof -
+  have "Some y = y \<oplus> b"
+    by (metis assms(2) assms(4) local.asso1 local.greater_equiv local.pure_def)
+  then show ?thesis
+    using assms(1) assms(3) local.addition_bigger by blast
+qed
 
 
 
@@ -1326,10 +1447,11 @@ proof -
     by (simp add: minus_equiv_def_any_elem)
   then obtain yy where "Some yy = (x \<ominus> a) \<oplus> r" 
     by (metis (full_types) \<open>Some y = x \<oplus> r\<close> assms(2) asso3 commutative minus_equiv_def not_Some_eq)
-  moreover obtain y' where "Some y' = yy \<oplus> a" 
-    by (smt \<open>Some y = x \<oplus> r\<close> assms(2) asso1 calculation commutative minus_equiv_def)
-  moreover have "y \<succeq> y'" 
-    by (smt \<open>Some y = x \<oplus> r\<close> assms(2) asso1 calculation(1) calculation(2) commutative minus_equiv_def option.sel succ_refl)
+  moreover obtain y' where "Some y' = yy \<oplus> a"
+    using \<open>Some y = x \<oplus> r\<close> assms(2) calculation local.asso1[of r] local.commutative minus_equiv_def[of x a] by metis
+  moreover have "y \<succeq> y'"
+    using \<open>Some y = x \<oplus> r\<close> assms(2) asso1 calculation(1) calculation(2) commutative[of a yy] minus_equiv_def[of x a]
+      option.sel succ_refl[of y] by metis
   moreover obtain x' where "Some x' = (x \<ominus> a) \<oplus> a" 
     using assms(2) commutative minus_equiv_def by fastforce
   then have "y \<succeq> x'" 
@@ -1448,23 +1570,23 @@ instance proof
   fix x y a b c :: "'a :: pcm_with_core \<times> 'b :: pcm_with_core"
 
   show "Some a = a \<oplus> |a|"
-    by (simp add: core_def core_is_smaller plus_prodI)
+    by (simp add: core_def core_is_smaller plus_prodIAlt)
 
   show "Some |a| = |a| \<oplus> |a|"
-    by (metis (mono_tags, opaque_lifting) SepAlgebra.core_def plus_prodI core_is_pure fst_eqD snd_eqD)
+    by (metis (mono_tags, opaque_lifting) SepAlgebra.core_def plus_prodIAlt core_is_pure fst_eqD snd_eqD)
 
   show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
   proof -
     assume asm0: "Some x = x \<oplus> c"
     then obtain r1 r2 where "Some |fst x| = fst c \<oplus> r1" "Some |snd x| = snd c \<oplus> r2"
-      by (smt (verit, best) plus_prod_def core_max fst_conv option.discI option.exhaust_sel option.sel snd_conv)
+      by (metis core_max plus_prodE)
     then show "\<exists>r. Some |x| = c \<oplus> r"
-      by (metis core_def fst_eqD plus_prodI snd_conv)
+      by (metis core_def fst_eqD plus_prodIAlt snd_conv)
   qed
 
   show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
-    by (smt (z3) plus_prodE core_def core_sum eq_snd_iff plus_prodI prod.sel(1))
-
+    using plus_prodE[of a b c] core_def[of a] core_def[of b] core_def[of c]
+      plus_prodIAlt[of "fst |c|" "|a|" "|b|"] core_sum eq_snd_iff  prod.sel(1) by metis
   show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
     by (metis plus_prodE cancellative core_def prod.collapse prod.sel(1) prod.sel(2))
 qed
@@ -1530,7 +1652,12 @@ instance proof
       have "Some (x l) = (x l) \<oplus> (c l)"
         by (metis (mono_tags, lifting) asm0 compatible_funE option.discI option.expand option.sel plus_fun_def)
       then show "xx l = |x| l"
-        by (smt (verit, ccfv_SIG) \<open>compatible_fun c |x|\<close> asso1 calculation core_fun core_is_pure core_max option.sel plus_fun_def positivity)
+        using core_fun[of x l] core_is_pure[of "x l"] core_max[of "x l" "c l"]
+         plus_fun_def[of c "|x|"] \<open>compatible_fun c |x|\<close> asso1[of "c l" _]
+          calculation
+          option.sel
+          positivity[of _ _ "|x l|"]
+        by metis
     qed
     ultimately show "\<exists>r. Some |x| = c \<oplus> r"
       by blast
@@ -1553,8 +1680,8 @@ instance proof
     proof (rule ext)
       fix l 
       show "x l = |c| l"
-        by (smt (z3) asm0 calculation compatible_funE core_fun core_sum option.discI option.exhaust_sel option.sel plus_fun_def)
-
+        using asm0 calculation core_fun[of _ l] core_sum[of "c l" "a l" "b l"] option.sel plus_funE[of c a b] plus_funE[of x]
+        by (metis (mono_tags))
     qed
     ultimately show "Some |c| = |a| \<oplus> |b|" by simp
   qed
@@ -1581,32 +1708,61 @@ fun core_option where
   "core_option None = None"
 | "core_option (Some x) = Some |x|"
 
+lemma core_option_None:
+  "|x| = None \<longleftrightarrow> x = None"
+  using core_option.elims by blast
+
+lemma core_option_Some:
+  "|x| \<noteq> None \<longleftrightarrow> x \<noteq> None"
+  by (simp add: core_option_None)
+
 instance proof
   fix x y a b c :: "'a option"
   show "Some x = x \<oplus> |x|"
     apply (cases x)    
      apply simp
-    by (smt (verit, ccfv_threshold) core_is_smaller core_option.simps(2) option.discI option.sel plus_option.elims)
+    using core_is_smaller core_option.simps(2) plus_optionI by blast
 
 
   show "Some |x| = |x| \<oplus> |x|"
     apply (cases x)
-    apply simp
-    by (smt (verit, ccfv_threshold) core_is_pure core_option.simps(2) option.discI option.inject plus_option.elims)
+     apply simp    
+    using core_is_pure plus_optionI by fastforce
 
 
   show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
     apply (cases x)
     apply force
     apply (cases c)
-    apply simp
-    by (smt (verit, del_insts) core_max core_option.simps(2) option.discI option.sel plus_option.simps(3))
+     apply simp
+    by (metis core_max core_option.simps(2) plus_optionE plus_optionI)
 
-  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"    
-    by (smt (verit) core_option.elims core_sum option.discI option.inject plus_option.elims)
-
+  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
+    apply (cases a; cases b; cases c)
+           apply auto[6]
+     apply (metis option.distinct(1) option.exhaust_sel option.inject plus_optionI plus_option_Some_None)
+  proof -
+    fix a' b' c' assume "Some c = a \<oplus> b" "a = Some a'" "b = Some b'" "c = Some c'"
+    then have "Some |c'| = |a'| \<oplus> |b'|"
+      using core_sum plus_optionE by blast
+    then show "Some |c| = |a| \<oplus> |b|"
+      using \<open>a = Some a'\<close> \<open>b = Some b'\<close> \<open>c = Some c'\<close> plus_optionI by fastforce
+  qed
   show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-    by (smt (verit) cancellative core_option.elims option.discI option.inject plus_option.elims)
+    apply (cases a; cases b; cases x; cases y)
+                   apply auto[7]
+            apply (metis option.collapse option.inject option.simps(3) plus_optionI plus_option_Some_None)
+           apply auto[5]
+      apply (metis core_option_None)
+    apply auto[1]
+  proof -
+    fix a' b' x' y'
+    assume "Some a = b \<oplus> x" "Some a = b \<oplus> y" "|x| = |y|" "a = Some a'" "b = Some b'" "x = Some x'" "y = Some y'"
+    then have "x' = y'" using cancellative[of a' b' x' y']
+      by (metis core_option.simps(2) option.inject plus_optionE)
+    then show "x = y"
+      by (simp add: \<open>x = Some x'\<close> \<open>y = Some y'\<close>)
+  qed
 qed
 
 end
@@ -1623,7 +1779,19 @@ fun core_sum where
 instance proof
   fix x y a b c :: "'a + 'b"
   show "Some x = x \<oplus> |x|"
-    by (smt (verit) Inr_not_Inl core_is_smaller core_sum.simps(1) core_sum.simps(2) option.discI option.sel plus_sum.elims sum.sel(1) sum.sel(2))
+  proof (cases x)
+    case (Inl a)
+    then have "Some a = a \<oplus> |a|"
+      by (simp add: core_is_smaller)
+    then show ?thesis
+      using Inl option.discI by fastforce
+  next
+    case (Inr b)
+    then have "Some b = b \<oplus> |b|"
+      by (simp add: core_is_smaller)
+    then show ?thesis
+      using Inr option.discI by fastforce
+  qed
   show "Some |x| = |x| \<oplus> |x|"
   proof (cases x)
     case (Inl a)
@@ -1773,12 +1941,14 @@ instance proof
   show "\<alpha> \<odot> (\<beta> \<odot> x) = pmult \<alpha> \<beta> \<odot> x"
     by (simp add: mult_mult mult_prod_def)
   show "Some (padd \<alpha> \<beta> \<odot> x) = \<alpha> \<odot> x \<oplus> \<beta> \<odot> x"
-    by (smt (verit, ccfv_SIG) SepAlgebra.mult_prod_def distrib_scala_mult fst_eqD plus_prodI snd_eqD)
+    apply (rule plus_prodI)
+    apply (simp add: SepAlgebra.mult_prod_def distrib_scala_mult)
+    by (simp add: SepAlgebra.mult_prod_def distrib_scala_mult)
   assume "Some x = a \<oplus> b"
   then have "Some (\<alpha> \<odot> fst x) = (\<alpha> \<odot> fst a) \<oplus> (\<alpha> \<odot> fst b) \<and> Some (\<alpha> \<odot> snd x) = (\<alpha> \<odot> snd a) \<oplus> (\<alpha> \<odot> snd b)"
     by (metis distrib_state_mult plus_prodE)
   then show "Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
-    by (metis fst_eqD mult_prod_def plus_prodI snd_eqD)
+    by (metis fst_eqD mult_prod_def plus_prodIAlt snd_eqD)
 qed
 
 end
@@ -1827,7 +1997,8 @@ instance proof
   moreover have "ff = \<alpha> \<odot> f"
   proof (rule ext)
     fix x show "ff x = (\<alpha> \<odot> f) x"
-      by (smt (verit) asm0 calculation distrib_state_mult mult_fun_def option.sel plus_funE)
+      using asm0 calculation distrib_state_mult mult_fun_def option.sel plus_funE[of _ a b] plus_funE[of _ "\<alpha> \<odot> a" "\<alpha> \<odot> b"]
+      by metis
   qed
   ultimately show "Some (\<alpha> \<odot> f) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
     by blast
@@ -1851,17 +2022,31 @@ instance proof
   show "\<alpha> \<odot> (\<beta> \<odot> x) = pmult \<alpha> \<beta> \<odot> x"
     by (metis SepAlgebra.mult_option.simps(1) mult_mult mult_option.simps(2) not_Some_eq)
   show "Some (padd \<alpha> \<beta> \<odot> x) = \<alpha> \<odot> x \<oplus> \<beta> \<odot> x"
-    by (smt (verit, ccfv_SIG) SepAlgebra.mult_option.elims distrib_scala_mult option.discI option.inject plus_option.elims)
+    apply (cases x)
+    apply simp
+    using distrib_scala_mult plus_optionI by fastforce
   assume asm0: "Some x = a \<oplus> b"
   show "Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
   proof (cases "a \<noteq> None \<and> b \<noteq> None \<and> x \<noteq> None")
     case True
+    then obtain aa bb xx where "a = Some aa \<and> b = Some bb \<and> x = Some xx"
+      by blast
+    then have "Some xx = aa \<oplus> bb"
+      using asm0 plus_optionE by blast
+    then have "Some (\<alpha> \<odot> xx) = \<alpha> \<odot> aa \<oplus> \<alpha> \<odot> bb"
+      by (simp add: distrib_state_mult)
     then show ?thesis
-      by (smt (verit) SepAlgebra.mult_option.elims asm0 distrib_state_mult option.discI option.sel plus_option.elims)
+      using SepAlgebra.mult_option.simps(2) \<open>a = Some aa \<and> b = Some bb \<and> x = Some xx\<close> option.discI by fastforce
   next
     case False
     then show ?thesis
-      by (smt (verit, ccfv_threshold) SepAlgebra.mult_option.simps(1) asm0 asso1 commutative option.inject plus_option.simps(1) positivity)
+      apply (cases a)
+      using asm0 apply force
+      apply (cases b)
+      using asm0 apply auto[1]
+      apply (cases x)
+      apply (metis asm0 asso1 option.distinct(1) option.inject plus_option.simps(1) positivity)
+      by simp
   qed
 qed
 
@@ -1959,7 +2144,7 @@ lemma already_stable: "stable x \<Longrightarrow> stabilize x = x"
   using local.already_stable_rel local.stable_def stabilize_def by force
 
 lemma stabilize_rel_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
-  by (smt (verit, del_insts) local.commutative local.core_is_smaller local.stabilize_rel_sum_double local.stabilize_rel_sum_pure local.u_neutral option.inject stabilize_def)
+  by (simp add: local.stabilize_rel_sum_double stabilize_def)
 
 lemma stabilize_is_stable: "stable (stabilize x)"
   by (simp add: local.stabilize_rel_is_stable_rel local.stable_def stabilize_def)
@@ -1979,7 +2164,10 @@ lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> sta
 
 lemma max_projection_prop_stable_rel_stabilize_rel:
   "max_projection_prop (stable_rel x) (stabilize_rel x)"
-  by (smt (verit, ccfv_threshold) local.already_stable_rel local.greater_def local.max_projection_prop_def local.stabilize_rel_is_stable_rel local.stabilize_rel_sum_pure stabilize_rel_mono_right)
+  apply (rule max_projection_propI)
+  using local.greater_def local.stabilize_rel_sum_pure apply blast
+  apply (simp add: local.stabilize_rel_is_stable_rel)
+  by (metis local.already_stable_rel stabilize_rel_mono_right)
 
 lemma max_projection_prop_stable_stabilize:
   "max_projection_prop stable stabilize"
@@ -2184,39 +2372,16 @@ definition u_prod :: "'a \<times> 'b" where
   "u_prod = (u, u)"
 
 instance
-(*
-  fix x y a b :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
-
-  show "sep_algebra_class.stable (stabilize x)"
-    by (simp add: SepAlgebra.stable_prod_def stabilize_is_stable stabilize_prod_def)
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    by (simp add: SepAlgebra.stabilize_prod_def SepAlgebra.stable_prod_def already_stable)
-  show "stable_rel a x \<Longrightarrow> stabilize_rel a x = x"
-    by (simp add: SepAlgebra.stabilize_rel_prod_def already_stable_rel stable_rel_prod_def)
-  show "x \<succeq> a \<Longrightarrow> stabilize_rel b x \<succeq> stabilize_rel b a"
-    by (simp add: greater_prod_eq stabilize_rel_mono stabilize_rel_prod_def)
-  show "x \<succeq> stabilize_rel a x \<and> stabilize_rel a x \<succeq> stabilize x"
-    by (simp add: greater_prod_eq stabilize_order stabilize_prod_def stabilize_rel_prod_def)
-  show "stable_rel a (stabilize_rel a x)"
-    by (simp add: SepAlgebra.stable_rel_prod_def stabilize_rel_is_stable_rel stabilize_rel_prod_def)
-
-  show "Some x = stabilize x \<oplus> |x|"
-    sorry
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
-    sorry
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    sorry
-
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    sorry
-qed
-*)
 proof
   fix x a :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
   show "Some x = stabilize_rel a x \<oplus> |x|"
-    by (smt (verit, del_insts) core_def core_is_smaller fst_eqD plus_prod_def snd_eqD stabilize_rel_prod_def stabilize_rel_sum_pure)
+    apply (rule plus_prodI)
+    apply (simp add: core_def stabilize_rel_prod_def stabilize_rel_sum_pure)
+    by (simp add: core_def stabilize_rel_prod_def stabilize_rel_sum_pure)
   show "Some x = x \<oplus> u"
-    by (smt (verit, del_insts) SepAlgebra.u_prod_def fst_conv not_None_eq option.sel plus_prod_def prod.exhaust_sel snd_conv u_neutral)
+    apply (rule plus_prodI)
+    apply (simp add: u_neutral u_prod_def)
+    by (simp add: u_neutral u_prod_def)
   show "stable_rel a (stabilize_rel a x)"
     by (simp add: stable_rel_prod_def stabilize_rel_is_stable_rel stabilize_rel_prod_def)
   assume "stable_rel a x"
@@ -2224,11 +2389,30 @@ proof
     by (simp add: stabilize_rel_prod_def already_stable_rel stable_rel_prod_def)
 next
   fix a b x y :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
-  assume "Some x = a \<oplus> b"
-  then show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    by (smt (verit) fst_eqD plus_prodE plus_prodI snd_eqD stabilize_rel_all_sum stabilize_rel_prod_def)
+  assume asm0: "Some x = a \<oplus> b"
+  then have "Some (fst (stabilize_rel y x)) = fst (stabilize_rel y a) \<oplus> fst (stabilize_rel y b)"
+    by (metis (mono_tags, lifting) SepAlgebra.stabilize_rel_prod_def fst_eqD plus_prodE stabilize_rel_all_sum)
+  moreover have "Some (snd (stabilize_rel y x)) = snd (stabilize_rel y a) \<oplus> snd (stabilize_rel y b)"
+    using asm0
+    by (metis (mono_tags, lifting) SepAlgebra.stabilize_rel_prod_def plus_prodE snd_conv stabilize_rel_all_sum)
+  ultimately show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
+    by (simp add: plus_prodIAlt)
+  thm plus_prodIAlt
+(*
+  have "Some (fst (stabilize_rel u x)) = fst (stabilize_rel u a) \<oplus> fst (stabilize_rel a b)"
+*)
+  thm plus_prodI
   show "Some (stabilize_rel u x) = stabilize_rel u a \<oplus> stabilize_rel a b"
-    by (smt (verit) \<open>Some x = a \<oplus> b\<close> fst_conv plus_prodE plus_prodI snd_conv stabilize_rel_prod_def stabilize_rel_sum_double u_prod_def)
+  proof (rule plus_prodI)
+    show "Some (fst (stabilize_rel u x)) = fst (stabilize_rel u a) \<oplus> fst (stabilize_rel a b)"
+      using asm0 stabilize_rel_sum_double[of "fst x"] plus_prodE[of a b x]
+        SepAlgebra.u_prod_def fst_eqD stabilize_rel_prod_def[of u] stabilize_rel_prod_def[of a]
+      by (metis (mono_tags))
+    show "Some (snd (stabilize_rel u x)) = snd (stabilize_rel u a) \<oplus> snd (stabilize_rel a b)"
+      using asm0 stabilize_rel_sum_double[of "snd x"] plus_prodE[of a b x]
+        SepAlgebra.u_prod_def snd_eqD stabilize_rel_prod_def[of u] stabilize_rel_prod_def[of a]
+      by (metis (mono_tags))
+  qed
 next
   fix a b x :: "'a :: sep_algebra \<times> 'b :: sep_algebra"
   assume "a \<succeq> b"
@@ -2272,19 +2456,26 @@ proof
   show "Some x = stabilize_rel a x \<oplus> |x|"
     by (simp add: core_fun plus_funI stabilize_rel_fun stabilize_rel_sum_pure)
   show "Some x = x \<oplus> u"
-    by (smt (verit) plus_funI u_fun_def u_neutral)
+    using plus_funI[of _ x u] u_fun_def u_neutral by fastforce
   show "stable_rel a (stabilize_rel a x)"
     by (simp add: stabilize_rel_fun stabilize_rel_is_stable_rel stable_rel_fun)
   assume "stable_rel a x"
-  then show "stabilize_rel a x = x"
-    by (smt (verit, del_insts) SepAlgebra.u_fun_def \<open>Some x = x \<oplus> u\<close> already_stable_rel cancellative commutative core_is_smaller plus_funI smaller_than_core stabilize_rel_fun stable_rel_fun succ_refl u_neutral)
+  show "stabilize_rel a x = x"
+  proof (rule ext)
+    fix l show "stabilize_rel a x l = x l"
+      by (metis \<open>stable_rel a x\<close> already_stable_rel stabilize_rel_fun stable_rel_fun)
+  qed
 next
   fix a b x y :: "'a \<Rightarrow> 'b :: sep_algebra"
   assume "Some x = a \<oplus> b"
   then show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    by (smt (verit, ccfv_threshold) plus_funE plus_funI stabilize_rel_all_sum stabilize_rel_fun)
+    using plus_funE[of x a b] plus_funI[of "stabilize_rel y x" "stabilize_rel y a" "stabilize_rel y b"]
+      stabilize_rel_all_sum stabilize_rel_fun[of y ]
+    by fastforce
   show "Some (stabilize_rel u x) = stabilize_rel u a \<oplus> stabilize_rel a b"
-    by (smt (verit, ccfv_threshold) \<open>Some x = a \<oplus> b\<close> plus_funE plus_funI stabilize_rel_fun stabilize_rel_sum_double u_fun_def)
+    using  \<open>Some x = a \<oplus> b\<close> plus_funE[of x a b] plus_funI[of "stabilize_rel u x" "stabilize_rel u a" "stabilize_rel a b"]
+      stabilize_rel_fun[of a] stabilize_rel_fun[of u] stabilize_rel_sum_double u_fun_def
+    by fastforce
 next
   fix a b x :: "'a \<Rightarrow> 'b :: sep_algebra"
   assume "a \<succeq> b"
@@ -2330,59 +2521,9 @@ lemma and_entails_star:
       and "B \<omega>"
       and "non_overlapping A B"
     shows "star A B \<omega>"
-  by (smt (verit, ccfv_SIG) assms(1) assms(2) assms(3) non_overlapping_def star_def)
+  using non_overlapping_def star_def[of A B \<omega>] assms(1) assms(2) assms(3) 
+  by metis
 
 end
-
-definition wf_mono where
-  "wf_mono is_wf \<longleftrightarrow> (\<forall>h h0 h1. h1 \<succeq> h \<and> h \<succeq> h0 \<and> is_wf h0 \<and> is_wf h1 \<longrightarrow> is_wf h)"
-
-definition wf_plus where
-  "wf_plus is_wf a b = (let r = a \<oplus> b in if r = None then None else if is_wf (the r) then r else None)"
-
-lemma wf_plus_commutative:
-  "wf_plus is_wf a b = wf_plus is_wf b a"
-proof (cases "a \<oplus> b")
-  case None
-  then show ?thesis
-    by (simp add: commutative wf_plus_def)
-next
-  case (Some ab)
-  then have "Some ab = a \<oplus> b" by simp
-  then show ?thesis
-  proof (cases "is_wf ab")
-    case True
-    then show ?thesis 
-      by (simp add: commutative wf_plus_def)
-  next
-    case False
-    then show ?thesis
-      by (simp add: commutative wf_plus_def)
-  qed
-qed
-
-lemma wf_asso1:
-    assumes "wf_plus is_wf a b = Some ab \<and> wf_plus is_wf b c = Some bc"
-    shows "wf_plus is_wf ab c = wf_plus is_wf a bc"
-  by (smt (verit, ccfv_SIG) assms asso1 option.distinct(1) wf_plus_def)
-
-lemma wf_positivity:
-  assumes "is_wf a"
-      and "wf_plus is_wf a b = Some c"
-      and "Some c = wf_plus is_wf c c"
-    shows "Some a = wf_plus is_wf a a"
-  by (smt (verit, best) assms option.distinct(1) option.sel positivity wf_plus_def)
-
-lemma wf_asso2:
-  assumes "is_wf b"
-      and "wf_mono is_wf"
-      and "wf_plus is_wf a b = Some ab"
-      and "wf_plus is_wf b c = None"
-  shows "wf_plus is_wf ab c = None"  
-  by (smt (verit, best) assms compatible_smaller greater_def greater_equiv wf_mono_def option.exhaust_sel option.inject option.simps(3) wf_plus_def)
-
-
-
-
 
 end
