@@ -82,10 +82,10 @@ section \<open>2 Viper and Boogie: Background and Semantics (Start of Step-by-St
 
 subsection \<open>2.1 The Viper and Boogie languages\<close>
 
-text \<open>The Viper AST for statements (\<open>VStmt\<close> at the top of Figure 1) is defined in \<^typ>\<open>ViperLang.stmt\<close>.
-      The Boogie AST for statement blocks (\<open>BStmtBlock\<close>) is defined in \<^typ>\<open>Ast.bigblock\<close>\<close>
+text \<open>The Viper AST for statements (\<open>VStmt\<close> in Figure 1) is defined in \<^typ>\<open>ViperLang.stmt\<close>.
+      The Boogie AST for statement blocks (\<open>BStmtBlock\<close> in Figure 1) is defined in \<^typ>\<open>Ast.bigblock\<close>.      
 
-text \<open>Both formalised ASTs includes a larger subset than presented in the paper (for example,
+      Both formalised ASTs includes a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is relevant. 
       For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the paper subset.
       It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>, \<^const>\<open>assert_in_paper_subset_no_rec\<close>,
@@ -95,9 +95,14 @@ text \<open>Both formalised ASTs includes a larger subset than presented in the 
       Note that \<^term>\<open>Acc e f (PureExp ep)\<close> denotes the accessibilty predicate \<open>acc(e.f, ep)\<close> in the paper
       and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.
       
+      In Boogie, note that \<^term>\<open>ParsedIf (Some(b)) s1 s2\<close> corresponds to \<open>if(b) { s1 } else { s1 }\<close> in the paper
+      and \<^term>\<open>ParsedIf None s1 s2\<close> corresponds to \<open>if(*) { s1 } else { s2 }\<close> in the paper (the latter is
+      a nondeterministic if-statement).
+      
       Some of our definitions in the formalisations are generalised to also work for features outside
-      the subset. These generalisations are not relevant here and throughout this file, we will make clear 
-      which parts are relevant.\<close>
+      the subset presented in the paper. These generalisations are not relevant here and throughout 
+      this file, we will make clear which parts are relevant.
+\<close>
 
 subsection \<open>2.2: Boogie Semantics\<close>
 
@@ -115,8 +120,9 @@ text \<open>The single step execution of a Boogie statement is expressed via \<^
 
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
       0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
-      where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.
-      Note that this semantics uses the semantics for simple commands (asserts, assumes, assignments, havocs)
+      where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>. Program points (i.e. \<^term>\<open>\<gamma>\<close> and \<^term>\<open>\<gamma>'\<close> in the example)
+      are expressed via the type product type \<^typ>\<open>bigblock * cont\<close> where \<^typ>\<open>cont\<close> is a continuation.
+      Note that this semantics uses the semantics for simple commands (asserts, assumes, assignments, and havocs)
       defined in \<^const>\<open>red_cmd\<close>.
 \<close>
 
@@ -127,7 +133,7 @@ text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<cl
       Viper states are defined via the record type \<^typ>\<open>'a full_total_state\<close>. The type parameter
       \<^typ>\<open>'a\<close> is not relevant for the Viper subset in the paper.
 
-      Given a Viper state \<^term>\<open>\<sigma>\<^sub>v :: 'a full_total_state\<close>, its components are:
+      Given a Viper state \<^term>\<open>\<sigma>\<^sub>v :: 'a full_total_state\<close>, its main components are:
         \<^item> the store: \<^term>\<open>get_store_total \<sigma>\<^sub>v\<close>
         \<^item> the heap: \<^term>\<open>get_hh_total_full \<sigma>\<^sub>v\<close> 
         \<^item> the permission mask: \<^term>\<open>get_mh_total_full \<sigma>\<^sub>v\<close>
@@ -139,25 +145,25 @@ text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<cl
 paragraph \<open>Semantics for Viper statements\<close> 
 text \<open>The big-step judgement for Viper statements is defined via \<^const>\<open>red_stmt_total\<close>.     
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>s, \<sigma>\<^sub>v\<rangle> \<rightarrow> r\<^sub>v\<close> in the paper (the execution of statement \<open>s\<close>
-      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close> in the formalisation,
+      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_stmt_total ctxt (\<lambda>_.True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close> in the formalisation,
       where the Viper context \<^term>\<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>ctxt\<close> and \<^term>\<open>\<Lambda>\<close>
 
-      The parameter \<^term>\<open>R\<close> is not required for the Viper subset in the paper. In our generated proofs, 
-      it is always instantiated as \<^term>\<open>\<lambda>_. True\<close>.
+      We instantiate the parameter \<^term>\<open>R\<close> in \<^term>\<open>red_stmt_total ctxt R \<Lambda> \<sigma>\<^sub>v \<omega> r\<^sub>v\<close> always with 
+      \<^term>\<open>\<lambda>_. True\<close> for the subset in the paper. The parameters exists because of Viper features outside
+      of the subset in the paper. This parameter also shows up in other definitions and for the subset
+      in the paper it is always instantiated with \<^term>\<open>\<lambda>_. True\<close>.
 \<close>
 
 paragraph \<open>Viper expression evaluation\<close>
 text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_exp_total\<close>.
       The notation \<open>\<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> V(v)\<close> in the paper (expression evaluation of expression \<open>e\<close> to value \<open>v\<close> 
-      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>ctxt, R, Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t Val v\<close> in the formalisation (here,
-      we defined special notation in Isabelle for \<^const>\<open>red_pure_exp_total\<close>). 
-      The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> <lightning_symbol>\<close> in the paper(expression \<open>e\<close> is ill-defined in \<open>\<sigma>\<^sub>v\<close>) 
-      corresponds to \<^prop>\<open>ctxt, R, Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t VFailure\<close>.
+      in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>ctxt, (\<lambda>_. True), Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t Val v\<close> in the formalisation (here,
+      we use special notation in Isabelle for \<^const>\<open>red_pure_exp_total\<close>). 
+      The notation \<open>\<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> <lightning_symbol>\<close> in the paper (expression \<open>e\<close> is ill-defined in \<open>\<sigma>\<^sub>v\<close>) 
+      corresponds to \<^prop>\<open>ctxt, (\<lambda>_. True), Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t VFailure\<close>.       
 
-      As for the statement reduction, \<^term>\<open>R\<close> is not required for the Viper subset in the paper and is always
-      instantiated as \<^term>\<open>\<lambda>_. True\<close> in our generated proofs. \<^term>\<open>ctxt\<close> is the same as for the statement reduction
-      but is redundant for the expression evaluation for the Viper subset in the paper and thus was 
-      omitted in the presentation.      
+      \<^term>\<open>ctxt\<close> is the same as for the statement reduction but is redundant for the expression 
+      evaluation for the Viper subset in the paper and thus was omitted in the presentation.
 
       One difference to the paper, is that the expression evaluation in the formalisation takes two 
       Viper states as input instead of just one. Having two states is only required for Viper features
@@ -167,37 +173,46 @@ text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_ex
       In almost all cases of the semantics formalisation, these two states are chosen to be the same one and thus 
       directly correspond to the paper. The only case where the two states differ is during \<open>remcheck\<close> operations, 
       where one state is instantiated to be the \<^emph>\<open>reduction state\<close> and the other the \<^emph>\<open>expression evaluation state\<close>
-      (introduced on lines 312-317 in the paper). The expression evaluation checks whether there
+      (introduced on lines 312-317 in the paper). The formalised expression evaluation checks whether there
       is nonzero permission to fields in the expression evaluation state (as in the paper), but 
-      the other lookups (e.g. heap, store) are performed in the reduction state. This is done, because 
-      there is a Viper feature outside of the subset in the paper that allows looking up the current 
-      permission in the \<^emph>\<open>reduction state\<close> during a \<open>remcheck\<close> operation. Since in the subset of the paper,
-      the expressions allow only looking up heap values and store values, instantiating both states to be the
-      expression evaluation state leads to the same result and thus directly corresponds to the paper
-      (because the reduction and expression evaluate state differ only on the permission mask).
+      the other lookups (e.g. heap, store) are performed in the reduction state. In the paper subset,
+      expressions can only look up values in the heap and store (but not the permission mask), thus 
+      expression lookups in the reduction state and expression evaluation state are the same (since the 
+      two states differ only on the permission mask).
+      As a result, only one state is required for the subset of the paper in the expression evaluation
+      (namely the expression evaluation state).
 \<close>
 
 paragraph \<open>Exhale semantics\<close>
 
-text \<open>The rule (EXH-SUCC) is given by:\<close>
+text \<open>The \<open>remcheck\<close> reduction is defined in \<^const>\<open>red_exhale\<close>.
+      The notation \<open>\<sigma>0\<^sub>v \<turnstile> \<langle>A, \<sigma>\<^sub>v\<rangle> \<rightarrow>\<^sub>r\<^sub>c r\<^sub>v\<close> (remcheck reduction of assertion \<open>A\<close> in expression evaluation
+      state \<open>\<sigma>0\<^sub>v\<close> and reduction state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_exhale ctxt (\<lambda>_.True) \<sigma>0\<^sub>v A \<sigma>\<^sub>v r\<^sub>v\<close>.
+      The parameter \<^term>\<open>ctxt\<close> is not relevant for the paper subset.\<close>
 
-lemmas EXH_SUCC = RedExhale \<comment>\<open>Note: you can ctrl-click on \<open>RedExhale\<close> to jump to the rule\<close>
+text \<open>The rule (EXH-SUCC) is given by (Figure 2):\<close>
 
-text \<open>TODO: discuss why nonDetSelect is the same as \<^const>\<open>havoc_locs_state\<close>\<close>
+lemmas EXH_SUCC = RedExhale \<comment>\<open>Recall: you can ctrl-click on lemmas such as \<open>RedExhale\<close> to jump to the rule\<close>
 
-text \<open>The rule (EXH-FAIL) is given by:\<close>
+text \<open>Note that the formalisation uses
+  \<^prop>\<open>\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}\<close>
+too express the heap assignment, while the paper uses \<open>nonDetSelect ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> (defined in Figure 4)
+for the sake of presentation.
+The following lemma shows that the two are equivalent (where \<open>nonDetSelect ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> is formalised
+via  \<^prop>\<open>non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close>):
+\<close>
+
+lemmas non_det_select_havoc_locs = non_det_select_havoc_locs_equivalence
+
+text \<open>The rule (EXH-FAIL) is given by (Figure 2):\<close>
 
 lemmas EXH_FAIL = RedExhaleFailure
 
-text \<open>The \<open>remcheck\<close> reduction is defined in \<^const>\<open>red_exhale\<close>.
-      The notation \<open>\<sigma>0\<^sub>v \<turnstile> \<langle>A, \<sigma>\<^sub>v\<rangle> \<rightarrow>\<^sub>r\<^sub>c r\<^sub>v\<close> (remcheck reduction of assertion \<open>A\<close> in expression evaluation
-      state \<open>\<sigma>0\<^sub>v\<close> and reduction state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_exhale ctxt R \<sigma>0\<^sub>v A \<sigma>\<^sub>v r\<^sub>v\<close> \<close>
-
-text \<open>The rule (RC-SEP) is given by:\<close>
+text \<open>The rule (RC-SEP) is given by (Figure 2):\<close>
 
 lemmas RC_SEP = ExhStarNormal
 
-text \<open>The rule (RC-ACC) is given by:\<close>
+text \<open>The rule (RC-ACC) is given by (Figure 2):\<close>
                      
 lemmas RC_ACC = ExhAcc
 

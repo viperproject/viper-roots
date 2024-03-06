@@ -2,29 +2,6 @@ theory PaperResultsSupport
 imports TotalViper.ViperBoogieEndToEnd
 begin
 
-definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_decl \<Rightarrow> bool" where
-  "vpr_method_correct_paper ctxt m \<equiv>
-         \<forall>(\<sigma>\<^sub>v :: 'a full_total_state) r\<^sub>v. 
-            \<comment>\<open>These first two premises state that the store must be well-typed w.r.t. the arguments and result
-               variable types and that the heap must be well-typed w.r.t. the field declarations. Both
-               of these premises were omitted in the paper for the sake of presentation (as pointed out
-               in footnote 7 on line 832 in the paper).\<close>
-            vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args m @ method_decl.rets m)) (get_store_total \<sigma>\<^sub>v) \<longrightarrow>
-            total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<sigma>\<^sub>v) \<longrightarrow>
-                          
-            \<comment>\<open>The following premise corresponds to \<open>\<forall>l. \<pi>(\<sigma>\<^sub>v)(l) = 0\<close> in the paper\<close>
-            is_empty_total_full \<sigma>\<^sub>v \<longrightarrow>
-
-            (\<forall>mbody. method_decl.body m = Some mbody \<longrightarrow>
-              (               
-                red_stmt_total ctxt (\<lambda>_. True) (nth_option (method_decl.args m @ method_decl.rets m))
-                                    (Seq (Inhale (method_decl.pre m)) (Seq mbody (Exhale (method_decl.post m))))
-                                    \<sigma>\<^sub>v
-                                    r\<^sub>v \<longrightarrow>
-                r\<^sub>v \<noteq> RFailure
-              )
-            )"
-
 fun exp_in_paper_subset_no_rec :: "pure_exp \<Rightarrow> bool"
   where 
   "exp_in_paper_subset_no_rec (pure_exp.Var x) \<longleftrightarrow> True"
@@ -92,6 +69,105 @@ fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
 
 abbreviation stmt_in_paper_subset
   where "stmt_in_paper_subset \<equiv> stmt_pred stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
+
+subsection \<open>Correspondence nonDetSelect and havocLocs\<close>
+
+definition non_det_select
+  where "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v' \<equiv>
+ 
+         \<comment>\<open>corresponds to \<open>st(\<sigma>\<^sub>v') = st(\<sigma>\<^sub>v'')\<close> in the paper\<close>
+         get_store_total \<sigma>\<^sub>v' = get_store_total \<sigma>\<^sub>v'' \<and>
+
+         \<comment>\<open>corresponds to \<open>\<pi>(\<sigma>\<^sub>v') = \<pi>(\<sigma>\<^sub>v'')\<close> in the paper\<close>
+         get_mh_total_full \<sigma>\<^sub>v' = get_mh_total_full \<sigma>\<^sub>v'' \<and>
+
+         \<comment>\<open>corresponds to \<open>\<forall>l. (\<pi>(\<sigma>\<^sub>v')(l) = 0 \<or> \<pi>(\<sigma>\<^sub>v'') > 0) \<longrightarrow> h(\<sigma>\<^sub>v')(l) = h(\<sigma>\<^sub>v'')(l)\<close>\<close>
+         (\<forall>l. (get_mh_total_full \<sigma>\<^sub>v l = 0 \<or> get_mh_total_full \<sigma>\<^sub>v'' l > 0) \<longrightarrow> get_hh_total_full \<sigma>\<^sub>v' l = get_hh_total_full \<sigma>\<^sub>v'' l) \<and>
+         
+         \<comment>\<open>This conjunct just states that the new heap must be well-typed, which we omitted from the paper for 
+            the sake of presentation\<close>
+         total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<sigma>\<^sub>v') \<and>
+         
+         \<comment>\<open>The following three conjuncts express equality on components of Viper states that are 
+            not required in the paper subset.\<close>
+         get_trace_total \<sigma>\<^sub>v' = get_trace_total \<sigma>\<^sub>v'' \<and>
+         get_mp_total_full \<sigma>\<^sub>v' = get_mp_total_full \<sigma>\<^sub>v'' \<and>
+         get_hp_total_full \<sigma>\<^sub>v' = get_hp_total_full \<sigma>\<^sub>v''"
+
+lemma non_det_select_heap_upd_1:
+  assumes "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'"
+      and "\<forall>l. (get_mh_total_full \<sigma>\<^sub>v l = 0 \<or> get_mh_total_full \<sigma>\<^sub>v'' l > 0) \<longrightarrow> hh' l = get_hh_total_full \<sigma>\<^sub>v'' l"
+    shows "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' (update_hh_total_full \<sigma>\<^sub>v'' hh')"
+  unfolding non_det_select_def
+  using assms
+  by auto          
+
+lemma non_det_select_havoc_locs_1:
+  assumes "\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}"
+  shows "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'"
+proof -
+  let ?hlocs = "{loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}"
+  from assms obtain hh' where 
+      "\<sigma>\<^sub>v' = update_hh_total_full \<sigma>\<^sub>v'' hh'"
+  and WellTyped: "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'"
+  and "hh' \<in> havoc_locs_heap (get_hh_total_full \<sigma>\<^sub>v'') ?hlocs"
+    unfolding havoc_locs_state_def
+    by blast
+
+  show ?thesis
+    apply (subst \<open>\<sigma>\<^sub>v' = _\<close>)
+    apply (rule non_det_select_heap_upd_1)
+     apply (rule WellTyped)
+    using \<open>hh' \<in> _\<close>
+    unfolding havoc_locs_heap_def
+    by force
+qed
+
+lemma non_det_select_heap_upd_2:
+  assumes "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'"
+  shows "\<exists>hh'. total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh' \<and>
+               \<sigma>\<^sub>v' = update_hh_total_full \<sigma>\<^sub>v'' hh' \<and>
+               (\<forall>l. (get_mh_total_full \<sigma>\<^sub>v l = 0 \<or> get_mh_total_full \<sigma>\<^sub>v'' l > 0) \<longrightarrow> hh' l = get_hh_total_full \<sigma>\<^sub>v'' l)"
+proof -
+  let ?hh' = "get_hh_total_full \<sigma>\<^sub>v'"
+
+  note Aux = assms[simplified non_det_select_def]
+
+  have "\<sigma>\<^sub>v' = update_hh_total_full \<sigma>\<^sub>v'' ?hh'"
+    apply (rule full_total_state.equality)
+    using Aux
+    by auto
+  
+  show ?thesis
+    apply (rule exI[where ?x = ?hh'])
+    using Aux \<open>\<sigma>\<^sub>v' = _ \<close>
+    by blast
+qed
+
+lemma non_det_select_havoc_locs_2:
+  assumes "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'"
+  shows  "\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}"
+proof -
+  from assms obtain hh'
+    where "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh'"
+      and "\<sigma>\<^sub>v' = update_hh_total_full \<sigma>\<^sub>v'' hh'"
+      and "(\<forall>l. (get_mh_total_full \<sigma>\<^sub>v l = 0 \<or> get_mh_total_full \<sigma>\<^sub>v'' l > 0) \<longrightarrow> hh' l = get_hh_total_full \<sigma>\<^sub>v'' l)"
+    using non_det_select_heap_upd_2
+    by blast
+
+  thus ?thesis
+    unfolding havoc_locs_state_def havoc_locs_heap_def
+    using pperm_pnone_pgt
+    by blast
+qed
+
+lemma non_det_select_havoc_locs_equivalence:
+  "non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v' \<longleftrightarrow> 
+   \<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}"
+  using non_det_select_havoc_locs_1 non_det_select_havoc_locs_2
+  by blast
+
+subsection \<open>Relationship Viper Method Correctness\<close>
 
 
 abbreviation states_differ_only_on_trace :: "'a full_total_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool"
@@ -1060,6 +1136,29 @@ next
     using RedSubExpressionFailure 
     by (auto intro: TotalSemantics.RedSubExpressionFailure)
 qed
+
+definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_decl \<Rightarrow> bool" where
+  "vpr_method_correct_paper ctxt m \<equiv>
+         \<forall>(\<sigma>\<^sub>v :: 'a full_total_state) r\<^sub>v. 
+            \<comment>\<open>These first two premises state that the store must be well-typed w.r.t. the arguments and result
+               variable types and that the heap must be well-typed w.r.t. the field declarations. Both
+               of these premises were omitted in the paper for the sake of presentation (as pointed out
+               in footnote 7 on line 832 in the paper).\<close>
+            vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args m @ method_decl.rets m)) (get_store_total \<sigma>\<^sub>v) \<longrightarrow>
+            total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<sigma>\<^sub>v) \<longrightarrow>
+                          
+            \<comment>\<open>The following premise corresponds to \<open>\<forall>l. \<pi>(\<sigma>\<^sub>v)(l) = 0\<close> in the paper\<close>
+            is_empty_total_full \<sigma>\<^sub>v \<longrightarrow>
+
+            (\<forall>mbody. method_decl.body m = Some mbody \<longrightarrow>
+              (               
+                red_stmt_total ctxt (\<lambda>_. True) (nth_option (method_decl.args m @ method_decl.rets m))
+                                    (Seq (Inhale (method_decl.pre m)) (Seq mbody (Exhale (method_decl.post m))))
+                                    \<sigma>\<^sub>v
+                                    r\<^sub>v \<longrightarrow>
+                r\<^sub>v \<noteq> RFailure
+              )
+            )"
 
 lemma method_correctness_stronger_than_paper:
   assumes "vpr_method_correct_total ctxt (\<lambda>_.True) m"
