@@ -34,8 +34,8 @@ rules in the paper. In particular, we use the following Isabelle document elemen
   \<^item> defined names (for example, \<^const>\<open>red_stmt_total\<close> --> you can click on defined names)
   \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
     --> you can click on defined names in terms (i.e. \<open>red_stmt_total\<close> in the example)
-  \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt R \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just boolean terms
-    --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> in the example)
+  \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just boolean terms
+    --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> and \<open>True\<close> in the example)
   \<^item> Standard ML terms (for example, \<^ML>\<open>stmt_rel_tac\<close>) and types (for example, \<^ML_type>\<open>'a stmt_rel_hint\<close>);
       we use Standard ML to define custom Isabelle tactics.
     --> you can click on the ML definitions in ML terms and types 
@@ -115,8 +115,8 @@ paragraph \<open>Semantics for Boogie statements\<close>
 text \<open>The single step execution of a Boogie statement is expressed via \<^const>\<open>red_bigblock_small\<close>, which 
       makes sure that at most one simple command is executed in each step.
       The semantics is taken directly from an extension of the CAV21 paper \<open>Formally Validating a Practical 
-      Verification Condition Generator\<close>, which is developed in an an open source repository with the 
-      Mozilla license. The details of the semantics are thus not part of this artifact.
+      Verification Condition Generator\<close>, which is developed in an an open source repository. 
+      The details of the semantics are not part of this artifact.
 
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
       0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
@@ -196,7 +196,7 @@ lemmas EXH_SUCC = RedExhale \<comment>\<open>Recall: you can ctrl-click on lemma
 
 text \<open>Note that the formalisation uses
   \<^prop>\<open>\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}\<close>
-too express the heap assignment, while the paper uses \<open>nonDetSelect ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> (defined in Figure 4)
+to express the heap assignment, while the paper uses \<open>nonDetSelect ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> (defined in Figure 4)
 for the sake of presentation.
 The following lemma shows that the two are equivalent (where \<open>nonDetSelect ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> is formalised
 via  \<^prop>\<open>non_det_select ctxt \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close>):
@@ -216,38 +216,30 @@ text \<open>The rule (RC-ACC) is given by (Figure 2):\<close>
                      
 lemmas RC_ACC = ExhAcc
 
-paragraph \<open>Inhale semantics\<close>
-
-text \<open>The statement reduction rule for \<open>inhale\<close> is given by:\<close>
-
-lemmas red_inhale = RedInhale
-
-text \<open>This rule is defined via a helper definition \<^const>\<open>red_inhale\<close>.\<close>
-
-
 section \<open>3 A Forward Simulation Methodology For Front-End Translations\<close>
+
 
 subsection \<open>3.2 One Simulation Judgement to Rule Them All\<close>
 
-text \<open>The generic forward simulation judgement \<open>sim\<close> in the paper is defined in \<^const>\<open>rel_general\<close>.
-      The notation \<open>sim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, Succ, Fail, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> corresponds to
+text \<open>The generic forward simulation judgement \<open>sim\<close> (Figure 4 top) in the paper is defined in \<^const>\<open>rel_general\<close>.
+      The notation \<open>sim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, Succ, Fail, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to
       \<^prop>\<open>rel_general R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Succ Fail P ctxt \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>, where the Boogie context \<open>\<Gamma>\<^sub>b\<close> captures both
       \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.\<close>
 
-paragraph \<open>Three common instantiations of \<open>sim\<close>\<close>
+paragraph \<open>Three common instantiations of \<open>sim\<close> (Figure 4 bottom)\<close>
 text \<open>For the three common instantiations shown at the bottom of figure 4, in the formalisation,
       the Boogie context \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>, and \<^term>\<open>StateCons\<close> corresponds 
-      to parameter \<^term>\<open>R\<close> discussed above for the statement and expression reduction and is always
+      to parameter \<^term>\<open>R\<close> discussed above for the statement reduction and is always
       instantiated to be \<^term>\<open>\<lambda>_.True\<close> in our generated proofs.
 
       The \<^emph>\<open>statement simulation\<close> is defined in \<^const>\<open>stmt_rel\<close>. 
       The notation \<open>stmSim\<^sub>\<Gamma>\<^sub>v,\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, s, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
-      \<^prop>\<open>stmt_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons \<Lambda> P ctxt s \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
+      \<^prop>\<open>stmt_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr (\<lambda>_.True) \<Lambda> P ctxt s \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
       The Viper context \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>ctxt_vpr\<close> and \<^term>\<open>\<Lambda>\<close>.
 
       The \<^emph>\<open>expression well-definedness simulation\<close> is defined in \<^const>\<open>exprs_wf_rel_2\<close>.
       The notation \<open>wfSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, es, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to
-      \<^prop>\<open>exprs_wf_rel_2 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr StateCons P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+      \<^prop>\<open>exprs_wf_rel_2 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr (\<lambda>_.True) P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
       \<^term>\<open>ctxt_vpr\<close> is not relevant here for subset presented in the paper.
      
       Since the expression evaluation takes two states as input in the formalisation (see above),
@@ -270,14 +262,14 @@ text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined in \<^cons
       For convenience, \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> are curried, and thus the instantiation via
       \<^const>\<open>rel_general\<close> uncurries them.
 
-     In our formalisation, we always directly work with a remcheck simulation that additionally takes
-     a predicate \<open>Q\<close> on assertions as a parameter as described in Section 3.5 of the paper.
-     The notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper (Figure 7) corresponds to 
-     \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
+      In our formalisation, we always directly work with a remcheck simulation that additionally takes
+      a predicate \<open>Q\<close> on assertions as a parameter as described in Section 3.5 of the paper.
+      The notation \<open>rcSim\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper (Figure 7) corresponds to 
+      \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
     
-     \<^const>\<open>exhale_rel\<close> is directly defined in terms of the generic simulation judgement, but the following
-     lemma shows that this is equivalent to defining \<^const>\<open>exhale_rel\<close> in terms \<^const>\<open>exhale_rel0\<close>
-     as we do in the paper for the sake of presentation:
+      \<^const>\<open>exhale_rel\<close> is directly defined in terms of the generic simulation judgement, but the following
+      lemma shows that this is equivalent to defining \<^const>\<open>exhale_rel\<close> in terms \<^const>\<open>exhale_rel0\<close>
+      as we do in the paper for the sake of presentation:
 \<close>
 
 lemma exhale_rel_exhale_rel0_inst_equiv: 
@@ -304,7 +296,24 @@ lemmas COMP_derived =
 
 text \<open>The propagation rule BPROP (Figure 5) is given by:\<close>
 
-\<comment>\<open>TODO: prove bSim in terms of rel_general\<close>
+lemmas BPROP = brop_paper
+
+text \<open>Here, we \<open>bsim\<^sub>\<Gamma>\<^sub>b(R, R', \<gamma>, \<gamma>')\<close> in the paper is defined by \<^term>\<open>bsim R R' P ctxt \<gamma> \<gamma>'\<close>.
+In the main parts of our formalisation, we use \<^term>\<open>red_ast_bpl_rel R R\<^sub>1 P ctxt \<gamma> \<gamma>'\<close> instead,
+which is not defined directly via the generic simulation judgement (for historical reasons). The
+following lemma shows that the two definitions are equivalent:
+\<close>
+
+lemmas bsim_red_ast_bpl_rel_equiv = bsim_red_ast_bpl_rel
+
+text \<open>Our formalisation uses various versions of propagation rules (using \<^const>\<open>red_ast_bpl_rel\<close>), 
+which follow the same structure as the rule BPROP in the paper (some of them are stronger rules).
+Examples include:\<close>
+
+lemmas propagation_rule_examples = 
+   rel_propagate_pre rel_propagate_post \<comment>\<open>generic versions\<close>
+   stmt_rel_propagate stmt_rel_propagate_2 \<comment>\<open>propagation rules derived for the statement relation\<close>
+   exhale_rel_propagate_pre exhale_rel_propagate_post \<comment>\<open>propagation rules derived for \<open>remcheck\<close> relation\<close>   
 
 subsection \<open>3.4 Examples: Generic Decomposition in Action\<close>
 
@@ -312,30 +321,34 @@ text \<open>The rule EXH-SIM (Figure 6) is given by:\<close>
 
 lemmas EXH_SIM = exhale0_stmt_rel
 
-\<comment>\<open>TODO: maybe show havocLocs corresponds to nonDet definition\<close>
+text \<open>As discussed above for section 2.3 (the semantics of \<open>exhale\<close>), we use
+\<^const>\<open>havoc_locs_state\<close> to express the nondeterministic heap assignment, 
+while the paper uses \<^const>\<open>non_det_select\<close>. As we show there, the two formulations are equivalent.
+The first two premises in the lemma (WfConsistency) are irrelevant for the paper, since \<^term>\<open>StateCons\<close>
+is always instantiated to be \<^term>\<open>\<lambda>_. True\<close> for the subset in the paper.
 
-text \<open>As discussed above in section 3.3, instead of working with \<open>rcInv\<close> we always work with 
-     \<open>rcInvSim\<close> (see Figure 7), which takes an additional predicate \<open>Q\<close> on assertions.
-     The EXH-SIM rule generalised to \<open>rcInvSim\<close> is given by:\<close>
+As discussed above in section 3.3, instead of working with \<open>rcInv\<close> we always work with
+\<open>rcInvSim\<close> (see Figure 7), which takes an additional predicate \<open>Q\<close> on assertions.
+The EXH-SIM rule generalised to \<open>rcInvSim\<close> is given by:\<close>
 
-lemmas EXH_SIM_rcInvSim = exhale_stmt_rel \<comment>\<open>the rule for EXH-SIM is proved via this rule\<close>
-
-\<comment>\<open>TODO: second example appendix B --> put it here or later?\<close>
+lemmas EXH_SIM_rcInvSim = exhale_stmt_rel
  
 subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
 
-text \<open>As also mentioned above in section 3.3., the notation \<open>rcSimInv\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
-      in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>.
-
-      The rule RSEP-SIM is given by: \<^theory>\<open>TotalViper.ViperBoogieEndToEnd\<close> 
-      @{thm exhale_rel0_def}
-
-      Test: @{thm [source] exhale_rel0_def}
-      Test2: @{thm [source] exhale_rel0_def exhale_rel_star stmt_rel_seq}
-      Test3: @{thm exhale_rel0_def exhale_rel_star stmt_rel_seq}    
+text \<open>As also mentioned above in section 3.3, the notation \<open>rcSimInv\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
+      in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>
+      and the following lemma shows that the definition given for \<open>rcSimInv\<close> is equivalent to the one
+      we give for \<open>exhale_rel\<close>
 \<close>
 
+lemmas rcSimInv_paper =  exhale_rel_exhale_rel0_inst_equiv
+
+text\<open>The rule RSEP-SIM is given by:\<close>
+
 lemmas RSEP_SIM = exhale_rel_star
+
+text \<open>Note that the paper has a typo in the rule RSEP_SIM on line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close>
+      instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>. We will fix this in the final version.\<close>
 
 
 section \<open>4 Putting the Methodology to Work\<close>
@@ -344,14 +357,17 @@ subsection \<open>4.1 State Relation\<close>
 
 text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
       The notation \<open>R\<^sub>\<Gamma>\<^sub>b\<^sup>T\<^sup>r\<^sup>,\<^sup>A\<^sup>v((\<sigma>0\<^sub>v,\<sigma>\<^sub>v), \<sigma>\<^sub>b)\<close> in the paper corresponds to
-      \<^prop>\<open>state_rel0 Pr (\<lambda>_.True) A \<Lambda> TyRep Tr Av \<sigma>0\<^sub>v \<sigma>\<^sub>v ns\<close>
-      where \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>A\<close> and \<^term>\<open>\<Lambda>\<close>, \<open>Pr\<close> is the Viper program representation and is left
-      implicit in the paper.
+      \<^prop>\<open>state_rel0 Pr (\<lambda>_.True) A \<Lambda> TyRep Tr Av \<sigma>0\<^sub>v \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
+      where \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>A\<close> and \<^term>\<open>\<Lambda>\<close>.
+      \<^term>\<open>Pr\<close> is the Viper program representation and is left implicit in the paper.
+      \<^term>\<open>TyRep\<close> provides information on how Viper types are represented in Boogie. We omit
+      \<^term>\<open>TyRep\<close> in the paper, since for the subset in the paper, we always instantiate it the same
+      way, namely using \<^term>\<open>ty_repr_basic I\<close> (where \<^term>\<open>I\<close> is irrelevant for the subset of the paper).
 
       The presented conjuncts in the paper are represented as follows in the definition of \<^const>\<open>state_rel0\<close>:
-      
+                                                                                       
       \<^item> State consistency: The conjunct \<open>consistent(\<sigma>\<^sub>v)\<close> corresponds to \<^term>\<open>wf_mask_simple (get_mh_total_full \<sigma>\<^sub>v)\<close>.
-      \<^item> Field relation: The conjunct \<open>fieldRel\<^sub>\<Gamma>\<^sub>b(field(Tr), \<sigma>\<^sub>b)\<close> corresponds to
+      \<^item> Field relation: The conjunct \<open>fieldRel\<^sub>\<Gamma>\<^sub>b(field(Tr), \<sigma>\<^sub>b)\<close> corresponds to     
                         \<^term>\<open>field_rel Pr \<Lambda> (field_translation Tr) \<sigma>\<^sub>b\<close>.
       \<^item> Auxiliary variable constraints: The conjunct \<open>\<forall>x,P. AV(x) = P \<longrightarrow> P(\<sigma>\<^sub>b(x))\<close> corresponds to
                         \<^term>\<open>aux_vars_pred_sat \<Lambda> AuxPred \<sigma>\<^sub>b\<close>
@@ -383,17 +399,21 @@ text \<open>The parameter \<^term>\<open>StateCons\<close> is redundant for the 
       to be within the subset presented in the paper.
 
       The premise \<open>\<not> \<langle>A, \<sigma>i\<^sub>v\<rangle> \<rightarrow>\<^sub>i\<^sub>n\<^sub>h F\<close> in the paper corresponds to
-      \<^prop>\<open>assertion_framing_state ctxt StateCons A \<omega>_inh\<close>.                 
+      \<^prop>\<open>assertion_framing_state ctxt StateCons A \<omega>_inh\<close>.
+
+      The conclusion \<open>\<langle>A, \<sigma>i\<^sub>v\<rangle> \<rightarrow>\<^sub>i\<^sub>n\<^sub>h N(\<sigma>s\<^sub>v)\<close> in the paper corresponds to
+      \<^prop>\<open>red_inhale ctxt StateCons A \<sigma>i\<^sub>v (RNormal \<sigma>s\<^sub>v)\<close> (reduction of \<open>inhale A\<close> that from state
+      \<^term>\<open>\<sigma>i\<^sub>v\<close> that results in outcome \<^term>\<open>(RNormal \<sigma>s\<^sub>v)\<close>.
 \<close>
 
 subsection \<open>4.3 Proof Automation\<close>
 
 text \<open>Our custom tactic to prove the forward simulation of Viper statements is defined in \<^ML>\<open>stmt_rel_tac\<close>
       directly in Standard ML programming language, which is Isabelle's implementation language.
-     \<^ML>\<open>stmt_rel_tac\<close> invokes other tactics such as, for example, the simulation of 
+     \<^ML>\<open>stmt_rel_tac\<close> invokes other custom tactics such as, for example, a tactic for the simulation of 
      \<open>remcheck\<close> operations defined in \<^ML>\<open>exhale_rel_aux_tac\<close>.
 
-     \<^ML>\<open>stmt_rel_tac\<close> is parametric in the hints and tactic for the primitive statements. The type 
+     \<^ML>\<open>stmt_rel_tac\<close> is parametric in the hints and the tactic for the \<^emph>\<open>primitive\<close> statements. The type 
      signature makes this explicit via the argument types \<^ML_type>\<open>('a, 'i, 'e) stmt_rel_info\<close> (a record
      that includes the primitive statement tactic) and \<^ML_type>\<open>'a stmt_rel_hint\<close> (for the hints).
      In our proofs, we instantiate 'a to be \<^ML_type>\<open>atomic_rel_hint\<close> and define the tactic for the 
@@ -404,28 +424,39 @@ text \<open>Our custom tactic to prove the forward simulation of Viper statement
      applies the lemma @{thm stmt_rel_seq_same_rel} for the sequential composition, which is the same as
      the sequential composition rule SEQ-SIM shown in Figure 5, except that the input and output relation
      are fixed to be the same.
-     \<comment>\<open>TODO: which parts of 4.3 should be reflected here?\<close>
 \<close>
 
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
 
 paragraph \<open>Boogie procedure correctness (top of Figure 8)\<close>
-text\<open>The correctness of a Boogie procedure is defined in \<^const>\<open>proc_is_correct\<close>. The final parameter of 
-the definition abstracts over the type of a procedure body and its associated operational semantics,
-which allows reusing the same definition for Boogie abstract syntax trees and control-flow graphs.
+text\<open>The correctness of a Boogie procedure is defined in \<^const>\<open>proc_is_correct\<close>. This definition
+was taken from an extension of the CAV21 paper \<open>Formally Validating a Practical Verification Condition Generator\<close>, 
+which is developed in an open source repository. The details of the Boogie semantics are not part of this artifact.
+The final parameter of the definition abstracts over the type of a procedure body and its associated
+operational semantics, which allows reusing the same definition for Boogie abstract syntax trees and control-flow graphs.
 
 The notation \<open>Correct\<^sub>b\<^sup>G(p)\<close> in the paper corresponds to 
 
 \<^prop>\<open>\<forall>T. proc_is_correct T fun_decls constants unique_consts global_vars axioms p Ast.proc_body_satisfies_spec\<close>
 
 where the universally quantified \<^term>\<open>T\<close> corresponds to the type interpretation. The global declarations \<^term>\<open>G\<close> 
-captures \<^term>\<open>fun_decls\<close> (function declarations), \<^term>\<open>constants\<close> (constant declarations),
+capture \<^term>\<open>fun_decls\<close> (function declarations), \<^term>\<open>constants\<close> (constant declarations),
 \<^term>\<open>unique_consts\<close> (subset of constant declarations that are marked as unique),
 \<^term>\<open>global_vars\<close> (global variable declarations) and \<^term>\<open>axioms\<close> (axioms).
 The final argument \<^const>\<open>Ast.proc_body_satisfies_spec\<close> concretely specifies when a body represented by a 
 Boogie AST has no failing executions. \<^const>\<open>Ast.proc_body_satisfies_spec\<close> also takes the procedure pre- 
 and postcondition into account, which are not relevant for the paper, since the Viper-to-Boogie 
 translation does not emit any pre- and postconditions in the Boogie program.
+
+Note that \<^const>\<open>Ast.proc_body_satisfies_spec\<close> expresses a finite Boogie execution that 0 or more steps 
+via \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close> (the empty lists reflect the instantiation in our case)
+while for the Boogie semantics discussed for section 2.2 above and most of the formalisation we 
+use \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>. The only difference between the two is that the former
+reduces the simple commands at the beginning of a statement block in a single step, while the latter 
+reduces each simple command separately (one step each). This distinction is just for convenience and 
+it does not matter in the end which one picks. Our correctness definition in the end is expressed 
+via \<^const>\<open>Ast.proc_body_satisfies_spec\<close> (which uses \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close>);
+we bridge the gap formally to our theorems expressed using  \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>.
 \<close>
 
 paragraph \<open>Polymorphic maps\<close>
@@ -436,7 +467,7 @@ note that \<^typ>\<open>'a \<rightharpoonup> 'b\<close> is syntactic sugar for \
 The function \<^const>\<open>vbpl_absval_ty_opt\<close> is the main building block for constructing the corresponding
 type interpretation for the Viper-to-Boogie translation (i.e. mapping values of type
 \<^typ>\<open>'a vbpl_absval\<close> to Boogie types).
-
+                                                                                             
 The instantiations for the \<open>upd\<close> and \<open>read\<close> functions of \<open>HType\<close> are provided by \<^const>\<open>store_heap\<close>
 and \<^const>\<open>select_heap\<close>, respectively.
 \<close>
@@ -450,8 +481,8 @@ where F,M capture \<^term>\<open>ctxt_vpr\<close>.
 
 In our generated proofs, we use a more general version of the correctness of a Viper method
 (defined in \<^const>\<open>vpr_method_correct_total\<close>) that is applicable to a larger subset of Viper than
-supported by the paper, where correctness of a method is expressed via 
-\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close>. 
+supported by the paper, where the correctness of a method is expressed via 
+\<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close>.
 
 The following lemma shows that the more general version implies the version of the paper for Viper 
 methods that lie withing the Viper subset presented in the paper:
@@ -466,7 +497,7 @@ paragraph \<open>Main helper lemma to prove final theorem\<close>
 
 text \<open>To generate proofs for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> (Figure 9, bottom), we use a generic helper lemma 
       that we prove once and for all and that reflects the strategy for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> as
-      described in Section 4.5 of  of the paper (starting at line 809 of the paper).
+      described in Section 4.5 of the paper (starting at line 809 of the paper).
       This generic helper lemmas is given by:\<close> 
 
 lemmas generic_helper_lemma_final_theorem = end_to_end_vpr_method_correct_partial
@@ -478,9 +509,9 @@ the proofs). There are three relevant assumptions directly mentioned in the pape
     of \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close>)
   \<^item> Assumption with name \<open>VprMethodRel\<close> (defined via \<^const>\<open>method_rel\<close>): 
     This assumption corresponds to the forward simulation statement on lines 818-820 in the paper. 
-    Note that the definition of \<^const>\<open>method_rel\<close> is more general than forward simulation shown in the paper. 
-    In particular, the conjunct \<^const>\<open>post_framing_rel\<close> is used to show the well-formedness of the method postcondition
-    (which we explicitly ignore in the paper as mentioned in line 810 of the paper).
+    Note that \<^const>\<open>method_rel\<close> is more general than the forward simulation shown in the paper. 
+    In particular, the conjunct \<^const>\<open>post_framing_rel\<close> is used to show the well-formedness of the
+    method postcondition (which we explicitly ignore in the paper as mentioned in line 810 of the paper).
     Moreover, note that \<^const>\<open>method_rel\<close> includes a left-hand side \<^const>\<open>vpr_all_method_spec_correct_total\<close>,
     which states each method specification in the program is well-formed (this directly corresponds
     to \<open>\<forall>m' \<in> M. SpecWf(m')\<close> in the definition \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper (Figure 9 bottom).
@@ -493,11 +524,32 @@ section \<open>Appendix\<close>
 
 subsection \<open>A Inhale Semantics\<close>
 
-text \<open>TODO\<close>
+text \<open>The rule (INH) (Figure 10) is given by:\<close>
+
+lemmas INH_paper = RedInhale
+
+text \<open>Here \<open>\<langle>A, \<sigma>\<^sub>v\<rangle> \<longrightarrow>\<^sub>i\<^sub>n\<^sub>h r\<^sub>v\<close> in the paper is given by \<^term>\<open>red_inhale ctxt (\<lambda>_.True) A \<sigma>\<^sub>v r\<^sub>v\<close>. The 
+parameter \<^term>\<open>ctxt\<close> is not relevant for the subset of the paper.\<close>
+
+text \<open>The rule (INH-ACC) (Figure 10) is given by:\<close>
+
+lemmas INH_ACC_paper = InhAcc
+
+text \<open>The rule (INH-SEP-S) (Figure 10) is given by:\<close>
+
+lemmas INH_SEP_S_paper = InhStarNormal
+
+text \<open>The rule (INH-SEP-F) (Figure 10) is given by:\<close>
+
+lemmas INH_SEP_F_paper = InhStarFailureMagic
+
+text \<open>Note that this lemma also capture the case for the magic outcome.\<close>
 
 subsection \<open>B Another Simulation Rule Example\<close>
 
-text \<open>TODO\<close>
+text \<open>The rule (RACC-SIM) (Figure 11) is given by:\<close>
+
+lemmas RACC_SIM_paper = exhale_rel_field_acc
 
 end
 

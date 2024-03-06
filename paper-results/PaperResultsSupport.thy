@@ -70,6 +70,33 @@ fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
 abbreviation stmt_in_paper_subset
   where "stmt_in_paper_subset \<equiv> stmt_pred stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
 
+subsection \<open>BPROP\<close>
+
+definition bsim
+  where "bsim R R\<^sub>1 P ctxt \<gamma> \<gamma>1 \<equiv> rel_general R R\<^sub>1 (\<lambda>\<tau> \<tau>'. \<tau> = \<tau>') (\<lambda>_. False) P ctxt \<gamma> \<gamma>1"
+
+lemma bsim_red_ast_bpl_rel:
+  shows "bsim R R\<^sub>1 P ctxt \<gamma> \<gamma>' \<longleftrightarrow> red_ast_bpl_rel R R\<^sub>1 P ctxt \<gamma> \<gamma>'"
+  unfolding bsim_def red_ast_bpl_rel_def rel_general_def
+  by auto
+
+lemma brop_paper:
+  assumes "bsim R R\<^sub>1 P ctxt \<gamma> \<gamma>\<^sub>1"
+      and "rel_general R\<^sub>1 R\<^sub>2 S F P ctxt \<gamma>\<^sub>1 \<gamma>\<^sub>2"
+      and "bsim R\<^sub>2 R' P ctxt \<gamma>\<^sub>2 \<gamma>\<^sub>3"
+    shows "rel_general R R' S F P ctxt \<gamma> \<gamma>\<^sub>3"
+proof -
+  from assms(1) have "red_ast_bpl_rel R R\<^sub>1 P ctxt \<gamma> \<gamma>\<^sub>1"
+    by (simp add: bsim_red_ast_bpl_rel)
+  with assms(2) have "rel_general R R\<^sub>2 S F P ctxt \<gamma> \<gamma>\<^sub>2"
+    using rel_propagate_pre
+    unfolding red_ast_bpl_rel_def
+    by metis
+  with assms(3) show ?thesis
+    using rel_propagate_post
+    by (simp add: bsim_red_ast_bpl_rel)
+qed
+
 subsection \<open>Correspondence nonDetSelect and havocLocs\<close>
 
 definition non_det_select

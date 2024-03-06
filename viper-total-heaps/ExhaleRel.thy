@@ -464,27 +464,38 @@ lemma exhale_rel_propagate_posts_same_exh:
 
 subsection \<open>Structural rules\<close>
 
-lemma exhale_rel_star: 
+lemma exhale_rel_star_0: 
   assumes Invariant1: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Q A1 \<omega>def \<omega>"
       and Invariant2: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> 
                                   (\<And>\<omega>'. red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>def \<omega>')"
-      and ExhRelA1: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2"
-      and ExhRelA2: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
-    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
+      and ExhRelA1: "exhale_rel R1 R2 Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2"
+      and ExhRelA2: "exhale_rel R2 R3 Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
+    shows "exhale_rel R1 R3 Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"
   text\<open>Idea of proof:
-       \<^item> use general composition rule where the intermediate relation is chosen to be \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close>
-       \<^item> Prove the first premise by weakening the input relation from \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (A1 && A2) \<omega>def \<omega>\<close> 
-         to \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A1 \<omega>def \<omega>\<close> and by adjusting the output relation
-         \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close> to \<^term>\<open>R\<close> 
-       (\<^term>\<open>R\<close> is strong enough given the additional assumptions when adjusting the output relation)\<close>
+       \<^item> use general composition rule where the intermediate relation is chosen to be \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R2 \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close>
+       \<^item> Prove the first premise by weakening the input relation from \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R1 \<omega>def \<omega> ns \<and> Q (A1 && A2) \<omega>def \<omega>\<close> 
+         to \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R1 \<omega>def \<omega> ns \<and> Q A1 \<omega>def \<omega>\<close> and by adjusting the output relation
+         \<^term>\<open>\<lambda>\<omega>def \<omega> ns. R2 \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>\<close> to \<^term>\<open>R2\<close> 
+       (\<^term>\<open>R2\<close> is strong enough given the additional assumptions when adjusting the output relation)\<close>
   unfolding exhale_rel_def
-  apply (rule rel_general_comp[where ?R2.0="uncurry (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>)"])
+  apply (rule rel_general_comp[where ?R2.0="uncurry (\<lambda>\<omega>def \<omega> ns. R2 \<omega>def \<omega> ns \<and> Q A2 \<omega>def \<omega>)"])
      apply (rule rel_general_conseq_input_output)
        apply (rule ExhRelA1[simplified exhale_rel_def])
       apply (simp add: Invariant1)
      apply (fastforce dest: Invariant2)
     apply (rule ExhRelA2[simplified exhale_rel_def])
   by (fastforce elim: ExhStar_case)+
+
+lemma exhale_rel_star: 
+  assumes Invariant1: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> Q A1 \<omega>def \<omega>"
+      and Invariant2: "\<And> \<omega>def \<omega>. Q (A1 && A2) \<omega>def \<omega> \<Longrightarrow> 
+                                  (\<And>\<omega>'. red_exhale ctxt_vpr StateCons \<omega>def A1 \<omega> (RNormal \<omega>') \<Longrightarrow> Q A2 \<omega>def \<omega>')"
+      and ExhRelA1: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A1 \<gamma>1 \<gamma>2"
+      and ExhRelA2: "exhale_rel R R Q ctxt_vpr StateCons P ctxt A2 \<gamma>2 \<gamma>3"
+    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (A1 && A2) \<gamma>1 \<gamma>3"  
+  apply (rule exhale_rel_star_0)
+  using assms 
+  by auto
 
 lemma exhale_rel_star_2: 
   assumes Invariant: "is_exh_rel_invariant ctxt_vpr StateCons cond_assert cond_exp Q"
