@@ -7,17 +7,21 @@ section \<open>Getting Started Guide for Exploration of the Isabelle Formalisati
 text \<open>
 The following Isabelle theory file contains references to all the formalised results explicitly mentioned in
 the paper. The theory file is structured using Isabelle sections and subsections, which match those from 
-the paper. You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a 
-section or subsection. 
+the paper. Within each subsection we structured the different parts that we show via Isabelle paragraphs (there is
+one paragraph per bullet point at the lowest level in the artifact README).
+You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly jump to a section, subsection,
+or paragraph.
 
 When you first load this file, Isabelle will load and check all Isabelle files in the formalisation for the paper.
 This takes several minutes to finish. You can see the progress by clicking on the \<open>Theories\<close> panel on 
 the right. Make sure that the checkbox \<open>Continuous checking\<close> at the top of the \<open>Theories\<close> panel is selected,
 which should already be the case by default (otherwise Isabelle won't check the files).
 Wait until Isabelle successfully finished checking all files (keep the current file open, otherwise Isabelle won't 
-continue with certain files). If the bars for all files on the right are fully white except the current
- \<open>PaperResult\<close> one, then it is finished. There should be no red bars in the files of the theory panel (this would 
-indicate that Isabelle was not able to check a file).
+continue with certain files). Make sure to go to the end of this file to make sure that Isabelle checks 
+all definitions and lemmas in the current file too. 
+If the bars for all files on the right are fully white, then the Isabelle has successfully checked all
+files. There should be no red bars in the files of the theory panel (a red bar indicates that Isabelle
+was not able to check a file).
 
 In the Isabelle IDE, you can ctrl-and-click on defined names, which takes you to the Isabelle source 
 where the constant is defined (for example, a standard definition or an Isabelle function). 
@@ -82,22 +86,39 @@ section \<open>2 Viper and Boogie: Background and Semantics (Start of Step-by-St
 
 subsection \<open>2.1 The Viper and Boogie languages\<close>
 
-text \<open>The Viper AST for statements (\<open>VStmt\<close> in Figure 1) is defined in \<^typ>\<open>ViperLang.stmt\<close>.
-      The Boogie AST for statement blocks (\<open>BStmtBlock\<close> in Figure 1) is defined in \<^typ>\<open>Ast.bigblock\<close>.      
+paragraph\<open>Figure 1\<close>
+text \<open>The components in Figure 1 are defined in (note that the formalisation contains a larger subset 
+      than in Figure 1 as we discuss right after the following list):
+
+      \<^item> Viper expressions (\<open>VExpr\<close> in Figure 1) are defined in \<^typ>\<open>ViperLang.pure_exp\<close>
+      \<^item> Viper assertions (\<open>VAssert\<close> in Figure 1) are defined in \<^typ>\<open>assertion\<close>. Note that 
+       \<^typ>\<open>assertion\<close> is formalised via the composite assertions \<^typ>\<open>('p, 'a) assert\<close>,
+        which is parametric in the expressions \<^typ>\<open>'p\<close> and primitive assertions \<^typ>\<open>'a\<close>. \<^typ>\<open>assertion\<close> 
+        is a type synonym for \<^typ>\<open>(pure_exp, pure_exp atomic_assert) assert\<close>.
+        Note that \<^term>\<open>Acc e f (PureExp ep)\<close> denotes the accessibilty predicate \<open>acc(e.f, ep)\<close> in the paper
+        and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.
+      \<^item> Viper statements (\<open>VStmt\<close> in Figure 1) are defined in \<^typ>\<open>ViperLang.stmt\<close>.
+
+      \<^item> Boogie expressions (\<open>BExpr\<close> in Figure 1) are defined in \<^typ>\<open>Lang.expr\<close>
+      \<^item> Boogie simple command (\<open>BSimpleCmd\<close> in Figure 1) are defined in \<^typ>\<open>Lang.cmd\<close>
+      \<^item> Boogie if statements (\<open>BIfOpt\<close> in Figure 1) are defined in \<^term>\<open>ParsedIf\<close>.
+        Note that \<^term>\<open>ParsedIf (Some(b)) s1 s2\<close> corresponds to \<open>if(b) { s1 } else { s1 }\<close> in the paper
+         and \<^term>\<open>ParsedIf None s1 s2\<close> corresponds to \<open>if(*) { s1 } else { s2 }\<close> in the paper (the latter is
+         a nondeterministic if-statement). Note that the empty case \<open>\<epsilon>\<close> is handled via statement blocks
+         in the formalisation.
+      \<^item> Boogie statement blocks (\<open>BStmtBlock\<close> in Figure 1) are defined in \<^typ>\<open>Ast.bigblock\<close>.
+        \<open>BStmt\<close> is expressed es \<^typ>\<open>Ast.bigblock list\<close>. Note that in the formalisation statement blocks
+        also include gotos, which we do not consider in the paper.    
 
       Both formalised ASTs includes a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is relevant. 
       For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the paper subset.
       It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>, \<^const>\<open>assert_in_paper_subset_no_rec\<close>,
       \<^const>\<open>atomic_assert_in_paper_subset\<close>, and \<^const>\<open>exp_in_paper_subset_no_rec\<close>, which indicate
-      which statement, assertion, atomic assertion (accessibility predicates or Boolean expression), 
+      which statement, assertion, primitive assertion (accessibility predicates or Boolean expression), 
       and expression constructors are in the paper subset.
       Note that \<^term>\<open>Acc e f (PureExp ep)\<close> denotes the accessibilty predicate \<open>acc(e.f, ep)\<close> in the paper
-      and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.
-      
-      In Boogie, note that \<^term>\<open>ParsedIf (Some(b)) s1 s2\<close> corresponds to \<open>if(b) { s1 } else { s1 }\<close> in the paper
-      and \<^term>\<open>ParsedIf None s1 s2\<close> corresponds to \<open>if(*) { s1 } else { s2 }\<close> in the paper (the latter is
-      a nondeterministic if-statement).
+      and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.      
       
       Some of our definitions in the formalisations are generalised to also work for features outside
       the subset presented in the paper. These generalisations are not relevant here and throughout 
@@ -106,12 +127,12 @@ text \<open>The Viper AST for statements (\<open>VStmt\<close> in Figure 1) is d
 
 subsection \<open>2.2: Boogie Semantics\<close>
 
-paragraph \<open>Outcomes\<close>
+paragraph \<open>Outcomes and states\<close>
 text \<open>Boogie outcomes are defined in \<^typ>\<open>'a state\<close> and Boogie states are defined in \<^typ>\<open>'a nstate\<close>.
       \<^typ>\<open>'a nstate\<close> defines the mapping of variables to values via different mappings (local variable mapping,
       global variable mapping etc.); the details are not relevant here.\<close>
 
-paragraph \<open>Semantics for Boogie statements\<close>
+paragraph \<open>The judgement expressing a finite Boogie execution\<close>
 text \<open>The single step execution of a Boogie statement is expressed via \<^const>\<open>red_bigblock_small\<close>, which 
       makes sure that at most one simple command is executed in each step.
       The semantics is taken directly from an extension of the CAV21 paper \<open>Formally Validating a Practical 
@@ -128,7 +149,7 @@ text \<open>The single step execution of a Boogie statement is expressed via \<^
 
 subsection \<open>2.3 Viper Semantics\<close>
 
-paragraph \<open>Outcomes\<close>
+paragraph \<open>Outcomes and states\<close>
 text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<close>.
       Viper states are defined via the record type \<^typ>\<open>'a full_total_state\<close>. The type parameter
       \<^typ>\<open>'a\<close> is not relevant for the Viper subset in the paper.
@@ -142,7 +163,7 @@ text \<open>Viper outcomes are defined in \<^typ>\<open>'a stmt_result_total\<cl
       presented in the paper.
 \<close>
 
-paragraph \<open>Semantics for Viper statements\<close> 
+paragraph \<open>The judgement for Viper statement execution\<close> 
 text \<open>The big-step judgement for Viper statements is defined via \<^const>\<open>red_stmt_total\<close>.     
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> \<langle>s, \<sigma>\<^sub>v\<rangle> \<rightarrow> r\<^sub>v\<close> in the paper (the execution of statement \<open>s\<close>
       in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>red_stmt_total ctxt (\<lambda>_.True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close> in the formalisation,
@@ -154,7 +175,7 @@ text \<open>The big-step judgement for Viper statements is defined via \<^const>
       in the paper it is always instantiated with \<^term>\<open>\<lambda>_. True\<close>.
 \<close>
 
-paragraph \<open>Viper expression evaluation\<close>
+paragraph \<open>The judgement for Viper expression evaluation\<close>
 text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_exp_total\<close>.
       The notation \<open>\<langle>e, \<sigma>\<^sub>v\<rangle> \<Down> V(v)\<close> in the paper (expression evaluation of expression \<open>e\<close> to value \<open>v\<close> 
       in state \<open>\<sigma>\<^sub>v\<close>) corresponds to \<^prop>\<open>ctxt, (\<lambda>_. True), Some(\<sigma>\<^sub>v) \<turnstile> \<langle>e; \<sigma>\<^sub>v\<rangle> [\<Down>]\<^sub>t Val v\<close> in the formalisation (here,
@@ -183,7 +204,7 @@ text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_ex
       (namely the expression evaluation state).
 \<close>
 
-paragraph \<open>Exhale semantics\<close>
+paragraph \<open>The judgement for \<open>remcheck\<close> reduction and Figure 2\<close>
 
 text \<open>The \<open>remcheck\<close> reduction is defined in \<^const>\<open>red_exhale\<close>.
       The notation \<open>\<sigma>0\<^sub>v \<turnstile> \<langle>A, \<sigma>\<^sub>v\<rangle> \<rightarrow>\<^sub>r\<^sub>c r\<^sub>v\<close> (remcheck reduction of assertion \<open>A\<close> in expression evaluation
@@ -221,7 +242,8 @@ section \<open>3 A Forward Simulation Methodology For Front-End Translations\<cl
 
 subsection \<open>3.2 One Simulation Judgement to Rule Them All\<close>
 
-text \<open>The generic forward simulation judgement \<open>sim\<close> (Figure 4 top) in the paper is defined in \<^const>\<open>rel_general\<close>.
+paragraph \<open>The generic simulation judgement \<open>sim\<close> (Figure 4 top)\<close>
+text \<open>The generic forward simulation judgement \<open>sim\<close> in the paper is defined in \<^const>\<open>rel_general\<close>.
       The notation \<open>sim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, Succ, Fail, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to
       \<^prop>\<open>rel_general R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Succ Fail P ctxt \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>, where the Boogie context \<open>\<Gamma>\<^sub>b\<close> captures both
       \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>.\<close>
@@ -280,6 +302,8 @@ lemma exhale_rel_exhale_rel0_inst_equiv:
 
 subsection \<open>3.3 Instantiation-Independent Rules\<close>
 
+paragraph \<open>The rules shown in Figure 5\<close>
+
 text \<open>The generic composition rule COMP (Figure 5) is given by:\<close>
 
 lemmas COMP_paper = rel_general_comp
@@ -317,7 +341,7 @@ lemmas propagation_rule_examples =
 
 subsection \<open>3.4 Examples: Generic Decomposition in Action\<close>
 
-text \<open>The rule EXH-SIM (Figure 6) is given by:\<close>
+paragraph \<open>The rule EXH-SIM (Figure 6) is given by:\<close>
 
 lemmas EXH_SIM = exhale0_stmt_rel
 
@@ -335,6 +359,7 @@ lemmas EXH_SIM_rcInvSim = exhale_stmt_rel
  
 subsection \<open>3.5 Injecting Non-Local Hypotheses into Simulation Proofs\<close>
 
+paragraph \<open>Figure 7\<close>
 text \<open>As also mentioned above in section 3.3, the notation \<open>rcSimInv\<^sub>\<Gamma>\<^sub>b\<^sup>Q(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> 
       in the paper (Figure 7) corresponds to \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>
       and the following lemma shows that the definition given for \<open>rcSimInv\<close> is equivalent to the one
@@ -347,14 +372,17 @@ text\<open>The rule RSEP-SIM is given by:\<close>
 
 lemmas RSEP_SIM = exhale_rel_star
 
-text \<open>Note that the paper has a typo in the rule RSEP_SIM on line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close>
-      instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>. We will fix this in the final version.\<close>
+text \<open>Note that the paper has two typos in the rule RSEP_SIM.
+      \<^item> On line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close> instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>.
+      \<^item> On line 540: The context for \<open>rcInvSim\<close> should be \<open>\<Gamma>\<^sub>b\<close> instead of \<open>\<Gamma>\<^sub>v\<close>
+      We will fix these typos in the final version.\<close>
 
 
 section \<open>4 Putting the Methodology to Work\<close>
 
 subsection \<open>4.1 State Relation\<close>
 
+paragraph \<open>State Relation\<close>
 text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
       The notation \<open>R\<^sub>\<Gamma>\<^sub>b\<^sup>T\<^sup>r\<^sup>,\<^sup>A\<^sup>v((\<sigma>0\<^sub>v,\<sigma>\<^sub>v), \<sigma>\<^sub>b)\<close> in the paper corresponds to
       \<^prop>\<open>state_rel0 Pr (\<lambda>_.True) A \<Lambda> TyRep Tr Av \<sigma>0\<^sub>v \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
@@ -383,14 +411,16 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
 
 subsection \<open>4.2 Non-Locality\<close>
 
+paragraph\<open>Definition \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close>\<close>
 text \<open>The predicate \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close> is defined in \<^const>\<open>framing_exh\<close>. 
       The notation \<open>Q\<^sub>p\<^sub>r\<^sub>e(A, \<sigma>0\<^sub>v, \<sigma>\<^sub>v)\<close> corresponds to \<^prop>\<open>framing_exh ctxt_vpr (\<lambda>_.True) A \<sigma>0\<^sub>v \<sigma>\<^sub>v\<close>.
       The extra parameter \<^term>\<open>ctxt_vpr\<close> (the Viper context) is not relevant for the subset presented 
       in the paper in this case.
 
-      Lemma 4.1 is shown by:
 \<close>
 
+paragraph\<open>Lemma 4.1\<close>      
+text\<open>Lemma 4.1 is shown by:\<close>
 lemmas lemma_4_1 = exhale_inhale_normal
 
 text \<open>The parameter \<^term>\<open>StateCons\<close> is redundant for the subset presented in the paper and is always
@@ -408,6 +438,7 @@ text \<open>The parameter \<^term>\<open>StateCons\<close> is redundant for the 
 
 subsection \<open>4.3 Proof Automation\<close>
 
+paragraph\<open>The Isabelle tactic to prove forward simulations\<close>
 text \<open>Our custom tactic to prove the forward simulation of Viper statements is defined in \<^ML>\<open>stmt_rel_tac\<close>
       directly in Standard ML programming language, which is Isabelle's implementation language.
      \<^ML>\<open>stmt_rel_tac\<close> invokes other custom tactics such as, for example, a tactic for the simulation of 
@@ -428,7 +459,7 @@ text \<open>Our custom tactic to prove the forward simulation of Viper statement
 
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
 
-paragraph \<open>Boogie procedure correctness (top of Figure 8)\<close>
+paragraph \<open>Boogie procedure correctness definition (top of Figure 8)\<close>
 text\<open>The correctness of a Boogie procedure is defined in \<^const>\<open>proc_is_correct\<close>. This definition
 was taken from an extension of the CAV21 paper \<open>Formally Validating a Practical Verification Condition Generator\<close>, 
 which is developed in an open source repository. The details of the Boogie semantics are not part of this artifact.
@@ -459,7 +490,7 @@ via \<^const>\<open>Ast.proc_body_satisfies_spec\<close> (which uses \<^term>\<o
 we bridge the gap formally to our theorems expressed using  \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>.
 \<close>
 
-paragraph \<open>Polymorphic maps\<close>
+paragraph \<open>Instantiation of \<open>HType\<close>\<close>
 text \<open>The type \<^typ>\<open>'a vbpl_absval\<close> defines our instantiation of the uninterpreted Boogie types
 generated by the Viper-to-Boogie translation. In this type definition, \<open>HType\<close> is instantiated via
 \<^term>\<open>AHeap h\<close>, where \<^term>\<open>h\<close> is a partial mapping (represented by a function that maps to the option type;
@@ -493,7 +524,7 @@ lemmas general_method_correctness_stronger = method_correctness_stronger_than_pa
 text \<open>Thus, our generated proofs prove the method correctness for each method as presented
       in the paper.\<close>
 
-paragraph \<open>Main helper lemma to prove final theorem\<close>
+paragraph \<open>Helper lemma to prove \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close>\<close>
 
 text \<open>To generate proofs for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> (Figure 9, bottom), we use a generic helper lemma 
       that we prove once and for all and that reflects the strategy for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> as
@@ -550,6 +581,10 @@ subsection \<open>B Another Simulation Rule Example\<close>
 text \<open>The rule (RACC-SIM) (Figure 11) is given by:\<close>
 
 lemmas RACC_SIM_paper = exhale_rel_field_acc
+
+text \<open>Note that formalisation directly uses the \<open>remcheck\<close> simulation relation with the additional predicate
+\<open>Q\<close> (\<open>rcInvSim\<close> in Figure 7). If one sets \<open>Q\<close> to be the trivial predicate \<^term>\<open>\<lambda>_ _ _. True\<close>, then the 
+formalisation corresponds to the rule using \<open>rcSim\<close>.\<close>
 
 end
 
