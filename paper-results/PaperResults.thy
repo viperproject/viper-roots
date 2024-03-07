@@ -75,7 +75,7 @@ text \<open>
   for these three lemmas.
 
   In general, we recommend ctrl-clicking to get to the source, where we have often provided names 
-  for the premises (sometimes we refer to these names explicitly) and is easier to read.
+  for the premises (sometimes we refer to these names explicitly), and the source is easier to read.
 
   This marks the end of the Getting Started Guide for the Isabelle formalisation. The next section
   starts with the Step-By-Step Instructions (ordered via Isabelle sections and subsections that match 
