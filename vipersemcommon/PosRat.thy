@@ -271,7 +271,12 @@ lemma pgt_implies_pgte:
 
 lemma half_plus_half:
   "half + half = 1"
-  by (smt (verit) Rep_prat_inject add_divide_distrib divide_prat.rep_eq mult_2 nonzero_mult_div_cancel_left one_add_one one_prat.abs_eq one_prat.rep_eq one_prat.rsp plus_prat.abs_eq plus_prat.rep_eq zero_neq_numeral)
+proof -
+  have "half + half = (1 + 1) / (Abs_prat 2)"
+    by (simp add: distrib_right field_divide_inverse)
+  then show ?thesis
+    by (metis Rep_prat_inverse divide_prat.rep_eq divide_self numeral_Bit0 numeral_One one_prat.rep_eq plus_prat.rep_eq zero_neq_numeral)
+qed
 
 lemma pgte_antisym:
   assumes "pgte a b"
@@ -293,8 +298,16 @@ proof -
     using assms pgte.rep_eq plus_prat.rep_eq by auto
   then obtain x where "aa = bb + x" "x \<ge> cc"
     by (metis add.commute add_le_cancel_left diff_add_cancel)
-  then show ?thesis
-    by (smt (verit, ccfv_threshold) Rep_prat Rep_prat_inverse \<open>aa = Rep_prat a\<close> \<open>bb = Rep_prat b\<close> \<open>cc = Rep_prat c\<close> add_0_right dual_order.trans eq_onp_same_args le_add_same_cancel1 mem_Collect_eq pgte.abs_eq plus_prat.abs_eq zero_prat.rsp)
+  let ?a1 = "Abs_prat bb"
+  let ?a2 = "Abs_prat x"
+  have "a = padd ?a1 ?a2"
+    by (metis Rep_prat Rep_prat_inverse \<open>aa = Rep_prat a\<close> \<open>aa = bb + x\<close> \<open>bb = Rep_prat b\<close> \<open>cc = Rep_prat c\<close> \<open>cc \<le> x\<close> dual_order.trans eq_onp_same_args mem_Collect_eq plus_prat.abs_eq)
+  moreover have "?a1 \<ge> b"
+    by (simp add: Rep_prat_inverse \<open>bb = Rep_prat b\<close>)
+  moreover have "?a2 \<ge> c"
+    using Rep_prat_inverse \<open>aa = Rep_prat a\<close> \<open>bb + cc \<le> aa\<close> \<open>bb = Rep_prat b\<close> \<open>cc = Rep_prat c\<close> calculation(1) less_eq_prat.rep_eq plus_prat.rep_eq by force
+  ultimately show ?thesis
+    by (metis le_iff_sup pmax_smaller)
 qed
 
 
@@ -412,7 +425,12 @@ lemma decompose_smaller_than_one:
   shows "\<exists>r. r > 0 \<and> 1 = x + r"
 proof -
   have "Abs_prat (1 - Rep_prat x) > 0 \<and> 1 = x + (Abs_prat (1 - Rep_prat x))"
-    by (smt (verit) Quotient_rep_abs_eq Rep_prat_inverse assms diff_gt_0_iff_gt eq_onp_le_eq eq_onp_same_args le_add_diff_inverse less_prat.rep_eq one_prat.rep_eq open_typedef_to_Quotient order.refl order_less_imp_le plus_prat.rep_eq type_definition_prat zero_prat_def)
+  proof
+    show "pnone < Abs_prat (1 - Rep_prat x)"
+      by (metis assms diff_gt_0_iff_gt eq_onp_same_args less_prat.abs_eq less_prat.rep_eq one_prat.rep_eq order_less_imp_le zero_prat.abs_eq zero_prat.rsp)
+    show "pwrite = padd x (Abs_prat (1 - Rep_prat x))"
+      by (metis Rep_prat Rep_prat_inverse assms diff_gt_0_iff_gt eq_onp_same_args le_add_diff_inverse less_prat.rep_eq mem_Collect_eq one_prat.rep_eq order_less_imp_le plus_prat.abs_eq)
+  qed
   then show ?thesis by auto
 qed
 
