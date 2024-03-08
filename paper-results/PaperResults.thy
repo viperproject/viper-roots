@@ -19,7 +19,8 @@ which should already be the case by default (otherwise Isabelle won't check the 
 Wait until Isabelle successfully finished checking all files (keep the current file open, otherwise Isabelle won't 
 continue with certain files). Make sure to go to the end of this file to make sure that Isabelle checks 
 all definitions and lemmas in the current file too. 
-If the bars for all files on the right are fully white, then the Isabelle has successfully checked all
+If the bars for all files on the right are fully white (orange is fine too, that just indicates
+a warning), then the Isabelle has successfully checked all
 files. There should be no red bars in the files of the theory panel (a red bar indicates that Isabelle
 was not able to check a file).
 
