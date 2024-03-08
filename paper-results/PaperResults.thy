@@ -127,6 +127,26 @@ text \<open>The components in Figure 1 are defined in (note that the formalisati
 
 subsection \<open>2.2: Boogie Semantics\<close>
 
+text \<open>The Boogie formalisation is taken from an extension of the CAV21 paper \<open>Formally Validating a Practical Verification Condition Generator\<close>
+, which is being developed in \<open>https://github.com/gauravpartha/foundational_boogie/\<close>.
+
+We have preloaded the formalisation of the Boogie semantics in the GUI.
+You can see this by clicking on \<open>Theories\<close> in Isabelle GUI's side panel and seeing that \<open>Boogie_Lang\<close> has been 
+selected as the main Isabelle session at the top (right below \<open>Purge\<close> and \<open>Continuous checking\<close>). 
+The advantage is that whenever you load the GUI, Isabelle does not need to recheck these files,
+thus speeding up the GUI set up process. A disadvantage is that the Boogie formalisation files are "locked", 
+which means that when you jump to the definitions in the Boogie formalisation, then the file will have 
+a red shade and you can't further explore the file other than just reading the file (for example, you can't 
+ctrl-click on definitions in a Boogie formalisation file). The same is true for many standard Isabelle 
+sessions, which are by default preloaded by the Isabelle GUI.
+
+We believe that since the Boogie formalisation is not part of the artifact that is
+to be evaluated, it is not crucial to explore the Boogie formalisation via ctrl-clicking in the GUI. 
+However, if you wish to explore the Boogie formalisation via the GUI, then you can change the main 
+Isabelle session from \<open>Boogie_Lang\<close> to \<open>HOL\<close>. After restarting Isabelle and loading \<open>PaperResults.thy\<close>, 
+Isabelle will load all files again including those from the Boogie formalisation, which you will then 
+be able to explore.\<close>
+
 paragraph \<open>Outcomes and states\<close>
 text \<open>Boogie outcomes are defined in \<^typ>\<open>'a state\<close> and Boogie states are defined in \<^typ>\<open>'a nstate\<close>.
       \<^typ>\<open>'a nstate\<close> defines the mapping of variables to values via different mappings (local variable mapping,
@@ -135,16 +155,26 @@ text \<open>Boogie outcomes are defined in \<^typ>\<open>'a state\<close> and Bo
 paragraph \<open>The judgement expressing a finite Boogie execution\<close>
 text \<open>The single step execution of a Boogie statement is expressed via \<^const>\<open>red_bigblock_small\<close>, which 
       makes sure that at most one simple command is executed in each step.
-      The semantics is taken directly from an extension of the CAV21 paper \<open>Formally Validating a Practical 
-      Verification Condition Generator\<close>, which is developed in an an open source repository. 
-      The details of the semantics are not part of this artifact.
-
       The notation \<open>\<Gamma>\<^sub>v \<turnstile> (\<gamma>, N(\<sigma>\<^sub>b)) \<rightarrow>\<^sub>b\<^sup>* (\<gamma>', r\<^sub>b)\<close> in the paper (expressing a finite Boogie execution taking
-      0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation,
+      0 or more steps) corresponds to \<^prop>\<open>red_ast_bpl P ctxt (\<gamma>, Normal \<sigma>\<^sub>b) (\<gamma>',r\<^sub>b)\<close> in the formalisation
+      (reflexive-transitive closure of \<^const>\<open>red_bigblock_small\<close>),
       where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>. Program points (i.e. \<^term>\<open>\<gamma>\<close> and \<^term>\<open>\<gamma>'\<close> in the example)
       are expressed via the type product type \<^typ>\<open>bigblock * cont\<close> where \<^typ>\<open>cont\<close> is a continuation.
-      Note that this semantics uses the semantics for simple commands (asserts, assumes, assignments, and havocs)
-      defined in \<^const>\<open>red_cmd\<close>.
+
+      Note that we have defined \<^const>\<open>red_bigblock_small\<close> ourselves directly building on \<^const>\<open>red_bigblock\<close>,
+      which is defined in the existing Boogie semantics. The only difference between the two is that 
+      our version \<^const>\<open>red_bigblock_small\<close> reduces a single simple command in one step, while the
+      version \<^const>\<open>red_bigblock\<close> in the existing Boogie semantics reduces the list of simple commands at 
+      the beginning of a statement block in a single step. Reducing a single simple command per step
+      is more natural for the proof connecting to the Viper program.
+
+      Note that both definitions use the semantics for simple commands (asserts, assumes, assignments, and havocs)
+      defined in \<^const>\<open>red_cmd\<close> from the existing Boogie formalisation.
+
+      As we will show later in this file, we use the same Boogie procedure correctness definition 
+      as the existing Boogie formalisation, which is expressed in terms of \<^const>\<open>red_bigblock\<close>.
+      So, in the end, our semantics defined via \<^const>\<open>red_bigblock_small\<close> just serves as a stepping stone
+      to complete the proof, and the final theorem just uses the existing Boogie semantics.
 \<close>
 
 subsection \<open>2.3 Viper Semantics\<close>
@@ -479,15 +509,19 @@ Boogie AST has no failing executions. \<^const>\<open>Ast.proc_body_satisfies_sp
 and postcondition into account, which are not relevant for the paper, since the Viper-to-Boogie 
 translation does not emit any pre- and postconditions in the Boogie program.
 
-Note that \<^const>\<open>Ast.proc_body_satisfies_spec\<close> expresses a finite Boogie execution that 0 or more steps 
-via \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close> (the empty lists reflect the instantiation in our case)
+Note that \<^const>\<open>Ast.proc_body_satisfies_spec\<close> expresses a finite Boogie execution that takes 0 or more steps 
+via \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close> (the empty lists \<^term>\<open>[]\<close> reflect the instantiation in our case)
 while for the Boogie semantics discussed for section 2.2 above and most of the formalisation we 
-use \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>. The only difference between the two is that the former
-reduces the simple commands at the beginning of a statement block in a single step, while the latter 
-reduces each simple command separately (one step each). This distinction is just for convenience and 
-it does not matter in the end which one picks. Our correctness definition in the end is expressed 
-via \<^const>\<open>Ast.proc_body_satisfies_spec\<close> (which uses \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close>);
-we bridge the gap formally to our theorems expressed using  \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>.
+use \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>. We discussed the difference between \<^term>\<open>red_ast_bpl\<close>
+(defined via \<^term>\<open>red_bigblock_small\<close>) and \<^term>\<open>red_bigblock\<close> in part on subsection 2.2 above:
+The only difference between the two is that \<^term>\<open>red_bigblock_small\<close> reduces the simple commands at 
+the beginning of a statement block in a single step, while  \<^term>\<open>red_bigblock\<close> reduces each simple command 
+separately (one step each). 
+
+Our correctness definition in the end is expressed
+via \<^const>\<open>Ast.proc_body_satisfies_spec\<close> (which uses \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close>),
+which is how the existing Boogie semantics is expressed.
+Thus, our proofs bridges the gap between the two versions formally when proving the final theorem.
 \<close>
 
 paragraph \<open>Instantiation of \<open>HType\<close>\<close>
