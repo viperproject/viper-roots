@@ -5,23 +5,18 @@ begin
 section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
 
 text \<open>
+Follow the instructions in the README for the artifact, which
+shows how to identify that Isabelle has checked all files correctly that are loaded when this file
+\<open>PaperResults.thy\<close> is loaded.
+
+Once Isabelle has successfully checked all files, continue with here.
+
 The following Isabelle theory file contains references to all the formalised results explicitly
 mentioned in the paper. The theory file is structured using Isabelle sections and subsections,
 which match those from the paper. Within each subsection we structured the different parts that we 
 show via Isabelle paragraphs (there is one paragraph per bullet point at the lowest level in the 
 artifact README). You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly 
 jump to a section, subsection, or paragraph.
-
-When you first load this file, Isabelle will load and check all Isabelle files in the formalisation 
-for the paper. This takes several minutes to finish. You can see the progress by clicking on the
- \<open>Theories\<close> panel on the right. Make sure that the checkbox \<open>Continuous checking\<close> at the top of the 
-\<open>Theories\<close> panel is selected,which should already be the case by default (otherwise Isabelle won't 
-check the files). Wait until Isabelle successfully finished checking all files (keep the current 
-file open, otherwise Isabelle won't continue with certain files). Make sure to go to the end of this
-file to make sure that Isabelle checks all definitions and lemmas in the current file too. If the 
-bars for all files on the right are fully white (orange is fine too, that just indicatesa warning),
-then the Isabelle has successfully checked all files. There should be no red bars in the files of 
-the theory panel (a red bar indicates that Isabelle was not able to check a file).
 
 In the Isabelle IDE, you can ctrl-and-click on defined names, which takes you to the Isabelle source 
 where the constant is defined (for example, a standard definition or an Isabelle function). 
