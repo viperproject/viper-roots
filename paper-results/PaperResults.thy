@@ -9,7 +9,7 @@ Follow the instructions in the README for the artifact, which
 shows how to identify that Isabelle has checked all files correctly that are loaded when this file
 \<open>PaperResults.thy\<close> is loaded.
 
-Once Isabelle has successfully checked all files, continue with here.
+Once Isabelle has successfully checked all files, continue here.
 
 The following Isabelle theory file contains references to all the formalised results explicitly
 mentioned in the paper. The theory file is structured using Isabelle sections and subsections,
@@ -52,7 +52,7 @@ Note that you can also double-click on specific files via the \<open>Theories\<c
 open them or open a specific active file by clicking on the bar with the current file name and 
 downwards arrow at the top of the Isabelle GUI (below the green arrows).
 
-To refer to specific lemmas proved in our Isabelle formalisation, we use Isabelle's \<open>lemmas\<close> keyword. 
+To refer to specific rules and lemmas in our Isabelle formalisation, we use Isabelle's \<open>lemmas\<close> keyword. 
 
 For example:
 \<close>
@@ -65,17 +65,19 @@ text \<open>
   You can ctrl-click on the lemmas \<open>RedExhale\<close>, \<open>RedExhaleFailure\<close> and \<open>exhale_inhale_normal\<close>.
   You can also inspect the lemmas by clicking anywhere right after the \<open>lemmas\<close> keyword
   and then looking at the resulting Isabelle statement in the \<open>Output\<close> panel at the bottom of the 
-  Isabelle GUI. Note that if multiple lemmas are listed (such as for \<open>example_for_rule\<close>), then 
+  Isabelle GUI (make sure that \<open>Proof state\<close> is selected in the \<open>Output panel\<close>, which should be the
+  case by default). 
+  Note that if multiple lemmas are listed (such as for \<open>example_for_rule\<close>), then 
   the \<open>Output\<close> panel shows both lemmas.
-  Make sure that you can do both of these things (ctrl-clicking and inspecting lemma in \<open>Output\<close> panel) 
+  Make sure that you can do both of these things (ctrl-clicking and inspecting lemma in the \<open>Output\<close> panel) 
   for these three lemmas.
 
   In general, we recommend ctrl-clicking to get to the source, where we have often provided names 
   for the premises (sometimes we refer to these names explicitly), and the source is easier to read.
 
   This marks the end of the Getting Started Guide for the Isabelle formalisation. The next section
-  starts with the Step-By-Step Instructions (ordered via Isabelle sections and subsections that match 
-  those in the paper as mentioned above).
+  in this document starts with the Step-By-Step Instructions 
+  (ordered via Isabelle sections and subsections that match those in the paper as mentioned above).
 \<close>
 
 section \<open>2 Viper and Boogie: Background and Semantics (Start of Step-by-Step Instructions)\<close>
@@ -111,7 +113,7 @@ text \<open>The components in Figure 1 are defined in (note that the formalisati
       relevant. For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the 
       paper subset. It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>,
       \<^const>\<open>assert_in_paper_subset_no_rec\<close>, \<^const>\<open>atomic_assert_in_paper_subset\<close>, and
-      \<^const>\<open>exp_in_paper_subset_no_rec\<close>, which indicate which statement, assertion, primitive
+      \<^const>\<open>exp_in_paper_subset_no_rec\<close>, which indicates which statement, assertion, primitive
       assertion (accessibility predicates or Boolean expression), and expression constructors are
       in the paper subset.
       Note that \<^term>\<open>Acc e f (PureExp ep)\<close> denotes the accessibilty predicate \<open>acc(e.f, ep)\<close> in 
