@@ -1,6 +1,6 @@
 # Viper Roots
 
-This repository contains the Viper Roots formalization for the [Viper intermediate
+This folder contains the Viper Roots formalization for the [Viper intermediate
 verification language](https://www.pm.inf.ethz.ch/research/viper.html).
 The formalization is done using the [Isabelle theorem prover](https://isabelle.in.tum.de/).
 
@@ -18,9 +18,10 @@ isabelle components -u vipersemcommon
 isabelle components -u viper-total-heaps
 ```
 where `isabelle` is the Isabelle executable. On Windows, the commands need to be
-run in the Isabelle cygwin instance (TODO: show commands for Windows).
+run in the Isabelle cygwin instance.
 
-Additionally, some parts of `viper-total-heaps` depend on a [formalization of the Boogie semantics](https://github.com/gauravpartha/foundational_boogie/). This semantics is included in this repository as a submodule and should be added as an isabelle component via the following command:
+Additionally, some parts of `viper-total-heaps` depend on a [formalization of the Boogie semantics](https://github.com/gauravpartha/foundational_boogie/). This semantics is included here in subfolder `foundational_boogie` and should be added as an isabelle component via the following command:
+
 ```
 isabelle components -u foundational_boogie/BoogieLang
 ```
