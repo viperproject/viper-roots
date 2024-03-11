@@ -7,19 +7,19 @@ section \<open>Getting Started Guide for Exploration of the Isabelle Formalisati
 text \<open>
 Follow the instructions in the README for the artifact, which
 shows how to identify that Isabelle has checked all files correctly that are loaded when this file
-\<open>PaperResults.thy\<close> is loaded.
+\<open>PaperResults.thy\<close> is opened.
 
 Once Isabelle has successfully checked all files, continue here.
 
 The following Isabelle theory file contains references to all the formalised results explicitly
 mentioned in the paper. The theory file is structured using Isabelle sections and subsections,
 which match those from the paper. Within each subsection we structured the different parts that we 
-show via Isabelle paragraphs (there is one paragraph per bullet point at the lowest level in the 
-artifact README). You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly 
+show via Isabelle paragraphs (there is one Isabelle paragraph per bullet point at the lowest level 
+in the artifact README). You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly 
 jump to a section, subsection, or paragraph.
 
 In the Isabelle IDE, you can ctrl-and-click on defined names, which takes you to the Isabelle source 
-where the constant is defined (for example, a standard definition or an Isabelle function). 
+where the name is defined (for example, a standard definition or an Isabelle function). 
 Whenever you jump somewhere via ctrl-and-clicking (for example, by jumping to a section or a definition),
 you can use the two green arrow buttons at the top of the Isabelle IDE to jump back (or forward) to the 
 previous position.
@@ -76,7 +76,7 @@ text \<open>
   for the premises (sometimes we refer to these names explicitly), and the source is easier to read.
 
   This marks the end of the Getting Started Guide for the Isabelle formalisation. The next section
-  in this document starts with the Step-By-Step Instructions 
+  in this document starts with the Step-By-Step Instructions for the Isabelle formalisation
   (ordered via Isabelle sections and subsections that match those in the paper as mentioned above).
 \<close>
 
@@ -88,6 +88,7 @@ paragraph\<open>Figure 1\<close>
 text \<open>The components in Figure 1 are defined in (note that the formalisation contains a larger subset 
       than in Figure 1 as we discuss right after the following list):
 
+      Viper:
       \<^item> Viper expressions (\<open>VExpr\<close> in Figure 1) are defined in \<^typ>\<open>ViperLang.pure_exp\<close>
       \<^item> Viper assertions (\<open>VAssert\<close> in Figure 1) are defined in \<^typ>\<open>assertion\<close>. Note that 
        \<^typ>\<open>assertion\<close> is formalised via the composite assertions \<^typ>\<open>('p, 'a) assert\<close>,
@@ -97,6 +98,8 @@ text \<open>The components in Figure 1 are defined in (note that the formalisati
         the paper and \<^term>\<open>A && B\<close> denotes the separating conjunction \<open>A * B\<close> in the paper.
       \<^item> Viper statements (\<open>VStmt\<close> in Figure 1) are defined in \<^typ>\<open>ViperLang.stmt\<close>.
 
+      Boogie (note that when ctrl-clicking Boogie elements, the Isabelle source is red and you can't explore
+      further; this is because we have preloaded the Boogie theories as we discuss in Section 2.2 below):
       \<^item> Boogie expressions (\<open>BExpr\<close> in Figure 1) are defined in \<^typ>\<open>Lang.expr\<close>
       \<^item> Boogie simple command (\<open>BSimpleCmd\<close> in Figure 1) are defined in \<^typ>\<open>Lang.cmd\<close>
       \<^item> Boogie if statements (\<open>BIfOpt\<close> in Figure 1) are defined in \<^term>\<open>ParsedIf\<close>.
@@ -105,10 +108,10 @@ text \<open>The components in Figure 1 are defined in (note that the formalisati
         paper (the latter is a nondeterministic if-statement). Note that the empty case \<open>\<epsilon>\<close> is handled 
         via statement blocks in the formalisation.
       \<^item> Boogie statement blocks (\<open>BStmtBlock\<close> in Figure 1) are defined in \<^typ>\<open>Ast.bigblock\<close>.
-        \<open>BStmt\<close> is expressed as \<^typ>\<open>Ast.bigblock list\<close>. Note that in the formalisation statement 
+        \<open>BStmt\<close> is expressed as \<^typ>\<open>Ast.bigblock list\<close>. Note that, in the formalisation, statement 
         blocks also include gotos, which we do not consider in the paper.    
 
-      Both formalised ASTs includes a larger subset than presented in the paper (for example,
+      Both formalised ASTs include a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is 
       relevant. For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the 
       paper subset. It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>,
@@ -129,8 +132,9 @@ text \<open>The Boogie formalisation is taken from an extension of the CAV21 pap
 in \<open>https://github.com/gauravpartha/foundational_boogie/\<close>.
 
 We have preloaded the formalisation of the Boogie semantics in the GUI.
-You can see this by clicking on \<open>Theories\<close> in Isabelle GUI's side panel and seeing that \<open>Boogie_Lang\<close> 
-has been selected as the main Isabelle session at the top (right below \<open>Purge\<close> and \<open>Continuous checking\<close>). 
+You can see this by clicking on \<open>Theories\<close> in Isabelle GUI's side panel on the right and seeing that
+\<open>Boogie_Lang\<close>  has been selected as the main Isabelle session at the top (right below \<open>Purge\<close> and
+\<open>Continuous checking\<close>). 
 The advantage is that whenever you load the GUI, Isabelle does not need to recheck these files,
 thus speeding up the GUI set-up process. A disadvantage is that the Boogie formalisation files are 
 "locked", which means that when you jump to the definitions in the Boogie formalisation, then the 
@@ -158,8 +162,8 @@ text \<open>The single step execution of a Boogie statement is expressed via \<^
       the formalisation
       (reflexive-transitive closure of \<^const>\<open>red_bigblock_small\<close>),
       where \<open>\<Gamma>\<^sub>v\<close> captures both \<^term>\<open>P\<close> and \<^term>\<open>ctxt\<close>. Program points (i.e. \<^term>\<open>\<gamma>\<close> and \<^term>\<open>\<gamma>'\<close> 
-      in the example) are expressed via the product type \<^typ>\<open>bigblock * cont\<close> where \<^typ>\<open>cont\<close> 
-      is a continuation.
+      in the example) are expressed via the product type \<^typ>\<open>bigblock * cont\<close> where \<^typ>\<open>bigblock\<close>
+      is a statement block and \<^typ>\<open>cont\<close> is a continuation.
 
       Note that we have defined \<^const>\<open>red_bigblock_small\<close> ourselves. This definition directly builds on
       \<^const>\<open>red_bigblock\<close>, which is defined in the existing Boogie semantics. The only difference 
@@ -217,7 +221,7 @@ text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_ex
       \<^term>\<open>ctxt\<close> is the same as for the statement reduction but is redundant for the expression 
       evaluation for the Viper subset in the paper and thus was omitted in the presentation.
 
-      One difference to the paper, is that the expression evaluation in the formalisation takes two 
+      One difference to the paper is that the expression evaluation in the formalisation takes two 
       Viper states as input instead of just one. Having two states is only required for Viper features
       outside of the subset of the paper and that's why in the paper we present the evaluation 
       just with one state to ease the presentation.
@@ -246,7 +250,7 @@ text \<open>The rule (EXH-SUCC) is given by (Figure 2):\<close>
 
 lemmas EXH_SUCC = RedExhale \<comment>\<open>Recall: you can ctrl-click on lemmas such as \<open>RedExhale\<close> to jump to the rule\<close>
 
-text \<open>Note that the premise in \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> in the paper (line 296) is expressed via
+text \<open>Note that the premise \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> in the paper (line 296) is expressed via
   \<^prop>\<open>\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}\<close>
   in the formalisation.
   The following lemma shows that the two are equivalent (where \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> is formalised
@@ -275,7 +279,7 @@ text \<open>Note that the term
       )\<close>
 
 in the formalisation corresponds to \<open>if exhAccSucc(r, p, \<sigma>\<^sub>v) then N(\<sigma>\<^sub>v\<^sup>R) else F\<close> in the paper (where \<open>\<sigma>\<^sub>v\<^sup>R\<close> 
- corresponds to \<^term>\<open>if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((mh (a,f)) - (Abs_preal p))\<close>).
+corresponds to \<^term>\<open>if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((mh (a,f)) - (Abs_preal p))\<close>).
 
 The formalisation uses this term directly in the conclusion instead of introducing a separate 
 variable \<open>r\<^sub>v\<close> with an additional premise as the paper does.
@@ -321,10 +325,10 @@ lemma exprs_wf_rel_with_2_equiv:
    exprs_wf_rel R ctxt_vpr StateCons P ctxt e_vpr \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t"
   by (simp add: exprs_wf_rel_2_def exprs_wf_rel_def)    
 
-text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined in terms of \<^const>\<open>exhale_rel0\<close>. The notation
+text \<open>The \<^emph>\<open>remcheck simulation\<close> is defined via \<^const>\<open>exhale_rel0\<close>. The notation
       \<open>rcSim\<^sub>\<Gamma>\<^sub>b(R\<^sub>i\<^sub>n, R\<^sub>o\<^sub>u\<^sub>t, A, \<gamma>\<^sub>i\<^sub>n, \<gamma>\<^sub>o\<^sub>u\<^sub>t)\<close> in the paper corresponds to 
       \<^prop>\<open>exhale_rel0 R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close> in the formalisation.
-      \<^term>\<open>ctxt_vpr\<close> is not relevant here for subset the presented in the paper.
+      \<^term>\<open>ctxt_vpr\<close> is not relevant here for the subset presented in the paper.
       For convenience, \<^term>\<open>R\<^sub>i\<^sub>n\<close> and \<^term>\<open>R\<^sub>o\<^sub>u\<^sub>t\<close> are curried, and thus the instantiation via
       \<^const>\<open>rel_general\<close> uncurries them.
 
@@ -391,7 +395,7 @@ lemmas EXH_SIM = exhale0_stmt_rel
 
 text \<open>As discussed above for section 2.3 (the semantics of \<open>exhale\<close>), we use
 \<^const>\<open>havoc_locs_state\<close> to express the nondeterministic heap assignment, 
-while the paper uses \<open>nonDetSelect\<close>. As we show there, the two formulations are equivalent.
+while the paper uses \<open>nonDet\<close>. As we show there, the two formulations are equivalent.
 The first two premises in the lemma (WfConsistency, Consistent) are irrelevant for the paper, since
 \<^term>\<open>StateCons\<close> is always instantiated to be \<^term>\<open>\<lambda>_. True\<close> for the subset in the paper, and thus
 these two premises are trivially satisfied.
@@ -409,21 +413,23 @@ text \<open>As also mentioned above in section 3.2, the notation \<open>rcInvSim
       in the paper (Figure 7) corresponds to
       \<^prop>\<open>exhale_rel R\<^sub>i\<^sub>n R\<^sub>o\<^sub>u\<^sub>t Q ctxt_vpr (\<lambda>_.True) P ctxt A \<gamma>\<^sub>i\<^sub>n \<gamma>\<^sub>o\<^sub>u\<^sub>t\<close>
       and the following lemma shows that the definition given for \<open>rcInvSim\<close> is equivalent to the one
-      we give for \<open>exhale_rel\<close>
+      we give for \<^const>\<open>exhale_rel\<close>
 \<close>
 
 lemmas rcSimInv_paper =  exhale_rel_exhale_rel0_inst_equiv
 
-text\<open>The rule RSEP-SIM is given by:\<close>
+text\<open>The rule RSEP-SIM (Figure 7) is given by:\<close>
 
 lemmas RSEP_SIM = exhale_rel_star
 
 text \<open>The two premises Invariant1 and Invariant2 in the formalisation correspond together to the
       last premise of RSEP-SIM in the paper.
 
-      Note that the paper has two typos in the rule RSEP_SIM.
-       \<^item> On line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close> instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>.
+      Note that the paper has two typos in the rule RSEP-SIM:
+
        \<^item> On line 540: The context for \<open>rcInvSim\<close> should be \<open>\<Gamma>\<^sub>b\<close> instead of \<open>\<Gamma>\<^sub>v\<close>
+       \<^item> On line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close> instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>.
+
       We will fix these typos in the final version.\<close>
 
 
@@ -442,8 +448,8 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
       way, namely using \<^term>\<open>ty_repr_basic I\<close> (where \<^term>\<open>I\<close> is irrelevant for the subset of the 
       paper).
 
-      The presented conjuncts in the paper are represented as follows in the definition of
-      \<^const>\<open>state_rel0\<close>:
+      The presented conjuncts in the paper (lines 633-636 in the paper) are represented as follows 
+      in the definition of \<^const>\<open>state_rel0\<close>:
                                                                                        
       \<^item> State consistency: The conjunct \<open>consistent(\<sigma>\<^sub>v)\<close> corresponds to
                            \<^term>\<open>wf_mask_simple (get_mh_total_full \<sigma>\<^sub>v)\<close>.
@@ -464,28 +470,28 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
 subsection \<open>4.2 Non-Locality\<close>
 
 paragraph\<open>Definition \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close>\<close>
-text \<open>The predicate \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close> is defined in \<^const>\<open>framing_exh\<close>. 
+text \<open>The predicate \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close> (line 657 in the paper) is defined in \<^const>\<open>framing_exh\<close>. 
       The notation \<open>Q\<^sub>p\<^sub>r\<^sub>e(A, \<sigma>0\<^sub>v, \<sigma>\<^sub>v)\<close> corresponds to \<^prop>\<open>framing_exh ctxt_vpr (\<lambda>_.True) A \<sigma>0\<^sub>v \<sigma>\<^sub>v\<close>.
       The extra parameter \<^term>\<open>ctxt_vpr\<close> (the Viper context) is not relevant for the subset 
       presented in the paper in this case.
-
+      The conjunct  \<open>\<not> \<langle>A, \<sigma>i\<^sub>v\<rangle> \<rightarrow>\<^sub>i\<^sub>n\<^sub>h F\<close> in the paper corresponds to
+      \<^prop>\<open>assertion_framing_state ctxt (\<lambda>_.True) A \<sigma>i\<^sub>v\<close>.
 \<close>
 
 paragraph\<open>Lemma 4.1\<close>      
 text\<open>Lemma 4.1 is shown by:\<close>
 lemmas lemma_4_1 = exhale_inhale_normal
 
-text \<open>The parameter \<^term>\<open>StateCons\<close> is redundant for the subset presented in the paper and is always
-      instantiated to be \<^term>\<open>\<lambda>_.True\<close> in our proofs. The premise \<^prop>\<open>mono_prop_downward (\<lambda>_.True)\<close>
-      is trivially true.
+text \<open>The parameter \<^term>\<open>StateCons\<close> is is always instantiated to be \<^term>\<open>\<lambda>_.True\<close> for the paper subset.
+      The premise \<^prop>\<open>mono_prop_downward (\<lambda>_.True)\<close> is trivially true.
       The premise \<^term>\<open>no_perm_assertion A \<and> no_unfolding_assertion A\<close> restricts the assertion \<^term>\<open>A\<close>
       to be within the subset presented in the paper.
 
       The premise \<open>\<not> \<langle>A, \<sigma>i\<^sub>v\<rangle> \<rightarrow>\<^sub>i\<^sub>n\<^sub>h F\<close> in the paper corresponds to
-      \<^prop>\<open>assertion_framing_state ctxt StateCons A \<omega>_inh\<close>.
+      \<^prop>\<open>assertion_framing_state ctxt (\<lambda>_.True) A \<sigma>i\<^sub>v\<close>.
 
       The conclusion \<open>\<langle>A, \<sigma>i\<^sub>v\<rangle> \<rightarrow>\<^sub>i\<^sub>n\<^sub>h N(\<sigma>s\<^sub>v)\<close> in the paper corresponds to
-      \<^prop>\<open>red_inhale ctxt StateCons A \<sigma>i\<^sub>v (RNormal \<sigma>s\<^sub>v)\<close> (reduction of \<open>inhale A\<close> that from state
+      \<^prop>\<open>red_inhale ctxt (\<lambda>_.True) A \<sigma>i\<^sub>v (RNormal \<sigma>s\<^sub>v)\<close> (reduction of \<open>inhale A\<close> from state
       \<^term>\<open>\<sigma>i\<^sub>v\<close> that results in outcome \<^term>\<open>(RNormal \<sigma>s\<^sub>v)\<close>.
 \<close>
 
@@ -493,21 +499,22 @@ subsection \<open>4.3 Proof Automation\<close>
 
 paragraph\<open>The Isabelle tactic to prove forward simulations\<close>
 text \<open>Our custom tactic to prove the forward simulation of Viper statements is defined in
-      \<^ML>\<open>stmt_rel_tac\<close> directly in Standard ML programming language, which is Isabelle's 
+      \<^ML>\<open>stmt_rel_tac\<close> directly in the Standard ML programming language, which is Isabelle's 
      implementation language. \<^ML>\<open>stmt_rel_tac\<close> invokes other custom tactics such as, for example, 
      a tactic for the simulation of \<open>remcheck\<close> operations defined in \<^ML>\<open>exhale_rel_aux_tac\<close>.
 
      \<^ML>\<open>stmt_rel_tac\<close> is parametric in the hints and the tactic for the \<^emph>\<open>primitive\<close> statements. 
      The type signature makes this explicit via the argument types \<^ML_type>\<open>('a, 'i, 'e) stmt_rel_info\<close> 
      (a record that includes the primitive statement tactic) and \<^ML_type>\<open>'a stmt_rel_hint\<close> (for the hints).
-     In our proofs, we instantiate 'a to be \<^ML_type>\<open>atomic_rel_hint\<close> and define the tactic for the 
-     primitive statements to be \<^ML>\<open>atomic_rel_inst_tac\<close>.
+     In our proofs, we instantiate 'a to be \<^ML_type>\<open>atomic_rel_hint\<close> primitive statement hints and 
+     define the tactic for the primitive statements to be \<^ML>\<open>atomic_rel_inst_tac\<close>.
 
-     Our tactics apply the rules proved for the different constructs. In some cases, we derive 
+     Our tactics apply rules proved for the different constructs. In some cases, we derive 
      instantiated versions of these rules upfront, which makes the tactics easier to write. 
-     For example, \<^ML>\<open>stmt_rel_tac\<close> applies the lemma @{thm stmt_rel_seq_same_rel} for the sequential 
-     composition, which is the same as the sequential composition rule SEQ-SIM shown in Figure 5, 
-     except that the input and output relation are fixed to be the same.
+     For example, \<^ML>\<open>stmt_rel_tac\<close> applies the lemma @{thm [source] stmt_rel_seq_same_rel} 
+     (you can ctrl-click on \<open>stmt_rel_seq_same_rel\<close>) for the sequential composition, which is 
+     the same as the sequential composition rule SEQ-SIM shown in Figure 5, except that the input 
+     and output relation are fixed to be the same.
 \<close>
 
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
@@ -520,7 +527,7 @@ semantics are not part of this artifact. Nevertheless, we explain the Boogie cor
 at a high level. 
 
 The final parameter of the \<^const>\<open>proc_is_correct\<close> definition abstracts over the type
- of a procedure body and its associated operational semantics, which allows reusing the same definition 
+of a procedure body and its associated operational semantics, which allows reusing the same definition 
 for Boogie abstract syntax trees and control-flow graphs.
 
 The notation \<open>Correct\<^sub>b\<^sup>G(p)\<close> in the paper corresponds to 
@@ -542,7 +549,7 @@ able to explore the files.)
 
 \<^const>\<open>Ast.proc_body_satisfies_spec\<close> expresses a finite Boogie execution that takes 0 or more steps 
 via \<^term>\<open>rtranclp (red_bigblock A [] \<Lambda> \<Gamma> [] ast)\<close> (the empty lists \<^term>\<open>[]\<close> reflect our instantiation
-for the corresponding parameters)  while for the Boogie semantics discussed for Section 2.2 above and most of the
+for the corresponding parameters)  while for the Boogie semantics discussed in Section 2.2 above and most of the
 formalisation we use \<^term>\<open>red_ast_bpl ast (create_ctxt_bpl A \<Lambda> \<Gamma>)\<close>. We discussed the difference 
 between \<^term>\<open>red_ast_bpl\<close> (defined via \<^term>\<open>red_bigblock_small\<close>) and \<^term>\<open>red_bigblock\<close> in  
 Section 2.2 above: 
@@ -553,7 +560,7 @@ We formally bridge the gap between these two definitions whenever we need to dir
 correctness of a Boogie procedure (e.g. when proving the final theorem).
 \<close>
 
-paragraph \<open>Instantiation of \<open>HType\<close>\<close>
+paragraph \<open>Instantiation of \<open>HType\<close> (lines 764 - 773 in the paper)\<close>
 text \<open>The type \<^typ>\<open>'a vbpl_absval\<close> defines our instantiation of the uninterpreted Boogie types
 generated by the Viper-to-Boogie translation. In this type definition, \<open>HType\<close> is instantiated via
 \<^term>\<open>AHeap h\<close>, where \<^term>\<open>h\<close> is a partial mapping (represented by a function that maps to the option 
@@ -573,13 +580,13 @@ text \<open>The correctness of a Viper method is defined in \<^const>\<open>vpr_
 The notation \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close> corresponds to \<^prop>\<open>vpr_method_correct_paper ctxt_vpr m\<close>
 where F,M capture \<^term>\<open>ctxt_vpr\<close>. 
 
-In our generated proofs, we use a more general version of the correctness of a Viper method
+In our generated proofs, we use a more general version for the correctness of a Viper method
 (defined in \<^const>\<open>vpr_method_correct_total\<close>) that is applicable to a larger subset of Viper than
 supported by the paper, where the correctness of a method is expressed via 
 \<^prop>\<open>vpr_method_correct_total ctxt_vpr (\<lambda>_.True) m\<close>.
 
 The following lemma shows that the more general version implies the version of the paper for Viper 
-methods that lie withing the Viper subset presented in the paper:
+methods that are within the Viper subset presented in the paper:
 \<close>
 
 lemmas general_method_correctness_stronger = method_correctness_stronger_than_paper
@@ -609,7 +616,7 @@ we generate the proofs). There are three relevant assumptions directly mentioned
     paper). Moreover, note that \<^const>\<open>method_rel\<close> includes a left-hand side
     \<^const>\<open>vpr_all_method_spec_correct_total\<close>, which states that each method specification in the program 
     is well-formed (this directly corresponds to \<open>\<forall>m' \<in> M. SpecWf(m')\<close> in the definition of
-    \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper (Figure 9 bottom).
+    \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper in Figure 9).
   \<^item> Assumption with name \<open>InitialStateRel\<close>:
     This assumption requires one to choose an initial Boogie state that is related to the initial
     Viper state as mentioned on lines 826-827 in the paper.
@@ -640,9 +647,9 @@ ensures that \<^term>\<open>W'\<close> is equal to the singleton set \<open>{ ad
 (\<open>addperm(\<sigma>\<^sub>v, r, f, p)\<close> is also used in Figure 10 of the paper to represent the state \<open>\<sigma>\<^sub>v\<close> where \<open>p\<close> 
 permission is added to the heap location \<open>(r,f)\<close>).
 
-This definition of \<^term>\<open>W'\<close> together with the  premise
- \<^prop>\<open>th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res\<close> captures the third,
-fourth, and fifth premises of rule INH-ACC in the paper. In particular, 
+This definition of \<^term>\<open>W'\<close> together with the premise
+ \<^prop>\<open>th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res\<close> in the formalisation capture
+ the third, fourth, and fifth premises of rule INH-ACC in the paper. In particular, 
  \<^prop>\<open>th_result_rel (p \<ge> 0) (W' \<noteq> {} \<and> (p > 0 \<longrightarrow> r \<noteq> Null)) W' res\<close> ensures that
   \<^item> \<^term>\<open>res\<close> is a failure state if \<^term>\<open>p \<ge> 0\<close> does not hold (third premise in paper)
   \<^item> \<^term>\<open>res\<close> is a normal state given by \<open>addperm(\<sigma>\<^sub>v, r, f, p)\<close> if (1) \<^term>\<open>p \<ge> 0\<close> holds and 
@@ -679,13 +686,13 @@ in the formalisation that take two Viper states as input, while in the paper the
 take one Viper state as input (due to the expression evaluation being more general in the formalisation,
 which is not relevant for the paper subset). 
 
-The universal quantifier in the paper allows bridging the gap from a state relation with two Viper states
+The universal quantifier in the paper bridges the gap from a state relation with two Viper states
 (for \<open>rcSim\<close>) to a state relation with one Viper state (for \<open>wfSim\<close>). More specifically, the universal
 quantifier states that only the expression evaluation state is relevant for \<open>wfSim\<close>, which is indeed 
 the case for the paper subset. 
 
 The formalisation does not need to bridge this gap, since in the formalisation both \<open>rcSim\<close> and \<open>wfSim\<close> 
-take state relations with two Viper state as inputs.
+use state relations that take two Viper state as inputs.
 \<close>
 
 end
