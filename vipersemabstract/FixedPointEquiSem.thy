@@ -192,7 +192,7 @@ next
   then show ?case
     by (meson NoOldBinop red_pure_red_pure_exps.RedBinopFailure)
 next
-  case (RedOldFailure t l \<Delta> e uz va)
+  case (RedOldFailure \<omega> l \<Delta> e)
   then show ?case
     by simp
 next
