@@ -2420,7 +2420,7 @@ next
         have "Some (set_value \<gamma> hl v) = set_value (get_ptr x) hl v \<oplus> snd (get_rem x)"
           by (smt (verit, ccfv_threshold) \<open>Some (\<sigma>, \<gamma>) = (\<sigma>, get_ptr x) \<oplus> get_rem x\<close> \<open>x \<in> SA\<close> frame_preserving_writing_orig plus_prodE r_get_rem rr snd_conv stable_snd)
         then show ?thesis
-          by (metis \<open>Some (\<sigma>, \<gamma>) = (\<sigma>, get_ptr x) \<oplus> get_rem x\<close> fst_conv plus_prodE plus_prodI snd_conv)
+          by (metis \<open>Some (\<sigma>, \<gamma>) = (\<sigma>, get_ptr x) \<oplus> get_rem x\<close> fst_eqD plus_prodE plus_prodIAlt snd_eqD)
       qed
       moreover have "stabilize ptr = stabilize (\<sigma>, set_value (get_ptr x) hl v)"
       proof (rule points_to_value_same)
