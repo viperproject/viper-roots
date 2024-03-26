@@ -229,7 +229,7 @@ text \<open>The expression evaluation is defined via \<^const>\<open>red_pure_ex
       In almost all cases of the semantics formalisation, these two states are chosen to be the same 
       one and thus directly correspond to the paper. The only case where the two states differ is 
       during \<open>remcheck\<close> operations, where one state is instantiated to be the \<^emph>\<open>reduction state\<close> and 
-      the other the \<^emph>\<open>expression evaluation state\<close> (introduced on lines 312-317 in the paper). The 
+      the other the \<^emph>\<open>expression evaluation state\<close> (these states are introduced in the paper). The 
       formalised expression evaluation checks whether there is nonzero permission to fields in the 
       expression evaluation state (as in the paper), but the other lookups (e.g. heap, store) are 
       performed in the reduction state. In the paper subset, expressions can only look up values in 
@@ -250,7 +250,7 @@ text \<open>The rule (EXH-SUCC) is given by (Figure 2):\<close>
 
 lemmas EXH_SUCC = RedExhale \<comment>\<open>Recall: you can ctrl-click on lemmas such as \<open>RedExhale\<close> to jump to the rule\<close>
 
-text \<open>Note that the premise \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> in the paper (line 296) is expressed via
+text \<open>Note that the premise \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> in the paper is expressed via
   \<^prop>\<open>\<sigma>\<^sub>v' \<in> havoc_locs_state ctxt \<sigma>\<^sub>v'' {loc. get_mh_total_full \<sigma>\<^sub>v loc > 0 \<and> get_mh_total_full \<sigma>\<^sub>v'' loc = 0}\<close>
   in the formalisation.
   The following lemma shows that the two are equivalent (where \<open>nonDet \<sigma>\<^sub>v \<sigma>\<^sub>v'' \<sigma>\<^sub>v'\<close> is formalised
@@ -423,14 +423,7 @@ text\<open>The rule RSEP-SIM (Figure 7) is given by:\<close>
 lemmas RSEP_SIM = exhale_rel_star
 
 text \<open>The two premises Invariant1 and Invariant2 in the formalisation correspond together to the
-      last premise of RSEP-SIM in the paper.
-
-      Note that the paper has two typos in the rule RSEP-SIM:
-
-       \<^item> On line 540: The context for \<open>rcInvSim\<close> should be \<open>\<Gamma>\<^sub>b\<close> instead of \<open>\<Gamma>\<^sub>v\<close>
-       \<^item> On line 542: It should be \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v\<^sup>0, \<sigma>\<^sub>v'))\<close> instead of \<open>Q(A\<^sub>2, (\<sigma>\<^sub>v', \<sigma>\<^sub>v\<^sup>0))\<close>.
-
-      We will fix these typos in the final version.\<close>
+      last premise of RSEP-SIM in the paper.\<close>
 
 
 section \<open>4 Putting the Methodology to Work\<close>
@@ -439,7 +432,7 @@ subsection \<open>4.1 State Relation\<close>
 
 paragraph \<open>State Relation\<close>
 text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
-      The notation \<open>R\<^sub>\<Gamma>\<^sub>b\<^sup>T\<^sup>r\<^sup>,\<^sup>A\<^sup>v((\<sigma>0\<^sub>v,\<sigma>\<^sub>v), \<sigma>\<^sub>b)\<close> in the paper corresponds to
+      The notation \<open>SR\<^sub>\<Gamma>\<^sub>b\<^sup>T\<^sup>r\<^sup>,\<^sup>A\<^sup>v((\<sigma>0\<^sub>v,\<sigma>\<^sub>v), \<sigma>\<^sub>b)\<close> in the paper corresponds to
       \<^prop>\<open>state_rel0 Pr (\<lambda>_.True) A \<Lambda> TyRep Tr Av \<sigma>0\<^sub>v \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
       where \<open>\<Gamma>\<^sub>b\<close> captures both \<^term>\<open>A\<close> and \<^term>\<open>\<Lambda>\<close>.
       \<^term>\<open>Pr\<close> is the Viper program representation and is left implicit in the paper.
@@ -448,7 +441,7 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
       way, namely using \<^term>\<open>ty_repr_basic I\<close> (where \<^term>\<open>I\<close> is irrelevant for the subset of the 
       paper).
 
-      The presented conjuncts in the paper (lines 633-636 in the paper) are represented as follows 
+      The presented conjuncts in the paper are represented as follows 
       in the definition of \<^const>\<open>state_rel0\<close>:
                                                                                        
       \<^item> State consistency: The conjunct \<open>consistent(\<sigma>\<^sub>v)\<close> corresponds to
@@ -459,10 +452,10 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
                         \<^term>\<open>aux_vars_pred_sat \<Lambda> AuxPred \<sigma>\<^sub>b\<close>
       \<^item> Store relation: The conjunct \<open>stRel\<^sub>\<Gamma>\<^sub>b(var(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to 
                         \<^term>\<open>store_rel A \<Lambda> (var_translation Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
-      \<^item> Heap and permission mask relation: The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(HM(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
+      \<^item> Heap and permission mask relation: The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(H(Tr), M(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
           \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b \<and>
                mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
-          The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(HM\<^sup>0(Tr), \<sigma>0\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
+          The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(H\<^sup>0(Tr), M\<^sup>0(Tr), \<sigma>0\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
           \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var_def Tr) \<sigma>0\<^sub>v \<sigma>\<^sub>b \<and>
                mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var_def Tr) \<sigma>0\<^sub>v \<sigma>\<^sub>b\<close>
 \<close>
@@ -470,7 +463,7 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
 subsection \<open>4.2 Non-Locality\<close>
 
 paragraph\<open>Definition \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close>\<close>
-text \<open>The predicate \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close> (line 657 in the paper) is defined in \<^const>\<open>framing_exh\<close>. 
+text \<open>The predicate \<open>Q\<^sub>p\<^sub>r\<^sub>e\<close> is defined in \<^const>\<open>framing_exh\<close>. 
       The notation \<open>Q\<^sub>p\<^sub>r\<^sub>e(A, \<sigma>0\<^sub>v, \<sigma>\<^sub>v)\<close> corresponds to \<^prop>\<open>framing_exh ctxt_vpr (\<lambda>_.True) A \<sigma>0\<^sub>v \<sigma>\<^sub>v\<close>.
       The extra parameter \<^term>\<open>ctxt_vpr\<close> (the Viper context) is not relevant for the subset 
       presented in the paper in this case.
@@ -519,7 +512,7 @@ text \<open>Our custom tactic to prove the forward simulation of Viper statement
 
 subsection \<open>4.4 Background Theory and Polymorphic Maps\<close>
 
-paragraph \<open>Boogie procedure correctness definition (top of Figure 8)\<close>
+paragraph \<open>Boogie procedure correctness definition (top of Figure 9)\<close>
 text\<open>The correctness of a Boogie procedure is defined in \<^const>\<open>proc_is_correct\<close>. This definition
 was taken from an extension of the CAV21 paper \<open>Formally Validating a Practical Verification 
 Condition Generator\<close>, which is developed in an open source repository. The details of the Boogie
@@ -560,7 +553,7 @@ We formally bridge the gap between these two definitions whenever we need to dir
 correctness of a Boogie procedure (e.g. when proving the final theorem).
 \<close>
 
-paragraph \<open>Instantiation of \<open>HType\<close> (lines 764 - 773 in the paper)\<close>
+paragraph \<open>Instantiation of \<open>HType\<close>\<close>
 text \<open>The type \<^typ>\<open>'a vbpl_absval\<close> defines our instantiation of the uninterpreted Boogie types
 generated by the Viper-to-Boogie translation. In this type definition, \<open>HType\<close> is instantiated via
 \<^term>\<open>AHeap h\<close>, where \<^term>\<open>h\<close> is a partial mapping (represented by a function that maps to the option 
@@ -575,7 +568,7 @@ and \<^const>\<open>select_heap\<close>, respectively.
 
 subsection \<open>4.5 Generating A Proof of the Final Theorem\<close>
 
-paragraph \<open>Correctness of a Viper method (Figure 8 at the bottom)\<close>
+paragraph \<open>Correctness of a Viper method (Figure 9 at the bottom)\<close>
 text \<open>The correctness of a Viper method is defined in \<^const>\<open>vpr_method_correct_paper\<close>.
 The notation \<open>Correct\<^sub>v\<^sup>F\<^sup>,\<^sup>M(m)\<close> corresponds to \<^prop>\<open>vpr_method_correct_paper ctxt_vpr m\<close>
 where F,M capture \<^term>\<open>ctxt_vpr\<close>. 
@@ -596,9 +589,9 @@ text \<open>Thus, our generated proofs prove the method correctness for each met
 
 paragraph \<open>Helper lemma to prove \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close>\<close>
 
-text \<open>To generate proofs for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> (Figure 9, bottom), we use a generic helper lemma 
+text \<open>To generate proofs for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> (Figure 10, bottom), we use a generic helper lemma 
       that we prove once and for all and that reflects the strategy for \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> as
-      described in Section 4.5 of the paper (starting at line 809 of the paper).
+      described in Section 4.5 of the paper.
       This generic helper lemmas is given by:\<close> 
 
 lemmas generic_helper_lemma_final_theorem = end_to_end_vpr_method_correct_partial
@@ -609,31 +602,31 @@ we generate the proofs). There are three relevant assumptions directly mentioned
     This expresses correctness of the Boogie procedures (corresponds to the left-hand side 
     \<open>Correct\<^sub>b\<^sup>G(p)\<close> of \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close>)
   \<^item> Assumption with name \<open>VprMethodRel\<close> (defined via \<^const>\<open>method_rel\<close>): 
-    This assumption corresponds to the forward simulation statement on lines 818-820 in the paper. 
-    Note that \<^const>\<open>method_rel\<close> is more general than the forward simulation shown in the paper. 
-    In particular, the conjunct \<^const>\<open>post_framing_rel\<close> is used to show the well-formedness of the
-    method postcondition (which we explicitly ignore in the paper as mentioned in line 810 of the
-    paper). Moreover, note that \<^const>\<open>method_rel\<close> includes a left-hand side
+    This assumption corresponds to the forward simulation statement shown at the end of Section 4.5 in 
+    the paper. Note that \<^const>\<open>method_rel\<close> is more general than the forward simulation shown in the 
+    paper. In particular, the conjunct \<^const>\<open>post_framing_rel\<close> is used to show the well-formedness 
+    of the method postcondition (which we ignore in the paper for the sake of presentation). 
+    Moreover, note that \<^const>\<open>method_rel\<close> includes a left-hand side
     \<^const>\<open>vpr_all_method_spec_correct_total\<close>, which states that each method specification in the program 
     is well-formed (this directly corresponds to \<open>\<forall>m' \<in> M. SpecWf(m')\<close> in the definition of
-    \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper in Figure 9).
+    \<open>Rel\<^sup>G\<^sub>F\<^sub>,\<^sub>M(m,p)\<close> in the paper in Figure 10).
   \<^item> Assumption with name \<open>InitialStateRel\<close>:
     This assumption requires one to choose an initial Boogie state that is related to the initial
-    Viper state as mentioned on lines 826-827 in the paper.
+    Viper state.
 \<close>
 
 section \<open>Appendix\<close>
 
 subsection \<open>A Inhale Semantics\<close>
 
-text \<open>The rule (INH) (Figure 10) is given by:\<close>
+text \<open>The rule (INH) (Figure 11) is given by:\<close>
 
 lemmas INH_paper = RedInhale
 
 text \<open>Here \<open>\<langle>A, \<sigma>\<^sub>v\<rangle> \<longrightarrow>\<^sub>i\<^sub>n\<^sub>h r\<^sub>v\<close> in the paper is given by \<^term>\<open>red_inhale ctxt (\<lambda>_.True) A \<sigma>\<^sub>v r\<^sub>v\<close>. The 
 parameter \<^term>\<open>ctxt\<close> is not relevant for the subset of the paper.\<close>
 
-text \<open>The rule (INH-ACC) (Figure 10) is given by:\<close>
+text \<open>The rule (INH-ACC) (Figure 11) is given by:\<close>
 
 lemmas INH_ACC_paper = InhAcc
 
@@ -644,7 +637,7 @@ The term
 
 ensures that \<^term>\<open>W'\<close> is equal to the singleton set \<open>{ addperm(\<sigma>\<^sub>v, r, f, p) }\<close> if adding \<open>p\<close> permission to heap location
 \<open>(r,f)\<close> does not exceed 1 permission and otherwise \<^term>\<open>W'\<close> is empty.
-(\<open>addperm(\<sigma>\<^sub>v, r, f, p)\<close> is also used in Figure 10 of the paper to represent the state \<open>\<sigma>\<^sub>v\<close> where \<open>p\<close> 
+(\<open>addperm(\<sigma>\<^sub>v, r, f, p)\<close> is also used in Figure 11 of the paper to represent the state \<open>\<sigma>\<^sub>v\<close> where \<open>p\<close> 
 permission is added to the heap location \<open>(r,f)\<close>).
 
 This definition of \<^term>\<open>W'\<close> together with the premise
@@ -659,11 +652,11 @@ This definition of \<^term>\<open>W'\<close> together with the premise
 \<close>
 
 
-text \<open>The rule (INH-SEP-S) (Figure 10) is given by:\<close>
+text \<open>The rule (INH-SEP-S) (Figure 11) is given by:\<close>
 
 lemmas INH_SEP_S_paper = InhStarNormal
 
-text \<open>The rule (INH-SEP-F) (Figure 10) is given by:\<close>
+text \<open>The rule (INH-SEP-F) (Figure 11) is given by:\<close>
 
 lemmas INH_SEP_F_paper = InhStarFailureMagic
 
@@ -671,7 +664,7 @@ text \<open>Note that this lemma also capture the case for the magic outcome.\<c
 
 subsection \<open>B Another Simulation Rule Example\<close>
 
-text \<open>The rule (RACC-SIM) (Figure 11) is given by:\<close>
+text \<open>The rule (RACC-SIM) (Figure 12) is given by:\<close>
 
 lemmas RACC_SIM_paper = exhale_rel_field_acc
 
