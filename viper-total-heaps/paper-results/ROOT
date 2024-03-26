@@ -1,0 +1,4 @@
+session PaperResults = TotalViper +
+  theories  
+    PaperResults
+    PaperResultsSupport

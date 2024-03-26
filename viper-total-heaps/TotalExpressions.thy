@@ -291,7 +291,7 @@ inductive red_pure_exp_total :: "'a total_context \<Rightarrow> ('a full_total_s
 \<close>
 
 \<comment>\<open>Permission introspection\<close>
-| RedPermNull: (* TODO: should perm(null.f) reduce to failure? *)
+| RedPermNull:
     "\<lbrakk> ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef Null) \<rbrakk> \<Longrightarrow> 
      ctxt, R, \<omega>_def \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VPerm 0)"
 | RedPerm: 

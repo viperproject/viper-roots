@@ -86,6 +86,28 @@ fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomi
 | "assert_pred_rec p_assert p_atm p_e (Exists _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
 | "assert_pred_rec p_assert p_atm p_e (Wand A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
 
+fun stmt_pred :: "(stmt \<Rightarrow> bool) \<Rightarrow> (assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> stmt \<Rightarrow> bool" and
+    stmt_pred_rec :: "(stmt \<Rightarrow> bool) \<Rightarrow> (assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> stmt \<Rightarrow> bool"
+    where   
+  "stmt_pred p_stmt p_assert p_e s \<longleftrightarrow> p_stmt s \<and> stmt_pred_rec p_stmt p_assert p_e s"
+| "stmt_pred_rec p_stmt p_assert p_e (Inhale A) \<longleftrightarrow> p_assert A"
+| "stmt_pred_rec p_stmt p_assert p_e (Exhale A) \<longleftrightarrow> p_assert A"
+| "stmt_pred_rec p_stmt p_assert p_e (Assert A) \<longleftrightarrow> p_assert A"
+| "stmt_pred_rec p_stmt p_assert p_e (Assume A) \<longleftrightarrow> p_assert A"
+| "stmt_pred_rec p_stmt p_assert p_e (LocalAssign x e) \<longleftrightarrow> p_e e"
+| "stmt_pred_rec p_stmt p_assert p_e (FieldAssign e1 f e2) \<longleftrightarrow> p_e e1 \<and> p_e e2"
+| "stmt_pred_rec p_stmt p_assert p_e (Havoc x) \<longleftrightarrow> True"
+| "stmt_pred_rec p_stmt p_assert p_e (If e s1 s2) \<longleftrightarrow> p_e e \<and> stmt_pred p_stmt p_assert p_e s1 \<and> stmt_pred p_stmt p_assert p_e s2"
+| "stmt_pred_rec p_stmt p_assert p_e (Seq s1 s2) \<longleftrightarrow> stmt_pred p_stmt p_assert p_e s1 \<and> stmt_pred p_stmt p_assert p_e s2"
+| "stmt_pred_rec p_stmt p_assert p_e (MethodCall ys m es) \<longleftrightarrow> list_all p_e es"
+| "stmt_pred_rec p_stmt p_assert p_e (While e A s) \<longleftrightarrow> p_e e \<and> p_assert A \<and> p_stmt s"
+| "stmt_pred_rec p_stmt p_assert p_e (Unfold pred es p) \<longleftrightarrow> list_all p_e es" \<comment>\<open>TODO: restrict p\<close>
+| "stmt_pred_rec p_stmt p_assert p_e (Fold pred es p) \<longleftrightarrow> list_all p_e es" \<comment>\<open>TODO: restrict p\<close>
+| "stmt_pred_rec p_stmt p_assert p_e (Package A B) \<longleftrightarrow> p_assert A \<and> p_assert B"
+| "stmt_pred_rec p_stmt p_assert p_e (Apply A B) \<longleftrightarrow> p_assert A \<and> p_assert B"
+| "stmt_pred_rec p_stmt p_assert p_e (Label lbl) \<longleftrightarrow> True"
+| "stmt_pred_rec p_stmt p_assert p_e (Scope vty s) \<longleftrightarrow> stmt_pred p_stmt p_assert p_e s"
+| "stmt_pred_rec p_stmt p_assert p_e Skip \<longleftrightarrow> True"
 
 subsubsection \<open>Common instantiations\<close>
 
@@ -102,6 +124,22 @@ abbreviation no_perm_pure_exp
 
 abbreviation no_perm_assertion
   where "no_perm_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_perm_pure_exp_no_rec"
+
+text \<open>No old expressions\<close>
+
+fun no_old_pure_exp_no_rec :: "pure_exp \<Rightarrow> bool"
+  where 
+    "no_old_pure_exp_no_rec (Old _ _) = False"
+  | "no_old_pure_exp_no_rec _ = True"
+
+abbreviation no_old_pure_exp
+  where "no_old_pure_exp \<equiv> pure_exp_pred no_old_pure_exp_no_rec"
+
+abbreviation no_old_assertion
+  where "no_old_assertion \<equiv> assert_pred (\<lambda>_. True) (\<lambda>_. True) no_old_pure_exp_no_rec"
+
+abbreviation no_old_stmt
+  where "no_old_stmt \<equiv> stmt_pred (\<lambda>_. True) no_old_assertion no_old_pure_exp"
 
 text \<open>parts not supported by proof generation\<close>
 

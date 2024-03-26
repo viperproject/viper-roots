@@ -9,7 +9,7 @@ fun print_and_fail_tac msg ctxt = ((print_tac ctxt msg) THEN no_tac)
 fun run_and_print_if_fail_tac' msg tac ctxt =
     (tac ctxt) ORELSE' (K (print_and_fail_tac msg ctxt))
 
-fun run_and_print_if_fail_2_tac' msg tac ctxt =
+fun run_and_print_if_fail_2_tac' msg tac _ =
    (* tac ORELSE' (K (print_and_fail_tac msg ctxt)): the version using print_tac is slower, 
       because it prints all subgoals and it does not terminate the execution 
       (as opposed to the current solution that raises an exception) *)

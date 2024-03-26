@@ -15,7 +15,7 @@ definition rel_general :: "('v \<Rightarrow> 'a nstate \<Rightarrow> bool) \<Rig
       \<comment>\<open>for all states in the input relation\<close>
       \<forall> \<omega> ns. R \<omega> ns \<longrightarrow> 
              (\<forall>\<omega>'. Success \<omega> \<omega>' \<longrightarrow>
-                 \<comment>\<open>success can be simulated by an Boogie execution that reaches \<gamma>' s.t. 
+                 \<comment>\<open>success can be simulated by a Boogie execution that reaches \<gamma>' s.t. 
                     the output relation is respected\<close>
                  (\<exists>ns'. (red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>' ns'))) \<and>
              (Fail \<omega> \<longrightarrow> 
