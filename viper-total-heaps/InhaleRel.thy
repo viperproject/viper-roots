@@ -668,7 +668,7 @@ proof (rule inhale_rel_refl)
     "ctxt_vpr, StateCons, Some \<omega> \<turnstile> \<langle>(ELit (ViperLang.lit.LBool True));\<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool b)" and
     "res = (if b then RNormal \<omega> else RMagic)"
     apply (rule InhPure_case)
-    by (auto elim: red_exp_list_failure_elim red_pure_exp_total_elims)
+    by (auto elim: red_pure_exp_total_elims)
 
   thus " res \<noteq> RFailure \<and> (\<forall>\<omega>'. res = RNormal \<omega>' \<longrightarrow> \<omega>' = \<omega>) "
     by simp
