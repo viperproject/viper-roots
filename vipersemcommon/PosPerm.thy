@@ -119,7 +119,14 @@ lemma pgte_pgt:
   assumes "a > b"
       and "c \<ge> d"
     shows "a + c > b + d"
-  by (smt (verit) add_assoc add_commute assms(1) assms(2) local.dual_order.eq_iff local.dual_order.strict_iff_not padd_cancellative pperm_gte_padd sum_larger)
+proof -
+  obtain r where r_def: "a = b + r"
+    using assms(1) local.dual_order.strict_iff_not local.pperm_gte_padd by blast
+  then have "a + c \<ge> b + d"
+    using assms(1) assms(2) local.order.strict_implies_order local.padd_mono by presburger
+  then show ?thesis
+    by (metis r_def assms(1) assms(2) local.order_antisym local.order_refl local.padd_cancellative local.padd_mono not_pgte_charact sum_larger)
+qed
 
 lemma pmult_distr:
   "a * (b + c) = (a * b) + (a * c)"
@@ -133,9 +140,6 @@ lemma pmult_special:
   "pwrite * x = x"
   by simp
 
-lemma pinv_double_half:
-  "half * (inverse p) = inverse (p + p)"
-  by (smt (verit) local.add_0_right local.field_divide_inverse local.field_inverse local.field_inverse_zero local.mult_1_left mult_assoc pmult_comm pmult_distr)
 
 lemma pinv_pmult_ok:
   assumes "ppos p"
@@ -172,6 +176,28 @@ lemma decompose_smaller_than_one:
 lemma pwrite_larger_one:
   "pwrite > half"
   by (metis half_plus_half local.dual_order.not_eq_order_implies_strict local.two_larger_one sum_larger)
+
+lemma one_plus_one:
+  "1 + 1 \<noteq> 0"
+  by (metis local.dual_order.asym local.two_larger_one pperm_pnone_pgt)
+
+lemma pinv_double_half:
+  "half * (inverse p) = inverse (p + p)"
+proof (cases "p = 0")
+  case True
+  then show ?thesis
+    by (metis half_plus_half local.add_0_right local.field_inverse_zero local.mult_1_right pmult_comm pmult_distr)
+next
+  case False
+  have "inverse p * p = pwrite \<and> inverse (p + p) * (p + p) = pwrite \<and> inverse (pwrite + pwrite) * (pwrite + pwrite) = pwrite"
+    by (metis False local.dual_order.strict_iff_not local.field_inverse one_plus_one pperm_pnone_pgt sum_larger)
+  then have "inverse (1 + 1) * inverse p = inverse (p + p)"
+    by (metis abel_semigroup.left_commute local.mult.abel_semigroup_axioms local.mult_1_right pmult_distr)
+  moreover have "half * inverse p = inverse (1 + 1) * inverse p"
+    by (simp add: local.field_divide_inverse)
+  ultimately show ?thesis by simp
+qed
+
 
 end
 

@@ -9,6 +9,14 @@ The formalization is done using the [Isabelle theorem prover](https://isabelle.i
 
 For installation instructions, see the README.md file at the toplevel of this repository.
 
+## Links to Paper
+
+The file `paper-results/PaperResults.thy` documents results from the paper 
+"Towards Trustworthy Automated Program Verifiers: Formally Validating Translations 
+into an Intermediate Verification Language" using Isabelle's documentation features. 
+To open the theory file, you must have installed the Isabelle sessions correctly 
+(see above).
+
 ## Viper Total Heap Semantics
 
 The total heap semantics is formalized in:
