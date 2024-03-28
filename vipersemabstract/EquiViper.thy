@@ -319,7 +319,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] VFailure"
 | RedBinopFailure: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v2 ; eval_binop v1 bop v2 = BinopOpFailure ; eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] VFailure" (* Division by 0 *)
-| RedOldFailure: "\<lbrakk> t l = None \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e ; ((_, Ag t), _)\<rangle> [\<Down>] VFailure"
+| RedOldFailure: "\<lbrakk> get_trace \<omega> l = None \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e ; \<omega>\<rangle> [\<Down>] VFailure"
 | RedExistsFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty \<longrightarrow> \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>] VFailure"
 | RedForallFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty \<longrightarrow> \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
@@ -432,7 +432,7 @@ next
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedBinopFailure)
 next
-  case (RedOldFailure t l \<Delta> e uz va)
+  case (RedOldFailure \<omega> l \<Delta> e)
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedOldFailure)
 next
