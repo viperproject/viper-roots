@@ -854,7 +854,7 @@ proof
     by (metis \<open>a \<notin> _\<close> \<open>f a = Some b\<close> domIff inj_on_contraD nth_mem option.distinct(1))
 qed
 
-definition map_upd_set \<comment>\<open>make this a definition?\<close>
+definition map_upd_set
   where "map_upd_set A B f \<equiv> A ++ (\<lambda>x. if x \<in> B then Some (f x) else None)"
 
 lemma map_upd_set_dom:
@@ -885,6 +885,28 @@ lemma map_upd_set_lookup_2:
   using assms
   unfolding map_upd_set_def
   by (simp add: map_add_def)
+
+lemma map_upd_set_combine: "map_upd_set (map_upd_set f A g) B g = map_upd_set f (A \<union> B) g" (is "?lhs = ?rhs")
+proof (rule HOL.ext)
+  fix x
+  show "?lhs x = ?rhs x"
+  proof (cases "x \<in> A \<union> B")
+    case True
+    then show ?thesis 
+      by (metis Un_iff map_upd_set_lookup_1 map_upd_set_lookup_2)
+  next
+    case False
+    then show ?thesis 
+      by (simp add: map_upd_set_lookup_2)
+  qed
+qed
+
+lemma map_upd_set_change_function_1: 
+  assumes "\<And>x. x \<in> A \<Longrightarrow> g x = g' x"
+  shows "map_upd_set f A g = map_upd_set f A g'"
+  using assms 
+  unfolding map_upd_set_def
+  by metis
 
 subsection \<open>Strictly Ordered Lists\<close>
 

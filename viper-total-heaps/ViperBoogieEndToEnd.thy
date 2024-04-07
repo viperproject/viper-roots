@@ -26,7 +26,7 @@ lemma state_rel_well_def_same_old_state:
           "\<And>l \<phi>. t l = Some \<phi> \<Longrightarrow> StateCons_t \<phi>" 
   shows "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred (update_trace_total w t) ns"
   unfolding state_rel_def state_rel0_def 
-  using state_rel_trace_independent
+  (*using state_rel_trace_independent*)
   oops
 (*
   apply (intro conjI)
@@ -242,45 +242,61 @@ proof (rule ccontr)
 qed
 
 definition post_framing_rel_aux
-  where "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns \<equiv>
+  where "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>Pre \<omega>1 ns \<equiv>
     (\<exists>ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrame R'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
-                                  red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> RPostFrame \<omega>1 ns' \<and>
-                                  \<comment>\<open>expressed via \<^const>\<open>stmt_rel\<close> because \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations\<close>
-                                  stmt_rel RPostFrame R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1)"
+              red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) (\<gamma>Framing0, Normal ns') \<and> RPostFrame \<omega>1 ns' \<and>
+              \<comment>\<open>expressed via \<^const>\<open>stmt_rel\<close> because \<^const>\<open>inhale_rel\<close> does not allow arbitrary input and output relations\<close>
+              stmt_rel RPostFrame R' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1)"
 
-definition post_framing_rel
+definition post_framing_rel ::  "
+              'a total_context
+               \<Rightarrow> ('a full_total_state \<Rightarrow> bool)
+                  \<Rightarrow> (nat \<Rightarrow> vtyp option)
+                     \<Rightarrow> bigblock list
+                        \<Rightarrow> 'a vbpl_absval econtext_bpl_general
+                           \<Rightarrow> 'b method_decl_scheme
+                              \<Rightarrow> ('a full_total_state \<Rightarrow> 'a vbpl_absval nstate \<Rightarrow> bool) \<Rightarrow> bigblock \<times> cont \<Rightarrow> bool"
   where "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<equiv>
            (\<forall>\<omega>0 \<omega>1 ns. R0 \<omega>0 ns \<longrightarrow> get_store_total \<omega>0 = get_store_total \<omega>1 \<longrightarrow> 
                                \<comment>\<open>One could omit emptiness and instead use a separate monotonicity theorem
                                   for inhale. We do this in a separate step.\<close> 
-                               is_empty_total_full \<omega>1 \<longrightarrow>                                                             
+                               is_empty_total_full \<omega>1 \<longrightarrow>     
+                               get_trace_total \<omega>1 old_label = Some (get_total_full \<omega>0) \<longrightarrow>
                                total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1) \<longrightarrow>
-                               post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R0 \<gamma>Pre \<omega>1 ns
+                               post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>Pre \<omega>1 ns
                    )"
 
 definition method_rel
-  where "method_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
+  where "method_rel R0 R1 R1Old ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>0 \<equiv> 
           (\<exists> \<gamma>Pre. stmt_rel R0 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) \<gamma>0 \<gamma>Pre \<and>
-                   post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R1 \<gamma>Pre \<and>
-                   (  \<comment>\<open>The correctness of the spec must be taken into account in this left-hand side here and 
-                         not in a previous conjunct, since the previous conjunct is required to justify the 
-                         correctness of the spec.
-                         We need this left-hand side, because the Boogie encoding may rely on the correctness
-                         of the specs.\<close> 
-                      method_decl.body mdecl \<noteq> None \<longrightarrow> \<comment>\<open>correctness of body is relevant only if the method has a body\<close>
-                      vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
-                      (\<exists>\<gamma>Body \<gamma>Post R1'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
-                         stmt_rel R1 R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>Pre \<gamma>Body \<and>    
-                          \<comment>\<open>because framedness of the postcondition was checked above, we may use it here.
-                             TODO: could make sense to abstract \<^const>\<open>framing_exh\<close> away via a parameter\<close>                   
-                         stmt_rel (\<lambda> \<omega> ns. R1 \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>) 
-                                  R1' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post
-                      )
+                   \<comment>\<open>TODO: transition to state where trace contains old state (need to check whether post_framing_rel is 
+                            too liberal in terms of allowing any such trace)\<close>
+                   (\<exists>\<gamma>PreOld.
+                     rel_general R1 R1Old (\<lambda>\<omega> \<omega>'. \<omega>' = update_trace_total \<omega> [old_label \<mapsto> get_total_full \<omega>]) (\<lambda>_. False) proc_body_bpl ctxt \<gamma>Pre \<gamma>PreOld \<and>
+                     post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl 
+                                      (\<lambda>\<omega> ns. R1Old \<omega> ns \<and> get_trace_total \<omega> old_label = Some (get_total_full \<omega>)) \<gamma>PreOld \<and>
+                     (  \<comment>\<open>The correctness of the spec must be taken into account in this left-hand side here and 
+                           not in a previous conjunct, since the previous conjunct is required to justify the 
+                           correctness of the spec.
+                           We need this left-hand side, because the Boogie encoding may rely on the correctness
+                           of the specs.\<close> 
+                        method_decl.body mdecl \<noteq> None \<longrightarrow> \<comment>\<open>correctness of body is relevant only if the method has a body\<close>
+                        vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> 
+                        (\<exists>\<gamma>Body \<gamma>Post R1Old'. \<comment>\<open>output Boogie program point and output relation are irrelevant\<close>
+                           stmt_rel R1Old R1Old ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (the (method_decl.body mdecl)) \<gamma>PreOld \<gamma>Body \<and>    
+                            \<comment>\<open>because framedness of the postcondition was checked above, we may use it here.
+                               TODO: could make sense to abstract \<^const>\<open>framing_exh\<close> away via a parameter\<close>                   
+                           stmt_rel (\<lambda> \<omega> ns. R1Old \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>) 
+                                    R1Old' ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post
+                        )
+                     )
                    )
           )"
 
 lemma post_framing_rel_aux:
-  assumes WfTyRep: "wf_ty_repr_bpl TyRep" 
+  assumes StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred \<omega> ns \<and>
+                                         get_trace_total \<omega> old_label = Some (get_total_full \<omega>)"
+      and WfTyRep: "wf_ty_repr_bpl TyRep" 
       and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
       and "domain_type TyRep = absval_interp_total ctxt_vpr"
@@ -288,12 +304,14 @@ lemma post_framing_rel_aux:
       and LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)"
       and LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
       and ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var"
+      and DomLabelMap: "active_labels_hm_tr (label_hm_translation Tr) = {old_label}"
       and Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
                               {mask_var Tr, mask_var_def Tr} \<union>
                               (ran (var_translation Tr)) \<union>
                               (ran (field_translation Tr)) \<union>
                               (range (const_repr Tr)) \<union>
-                              dom AuxPred) = {}" (is "?A \<inter> ?B = {}")
+                              dom AuxPred \<union>
+                              vars_label_hm_tr (label_hm_translation Tr)) = {}" (is "?A \<inter> ?B = {}")
       and "hvar' \<noteq> mvar'"
       and PropagateBpl: "red_ast_bpl_rel (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) 
                                          (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred) proc_body_bpl ctxt 
@@ -305,23 +323,24 @@ lemma post_framing_rel_aux:
                        (Inhale (method_decl.post mdecl))
                        (BigBlock name cs str tr, cont)
                        \<gamma>'" 
-shows "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl 
-                        (state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
-                        \<gamma>Pre"
+      shows "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl R \<gamma>Pre"
   unfolding post_framing_rel_def
 proof (rule allI | rule impI)+
   fix \<omega>0 \<omega>1 :: "'a full_total_state "
   fix ns
-  assume "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>0 ns" (is "?R Tr \<omega>0 ns") and
+  assume "R \<omega>0 ns" and
          StoreSame: "get_store_total \<omega>0 = get_store_total \<omega>1" and
-         HeapWellTy:  "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
+         OldState: "get_trace_total \<omega>1 old_label = Some (get_total_full \<omega>0)" and
+         HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>1)" and
          IsEmpty: "is_empty_total_full \<omega>1"
+
+  note StateRelInst = StateRel[OF \<open>R \<omega>0 ns\<close>]
 
   with PropagateBpl obtain ns1 where 
     RedBpl1: "red_ast_bpl proc_body_bpl ctxt 
                               (\<gamma>Pre, Normal ns)
                               ((BigBlock name (Havoc hvar' # Assign mvar' (Var zero_mask_var) # cs) str tr, cont), Normal ns1)" and
-    R1: "?R Tr \<omega>0 ns1"
+    R1: "state_rel_well_def_same ctxt Pr StateCons TyRep Tr AuxPred \<omega>0 ns1" (is "?StateRel1 Tr \<omega>0 ns1")
     unfolding red_ast_bpl_rel_def
     by blast    
 
@@ -335,23 +354,31 @@ proof (rule allI | rule impI)+
   have "StateCons \<omega>1"
     using WfConsistency[simplified wf_total_consistency_def] IsEmpty
     by blast
+ 
+  have OldStateSame: "get_trace_total \<omega>1 old_label = get_trace_total \<omega>0 old_label"
+    using StateRelInst OldState
+    by argo
 
-  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame _ \<open>StateCons \<omega>1\<close> _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
+  have DomLabelMap2: "active_labels_hm_tr (label_hm_translation Tr) \<subseteq> {old_label}"
+    using DomLabelMap
+    by blast
+
+  from post_framing_propagate_aux[OF R1 WfTyRep TypeInterp StoreSame OldStateSame DomLabelMap2 _ \<open>StateCons \<omega>1\<close> _ LookupDeclHeap LookupTyMask * zero_mask_rel_2 Disj \<open>hvar' \<noteq> _\<close>]
        HeapWellTy \<open>Pr = _\<close> \<open>domain_type TyRep = _\<close>
        IsEmpty obtain ns2 where
     "red_ast_bpl proc_body_bpl ctxt
         ((BigBlock name (cmd.Havoc hvar' # Assign mvar' (expr.Var zero_mask_var) # cs) str tr, cont),
          Normal ns1)
         ((BigBlock name cs str tr, cont), Normal ns2)" and
-    R2: "?R (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
-    using is_empty_total_wf_mask[OF IsEmpty] 
+    R2: "?StateRel1 (Tr\<lparr>heap_var := hvar', mask_var := mvar', heap_var_def := hvar', mask_var_def := mvar'\<rparr>) \<omega>1 ns2"             
+    using is_empty_total_wf_mask[OF IsEmpty]
     by force
     
   with RedBpl1 have RedBpl2: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal ns) ((BigBlock name cs str tr, cont), Normal ns2)"
     using red_ast_bpl_transitive
     by fast
    
-  show "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl (?R Tr) \<gamma>Pre \<omega>1 ns"
+  show "post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>Pre \<omega>1 ns"
     unfolding post_framing_rel_aux_def
     apply ((rule exI)+, intro conjI)
       apply (rule RedBpl2)
@@ -442,10 +469,11 @@ lemma end_to_end_vpr_method_correct_partial:
       and VprMethodRel: "method_rel 
                (state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred))
                (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred)
+               (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons (TyRep :: 'a ty_repr_bpl) Tr' AuxPred)
                ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl               
                (convert_ast_to_program_point proc_body_bpl)" 
-          (is "method_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0")
-      and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr)"
+          (is "method_rel ?R0 ?R1 ?R1Old ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?\<gamma>0")
+      and ConsistencyEnabled: "consistent_state_rel_opt (state_rel_opt Tr')"
 
 \<comment>\<open>construct initial state\<close>
       and InitialStateRel: "\<And> \<omega>.  
@@ -463,20 +491,21 @@ shows "vpr_method_correct_total_partial ctxt_vpr StateCons mdecl"
 proof (rule allI | rule impI)+
   text \<open>Proof setup: deconstruct relation statement\<close>
 
-  let ?R1Post = "\<lambda>\<omega> ns. ?R1 \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>"
+  let ?R1OldInit = "\<lambda>\<omega> ns. ?R1Old \<omega> ns \<and> get_trace_total \<omega> old_label = Some (get_total_full \<omega>)"
 
-  from VprMethodRel obtain \<gamma>Pre \<gamma>Body \<gamma>Post Rend where 
+  from VprMethodRel obtain \<gamma>Pre \<gamma>PreOld \<gamma>Body \<gamma>Post Rend where 
     PreInhRel: "stmt_rel ?R0 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.pre mdecl)) ?\<gamma>0 \<gamma>Pre" and
-    PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1 \<gamma>Pre" and
+    PreToPreOldRel: "rel_general ?R1 ?R1Old (\<lambda>\<omega> \<omega>'. \<omega>' = update_trace_total \<omega> [old_label \<mapsto> (get_total_full \<omega>)]) (\<lambda>_. False) proc_body_bpl ctxt \<gamma>Pre \<gamma>PreOld" and
+    PostFramingRel: "post_framing_rel ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl ?R1OldInit \<gamma>PreOld" and
     BodyRel: "method_decl.body mdecl \<noteq> None \<Longrightarrow>
               vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
-              stmt_rel ?R1 ?R1 ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>Pre \<gamma>Body" and
+              stmt_rel ?R1Old ?R1Old ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt body_vpr \<gamma>PreOld \<gamma>Body" and
     PostExhRel: "method_decl.body mdecl \<noteq> None \<Longrightarrow>
               vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<Longrightarrow>
-              stmt_rel ?R1Post Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
+              stmt_rel (\<lambda>\<omega> ns. ?R1Old \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega> \<omega>) Rend ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Exhale (method_decl.post mdecl)) \<gamma>Body \<gamma>Post"
     unfolding method_rel_def
-    using VprMethodBody
-    by fastforce   
+    using VprMethodBody    
+    by (metis (no_types, lifting) option.sel)
 
   text \<open>start actual proof\<close>
 
@@ -490,7 +519,7 @@ proof (rule allI | rule impI)+
   
   let ?abs = "vbpl_absval_ty TyRep"
 
-  note Boogie_correct_inst=Boogie_correct
+  note Boogie_correct_inst = Boogie_correct
 
   obtain ns ls gs where 
     "ns = \<lparr>old_global_state = gs, global_state = gs, local_state = ls, binder_state = Map.empty\<rparr>" and
@@ -602,6 +631,14 @@ proof (rule allI | rule impI)+
             using RedInhale \<open>rpre = RNormal \<omega>pre\<close>
             by blast
 
+      let ?\<omega>preOld = "(update_trace_total \<omega>pre (Map.empty(old_label \<mapsto> get_total_full \<omega>pre)))"
+
+      from rel_success_elim[OF PreToPreOldRel] Rpre obtain nspre_old
+        where RedPreOldBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) (\<gamma>PreOld, Normal nspre_old)"
+          and RpreOld: "?R1Old ?\<omega>preOld nspre_old"
+        using RedPreBpl red_ast_bpl_transitive
+        by meson
+
       show PostFramed: "vpr_postcondition_framed ctxt_vpr StateCons (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>)"
         unfolding vpr_postcondition_framed_def assertion_framing_state_def
       proof (rule allI | rule impI)+
@@ -615,15 +652,29 @@ proof (rule allI | rule impI)+
 
         hence HeapWellTy: "total_heap_well_typed (program_total ctxt_vpr) (absval_interp_total ctxt_vpr) (get_hh_total_full ?\<omega>PostEmpty)"
           by (simp add: empty_full_total_state_def)
+
+        have StoreSame2: "get_store_total ?\<omega>preOld = get_store_total \<omega>"
+          using StoreSame
+          by simp
+
+        have TraceOldLabel: "get_trace_total ?\<omega>PostEmpty old_label = Some (get_total_full ?\<omega>preOld)"
+          using TraceOldState
+          by simp
         
-        from PostFramingRel obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameStart RPostFrameEnd where 
-          RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Framing0, Normal ns')" and
+        note PostFramingRelInst=
+             PostFramingRel[simplified post_framing_rel_def, THEN spec[where ?x="?\<omega>preOld"], THEN spec[where ?x="?\<omega>PostEmpty"], simplified]
+        from PostFramingRelInst have
+             " post_framing_rel_aux ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt mdecl \<gamma>PreOld 
+                 (empty_full_total_state (get_store_total \<omega>) trace (get_hh_total mh) (get_hp_total mh)) nspre_old"
+          using RpreOld StoreSame is_empty_empty_full_total_state HeapWellTy TraceOldState get_store_empty_full_total_state get_trace_empty_full_total_state                    
+          by fastforce
+        from this obtain ns' \<gamma>Framing0 \<gamma>Framing1 RPostFrameStart RPostFrameEnd where 
+          RedPreToFramingBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>PreOld, Normal nspre_old) (\<gamma>Framing0, Normal ns')" and
           "RPostFrameStart ?\<omega>PostEmpty ns'" and
           PostFramingInhRel: "stmt_rel RPostFrameStart RPostFrameEnd ctxt_vpr StateCons \<Lambda> proc_body_bpl ctxt (Inhale (method_decl.post mdecl)) \<gamma>Framing0 \<gamma>Framing1"
-          using Rpre StoreSame is_empty_empty_full_total_state  HeapWellTy
-          unfolding post_framing_rel_def post_framing_rel_aux_def
-          by (metis get_store_empty_full_total_state)
-
+          unfolding post_framing_rel_aux_def
+          by blast
+      
         show "res \<noteq> RFailure"
         proof (rule ccontr)
           assume "\<not> res \<noteq> RFailure"
@@ -645,7 +696,7 @@ proof (rule allI | rule impI)+
             using RedInhale \<open>\<Lambda> = _\<close>
             by blast
             
-          with RedPreBpl RedPreToFramingBpl
+          with RedPreBpl RedPreOldBpl RedPreToFramingBpl 
           have RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
             using red_ast_bpl_transitive
             by blast
@@ -663,7 +714,6 @@ proof (rule allI | rule impI)+
       show "method_decl.body mdecl \<noteq> None \<longrightarrow> vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr) \<longrightarrow> vpr_method_body_correct ctxt_vpr StateCons mdecl \<omega>pre"
         unfolding vpr_method_body_correct_def
       proof (rule allI | rule impI | rule conjI)+
-        let ?\<omega>pre' = "(update_trace_total \<omega>pre [old_label \<mapsto> get_total_full \<omega>pre])"
         let ?\<Lambda> = "(nth_option (method_decl.args mdecl @ rets mdecl))"
         let ?mbody = "(the (method_decl.body mdecl))"
         fix rpost
@@ -671,48 +721,31 @@ proof (rule allI | rule impI)+
            and SpecsCorrect: "vpr_all_method_spec_correct_total ctxt_vpr StateCons (program_total ctxt_vpr)"   
            and RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> 
                                (Seq ?mbody (Exhale (method_decl.post mdecl)))
-                               ?\<omega>pre' rpost"
+                               ?\<omega>preOld rpost"
 
         with VprMethodBody have VprMethodBodySome: "method_decl.body mdecl = Some body_vpr"
           by fast
-
-        \<comment>\<open>the following will have to be adjusted once we track old states\<close>
-        have Rpre_old_upd:"?R (update_trace_total \<omega>pre ([old_label \<mapsto> get_total_full \<omega>pre])) nspre"
-        proof -
-          have *: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons_t (get_total_full \<omega>pre)"
-            using WfConsistency state_rel_consistent[OF Rpre]
-            unfolding wf_total_consistency_def
-            by blast
-          show ?thesis
-            apply (rule state_rel_trace_independent[OF WfConsistency])
-            using *
-             apply (simp split: if_split_asm)
-            using Rpre
-            by blast
-        qed
  
         show "rpost \<noteq> RFailure"
         proof (rule ccontr)
           assume "\<not> rpost \<noteq> RFailure"
           hence "rpost = RFailure" by simp
           with RedBodyVpr 
-          have RedCasesVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>pre' RFailure \<or>
-               (\<exists>\<omega>body. red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>pre' (RNormal \<omega>body) \<and>
+          consider (BodyFails) "red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>preOld RFailure" |
+                   (PostFails) "(\<exists>\<omega>body. red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>preOld (RNormal \<omega>body) \<and>
                         red_stmt_total ctxt_vpr StateCons ?\<Lambda> (Exhale (method_decl.post mdecl)) \<omega>body RFailure)"
-            (is "?Case1 \<or> ?Case2")
-            by (auto elim: red_stmt_total_inversion_thms)
+            by (fastforce elim: red_stmt_total_inversion_thms)
           
-          show False
-          proof (rule disjE[OF RedCasesVpr])
-            assume ?Case1
-   
-            with stmt_rel_failure_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain c' 
-              where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) c'"
-              using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect
-              by fastforce
-  
+          thus False
+          proof cases
+            case BodyFails
+            with stmt_rel_failure_elim[OF BodyRel RpreOld] RedBodyVpr obtain c' 
+              where "snd c' = Failure" and "red_ast_bpl proc_body_bpl ctxt (\<gamma>PreOld, Normal nspre_old) c'"
+              using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect 
+              by auto
+                
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
-              using RedPreBpl red_ast_bpl_transitive
+              using RedPreOldBpl red_ast_bpl_transitive
               by blast
   
             have "snd c' \<noteq> Failure"
@@ -723,18 +756,21 @@ proof (rule allI | rule impI)+
             thus False 
               by (simp add: \<open>snd c' = Failure\<close>)
           next
-            assume ?Case2
+            case PostFails
             from this obtain \<omega>body where
-              RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>pre' (RNormal \<omega>body)" and
+              RedBodyVpr: "red_stmt_total ctxt_vpr StateCons ?\<Lambda> ?mbody ?\<omega>preOld (RNormal \<omega>body)" and
               RedExhPost: "red_exhale ctxt_vpr StateCons \<omega>body (method_decl.post mdecl) \<omega>body RFailure"
               by (auto elim: red_stmt_total_inversion_thms)
 
-            from stmt_rel_normal_elim[OF BodyRel Rpre_old_upd] RedBodyVpr obtain nsbody
+            from stmt_rel_normal_elim[OF BodyRel RpreOld] RedBodyVpr obtain nsbody
               where 
-               RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>Pre, Normal nspre) (\<gamma>Body, Normal nsbody)" and
-               Rbody: "state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons TyRep Tr AuxPred \<omega>body nsbody"
+               RedBodyBpl: "red_ast_bpl proc_body_bpl ctxt (\<gamma>PreOld, Normal nspre_old) (\<gamma>Body, Normal nsbody)" and
+               (*Rbody: "state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons TyRep Tr AuxPred \<omega>body nsbody"*)
+               Rbody: "?R1Old \<omega>body nsbody"
               using \<open>\<Lambda> = _\<close> VprMethodBodySome SpecsCorrect
               by auto
+
+            thm framing_exhI_state_rel
 
             have FramingExhPost: "framing_exh ctxt_vpr StateCons (method_decl.post mdecl) \<omega>body \<omega>body"
             proof (rule framing_exhI_state_rel[OF Rbody ConsistencyEnabled])
@@ -818,7 +854,7 @@ proof (rule allI | rule impI)+
               by blast
 
             hence RedBpl: "red_ast_bpl proc_body_bpl ctxt (convert_ast_to_program_point proc_body_bpl, Normal ns) c'"
-              using RedPreBpl RedBodyBpl red_ast_bpl_transitive
+              using RedPreOldBpl RedBodyBpl red_ast_bpl_transitive
               by blast
 
             have "snd c' \<noteq> Failure"
@@ -1418,11 +1454,6 @@ assumes FieldTrTy: "\<And>f_vpr t_vpr.
       by simp
   qed
 
-definition disj_vars_state_relation
-  where "disj_vars_state_relation Tr AuxPred =
-              disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), 
-                               ran (field_translation Tr), range (const_repr Tr), dom AuxPred]"
-
 definition field_tr_prop_full
   where "field_tr_prop_full Pr global_vdecls TyRep FieldTr \<equiv> \<forall>f_vpr t_vpr. 
                           declared_fields Pr f_vpr = Some t_vpr \<longrightarrow>
@@ -1431,26 +1462,27 @@ definition field_tr_prop_full
                            field_tr_prop TyRep global_vdecls (f_vpr, t_vpr) (f_vpr, f_bpl))"
 
 lemma init_state_in_state_relation:
-  assumes  WfTyRepr: "wf_ty_repr_bpl T" and
-         Disj: "disj_vars_state_relation Tr Map.empty" and
+  assumes WfTyRepr: "wf_ty_repr_bpl T" and
+          Disj: "disjoint_list (state_rel0_disj_list Tr Map.empty)" and
           "is_empty_total_full \<omega>" and
           ViperHeapWellTy: "total_heap_well_typed ((program_total ctxt_vpr)) (absval_interp_total ctxt_vpr) (get_hh_total_full \<omega>)" and
           WfMask: "wf_mask_simple (get_mh_total_full \<omega>)" and
           Consistent: "StateCons \<omega>" and
-         TyInterp: "type_interp ctxt = vbpl_absval_ty T" and
+          TyInterp: "type_interp ctxt = vbpl_absval_ty T" and
           DomainTy:  "domain_type T = absval_interp_total ctxt_vpr" and
           "ns = \<lparr> old_global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
                   global_state = initial_global_state T (fst (var_context ctxt)) (program_total ctxt_vpr) Tr \<omega>,
                   local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
                   binder_state = Map.empty \<rparr>" and
-         InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
+          InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
 
           ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
           ClosedLocals: "list_all (closed \<circ> (fst \<circ> snd)) (snd (var_context ctxt))" and
           GlobalsLocalsDisj: "set (map fst (fst (var_context ctxt))) \<inter> set (map fst (snd (var_context ctxt))) = {}" and
 
           "heap_var Tr = heap_var_def Tr" and
-          "mask_var Tr = mask_var_def Tr" and
+          "mask_var Tr = mask_var_def Tr" and          
+          NoTrackedLabeledStates: "label_hm_translation Tr = (Map.empty, Map.empty)" and
 
 \<comment>\<open>Global state assumptions\<close>
           InjFieldTr:  "inj_on (field_translation Tr) (dom (field_translation Tr))" and
@@ -1464,8 +1496,7 @@ lemma init_state_in_state_relation:
           VarTranslationTy: "\<And> x_vpr x_bpl. var_translation Tr x_vpr = Some x_bpl \<Longrightarrow>
                                    (\<exists>v_vpr. get_store_total \<omega> x_vpr = Some v_vpr \<and> 
                                             (\<exists>t. lookup_vdecls_ty (snd (var_context ctxt)) x_bpl = Some t \<and>
-                                                 type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))"
-
+                                                 type_of_vbpl_val T (val_rel_vpr_bpl v_vpr) = t))"          
 
   shows "state_rel_empty (state_rel_well_def_same ctxt (program_total ctxt_vpr) StateCons T Tr Map.empty) \<omega> ns"
 proof -
@@ -1476,10 +1507,8 @@ proof -
     "binder_state ns = Map.empty"
     by simp_all
 
-  note DisjSimp = Disj[simplified disj_vars_state_relation_def]
-
   have "disjoint_list [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (field_translation Tr), range (const_repr Tr)]"
-    by (rule disjoint_list_sublist[OF DisjSimp]) fastforce    
+    by (rule disjoint_list_sublist[OF Disj]) fastforce    
   hence DisjAux: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (field_translation Tr), range (const_repr Tr)]"
     by (rule disjoint_list_subset_list_all2) blast
 
@@ -1509,7 +1538,7 @@ proof -
         by (metis lookup_var_local lookup_vdecls_ty_map_of prod.exhaust_sel)
     qed
              
-    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) \<omega> ns"
+    show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr) (get_store_total \<omega>) ns"
       unfolding store_rel_def
       apply (rule conjI[OF InjVarTr], (rule allI | rule impI)+)
       using VarTranslationTy TyInterp Aux
@@ -1517,7 +1546,7 @@ proof -
   
   next
   
-    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var Tr) \<omega> ns"
+    show "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>) ns"
       unfolding heap_var_rel_def
     proof (intro conjI, rule exI, intro conjI)
       have "global_state ns (heap_var Tr) = Some (AbsV (AHeap (construct_bpl_heap_from_vpr_heap (program_total ctxt_vpr) (field_translation Tr) (get_hh_total_full \<omega>))))"
@@ -1545,11 +1574,11 @@ proof -
         using DomainTy ViperHeapWellTy by auto
     qed
   
-    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var_def Tr) \<omega> ns"
+    thus "heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (heap_var_def Tr) (get_hh_total_full \<omega>) ns"
       using \<open>heap_var Tr = _\<close>
       by simp
   next  
-    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var Tr) \<omega> ns"
+    show "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var Tr) (get_mh_total_full \<omega>) ns"
       unfolding mask_var_rel_def
     proof (rule exI, intro conjI)
                     
@@ -1573,7 +1602,7 @@ proof -
         by (simp add: zero_preal.rep_eq)
     qed
   
-    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) \<omega> ns"
+    thus "mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (mask_var_def Tr) (get_mh_total_full \<omega>) ns"
       using \<open>mask_var Tr = _\<close>
       by simp
   
@@ -1636,7 +1665,11 @@ proof -
   next  
     show "aux_vars_pred_sat (var_context ctxt) Map.empty ns"
       by (simp add: aux_vars_pred_sat_def)  
-  qed (insert assms DisjSimp, auto)
+  next
+    show "label_hm_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+      using label_hm_rel_empty NoTrackedLabeledStates
+      by metis
+  qed (insert assms Disj, auto)
 qed
 
 subsection \<open>Unique constants helper lemmas\<close>
@@ -1857,11 +1890,12 @@ qed
 lemma disj_vars_state_relation_initialI:
   assumes "heap_var Tr = heap_var_def Tr"
       and "mask_var Tr = mask_var_def Tr"
-      and "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
+      and "label_hm_translation Tr = (Map.empty, Map.empty)"
+      and Disj: "disjoint_list [{heap_var Tr}, {mask_var Tr}, ran (var_translation Tr),
                                ran (field_translation Tr), range (const_repr Tr)]"
-    shows "disj_vars_state_relation Tr Map.empty"
-  unfolding disj_vars_state_relation_def
-  using assms disjoint_list_append_empty
+    shows "disjoint_list (state_rel0_disj_list Tr Map.empty)"  
+  using assms Disj[THEN disjoint_list_append_empty, THEN disjoint_list_append_empty]
+  unfolding vars_label_hm_tr_def
   by fastforce
 
 text \<open>helper tactic for proving disjointness of global Boogie variables\<close>
@@ -2045,5 +2079,160 @@ lemma heap_upd_ty_preserved_2_basic:
   using heap_upd_ty_preserved_2[OF wf_ty_repr_basic]
   unfolding ty_repr_basic_def
   by (metis FieldTy2 NewVal OldHeap tcon_enum_to_id.simps(2) tcon_enum_to_id.simps(3) ty_repr_basic_def ty_repr_bpl.select_convs(1))
+
+subsection \<open>Old expressions\<close>
+
+lemma finished_remains: 
+  assumes "A,M,\<Lambda>,\<Gamma>,\<Omega>,G \<turnstile> (Inr (), s) -n\<rightarrow>* (m',n')"
+  shows "(m',n') = (Inr(), s)"
+  using assms
+proof (induction rule: rtranclp_induct2)
+  case refl
+  then show ?case by simp
+next
+  case (step a b a' b')
+  with step.hyps(2) show ?case
+    by (cases; simp)
+qed
+
+lemma red_cmd_old_state_same:
+  assumes "type_interp ctxt,[],var_context ctxt,fun_interp ctxt,rtype_interp ctxt \<turnstile> \<langle>c, Normal ns\<rangle> \<rightarrow> Normal ns'"
+  shows "old_global_state ns' = old_global_state ns"
+  using assms
+proof (cases)
+next
+  case (RedAssign x ty v e)
+  then show ?thesis 
+    by (simp add: update_var_old_global_same)
+next
+  case (RedHavocNormal x ty w v)
+  then show ?thesis 
+    by (simp add: update_var_old_global_same)
+qed (simp_all)
+
+lemma red_bigblock_small_old_state_same:
+  assumes "red_bigblock_small P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s = Normal ns"
+      and "s' = Normal ns'"
+    shows "old_global_state ns' = old_global_state ns"
+  using assms
+proof (cases)
+  case (RedBigBlockSmallSimpleCmd c name cs str tr cont)
+  then show ?thesis 
+    using \<open>s = _\<close> \<open>s' = _\<close> red_cmd_old_state_same
+    by blast    
+next
+  case (RedBigBlockSmallNoSimpleCmdOneStep name str tr cont b' cont')
+  from RedBigBlockSmallNoSimpleCmdOneStep(3)
+  show ?thesis 
+    using \<open>s = _\<close> \<open>s' = _\<close>
+    apply cases
+    by simp_all    
+qed
+
+lemma red_bigblock_small_normal_target:
+  assumes "red_bigblock_small P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s' = Normal ns'"
+    shows "\<exists>ns. s = Normal ns"
+  using assms
+proof cases
+  case (RedBigBlockSmallSimpleCmd c name cs str tr cont)
+  from this(3) assms show ?thesis 
+    by (cases) simp_all
+next
+  case (RedBigBlockSmallNoSimpleCmdOneStep name str tr cont b' cont')
+  from this(3) assms show ?thesis 
+    by (cases) simp_all
+qed
+
+lemma red_ast_bpl_normal_target:
+  assumes "red_ast_bpl P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s' = Normal ns'"
+    shows "\<exists>ns. s = Normal ns"
+  using assms
+  unfolding red_ast_bpl_def
+proof (induction rule: converse_rtranclp_induct2)
+  case refl
+  then show ?case 
+    by blast
+next
+  case (step \<gamma>1 s1 \<gamma>2 s2)
+  then show ?case 
+    using red_bigblock_small_normal_target
+    by blast
+qed
+
+lemmas red_bigblock_small_multi_normal_target = red_ast_bpl_normal_target[simplified red_ast_bpl_def]
+
+lemma red_ast_bpl_old_state_same:
+  assumes  "red_ast_bpl P ctxt (\<gamma>, s) (\<gamma>', s')"
+      and "s = Normal ns"
+      and "s' = Normal ns'"
+  shows "old_global_state ns' = old_global_state ns"
+  using assms
+  unfolding red_ast_bpl_def
+proof (induction arbitrary: ns rule: converse_rtranclp_induct2)
+  case refl
+  then show ?case 
+    by simp
+next
+  case (step \<gamma>1 s1 \<gamma>2 s2)
+  from this obtain ns2 where "s2 = Normal ns2"
+    using red_bigblock_small_multi_normal_target
+    by blast
+  hence "old_global_state ns' = old_global_state ns2"
+    using step
+    by blast
+  moreover have "old_global_state ns2 = old_global_state ns" 
+    using \<open>red_bigblock_small P ctxt (\<gamma>1, s1) (\<gamma>2, s2)\<close> \<open>s2 = _\<close> \<open>s1 = _\<close>
+          red_bigblock_small_old_state_same
+    by blast
+  ultimately show ?case
+    by simp    
+qed
+
+lemma old_expressions_assume_initialization:
+  assumes StmtRel1: "stmt_rel R1 R2 ctxt_vpr StateCons \<Lambda> P ctxt s1 \<gamma>1 \<gamma>2"
+      and StmtRel2: "stmt_rel R2' R3 ctxt_vpr StateCons \<Lambda> P ctxt s2 \<gamma>2 \<gamma>3"
+      and InitState: "\<And> \<omega> \<omega>'. \<exists>ns. Init ns \<and> R1 \<omega> ns \<and> Q \<omega>' (old_global_state ns)"
+      and RelTransition: "\<And> \<omega> ns. R2 \<omega> ns \<Longrightarrow> Q \<omega> (old_global_state ns) \<Longrightarrow> R2' \<omega> ns"
+      and RedStmtSeq: "red_stmt_total ctxt_vpr StateCons \<Lambda> (Seq s1 s2) \<omega> RFailure"
+    shows "\<exists>ns \<gamma>'. Init ns \<and> red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>', Failure)"
+proof (cases rule: RedSeqFailureOrMagic_case[OF RedStmtSeq])
+  case (1 \<omega>')
+  from InitState obtain ns where nsProperties: "Init ns" "R1 \<omega> ns" "Q \<omega>' (old_global_state ns)"
+    by blast
+
+  with 1 obtain ns1 where 
+   RedBpl1: "red_ast_bpl P ctxt (\<gamma>1, Normal ns) (\<gamma>2, Normal ns1)" and "R2 \<omega>' ns1"
+    using stmt_rel_normal_elim[OF StmtRel1]
+    by blast
+
+  hence "Q \<omega>' (old_global_state ns1)"
+    using \<open>Q \<omega>' (old_global_state ns)\<close> red_ast_bpl_old_state_same
+    by metis
+
+  hence "R2' \<omega>' ns1"
+    using \<open>R2 _ _\<close> RelTransition
+    by blast
+
+  with 1 obtain c where "red_ast_bpl P ctxt (\<gamma>2, Normal ns1) c" and "snd c = Failure"
+    using stmt_rel_failure_elim[OF StmtRel2]
+    by blast
+
+  with RedBpl1 show ?thesis
+    using nsProperties red_ast_bpl_transitive
+    by (metis prod.exhaust_sel)
+next
+  case 2
+  from InitState obtain ns where "Init ns" and "R1 \<omega> ns"
+    by blast
+  then show ?thesis 
+    using 2 StmtRel1 stmt_rel_failure_elim
+    by (metis prod.collapse)
+next
+  case 3
+  then show ?thesis by simp
+qed
 
 end

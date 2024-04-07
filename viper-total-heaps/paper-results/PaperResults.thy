@@ -453,11 +453,11 @@ text \<open>The state relation is defined in \<^const>\<open>state_rel0\<close>.
       \<^item> Store relation: The conjunct \<open>stRel\<^sub>\<Gamma>\<^sub>b(var(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to 
                         \<^term>\<open>store_rel A \<Lambda> (var_translation Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
       \<^item> Heap and permission mask relation: The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(H(Tr), M(Tr), \<sigma>\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
-          \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b \<and>
-               mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var Tr) \<sigma>\<^sub>v \<sigma>\<^sub>b\<close>
+          \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var Tr) (get_hh_total_full \<sigma>\<^sub>v) \<sigma>\<^sub>b \<and>
+               mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var Tr) (get_mh_total_full \<sigma>\<^sub>v) \<sigma>\<^sub>b\<close>
           The conjunct \<open>hmRel\<^sub>\<Gamma>\<^sub>b(H\<^sup>0(Tr), M\<^sup>0(Tr), \<sigma>0\<^sub>v, \<sigma>\<^sub>b)\<close> corresponds to
-          \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var_def Tr) \<sigma>0\<^sub>v \<sigma>\<^sub>b \<and>
-               mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var_def Tr) \<sigma>0\<^sub>v \<sigma>\<^sub>b\<close>
+          \<^term>\<open>heap_var_rel Pr \<Lambda> TyRep (field_translation Tr) (heap_var_def Tr) (get_hh_total_full \<sigma>0\<^sub>v) \<sigma>\<^sub>b \<and>
+               mask_var_rel Pr \<Lambda> TyRep (field_translation Tr) (mask_var_def Tr) (getm_mh_total_full \<sigma>0\<^sub>v) \<sigma>\<^sub>b\<close>
 \<close>
 
 subsection \<open>4.2 Non-Locality\<close>

@@ -29,6 +29,9 @@ lemma update_trace_total_heap_same: "get_hh_total_full (update_trace_total \<ome
 lemma update_trace_total_mask_same: "get_mh_total_full (update_trace_total \<omega> \<pi>) = get_mh_total_full \<omega>"
   by simp
 
+fun update_trace_label_total :: "('a, 'b) full_total_state_scheme \<Rightarrow> label \<Rightarrow> 'a total_state \<Rightarrow> ('a, 'b) full_total_state_scheme"
+  where "update_trace_label_total \<omega> lbl \<phi> = update_trace_total \<omega> ((get_trace_total \<omega>)(lbl \<mapsto> \<phi>))"
+
 subsection \<open>heap and mask in total state\<close>
 
 fun get_m_total :: "('a, 'b) total_state_scheme \<Rightarrow> field_mask \<times> 'a predicate_mask"
