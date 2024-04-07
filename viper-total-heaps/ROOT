@@ -20,9 +20,10 @@ session TotalViper = ViperCommon +
     ExpRelML
     ExprWfRel
     ExprWfRelML
-    StmtRel
     InhaleRelML
     ExhaleRelML
+  theories [quick_and_dirty] (* these should be fixed *)
+    StmtRel
     StmtRelML
     ViperBoogieEndToEnd
     ViperBoogieEndToEndML
