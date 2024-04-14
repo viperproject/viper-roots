@@ -301,12 +301,39 @@ proof (rule exp_rel_vpr_bpl_intro_2)
 qed
 
 lemma exp_rel_oldexp:
-  assumes "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> ROld (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>) 
+  assumes R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> ROld (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
                                              (\<omega> \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>) 
                                              ns"
-      and "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
+      and E_rel_EBoogie: "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
     shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
-  oops
+proof (rule exp_rel_vpr_bpl_intro)
+  fix StateCons \<omega> \<omega>_def1 \<omega>_def2_opt ns v1
+  assume r_omega_ns: "R \<omega>_def1 \<omega> ns"
+  assume "ctxt_vpr, StateCons, \<omega>_def2_opt \<turnstile> \<langle>pure_exp.Old lbl e;\<omega>\<rangle> [\<Down>]\<^sub>t Val v1"
+  then obtain \<phi> \<omega>_def' where
+    lbl_total_state_exists: "get_trace_total \<omega> lbl = Some \<phi>" and
+    "\<omega>_def' = map_option (\<lambda>\<omega>_def_val. \<omega>_def_val\<lparr> get_total_full := \<phi> \<rparr>) \<omega>_def2_opt" and
+    e_evaluates_to_v1: "ctxt_vpr, StateCons, \<omega>_def' \<turnstile> \<langle>e; \<omega>\<lparr> get_total_full := \<phi> \<rparr>\<rangle> [\<Down>]\<^sub>t Val v1"
+  by(cases) simp
+  let ?\<omega>' = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
+  have "ROld (\<omega>_def1 \<lparr> get_total_full := \<phi> \<rparr>)  ?\<omega>' ns"
+    using
+      R_implies_ROld
+      r_omega_ns
+      lbl_total_state_exists
+    by fastforce
+  hence "exp_rel_vb_single ctxt_vpr ctxt e e_bpl ?\<omega>' ns"
+    using E_rel_EBoogie
+    unfolding exp_rel_vpr_bpl_def
+    by(simp)
+  hence "(ctxt_vpr, StateCons, \<omega>_def' \<turnstile> \<langle>e; ?\<omega>'\<rangle> [\<Down>]\<^sub>t Val v1) \<longrightarrow>
+               (\<exists>v2. (red_expr_bpl ctxt e_bpl ns v2) \<and> (val_rel_vpr_bpl v1 = v2))"
+    unfolding exp_rel_vb_single_def
+    by auto
+  thus "\<exists>v2. (red_expr_bpl ctxt e_bpl ns v2) \<and> (val_rel_vpr_bpl v1 = v2)"
+    using e_evaluates_to_v1
+    by simp
+qed
 
 subsubsection \<open>Binary Operations\<close>
 
