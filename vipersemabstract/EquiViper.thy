@@ -26,6 +26,10 @@ qed
 
 end
 
+lemma plus_val_id :
+  "(v :: 'a val) \<oplus> v = Some v"
+  by (simp add: plus_val_def)
+
 
 instantiation val :: (type) pcm_mult
 begin
@@ -61,8 +65,8 @@ type_synonym 'a partial_heap = "heap_loc \<rightharpoonup> 'a val"
 - mask (x, f) \<le> 1
 - If mask (x, f) > 0 \<Longrightarrow> heap (x, f) != None
 *)
-fun wf_pre_virtual_state :: "'a pre_virtual_state \<Rightarrow> bool" where
-  "wf_pre_virtual_state (\<pi>, h) \<longleftrightarrow> (\<forall>hl. ppos (\<pi> hl) \<longrightarrow> h hl \<noteq> None)"
+definition wf_pre_virtual_state :: "'a pre_virtual_state \<Rightarrow> bool" where
+"wf_pre_virtual_state st \<longleftrightarrow> (\<forall>hl. ppos (fst st hl) \<longrightarrow> snd st hl \<noteq> None) \<and> wf_mask_simple (fst st)"
 
 (*
 States are *unbounded*
@@ -71,8 +75,9 @@ wf_mask_simple \<pi> \<and>
 
 lemma wf_pre_virtual_stateI:
   assumes "\<And>hl. ppos (\<pi> hl) \<Longrightarrow> h hl \<noteq> None"
+  assumes "wf_mask_simple \<pi>"
     shows "wf_pre_virtual_state (\<pi>, h)"
-  using assms wf_mask_simple_def by simp
+  using assms by (simp add:wf_pre_virtual_state_def)
 
 
 
@@ -130,6 +135,8 @@ lemma wf_uuu:
 proof (rule wf_pre_virtual_stateI)
   show "\<And>hl. ppos (zero_mask hl) \<Longrightarrow> empty_heap hl \<noteq> None"
     by (simp add: ppos.rep_eq zero_mask_def zero_preal.rep_eq)
+  show "wf_mask_simple (zero_mask)"
+    by (simp add: wf_zero_mask)
 qed
 
 typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_virtual_state \<phi> }"
@@ -148,10 +155,18 @@ lemma sum_wf_is_wf:
       and "wf_pre_virtual_state b"
       and "Some x = a \<oplus> b"
     shows "wf_pre_virtual_state x"
-  sorry
+  oops
 
 fun read_field :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
   where "read_field \<phi> loc = get_vh \<phi> loc"
+
+lemma wf_mask_simple_get_vm [simp] :
+  "wf_mask_simple (get_vm x)"
+  by (metis Rep_virtual_state get_vm_def mem_Collect_eq wf_pre_virtual_state_def)
+
+lemma get_vm_bound :
+  "get_vm x hl \<le> 1"
+  using wf_mask_simple_get_vm wf_mask_simple_def by blast
 
 subsection \<open>Addition of virtual equi_states\<close>
 
@@ -161,18 +176,23 @@ begin
 
 
 lift_definition plus_virtual_state :: "'a virtual_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a virtual_state option"
-  is "(\<oplus>)"
-  by (metis not_Some_eq option.pred_inject(1) option.pred_inject(2) sum_wf_is_wf)
+  is "(\<lambda> st1 st2. Option.bind (st1 \<oplus> st2) (\<lambda> x. if wf_mask_simple (fst x) then Some x else None))"
+  apply (simp add: bind_split wf_pre_virtual_state_def del:Product_Type.split_paired_All)
+  sorry
 
 lemma compatible_virtual_state_implies_pre_virtual_state:
   assumes "Some x = a \<oplus> b"
   shows "Some (Rep_virtual_state x) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
-  by (metis EquiViper.plus_virtual_state.rep_eq assms option.simps(9))
+  using assms apply (transfer) by (clarsimp split:bind_splits if_splits)
 
 lemma compatible_virtual_state_implies_pre_virtual_state_rev:
   assumes "Some (Rep_virtual_state x) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
   shows "Some x = a \<oplus> b"
-  by (metis EquiViper.plus_virtual_state.abs_eq Rep_virtual_state Rep_virtual_state_inverse assms eq_onp_same_args mem_Collect_eq option.simps(9))
+  using assms apply (transfer) by (clarsimp simp add:wf_pre_virtual_state_def split:bind_splits if_splits)
+
+lemma virtual_state_plus_None :
+  "a \<oplus> b = None \<longleftrightarrow> Rep_virtual_state a \<oplus> Rep_virtual_state b = None \<or> \<not> wf_mask_simple (the (get_vm a \<oplus> get_vm b))"
+  by (smt (verit) EquiViper.plus_virtual_state.rep_eq bind.bind_lunit bind_eq_None_conv fst_conv get_vm_def option.map_disc_iff plus_prod_def)
 
 instance proof
   fix a b c ab bc :: "'a virtual_state"
@@ -185,9 +205,12 @@ instance proof
   show "a \<oplus> b = b \<oplus> a"
     by (simp add: commutative plus_virtual_state_def)
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    by (smt (verit) EquiViper.compatible_virtual_state_implies_pre_virtual_state asso1 compatible_virtual_state_implies_pre_virtual_state_rev not_Some_eq) (* long *)
+    by (smt (verit, del_insts) EquiViper.compatible_virtual_state_implies_pre_virtual_state asso1 map_fun_apply plus_virtual_state_def)
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
-    by (smt (verit) EquiViper.compatible_virtual_state_implies_pre_virtual_state EquiViper.plus_virtual_state.rep_eq asso2 option.map_disc_iff)
+    apply (clarsimp simp add:virtual_state_plus_None)
+    apply (safe)
+     apply (metis EquiViper.compatible_virtual_state_implies_pre_virtual_state asso2 option.discI)
+    sorry
   assume asm0: "a \<oplus> b = Some c" "Some c = c \<oplus> c"
   then have "Some ?c = ?a \<oplus> ?b \<and> Some ?c = ?c \<oplus> ?c"
     by (metis compatible_virtual_state_implies_pre_virtual_state)
@@ -227,7 +250,8 @@ instance proof
     by (simp add: compatible_virtual_state_implies_pre_virtual_state_rev distrib_scala_mult mult_virtual_state.rep_eq)
 
   show "Some x = a \<oplus> b \<Longrightarrow> Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
-    by (smt (verit) compatible_virtual_state_implies_pre_virtual_state compatible_virtual_state_implies_pre_virtual_state_rev distrib_state_mult mult_virtual_state.rep_eq)
+    sorry
+    (*by (smt (verit) compatible_virtual_state_implies_pre_virtual_state compatible_virtual_state_implies_pre_virtual_state_rev distrib_state_mult mult_virtual_state.rep_eq) *)
 qed
 
 end
@@ -265,7 +289,7 @@ fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_virtual_state" where "get_pv \
 definition u :: "'a equi_state" where "u = ((Ag Map.empty, Ag Map.empty), uu)"
 
 definition shift_and_add_equi_state where
-  "shift_and_add_equi_state \<omega> x = ((Ag (shift_and_add (get_store \<omega>) x), Ag (get_trace \<omega>)), get_state \<omega>)"
+  "shift_and_add_equi_state \<omega> x = set_store \<omega> (shift_and_add (get_store \<omega>) x)"
 
 subsection \<open>Assertions\<close>
 

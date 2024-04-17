@@ -88,8 +88,8 @@ text \<open>The truth of A in a only depends on parts of a (for a ## \<omega>) t
 2) are given by |\<omega>|\<close>
 definition rel_stable_assertion where
 (*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>\<omega>'. \<omega> ## \<omega>' \<longrightarrow> (A \<omega>' \<longleftrightarrow> A (stabilize_rel \<omega> \<omega>')))" *)
-  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (A a \<longleftrightarrow> A x))"
-
+(*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (A a \<longleftrightarrow> A x))" *)
+  "rel_stable_assertion \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> \<langle>A\<rangle>)"
 
 section \<open>Operational semantics\<close>
 

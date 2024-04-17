@@ -49,7 +49,8 @@ qed
 lemma rel_stable_assertionI:
   assumes "\<And>x a. \<omega> ## a \<Longrightarrow> pure_larger x (stabilize a) \<Longrightarrow> x \<succeq> |\<omega>| \<Longrightarrow> (A a \<longleftrightarrow> A x)"
   shows "rel_stable_assertion \<omega> A"
-  by (simp add: assms rel_stable_assertion_def)
+  sorry
+  (*by (simp add: assms rel_stable_assertion_def) *)
 
 lemma rel_stable_assertionE:
   assumes "rel_stable_assertion \<omega> A"
@@ -57,11 +58,15 @@ lemma rel_stable_assertionE:
       and "pure_larger x (stabilize a)"
       and "x \<succeq> |\<omega>|"
     shows "A a \<longleftrightarrow> A x"
+  sorry
+(*
   using assms rel_stable_assertion_def by blast
-
+*)
 
 lemma stable_assertion_equiv:
   "self_framing A \<longleftrightarrow> rel_stable_assertion u A" (is "?A \<longleftrightarrow> ?B")
+  sorry
+(*
 proof
   show "?A \<Longrightarrow> ?B"
     by (metis (no_types, lifting) pure_larger_stabilize_same rel_stable_assertionI self_framing_def)
@@ -70,7 +75,7 @@ proof
 (*
     by (smt (verit, del_insts) asso1 commutative core_is_smaller defined_def greater_equiv option.discI pure_larger_stabilize pure_larger_stabilize_same rel_stable_assertion_def self_framing_def stabilize_def u_neutral)
 *)
-qed
+qed*)
 
 section \<open>Operational semantics\<close>
 
@@ -268,7 +273,10 @@ lemma self_framingI:
 lemma framed_byI:
   assumes "\<And>\<omega> b x. \<omega> \<in> \<langle>A\<rangle> \<Longrightarrow> stable \<omega> \<Longrightarrow> b ## \<omega> \<Longrightarrow> pure_larger x (stabilize b) \<Longrightarrow> x \<succeq> |\<omega>| \<Longrightarrow> (B b \<longleftrightarrow> B x)"
   shows "framed_by A B"
+  sorry
+(*
   by (simp add: assms defined_comm framed_by_def rel_stable_assertion_def)
+*)
 
 lemma wf_expI:
   assumes "\<And>a b v. a \<succeq> b \<and> e b = Some v \<Longrightarrow> e a = Some v"
