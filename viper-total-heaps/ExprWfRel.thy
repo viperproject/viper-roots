@@ -512,6 +512,84 @@ next
   qed
 qed
 
+inductive_cases RedOldFailure_case:
+  "ctxt_vpr, StateCons, \<omega>def_opt \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+thm RedOldFailure_case
+
+abbreviation wf_rel_old
+  where "wf_rel_old R R' ctxt_vpr StateCons P ctxt lbl expr \<equiv>  wf_rel R R'
+            (\<lambda>\<omega>def \<omega>. (\<exists>val. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>(pure_exp.Old lbl expr);\<omega>\<rangle> [\<Down>]\<^sub>t Val val))
+            (\<lambda>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>(pure_exp.Old lbl expr);\<omega>\<rangle> [\<Down>]\<^sub>t VFailure)
+            P ctxt"
+
+(* If relation holds, then total state of omegadef and omega at label lbl is defined *)
+lemma old_expr_wf_rel:
+  assumes interior_expr_wf: "expr_wf_rel ROld ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+      and R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow>
+                          ROld
+                            (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
+                            (\<omega> \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
+                            ns"
+      and R_implies_trace_exists:"\<And> \<omega>def \<omega> ns.  R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+  shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
+  (* Next task: instantiate R and ROld with concrete state relations *)
+proof (rule expr_wf_rel_intro)
+  let ?IsNormal = "(\<lambda>\<omega>def \<omega>. \<exists>v. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v))"
+  let ?IsFailure = "(\<lambda>\<omega>def \<omega>. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure))"
+  show "\<And>v \<omega>def \<omega> ns.
+       R \<omega>def \<omega> ns \<Longrightarrow>
+       ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
+       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'" sorry
+  show "\<And>v \<omega>def \<omega> ns.
+       R \<omega>def \<omega> ns \<Longrightarrow>
+       ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t v \<Longrightarrow>
+       v = VFailure \<Longrightarrow> \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+  proof -
+    fix v \<omega>def \<omega> ns
+    assume R: "R \<omega>def \<omega> ns"
+       and v_judgement: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t v"
+       and v_failure: "v = VFailure"
+    show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+    proof -
+      from v_judgement v_failure have
+        "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
+        by simp
+      thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+      proof (rule RedOldFailure_case)
+        show "\<And>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<Longrightarrow>
+                    ctxt_vpr, StateCons, map_option (get_total_full_update (\<lambda>_. \<phi>))
+                      (Some \<omega>def) \<turnstile> \<langle>expr;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow>
+                      \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+         (is "\<And>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<Longrightarrow>
+                    ctxt_vpr, StateCons, map_option (get_total_full_update (\<lambda>_. \<phi>)) (Some \<omega>def) \<turnstile> \<langle>expr;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure  \<Longrightarrow>
+                    ?conclusion")
+        proof -
+          fix \<phi>
+          assume "get_trace_total \<omega> lbl = Some \<phi>"
+          hence the_trace_is_phi: "\<phi> = the (get_trace_total \<omega> lbl)" by simp
+          let ?\<omega>' = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
+          let ?\<omega>def' = "\<omega>def \<lparr> get_total_full := \<phi> \<rparr>"
+          assume "ctxt_vpr, StateCons, map_option (get_total_full_update (\<lambda>_. \<phi>)) (Some \<omega>def) \<turnstile> \<langle>expr;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure"
+          hence "ctxt_vpr, StateCons, (Some ?\<omega>def') \<turnstile> \<langle>expr;?\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure" by simp
+          hence is_failure: "?IsFailure ?\<omega>def' ?\<omega>'" by simp
+          from R R_implies_ROld the_trace_is_phi have ROld: "ROld ?\<omega>def' ?\<omega>' ns" by simp
+          from interior_expr_wf ROld is_failure show ?conclusion
+            using wf_rel_failure_elim
+            by fast
+        qed
+        show "get_trace_total \<omega> lbl = None \<Longrightarrow>
+               \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+         (is "get_trace_total \<omega> lbl = None \<Longrightarrow> ?conclusion")
+        proof -
+          assume no_trace: "get_trace_total \<omega> lbl = None"
+          from no_trace R R_implies_trace_exists have "False" by simp
+          thus ?conclusion by simp
+        qed
+      qed (simp)
+    qed
+  qed
+qed
+
 abbreviation wf_rel_fieldacc
   where "wf_rel_fieldacc admissible_locs R R' ctxt_vpr StateCons P ctxt e f \<equiv> wf_rel R R'
            (\<lambda>\<omega>def \<omega>. (\<exists>a. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a))) \<and> 
