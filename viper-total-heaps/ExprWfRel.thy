@@ -522,24 +522,53 @@ abbreviation wf_rel_old
             (\<lambda>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>(pure_exp.Old lbl expr);\<omega>\<rangle> [\<Down>]\<^sub>t VFailure)
             P ctxt"
 
-(* If relation holds, then total state of omegadef and omega at label lbl is defined *)
 lemma old_expr_wf_rel:
-  assumes interior_expr_wf: "expr_wf_rel ROld ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
-      and R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow>
-                          ROld
+  assumes R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow>
+                          (ROld
+                            (\<omega>def, \<omega>)
                             (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
                             (\<omega> \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
-                            ns"
-      and R_implies_trace_exists:"\<And> \<omega>def \<omega> ns.  R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+                            ns \<and>
+                          expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>')"
+      and ROld_implies_R: "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
+                            R \<omega>def \<omega> ns"
+      and R_implies_trace_exists:"\<And> \<omega>def \<omega> ns.  R \<omega>def \<omega> ns \<Longrightarrow>
+                                    get_trace_total \<omega>def lbl \<noteq> None \<and>
+                                    get_trace_total \<omega> lbl \<noteq> None"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
-  (* Next task: instantiate R and ROld with concrete state relations *)
 proof (rule expr_wf_rel_intro)
   let ?IsNormal = "(\<lambda>\<omega>def \<omega>. \<exists>v. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v))"
   let ?IsFailure = "(\<lambda>\<omega>def \<omega>. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure))"
   show "\<And>v \<omega>def \<omega> ns.
        R \<omega>def \<omega> ns \<Longrightarrow>
        ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
-       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'" sorry
+       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
+  proof -
+    fix v \<omega>def \<omega> ns
+    assume R: "R \<omega>def \<omega> ns"
+       and judgement: "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t Val v"
+    from judgement obtain \<phi> where
+      trace_is_phi: "get_trace_total \<omega> lbl = Some \<phi>" and
+      old_judgement: "ctxt_vpr, StateCons, Some (\<omega>def \<lparr> get_total_full := \<phi> \<rparr>) \<turnstile> \<langle>expr; \<omega>\<lparr> get_total_full := \<phi> \<rparr>\<rangle> [\<Down>]\<^sub>t Val v"
+      by(cases) simp
+    let ?\<omega>_old = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
+    let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := \<phi> \<rparr>"
+    from R R_implies_ROld trace_is_phi have
+      ROld_and_interior_expr_wf: "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+             expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+      by fastforce
+    from old_judgement have is_normal: "?IsNormal ?\<omega>def_old ?\<omega>_old"
+      by auto
+    from is_normal ROld_and_interior_expr_wf obtain ns' where
+      ROld_ns': "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns'" and
+      normal_termination: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
+      using wf_rel_normal_elim
+      by blast
+    from ROld_ns' ROld_implies_R have R_ns': "R \<omega>def \<omega> ns'" by simp
+    from normal_termination R_ns' show
+      "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
+      by auto
+  qed
   show "\<And>v \<omega>def \<omega> ns.
        R \<omega>def \<omega> ns \<Longrightarrow>
        ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>pure_exp.Old lbl expr;\<omega>\<rangle> [\<Down>]\<^sub>t v \<Longrightarrow>
@@ -567,13 +596,16 @@ proof (rule expr_wf_rel_intro)
           fix \<phi>
           assume "get_trace_total \<omega> lbl = Some \<phi>"
           hence the_trace_is_phi: "\<phi> = the (get_trace_total \<omega> lbl)" by simp
-          let ?\<omega>' = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
-          let ?\<omega>def' = "\<omega>def \<lparr> get_total_full := \<phi> \<rparr>"
+          let ?\<omega>_old = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
+          let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := \<phi> \<rparr>"
           assume "ctxt_vpr, StateCons, map_option (get_total_full_update (\<lambda>_. \<phi>)) (Some \<omega>def) \<turnstile> \<langle>expr;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t VFailure"
-          hence "ctxt_vpr, StateCons, (Some ?\<omega>def') \<turnstile> \<langle>expr;?\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure" by simp
-          hence is_failure: "?IsFailure ?\<omega>def' ?\<omega>'" by simp
-          from R R_implies_ROld the_trace_is_phi have ROld: "ROld ?\<omega>def' ?\<omega>' ns" by simp
-          from interior_expr_wf ROld is_failure show ?conclusion
+          hence "ctxt_vpr, StateCons, (Some ?\<omega>def_old) \<turnstile> \<langle>expr;?\<omega>_old\<rangle> [\<Down>]\<^sub>t VFailure" by simp
+          hence is_failure: "?IsFailure ?\<omega>def_old ?\<omega>_old" by simp
+          from R R_implies_ROld the_trace_is_phi have
+            ROld_and_interior_expr_wf: "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+            expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+            by fastforce
+          from ROld_and_interior_expr_wf is_failure show ?conclusion
             using wf_rel_failure_elim
             by fast
         qed
