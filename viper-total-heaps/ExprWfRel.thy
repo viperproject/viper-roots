@@ -622,6 +622,57 @@ proof (rule expr_wf_rel_intro)
   qed
 qed
 
+lemma old_expr_wf_rel_staterel:
+  assumes R_is_state_rel:
+           "\<And> \<omega>def \<omega> \<omega>def_old \<omega>_old ns.
+                R \<omega>def \<omega> ns = state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and>
+                ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns = state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns"
+      and label_hm_translation: "label_hm_translation Tr = lbls"
+      and OldH: "fst lbls lbl = Some OldH"
+      and OldM: "snd lbls lbl = Some OldM"
+      and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM \<rparr>"
+  shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
+proof (rule old_expr_wf_rel)
+  show "\<And>\<omega>def \<omega> ns.
+           R \<omega>def \<omega> ns \<Longrightarrow>
+           ROld (\<omega>def, \<omega>)
+                (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+                (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+                ns \<and>
+       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'" sorry
+  show "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow> R \<omega>def \<omega> ns" sorry
+  show "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+  proof -
+    fix \<omega>def \<omega> ns
+    assume R: "R \<omega>def \<omega> ns"
+    let ?\<omega>_trace_total = "get_trace_total \<omega>"
+    let ?\<omega>def_trace_total = "get_trace_total \<omega>def"
+    let ?P = "(\<lambda>m \<phi>. mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>))"
+    let ?LabelMap = "(snd (label_hm_translation Tr))"
+    from R_is_state_rel R have state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" by simp
+    hence "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) ?\<omega>_trace_total ns"
+      using state_rel_def state_rel0_label_hm_rel
+      by fast
+    hence "label_rel ?P ?LabelMap ?\<omega>_trace_total ns \<and>
+           label_rel ?P ?LabelMap ?\<omega>_trace_total ns"
+      using label_hm_rel_def
+      by fast
+    thm label_rel_def
+    hence LabelMap_implies_Some: "(\<forall> lbl h. ?LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega>) lbl = Some \<phi> \<and> ?P h \<phi> ns))"
+      using label_rel_def
+      by meson
+    from label_hm_translation OldM have LabelMap: "?LabelMap lbl = Some OldM"
+      by simp
+    from LabelMap_implies_Some LabelMap have \<omega>_not_none: "?\<omega>_trace_total lbl \<noteq> None"
+      by auto
+    from state_rel_def state_rel0_def state_rel have \<omega>_trace_is_\<omega>def_trace: "?\<omega>def_trace_total = ?\<omega>_trace_total"
+      by blast
+    from \<omega>_not_none \<omega>_trace_is_\<omega>def_trace
+      show "get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+      by simp
+  qed
+qed
+
 abbreviation wf_rel_fieldacc
   where "wf_rel_fieldacc admissible_locs R R' ctxt_vpr StateCons P ctxt e f \<equiv> wf_rel R R'
            (\<lambda>\<omega>def \<omega>. (\<exists>a. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t (Val (VRef (Address a))) \<and> 
