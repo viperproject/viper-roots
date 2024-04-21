@@ -624,9 +624,18 @@ qed
 
 lemma old_expr_wf_rel_staterel:
   assumes R_is_state_rel:
+           "\<And> \<omega>def \<omega> ns.
+                R \<omega>def \<omega> ns = state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and ROld_is_state_rel:
            "\<And> \<omega>def \<omega> \<omega>def_old \<omega>_old ns.
-                R \<omega>def \<omega> ns = state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and>
-                ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns = state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns"
+              ROld
+                (\<omega>def, \<omega>)
+                \<omega>def_old
+                \<omega>_old
+                ns =
+                (\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
+                (\<omega>_old    = \<omega> \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
+                state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns"
       and label_hm_translation: "label_hm_translation Tr = lbls"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
@@ -640,7 +649,23 @@ proof (rule old_expr_wf_rel)
                 (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
                 ns \<and>
        expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'" sorry
-  show "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow> R \<omega>def \<omega> ns" sorry
+  show "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow> R \<omega>def \<omega> ns"
+  proof -
+    fix \<omega>def \<omega> \<omega>def_old \<omega>_old ns
+    assume "ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns"
+    from ROld_is_state_rel this have
+      "state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns \<and>
+      \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
+      \<omega>_old = \<omega> \<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
+      by simp
+    hence "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      using state_rel_def
+      (* TODO clear this up *)
+      by (metis UnI1 assms(4) assms(6) heap_var_disjoint label_hm_translation ranI tr_vpr_bpl.simps(1) tr_vpr_bpl.simps(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+    thus "R \<omega>def \<omega> ns"
+      using R_is_state_rel
+      by simp
+  qed
   show "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
   proof -
     fix \<omega>def \<omega> ns
