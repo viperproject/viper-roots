@@ -639,7 +639,7 @@ lemma old_expr_wf_rel_staterel:
       and label_hm_translation: "label_hm_translation Tr = lbls"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
-      and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM \<rparr>"
+      and Tr': "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM \<rparr>"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
 proof (rule old_expr_wf_rel)
   show "\<And>\<omega>def \<omega> ns.
@@ -648,7 +648,72 @@ proof (rule old_expr_wf_rel)
                 (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
                 (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
                 ns \<and>
-       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'" sorry
+       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+  proof -
+    fix \<omega>def \<omega> ns
+    assume "R \<omega>def \<omega> ns"
+    from R_is_state_rel this have
+      "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      by simp
+    hence state_rel0: "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
+      using state_rel_def
+      by fast
+    let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+    let ?\<omega>_old    = "\<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+    have "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr' AuxPred ?\<omega>def_old ?\<omega>_old ns"
+      using state_rel_state_rel0 ROld_is_state_rel
+      by fast
+    hence state_rel_\<omega>_old: "state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
+      using state_rel_def
+      by fast
+    hence "ROld (\<omega>def, \<omega>)
+               (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+               (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+               ns"
+      using ROld_is_state_rel
+      by simp
+    hence ROld: "ROld (\<omega>def, \<omega>)
+               (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+               (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+               ns"
+      by simp
+    have expr_wf_rel: "expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+    proof (rule  wf_rel_intro)
+      show "\<And>\<omega>defa \<omega>' ns.
+       ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns \<Longrightarrow>
+       \<exists>v. ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
+       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns'"
+      proof -
+        fix \<omega>defa \<omega>' ns
+        assume "ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns"
+        from ROld_is_state_rel this have
+          "(?\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
+           (?\<omega>_old    = \<omega> \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
+           state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
+          by simp
+        thus "\<exists>v. ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
+         \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns'"
+          (* TODO make this more explicit *)
+          by (metis OldM Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+      qed
+      show " \<And>\<omega>defa \<omega>' ns.
+       ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns \<Longrightarrow>
+       ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow>
+       \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
+      proof -
+        fix \<omega>defa \<omega>' ns
+        assume "ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns" and
+               "ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure"
+        show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure" 
+          (* TODO make this more explicit *)
+          by (smt (verit) OldM Tr' UnCI state_rel_\<omega>_old label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+      qed
+    qed
+    from expr_wf_rel ROld show "ROld (\<omega>def, \<omega>) (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+        (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns \<and>
+       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+      by simp
+  qed
   show "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow> R \<omega>def \<omega> ns"
   proof -
     fix \<omega>def \<omega> \<omega>def_old \<omega>_old ns
