@@ -1,5 +1,5 @@
 theory AbstractSemantics
-  imports ViperCommon.LiftSepAlgebra
+  imports ViperCommon.LiftSepAlgebra ViperCommon.SepLogic
 begin
 
 section Start
