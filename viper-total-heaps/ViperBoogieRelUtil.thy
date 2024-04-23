@@ -990,7 +990,7 @@ definition pred_eq_heap
 
 definition aux_pred_capture_state
   where "aux_pred_capture_state Pr TyRep FieldTr AuxPred ctxt m h \<omega> \<equiv>
-           AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr ctxt m \<omega>)
+           (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr ctxt m \<omega>))
                   (h \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt h \<omega>)"
 
 lemma aux_pred_capture_state_dom: 
@@ -1015,7 +1015,7 @@ abbreviation state_rel_capture_total_state :: \<comment>\<open>make type explici
 
 lemma state_rel_capture_total_stateI:
   assumes "state_rel Pr StateCons TyRep Tr AuxPred' ctxt \<omega>def \<omega> ns"
-      and "AuxPred' = (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>0)
+      and "AuxPred' = ((AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>0))
                               (h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>0))"
     shows "state_rel_capture_total_state Pr StateCons TyRep Tr FieldTr0 AuxPred  ctxt m h \<omega>0 \<omega>def \<omega> ns"
   using assms
