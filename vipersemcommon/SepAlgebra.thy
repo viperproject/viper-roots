@@ -850,6 +850,17 @@ section \<open>Separation algebra\<close>
 
 class sep_algebra = pcm_with_core +
 
+  fixes stable :: "'a \<Rightarrow> bool"
+  fixes stabilize :: "'a \<Rightarrow> 'a"
+
+  assumes already_stable: "stable x \<Longrightarrow> stabilize x = x"
+    and stabilize_is_stable: "stable (stabilize x)"
+    and stabilize_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
+    and decompose_stabilize_pure: "Some x = stabilize x \<oplus> |x|"
+    and stabilize_core_emp : "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
+
+
+(*
   fixes u :: 'a
 
   fixes stable_rel :: "'a \<Rightarrow> 'a \<Rightarrow> bool"
@@ -863,20 +874,21 @@ class sep_algebra = pcm_with_core +
       and stabilize_rel_sum_double: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel u x) = stabilize_rel u a \<oplus> stabilize_rel a b"
 (* TODO: Think about this one *)
       and u_neutral: "Some x = x \<oplus> u"
+*)
 
 begin
 
-definition stable :: "'a \<Rightarrow> bool" where
-  "stable = stable_rel u"
+definition stable_rel :: "'a \<Rightarrow> 'a \<Rightarrow> bool" where
+  "stable_rel a b = (\<forall>c. a \<oplus> b = Some c \<longrightarrow> stable c)"
+
+lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> stabilize a"
+  using local.greater_equiv local.stabilize_sum by blast
 
 (*
 lemma stabilize_rel:
   assumes "Some x = a \<oplus> b"
   shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def sorry
-*)
 
-definition stabilize :: "'a \<Rightarrow> 'a" where
-  "stabilize = stabilize_rel u"
 
 lemma stabilize_rel_order:
   "stabilize_rel a x \<succeq> stabilize x"
@@ -886,27 +898,9 @@ lemma stabilize_rel_mono_right:
   "x \<succeq> a \<Longrightarrow> stabilize_rel b x \<succeq> stabilize_rel b a"
   using local.greater_def local.stabilize_rel_all_sum by blast
 
-lemma already_stable: "stable x \<Longrightarrow> stabilize x = x"
-  using local.already_stable_rel local.stable_def stabilize_def by force
 
 lemma stabilize_rel_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
   by (simp add: local.stabilize_rel_sum_double stabilize_def)
-
-lemma stabilize_is_stable: "stable (stabilize x)"
-  by (simp add: local.stabilize_rel_is_stable_rel local.stable_def stabilize_def)
-
-lemma stabilize_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-  using local.stabilize_rel_all_sum stabilize_def by auto
-
-
-lemma decompose_stabilize_pure: "Some x = stabilize x \<oplus> |x|"
-  by (simp add: local.stabilize_rel_sum_pure stabilize_def)
-
-
-
-lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> stabilize a"
-  using local.greater_equiv local.stabilize_sum by blast
-
 
 lemma max_projection_prop_stable_rel_stabilize_rel:
   "max_projection_prop (stable_rel x) (stabilize_rel x)"
@@ -914,10 +908,11 @@ lemma max_projection_prop_stable_rel_stabilize_rel:
   using local.greater_def local.stabilize_rel_sum_pure apply blast
   apply (simp add: local.stabilize_rel_is_stable_rel)
   by (metis local.already_stable_rel stabilize_rel_mono_right)
+*)
 
 lemma max_projection_prop_stable_stabilize:
   "max_projection_prop stable stabilize"
-  by (simp add: local.stable_def max_projection_prop_stable_rel_stabilize_rel stabilize_def)
+  by (metis local.already_stable local.commutative local.decompose_stabilize_pure local.greater_equiv local.max_projection_propI local.stabilize_is_stable stabilize_mono)
 
 lemma core_stabilize_mono:
   assumes "a \<succeq> b"
@@ -955,10 +950,11 @@ proof (rule cancellative)
 qed
 *)
 
-
+(*
 lemma stabilize_rel_invo:
   "stabilize_rel x (stabilize_rel x a) = stabilize_rel x a"
   using local.already_stable_rel local.stabilize_rel_is_stable_rel by blast
+*)
 
 definition pure_larger where
   "pure_larger a b \<longleftrightarrow> (\<exists>r. pure r \<and> Some a = b \<oplus> r)"
@@ -980,9 +976,11 @@ lemma pure_larger_sum:
     shows "\<exists>a'. pure_larger a' a \<and> Some x' = a' \<oplus> b"
   sorry
 
+(*
 lemma pure_larger_stabilize:
   "pure_larger x (stabilize_rel y x)"
   using local.core_is_pure local.pure_def local.stabilize_rel_sum_pure pure_larger_def by blast
+*)
 
 lemma stabilize_sum_of_stable:
   assumes "stable x"
@@ -1004,7 +1002,7 @@ proof -
   ultimately show ?thesis
     by (metis local.asso1)
 qed
-
+(*
 lemma neutral_smallest:
   "\<omega> \<succeq> u"
   using greater_equiv u_neutral by blast
@@ -1023,6 +1021,7 @@ proof -
     sorry
   show ?thesis sorry
 qed
+*)
 
 lemma obtain_pure_remainder:
   assumes "a \<succeq> b"
@@ -1046,6 +1045,33 @@ lemma is_minimum_satE:
     shows "x \<succeq> \<omega>"
   by (metis assms is_minimum_sat_def)
 *)
+
+lemma plus_pure_stabilize_eq :
+  "Some a = b \<oplus> |c| \<Longrightarrow> stabilize a = stabilize b"
+  using stabilize_core_emp stabilize_sum by blast
+
+
+lemma stable_and_sum_pure_same:
+  assumes "Some x = a \<oplus> p"
+      and "stable x"
+      and "pure p"
+    shows "x = a"
+proof -
+  have "|x| \<succeq> p"
+    using assms(1) assms(3) greater_equiv max_projection_propE(3) max_projection_prop_pure_core by blast
+  then show ?thesis
+    by (metis assms(1) assms(2) assms(3) local.already_stable local.greater_def local.max_projection_prop_def local.succ_antisym max_projection_prop_stable_stabilize pure_larger_def pure_larger_stabilize_same)
+qed
+
+lemma pure_large_stable_same:
+  assumes "pure_larger x a"
+      and "stable x"
+    shows "x = a"
+  using assms(1) assms(2) pure_larger_def stable_and_sum_pure_same by blast
+
+lemma stabilize_core_right_id :
+  "Some a = a \<oplus> stabilize |a|"
+  by (metis local.asso1 local.commutative local.core_is_smaller local.decompose_stabilize_pure)
 
 end
 
