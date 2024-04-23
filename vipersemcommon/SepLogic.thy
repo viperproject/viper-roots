@@ -382,14 +382,13 @@ lemma larger_set_refl:
   by (simp add: sub_bigger)
 
 definition emp_core :: "'a set" where
-"emp_core = {a. \<exists> b. a = |b| }"
-
+  "emp_core = {a. pure a }"
 
 definition corely :: "'a set \<Rightarrow> 'a set" where
-"corely A = A \<inter> emp_core"
+  "corely A = A \<inter> emp_core"
 
 definition up_close_core :: "'a set \<Rightarrow> 'a set" where
-"up_close_core A = A \<otimes> emp_core"
+  "up_close_core A = A \<otimes> emp_core"
 
 lemma up_close_core_sum : 
   "up_close_core A \<otimes> B = up_close_core (A \<otimes> B)"
@@ -399,10 +398,42 @@ lemma up_close_core_empty [simp] :
   "up_close_core {} = {}"
   by (simp add:up_close_core_def)
 
+lemma in_up_close_core_decompose:
+  assumes "x \<in> up_close_core A"
+  shows "\<exists>a p. a \<in> A \<and> pure p \<and> Some x = a \<oplus> p"
+  using assms emp_core_def local.x_elem_set_product up_close_core_def by auto
+
+lemma prove_in_up_close_core:
+  assumes "Some x = a \<oplus> p"
+      and "a \<in> A"
+      and "pure p"
+    shows "x \<in> up_close_core A"
+  using assms(1) assms(2) assms(3) emp_core_def local.x_elem_set_product up_close_core_def by auto
+
+lemma corely_eq_def:
+  "corely A = Set.filter pure A" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+    using corely_def emp_core_def by force
+  show "?B \<subseteq> ?A"
+    using corely_def emp_core_def by force
+qed
+
 lemma stabilize_in_up_close_core :
-   "stabilize x \<in> up_close_core A \<longleftrightarrow> stabilize x \<in> A"
-  apply (simp add:up_close_core_def emp_core_def add_set_def)
-  by (metis asso1 commutative core_is_smaller decompose_stabilize_pure option.inject plus_pure_stabilize_eq)
+   "stabilize x \<in> up_close_core A \<longleftrightarrow> stabilize x \<in> A" (is "?A \<longleftrightarrow> ?B")
+proof
+  assume ?A
+  then obtain a p where "a \<in> A" "Some (stabilize x) = a \<oplus> p" "pure p"
+    using pcm_with_core_class.in_up_close_core_decompose by blast
+  then show ?B
+    using stabilize_is_stable stable_and_sum_pure_same by blast
+next
+  assume ?B
+  moreover have "Some (stabilize x) = stabilize x \<oplus> |stabilize x|"
+    by (simp add: pcm_with_core_class.core_is_smaller)
+  ultimately show ?A
+    by (simp add: pcm_class.pure_def pcm_with_core_class.core_is_pure pcm_with_core_class.prove_in_up_close_core)
+qed
 
 lemma stable_in_up_close_core [simp] :
   assumes "stable \<omega>"
@@ -412,21 +443,34 @@ lemma stable_in_up_close_core [simp] :
 lemma up_close_core_id :
   "A \<subseteq> up_close_core A"
   apply (simp add:up_close_core_def emp_core_def)
-  using add_set_def core_is_smaller by fastforce
+  using emp_core_def local.core_is_smaller local.max_projection_prop_pure_core local.mpp_prop prove_in_up_close_core up_close_core_def by fastforce
+
 
 lemma sep_and_corely :
   assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
   assumes "up_closed B"
   assumes "A \<subseteq> B"
-  shows "A \<otimes> corely B = up_close_core A"
-  using assms
-  unfolding corely_def up_close_core_def
-
-  unfolding  add_set_def emp_core_def up_close_core_def up_close_def
-  apply (auto)
-  (* subgoal for x a b *)
-    (* sledgehammer *)
-    by (smt (verit, ccfv_threshold) asso1 commutative core_is_pure core_is_smaller core_max minusI minus_bigger minus_default subsetD up_closed_def)
+  shows "A \<otimes> corely B = up_close_core A" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+    by (simp add: corely_def local.add_set_mono up_close_core_def)
+  show "?B \<subseteq> ?A"
+  proof
+    fix x assume "x \<in> ?B"
+    then obtain a p where "a \<in> A \<and> pure p \<and> Some x = a \<oplus> p"
+      using in_up_close_core_decompose by blast
+    then obtain ap where "Some ap = |a| \<oplus> p"
+      by (metis local.compatible_smaller local.max_projection_prop_def local.max_projection_prop_pure_core)
+    then have "ap \<in> B"
+      by (metis \<open>a \<in> A \<and> pure p \<and> Some x = a \<oplus> p\<close> \<open>x \<in> up_close_core A\<close> assms(1) assms(2) assms(3) local.cancellative local.core_is_smaller local.core_sum local.in_set_sum local.max_projection_prop_pure_core local.mpp_invo local.pure_def local.up_closed_def option.inject subsetD up_close_core_def)
+    then have "ap \<in> corely B"
+      by (metis Int_iff \<open>Some ap = |a| \<oplus> p\<close> \<open>a \<in> A \<and> pure p \<and> Some x = a \<oplus> p\<close> corely_def emp_core_def local.max_projection_prop_pure_core local.mpp_prop local.pure_stable mem_Collect_eq)
+    moreover have "Some x = a \<oplus> ap"
+      by (metis \<open>Some ap = |a| \<oplus> p\<close> \<open>a \<in> A \<and> pure p \<and> Some x = a \<oplus> p\<close> local.asso1 local.core_is_smaller)
+    ultimately show "x \<in> ?A"
+      using \<open>a \<in> A \<and> pure p \<and> Some x = a \<oplus> p\<close> local.add_set_elem by blast
+  qed
+qed
 
 lemma sep_and_corely1 :
   assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
@@ -441,9 +485,10 @@ lemma sep_and_corely1 :
     using greater_equiv up_closed_def by blast
   subgoal for x a b
     apply (rule exI[of _ a], safe)
-    by (smt (verit, ccfv_threshold) asso1 core_is_smaller core_sum max_projection_prop_pure_core mpp_invo)
+    by (metis local.asso1 local.commutative local.core_is_pure local.max_projection_prop_pure_core local.minusI local.minus_equiv_def_any_elem local.mpp_smaller local.pure_def)
   done
 
+(*
 lemma sep_and_corely2 :
   assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
   assumes "up_closed B"
@@ -454,12 +499,14 @@ lemma sep_and_corely2 :
   unfolding  add_set_def emp_core_def up_close_core_def up_close_def
   apply (auto)
   subgoal for x a b
+    sorry
+
     (* using greater_equiv up_closed_def by blast *)
   (* subgoal for x a b *)
     (* apply (rule exI[of _ a], safe) *)
     (* by (smt (verit, ccfv_threshold) asso1 core_is_smaller core_sum max_projection_prop_pure_core mpp_invo) *)
     oops
-
+*)
 
 end
 
@@ -471,14 +518,6 @@ subsection \<open>Separation algebra\<close>
 
 context sep_algebra
 begin
-
-lemma stabilize_core_right_id :
-  "Some a = a \<oplus> stabilize |a|"
-  by (metis local.asso1 local.commutative local.max_projection_prop_pure_core local.mpp_invo local.stabilize_def local.stabilize_rel_sum_pure)
-
-lemma plus_pure_stabilize_eq :
-  "Some a = b \<oplus> |c| \<Longrightarrow> stabilize a = stabilize b"
-  using stabilize_core_emp stabilize_sum by blast
 
 lemma stabilize_minus_pure :
   "stabilize (x \<ominus> |a| ) = stabilize x"
@@ -573,8 +612,13 @@ lemma Stabilize_ex :
   by (auto simp add:Stabilize_def)
 
 lemma Stabilize_up_close_core : 
-  "Stabilize (up_close_core A) = Stabilize A"
-  by (simp add:Stabilize_def stabilize_in_up_close_core)
+  "Stabilize (up_close_core A) = Stabilize A" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+    using local.in_up_close_core_decompose local.max_projection_prop_stable_stabilize local.mpp_prop local.stable_and_sum_pure_same by fastforce
+  show "?B \<subseteq> ?A"
+    using local.up_close_core_id by force
+qed
 
 definition Stable :: "'a set \<Rightarrow> bool" where
   "Stable A \<longleftrightarrow> (A \<subseteq> Stabilize A)"
@@ -596,7 +640,8 @@ lemma Stable_emp [simp] :
 lemma Stable_emp_core [simp] :
   "Stable emp_core"
   unfolding Stable_def Stabilize_def emp_core_def
-  by (smt (verit) Collect_mono_iff commutative core_is_smaller mem_Collect_eq stabilize_core_emp)
+  using local.max_projection_prop_def local.max_projection_prop_stable_stabilize local.pure_smaller by force
+
 
 lemma Stable_empty [simp] : 
   "Stable {}"
@@ -671,12 +716,14 @@ proof -
     apply (simp add:emp_core_def)
     apply (rule set_mp[OF add_set_mono])
       prefer 3 apply (assumption)
-    by blast+
+    apply (simp add: local.max_projection_prop_pure_core local.mpp_prop)
+    by blast
   show "?thesis"
     apply (rule assms(4)[of "stabilize a"])
     subgoal using assms Stable_def \<open>a \<in> A\<close> in_Stabilize by blast
     subgoal by (simp add: stabilize_is_stable)
-    using \<open>x \<in> up_close_core ({stabilize a} \<otimes> B)\<close> assms by (simp)
+    using \<open>x \<in> up_close_core ({stabilize a} \<otimes> B)\<close> assms
+    using local.in_up_close_core_decompose local.stable_and_sum_pure_same by blast
 qed
 
 lemma Stable_star_singleton :
@@ -688,7 +735,7 @@ proof (rule StableI)
   (* TODO: use star_to_singleton_stableE to simplify this proof? *)
   then obtain a where "x \<in> {a} \<otimes> B" "a \<in> A" using star_to_singletonE by blast
   then have "Stable ({stabilize a} \<otimes> B)" using stabilize_is_stable Stable_def assms in_Stabilize by blast
-  from \<open>x \<in> {a} \<otimes> B\<close> have "x \<in> up_close_core ({stabilize a} \<otimes> B)" 
+  from \<open>x \<in> {a} \<otimes> B\<close> have "x \<in> up_close_core ({stabilize a} \<otimes> B)"
     (* This proof is a lot more painful than it should be. *)
     apply (simp add:split_star_singleton_stabilize[of "a"])
     apply (simp add:add_set_commm[of "{stabilize a}"] add_set_asso)
@@ -696,10 +743,12 @@ proof (rule StableI)
     apply (simp add:emp_core_def)
     apply (rule set_mp[OF add_set_mono])
       prefer 3 apply (assumption)
-    by blast+
+    apply (simp add: local.core_is_pure local.pure_def)
+    by blast
   then have "stabilize x \<in> {stabilize a} \<otimes> B" 
     using Stable_def \<open>Stable ({stabilize a} \<otimes> B)\<close>
-    using Stabilize_up_close_core Stable_up_close_core by fastforce
+    using Stabilize_up_close_core Stable_up_close_core
+    by (metis in_Stabilize subsetD)
   show "stabilize x \<in> A \<otimes> B"
     apply (rule star_to_singletonI[of "stabilize a"])
     using assms(1) \<open>a \<in> A\<close> Stable_def apply (fastforce)
