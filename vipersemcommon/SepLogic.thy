@@ -1,5 +1,5 @@
 theory SepLogic
-  imports SepAlgebra
+  imports SepAlgebraDef
 begin
 
 section \<open>Extending separation algebra with sets\<close>
