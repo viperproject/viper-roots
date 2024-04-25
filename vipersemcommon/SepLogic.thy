@@ -1,5 +1,5 @@
 theory SepLogic
-  imports SepAlgebra
+  imports SepAlgebraDef
 begin
 
 section \<open>Extending separation algebra with sets\<close>
@@ -9,7 +9,9 @@ subsection \<open>PCM\<close>
 
 context pcm
 begin
-                                                         
+
+subsubsection \<open>definitions\<close>
+
 definition add_set :: "'a set \<Rightarrow> 'a set \<Rightarrow> 'a set" (infixl "\<otimes>" 60) where
   "A \<otimes> B = { \<phi> | \<phi> a b. a \<in> A \<and> b \<in> B \<and> Some \<phi> = a \<oplus> b }"
 
@@ -28,6 +30,14 @@ definition setify :: "('a \<Rightarrow> bool) \<Rightarrow> ('a set \<Rightarrow
 definition under :: "'a set \<Rightarrow> 'a \<Rightarrow> 'a set" where
   "under A \<omega> = { \<omega>' | \<omega>'. \<omega>' \<in> A \<and> \<omega> \<succeq> \<omega>'}"
 
+definition wand :: "'a set \<Rightarrow> 'a set \<Rightarrow> 'a set" (infixl "--\<otimes>" 60) where
+  "A --\<otimes> B = { x. \<forall> a b. a \<in> A \<longrightarrow> Some b = a \<oplus> x \<longrightarrow> b \<in> B}"
+
+definition up_close :: "'a set \<Rightarrow> 'a set" where
+  "up_close A = A \<otimes> UNIV"
+
+subsubsection \<open>add_set\<close>
+
 lemma add_set_commm:
   "A \<otimes> B = B \<otimes> A"
 proof -
@@ -36,13 +46,20 @@ proof -
   then show ?thesis by blast
 qed
 
-lemma x_elem_set_product:
+lemma in_add_set:
   "x \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. a \<in> A \<and> b \<in> B \<and> Some x = a \<oplus> b)"
-  using add_set_def by fastforce
+  using add_set_def   by fastforce
 
-lemma x_elem_set_product_splus:
+(* TODO: rename usages and remove *)
+lemmas x_elem_set_product = in_add_set
+lemmas add_set_elem = in_add_set
+
+lemma in_add_set_splus:
   "x \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. a \<in> A \<and> b \<in> B \<and> Some x = splus (Some a) (Some b))"
   using add_set_def   by fastforce
+
+(* TODO: rename usages and remove *)
+lemmas x_elem_set_product_splus = in_add_set_splus
 
 lemma add_set_asso:
   "(A \<otimes> B) \<otimes> C = A \<otimes> (B \<otimes> C)" (is "?A = ?B")
@@ -74,146 +91,7 @@ proof -
   ultimately show ?thesis by blast
 qed
 
-lemma up_closedI:
-  assumes "\<And>\<phi>' \<phi>. (\<phi>' :: 'a) \<succeq> \<phi> \<and> \<phi> \<in> A \<Longrightarrow> \<phi>' \<in> A"
-  shows "up_closed A"
-  using assms up_closed_def by blast
-
-lemma up_closed_plus_UNIV:
-  "up_closed (A \<otimes> UNIV)"
-proof (rule up_closedI)
-  fix \<phi> \<phi>'
-  assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> UNIV"
-  then obtain r a b where "Some \<phi>' = \<phi> \<oplus> r" "Some \<phi> = a \<oplus> b" "a \<in> A"
-    using greater_def x_elem_set_product by auto
-  then obtain br where "Some br = b \<oplus> r" 
-    by (metis asso2 option.exhaust_sel)
-  then have "Some \<phi>' = a \<oplus> br" 
-    by (metis \<open>Some \<phi> = a \<oplus> b\<close> \<open>Some \<phi>' = \<phi> \<oplus> r\<close> splus.simps(3) splus_asso)
-  then show "\<phi>' \<in> A \<otimes> UNIV" 
-    using \<open>a \<in> A\<close> x_elem_set_product by auto
-qed
-
-(*
-lemma up_closed_up_mult_set:
-  "up_closed (up_mult_set \<alpha> A)"
-  by (simp add: up_closed_plus_UNIV up_mult_set_def)
-*)
-
-lemma succ_set_trans:
-  assumes "A \<ggreater> B"
-      and "B \<ggreater> C"
-    shows "A \<ggreater> C"
-  by (meson assms(1) assms(2) greater_set_def succ_trans)
-
-lemma greater_setI:
-  assumes "\<And>a. a \<in> A \<Longrightarrow> (\<exists>b \<in> B. a \<succeq> b)"
-    shows "A \<ggreater> B"
-  by (simp add: assms greater_set_def)  
-
-lemma bigger_set:
-  assumes "A' \<ggreater> A"
-  shows "A' \<otimes> B \<ggreater> A \<otimes> B"
-proof (rule greater_setI)
-  fix x assume "x \<in> A' \<otimes> B"
-  then obtain a' b where "Some x = a' \<oplus> b" "a' \<in> A'" "b \<in> B"
-    using x_elem_set_product by auto
-  then obtain a where "a' \<succeq> a" "a \<in> A"
-    using assms greater_set_def by blast
-  then obtain ab where "Some ab = a \<oplus> b"
-    by (metis \<open>Some x = a' \<oplus> b\<close> asso2 domD domIff greater_equiv)
-  then show "\<exists>ab\<in>A \<otimes> B. x \<succeq> ab"
-    using \<open>Some x = a' \<oplus> b\<close> \<open>a \<in> A\<close> \<open>a' \<succeq> a\<close> \<open>b \<in> B\<close> addition_bigger x_elem_set_product by blast
-qed
-
-lemma bigger_singleton:
-  assumes "\<phi>' \<succeq> \<phi>"
-  shows "{\<phi>'} \<ggreater> {\<phi>}"
-  by (simp add: assms greater_set_def)
-
-lemma add_set_elem:
-  "\<phi> \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. Some \<phi> = a \<oplus> b \<and> a \<in> A \<and> b \<in> B)"
-  using add_set_def by auto
-
-lemma up_closed_sum:
-  assumes "up_closed A"
-    shows "up_closed (A \<otimes> B)"
-proof (rule up_closedI)
-  fix \<phi>' \<phi> assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> B"
-  then obtain a b where "a \<in> A" "b \<in> B" "Some \<phi> = a \<oplus> b" 
-    using add_set_elem by auto
-  moreover obtain r where "Some \<phi>' = \<phi> \<oplus> r" 
-    using asm greater_def by blast
-  then obtain ar where "Some ar = a \<oplus> r" 
-    by (metis asso2 calculation(3) commutative option.exhaust_sel option.simps(3))
-  then have "ar \<in> A" 
-    by (meson assms calculation(1) greater_def up_closed_def  )
-  then show "\<phi>' \<in> A \<otimes> B" 
-    by (metis \<open>Some \<phi>' = \<phi> \<oplus> r\<close> \<open>Some ar = a \<oplus> r\<close> add_set_elem asso1 calculation(2) calculation(3) commutative)
-qed
-
-lemma up_closed_bigger_subset:
-  assumes "up_closed B"
-      and "A \<ggreater> B"
-    shows "A \<subseteq> B"
-  by (meson assms(1) assms(2) greater_set_def up_closed_def   subsetI)
-
-lemma equiv_stable_sum:
-  assumes "A \<sim> B"
-  shows "A \<otimes> C \<sim> B \<otimes> C"
-  using assms bigger_set local.equiv_def by auto
-
-lemma equiv_up_closed_subset:
-  assumes "up_closed A"
-      and "equiv B C"
-    shows "B \<subseteq> A \<longleftrightarrow> C \<subseteq> A" (is "?B \<longleftrightarrow> ?C")
-proof -
-  have "?B \<Longrightarrow> ?C"
-    by (meson greater_set_def up_closed_def equiv_def assms(1) assms(2) subsetD subsetI)
-  moreover have "?C \<Longrightarrow> ?B"
-    by (meson greater_set_def up_closed_def equiv_def assms(1) assms(2) subsetD subsetI)
-  ultimately show ?thesis by blast
-qed
-
-lemma mono_prop_set:
-  assumes "A \<ggreater> B"
-      and "setify P B"
-      and "mono_prop P"
-    shows "setify P A"
-  using assms(1) assms(2) assms(3) greater_set_def local.setify_def mono_prop_def by auto
-
-lemma mono_prop_set_equiv:
-  assumes "mono_prop P"
-      and "equiv A B"
-    shows "setify P A \<longleftrightarrow> setify P B"
-  by (meson assms(1) assms(2) local.equiv_def mono_prop_set  )
-
-lemma setify_sum:
-  "setify P (A \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
-proof -
-  have "?A \<Longrightarrow> ?B" 
-    using local.setify_def add_set_elem   singletonD by fastforce
-  moreover have "?B \<Longrightarrow> ?A" 
-    using add_set_elem local.setify_def by fastforce
-  ultimately show ?thesis by blast
-qed
-
-lemma setify_sum_image:
-  "setify P ((Set.image f A) \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({f x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
-proof
-  show "?A \<Longrightarrow> ?B"
-    by (meson image_eqI setify_sum)
-  show "?B \<Longrightarrow> ?A"
-    by (metis (mono_tags, lifting) imageE setify_sum)
-qed
-
-lemma equivI:
-  assumes "A \<ggreater> B"
-    and "B \<ggreater> A"
-    shows "equiv A B"
-  by (simp add: assms(1) assms(2) local.equiv_def)
-
-lemma sum_then_singleton:
+lemma add_set_singleton:
   "Some a = b \<oplus> c \<longleftrightarrow> {a} = {b} \<otimes> {c}" (is "?A \<longleftrightarrow> ?B")
 proof -
   have "?A \<Longrightarrow> ?B"
@@ -231,21 +109,20 @@ proof -
   ultimately show ?thesis by blast
 qed
 
-lemma empty_set_sum:
-  "{} \<otimes> A = {}" 
-  by (simp add: add_set_def)
+lemmas sum_then_singleton = add_set_singleton
 
+(* TODO: Rename? *)
 lemma is_in_set_sum:
   assumes "Some a = b \<oplus> c"
       and "c \<in> C"
     shows "a \<in> {b} \<otimes> C"
   using add_set_elem assms(1) assms(2) by blast
 
+(* TODO: Rename? *)
 lemma in_set_sum:
   assumes "\<omega> \<in> A \<otimes> B"
   shows "\<exists>a \<in> A. \<omega> \<succeq> a"
   by (metis add_set_elem assms commutative greater_equiv)
-
 
 
 lemma add_set_left_comm :
@@ -276,26 +153,183 @@ lemma add_set_empty_r [simp] :
   "(A \<otimes> {}) = {}"
   by (simp add:add_set_def)
 
+(* TODO: Rename? *)
 lemma star_to_singletonE :
   assumes "x \<in> A \<otimes> B"
   assumes "\<And> a. a \<in> A \<Longrightarrow> x \<in> {a} \<otimes> B \<Longrightarrow> P"
   shows "P"
   using assms by (auto simp add:add_set_def)
 
+(* TODO: Rename? *)
 lemma star_to_singletonI :
   assumes "a \<in> A"
   assumes "x \<in> {a} \<otimes> B"
   shows "x \<in> A \<otimes> B"
   using assms by (auto simp add:add_set_def)
 
+subsubsection \<open>greater_set\<close>
 
-lemma and_sep_comm :
-  shows "(A \<inter> B) \<otimes> C = (A \<otimes> C) \<inter> (B \<otimes> C)"
-  unfolding add_set_def
-  oops
+lemma greater_set_trans:
+  assumes "A \<ggreater> B"
+      and "B \<ggreater> C"
+    shows "A \<ggreater> C"
+  by (meson assms(1) assms(2) greater_set_def succ_trans)
 
-definition wand :: "'a set \<Rightarrow> 'a set \<Rightarrow> 'a set" (infixl "--\<otimes>" 60) where
-  "A --\<otimes> B = { x. \<forall> a b. a \<in> A \<longrightarrow> Some b = a \<oplus> x \<longrightarrow> b \<in> B}"
+(* TODO: rename usages and remove *)
+lemmas succ_set_trans = greater_set_trans
+
+lemma greater_setI:
+  assumes "\<And>a. a \<in> A \<Longrightarrow> (\<exists>b \<in> B. a \<succeq> b)"
+    shows "A \<ggreater> B"
+  by (simp add: assms greater_set_def)  
+
+lemma add_set_greater_set_mono:
+  assumes "A' \<ggreater> A"
+  shows "A' \<otimes> B \<ggreater> A \<otimes> B"
+proof (rule greater_setI)
+  fix x assume "x \<in> A' \<otimes> B"
+  then obtain a' b where "Some x = a' \<oplus> b" "a' \<in> A'" "b \<in> B"
+    using x_elem_set_product by auto
+  then obtain a where "a' \<succeq> a" "a \<in> A"
+    using assms greater_set_def by blast
+  then obtain ab where "Some ab = a \<oplus> b"
+    by (metis \<open>Some x = a' \<oplus> b\<close> asso2 domD domIff greater_equiv)
+  then show "\<exists>ab\<in>A \<otimes> B. x \<succeq> ab"
+    using \<open>Some x = a' \<oplus> b\<close> \<open>a \<in> A\<close> \<open>a' \<succeq> a\<close> \<open>b \<in> B\<close> addition_bigger x_elem_set_product by blast
+qed
+
+(* TODO: rename usages and remove *)
+lemmas bigger_set = add_set_greater_set_mono
+
+lemma greater_set_singleton:
+  assumes "\<phi>' \<succeq> \<phi>"
+  shows "{\<phi>'} \<ggreater> {\<phi>}"
+  by (simp add: assms greater_set_def)
+
+(* TODO: rename usages and remove *)
+lemmas bigger_singleton = greater_set_singleton
+
+lemma up_closed_greater_set_subset:
+  assumes "up_closed B"
+      and "A \<ggreater> B"
+    shows "A \<subseteq> B"
+  by (meson assms(1) assms(2) greater_set_def up_closed_def   subsetI)
+
+lemmas up_closed_bigger_subset = up_closed_greater_set_subset
+
+subsubsection \<open>up_closed\<close>
+
+lemma up_closedI:
+  assumes "\<And>\<phi>' \<phi>. (\<phi>' :: 'a) \<succeq> \<phi> \<and> \<phi> \<in> A \<Longrightarrow> \<phi>' \<in> A"
+  shows "up_closed A"
+  using assms up_closed_def by blast
+
+lemma up_closed_plus_UNIV:
+  "up_closed (A \<otimes> UNIV)"
+proof (rule up_closedI)
+  fix \<phi> \<phi>'
+  assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> UNIV"
+  then obtain r a b where "Some \<phi>' = \<phi> \<oplus> r" "Some \<phi> = a \<oplus> b" "a \<in> A"
+    using greater_def x_elem_set_product by auto
+  then obtain br where "Some br = b \<oplus> r" 
+    by (metis asso2 option.exhaust_sel)
+  then have "Some \<phi>' = a \<oplus> br" 
+    by (metis \<open>Some \<phi> = a \<oplus> b\<close> \<open>Some \<phi>' = \<phi> \<oplus> r\<close> splus.simps(3) splus_asso)
+  then show "\<phi>' \<in> A \<otimes> UNIV" 
+    using \<open>a \<in> A\<close> x_elem_set_product by auto
+qed
+
+(*
+lemma up_closed_up_mult_set:
+  "up_closed (up_mult_set \<alpha> A)"
+  by (simp add: up_closed_plus_UNIV up_mult_set_def)
+*)
+
+lemma up_closed_add_set:
+  assumes "up_closed A"
+    shows "up_closed (A \<otimes> B)"
+proof (rule up_closedI)
+  fix \<phi>' \<phi> assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> B"
+  then obtain a b where "a \<in> A" "b \<in> B" "Some \<phi> = a \<oplus> b" 
+    using add_set_elem by auto
+  moreover obtain r where "Some \<phi>' = \<phi> \<oplus> r" 
+    using asm greater_def by blast
+  then obtain ar where "Some ar = a \<oplus> r" 
+    by (metis asso2 calculation(3) commutative option.exhaust_sel option.simps(3))
+  then have "ar \<in> A" 
+    by (meson assms calculation(1) greater_def up_closed_def  )
+  then show "\<phi>' \<in> A \<otimes> B" 
+    by (metis \<open>Some \<phi>' = \<phi> \<oplus> r\<close> \<open>Some ar = a \<oplus> r\<close> add_set_elem asso1 calculation(2) calculation(3) commutative)
+qed
+
+lemmas up_closed_sum = up_closed_add_set
+
+subsubsection \<open>equiv\<close>
+
+lemma equivI:
+  assumes "A \<ggreater> B"
+    and "B \<ggreater> A"
+    shows "equiv A B"
+  by (simp add: assms(1) assms(2) local.equiv_def)
+
+lemma equiv_stable_add_set:
+  assumes "A \<sim> B"
+  shows "A \<otimes> C \<sim> B \<otimes> C"
+  using assms bigger_set local.equiv_def by auto
+
+lemmas equiv_stable_sum = equiv_stable_add_set
+
+lemma equiv_up_closed_subset:
+  assumes "up_closed A"
+      and "equiv B C"
+    shows "B \<subseteq> A \<longleftrightarrow> C \<subseteq> A" (is "?B \<longleftrightarrow> ?C")
+proof -
+  have "?B \<Longrightarrow> ?C"
+    by (meson greater_set_def up_closed_def equiv_def assms(1) assms(2) subsetD subsetI)
+  moreover have "?C \<Longrightarrow> ?B"
+    by (meson greater_set_def up_closed_def equiv_def assms(1) assms(2) subsetD subsetI)
+  ultimately show ?thesis by blast
+qed
+
+subsubsection \<open>setify\<close>
+
+lemma mono_prop_set:
+  assumes "A \<ggreater> B"
+      and "setify P B"
+      and "mono_prop P"
+    shows "setify P A"
+  using assms(1) assms(2) assms(3) greater_set_def local.setify_def mono_prop_def by auto
+
+lemma mono_prop_set_equiv:
+  assumes "mono_prop P"
+      and "equiv A B"
+    shows "setify P A \<longleftrightarrow> setify P B"
+  by (meson assms(1) assms(2) local.equiv_def mono_prop_set  )
+
+lemma setify_add_set:
+  "setify P (A \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
+proof -
+  have "?A \<Longrightarrow> ?B" 
+    using local.setify_def add_set_elem   singletonD by fastforce
+  moreover have "?B \<Longrightarrow> ?A" 
+    using add_set_elem local.setify_def by fastforce
+  ultimately show ?thesis by blast
+qed
+
+lemmas setify_sum = setify_add_set
+
+lemma setify_add_set_image:
+  "setify P ((Set.image f A) \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({f x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
+proof
+  show "?A \<Longrightarrow> ?B"
+    by (meson image_eqI setify_sum)
+  show "?B \<Longrightarrow> ?A"
+    by (metis (mono_tags, lifting) imageE setify_sum)
+qed
+
+lemmas setify_sum_image = setify_add_set_image
+
+subsubsection \<open>wand\<close>
 
 lemma wand_apply :
   "A \<otimes> (A --\<otimes> B) \<subseteq> B"
@@ -305,10 +339,7 @@ lemma wand_empty [simp] :
   "({} --\<otimes> B) = UNIV"
   unfolding wand_def by (auto)
 
-
-
-definition up_close :: "'a set \<Rightarrow> 'a set" where
-  "up_close A = A \<otimes> UNIV"
+subsubsection \<open>up_close\<close>
 
 lemma up_close_sum : 
   "up_close A \<otimes> B = up_close (A \<otimes> B)"
@@ -317,16 +348,6 @@ lemma up_close_sum :
 lemma up_close_empty [simp] :
   "up_close {} = {}"
   by (simp add:up_close_def)
-
-
-lemma sep_and_pers :
-  assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
-  (* probably B needs to be up_closed as well*)
-  shows "A \<otimes> B = up_close (A \<inter> B)"
-  using assms unfolding up_close_def
-   apply (auto)
-   sorry
-
 
 end
 
@@ -359,6 +380,19 @@ subsection \<open>PCM with core\<close>
 context pcm_with_core
 begin
 
+subsubsection \<open>definitions\<close>
+
+definition emp_core :: "'a set" where
+  "emp_core = {a. pure a }"
+
+definition corely :: "'a set \<Rightarrow> 'a set" where
+  "corely A = A \<inter> emp_core"
+
+definition up_close_core :: "'a set \<Rightarrow> 'a set" where
+  "up_close_core A = A \<otimes> emp_core"
+
+subsubsection \<open>equiv\<close>
+
 lemma up_close_equiv:
   assumes "up_closed A"
       and "up_closed B"
@@ -372,23 +406,22 @@ proof -
     by blast
 qed
 
-lemma sub_bigger:
+subsubsection \<open>greater_set\<close>
+
+lemma sub_greater_set:
   assumes "A \<subseteq> B"
   shows "A \<ggreater> B"
   by (meson assms greater_set_def in_mono succ_refl)
 
-lemma larger_set_refl:
+lemmas sub_bigger = sub_greater_set
+
+lemma greater_set_refl:
   "A \<ggreater> A"
   by (simp add: sub_bigger)
 
-definition emp_core :: "'a set" where
-  "emp_core = {a. pure a }"
+lemmas larger_set_refl = greater_set_refl
 
-definition corely :: "'a set \<Rightarrow> 'a set" where
-  "corely A = A \<inter> emp_core"
-
-definition up_close_core :: "'a set \<Rightarrow> 'a set" where
-  "up_close_core A = A \<otimes> emp_core"
+subsubsection \<open>up_close_core\<close>
 
 lemma up_close_core_sum : 
   "up_close_core A \<otimes> B = up_close_core (A \<otimes> B)"
@@ -409,15 +442,6 @@ lemma prove_in_up_close_core:
       and "pure p"
     shows "x \<in> up_close_core A"
   using assms(1) assms(2) assms(3) emp_core_def local.x_elem_set_product up_close_core_def by auto
-
-lemma corely_eq_def:
-  "corely A = Set.filter pure A" (is "?A = ?B")
-proof
-  show "?A \<subseteq> ?B"
-    using corely_def emp_core_def by force
-  show "?B \<subseteq> ?A"
-    using corely_def emp_core_def by force
-qed
 
 lemma stabilize_in_up_close_core :
    "stabilize x \<in> up_close_core A \<longleftrightarrow> stabilize x \<in> A" (is "?A \<longleftrightarrow> ?B")
@@ -445,6 +469,16 @@ lemma up_close_core_id :
   apply (simp add:up_close_core_def emp_core_def)
   using emp_core_def local.core_is_smaller local.max_projection_prop_pure_core local.mpp_prop prove_in_up_close_core up_close_core_def by fastforce
 
+subsubsection \<open>corely\<close>
+
+lemma corely_eq_def:
+  "corely A = Set.filter pure A" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+    using corely_def emp_core_def by force
+  show "?B \<subseteq> ?A"
+    using corely_def emp_core_def by force
+qed
 
 lemma sep_and_corely :
   assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
@@ -471,43 +505,6 @@ proof
       using \<open>a \<in> A \<and> pure p \<and> Some x = a \<oplus> p\<close> local.add_set_elem by blast
   qed
 qed
-
-lemma sep_and_corely1 :
-  assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
-  assumes "up_closed B"
-  shows "A \<otimes> corely B = up_close_core A \<inter> B"
-  using assms
-  unfolding corely_def up_close_core_def
-
-  unfolding  add_set_def emp_core_def up_close_core_def up_close_def
-  apply (auto)
-  subgoal for x a b
-    using greater_equiv up_closed_def by blast
-  subgoal for x a b
-    apply (rule exI[of _ a], safe)
-    by (metis local.asso1 local.commutative local.core_is_pure local.max_projection_prop_pure_core local.minusI local.minus_equiv_def_any_elem local.mpp_smaller local.pure_def)
-  done
-
-(*
-lemma sep_and_corely2 :
-  assumes "\<And> \<omega>. \<omega> \<in> B \<Longrightarrow> |\<omega>| \<in> B"
-  assumes "up_closed B"
-  shows "A \<otimes> corely B = up_close_core (A \<inter> B)"
-  using assms
-  unfolding corely_def up_close_core_def
-
-  unfolding  add_set_def emp_core_def up_close_core_def up_close_def
-  apply (auto)
-  subgoal for x a b
-    sorry
-
-    (* using greater_equiv up_closed_def by blast *)
-  (* subgoal for x a b *)
-    (* apply (rule exI[of _ a], safe) *)
-    (* by (smt (verit, ccfv_threshold) asso1 core_is_smaller core_sum max_projection_prop_pure_core mpp_invo) *)
-    oops
-*)
-
 end
 
 
@@ -519,12 +516,26 @@ subsection \<open>Separation algebra\<close>
 context sep_algebra
 begin
 
+(* TODO: Where to put this? *)
 lemma stabilize_minus_pure :
   "stabilize (x \<ominus> |a| ) = stabilize x"
   by (metis commutative minus_default minus_equiv_def plus_pure_stabilize_eq)
 
+subsubsection \<open>definitions\<close>
+
 definition emp :: "'a set" where
 "emp = {a. \<exists> b. a = stabilize |b| }"
+
+definition bool_to_assertion :: "bool \<Rightarrow> 'a set" ("\<llangle>_\<rrangle>" [0] 81) where
+"bool_to_assertion b = (if b then emp else {})"
+
+definition Stabilize :: "'a set \<Rightarrow> 'a set" where
+  "Stabilize A = {\<omega>. stabilize \<omega> \<in> A}"
+
+definition Stable :: "'a set \<Rightarrow> bool" where
+  "Stable A \<longleftrightarrow> (A \<subseteq> Stabilize A)"
+
+subsubsection \<open>emp\<close>
 
 lemma emp_star_right_id [simp] :
   "A \<otimes> emp = A"
@@ -541,8 +552,7 @@ lemma wand_emp [simp] :
    apply (metis commutative stabilize_core_right_id)
   by (metis commutative stabilize_core_emp)
 
-definition bool_to_assertion :: "bool \<Rightarrow> 'a set" ("\<llangle>_\<rrangle>" [0] 81) where
-"bool_to_assertion b = (if b then emp else {})"
+subsubsection \<open>bool_to_assertion\<close>
 
 lemma bool_to_assertion_split :
   "P (\<llangle>Q\<rrangle>) = ((Q \<longrightarrow> P emp) \<and> (\<not> Q \<longrightarrow> P {}))"
@@ -567,17 +577,7 @@ lemma bool_to_assertion_false [simp]:
   shows "\<llangle>P\<rrangle> = {}"
   using assms by (simp split:bool_to_assertion_splits)
   
-
-
-
-
-
-
-
-
-
-definition Stabilize :: "'a set \<Rightarrow> 'a set" where
-  "Stabilize A = {\<omega>. stabilize \<omega> \<in> A}"
+subsubsection \<open>Stabilize\<close>
 
 lemma in_Stabilize[simp] :
   "\<omega> \<in> Stabilize A \<longleftrightarrow> stabilize \<omega> \<in> A"
@@ -600,13 +600,6 @@ lemma Stabilize_empty [simp] :
   "Stabilize {} = {}"
   by (simp add:Stabilize_def)
 
-(* lemma Stabilize_emp [simp] :  *)
-  (* "Stabilize emp = emp" *)
-  (* unfolding emp_def Stabilize_def *)
-  (* apply (simp; safe) *)
-  
-  (* by (auto) *)
-
 lemma Stabilize_ex :
   "Stabilize (\<Union> x. A x) = (\<Union> x. Stabilize (A x))"
   by (auto simp add:Stabilize_def)
@@ -620,8 +613,7 @@ proof
     using local.up_close_core_id by force
 qed
 
-definition Stable :: "'a set \<Rightarrow> bool" where
-  "Stable A \<longleftrightarrow> (A \<subseteq> Stabilize A)"
+subsubsection \<open>Stable\<close>
 
 lemma StableI :
   assumes "\<And> x. x \<in> A \<Longrightarrow> stabilize x \<in> A"
