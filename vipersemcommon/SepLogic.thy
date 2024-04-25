@@ -38,7 +38,7 @@ qed
 
 lemma x_elem_set_product:
   "x \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. a \<in> A \<and> b \<in> B \<and> Some x = a \<oplus> b)"
-  using add_set_def   by fastforce
+  using add_set_def by fastforce
 
 lemma x_elem_set_product_splus:
   "x \<in> A \<otimes> B \<longleftrightarrow> (\<exists>a b. a \<in> A \<and> b \<in> B \<and> Some x = splus (Some a) (Some b))"
