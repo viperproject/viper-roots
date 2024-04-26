@@ -1329,30 +1329,19 @@ begin
 
 definition u_virtual_state where "u_virtual_state = Abs_virtual_state uuu"
 
-definition stable_rel_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state \<Rightarrow> bool" where
-  "stable_rel_virtual_state a x \<longleftrightarrow> (\<forall>hl :: heap_loc. get_vh x hl \<noteq> None \<longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0)"
+definition stable_virtual_state :: "'v virtual_state \<Rightarrow> bool" where
+  "stable_virtual_state x \<longleftrightarrow> (\<forall>hl :: heap_loc. get_vh x hl \<noteq> None \<longrightarrow> ppos (get_vm x hl))"
 
-definition stabilize2pre :: "'v virtual_state \<Rightarrow> 'v virtual_state \<Rightarrow> 'v pre_virtual_state" where
-  "stabilize2pre a x = (get_vm x, \<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
+definition stabilize2pre :: "'v virtual_state \<Rightarrow> 'v pre_virtual_state" where
+  "stabilize2pre x = (get_vm x, get_vh x |` {hl. ppos (get_vm x hl)})"
 
-definition stabilize_rel_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state \<Rightarrow> 'v virtual_state" where
-  "stabilize_rel_virtual_state a x = Abs_virtual_state (stabilize2pre a x)"
-
-lemma stable_rel_rule:
-  assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
-    shows "stable_rel a x"
-  using assms stable_rel_virtual_state_def by blast
-
-lemma stable_rel_imp:
-  assumes "stable_rel a x"
-      and "get_vh x hl = Some v"
-    shows "get_vm x hl > 0 \<or> get_vm a hl > 0"
-  by (metis assms option.discI stable_rel_virtual_state_def)
+definition stabilize_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state" where
+  "stabilize_virtual_state x = Abs_virtual_state (stabilize2pre x)"
 
 lemma stabilize_wf:
-  "wf_pre_virtual_state (stabilize2pre a x)"
+  "wf_pre_virtual_state (stabilize2pre x)"
 proof -
-  obtain \<pi> h where "stabilize2pre a x = (\<pi>, h)" "\<pi> = get_vm x" "h = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
+  obtain \<pi> h where "stabilize2pre x = (\<pi>, h)" "\<pi> = get_vm x" "h = get_vh x |` {hl. ppos (get_vm x hl)}"
     by (simp add: stabilize2pre_def)
   moreover have "wf_pre_virtual_state (\<pi>, h)"
   proof (rule wf_pre_virtual_stateI)
@@ -1371,281 +1360,81 @@ proof -
       ultimately show ?thesis
         by simp
     qed
-    moreover have "get_vm x hl \<noteq> 0"
-      by (metis \<open>\<pi> = get_vm x\<close> \<open>ppos (\<pi> hl)\<close> empty_heap_def wf_pre_virtual_state.simps wf_uuu zero_mask_def)
+    moreover have "ppos (get_vm x hl)"
+      sledgehammer
+      using \<open>PosReal.ppos (\<pi> hl)\<close> \<open>\<pi> = get_vm x\<close> by blast
     ultimately show "h hl \<noteq> None"
-      by (simp add: \<open>h = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)\<close>)
+      by (simp add: \<open>h = get_vh x |` {hl. ppos (get_vm x hl)}\<close> restrict_map_def)
   qed
   ultimately show ?thesis
     by simp
 qed
 
 lemma vstate_stabilize_structure:
-  shows "get_vm (stabilize_rel a x) = get_vm x"
-    and "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
+  shows "get_vm (stabilize x) = get_vm x"
+    and "get_vh (stabilize x) = get_vh x |` {hl. ppos (get_vm x hl)}"
 proof -
   have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
     by (simp add: get_vm_def)
-  moreover have "Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x"
+  moreover have "Rep_virtual_state (Abs_virtual_state (stabilize2pre x)) = stabilize2pre x"
     by (simp add: Abs_virtual_state_inverse stabilize_wf)
-  ultimately show "get_vm (stabilize_rel a x) = get_vm x"
-    by (simp add: get_vm_def stabilize2pre_def stabilize_rel_virtual_state_def)
-  show "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)" using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x\<close>
-    by (simp add: get_vh_def stabilize2pre_def stabilize_rel_virtual_state_def)
+  ultimately show "get_vm (stabilize x) = get_vm x"
+    by (simp add: get_vm_def stabilize2pre_def stabilize_virtual_state_def)
+  show "get_vh (stabilize x) = get_vh x |` {hl. ppos (get_vm x hl)}" 
+    using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre x)) = stabilize2pre x\<close>
+    by (simp add: get_vh_def stabilize2pre_def stabilize_virtual_state_def)
 qed
 
-lemma vstate_u_structure:
-  shows "get_vm sep_algebra_class.u = zero_mask"
-    and "get_vh sep_algebra_class.u = empty_heap"
-proof -
-  have "Rep_virtual_state (Abs_virtual_state uuu) = uuu" using wf_uuu
-    using Abs_virtual_state_inverse uuu_def by blast
-  moreover have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: get_vm_def)
-  ultimately show "get_vm sep_algebra_class.u = zero_mask"
-    by (smt (verit) fst_conv u_virtual_state_def uuu_def)
-  have "\<And>\<omega>. get_vh \<omega> = snd (Rep_virtual_state \<omega>)"
-    by (simp add: get_vh_def)
-  then show "get_vh sep_algebra_class.u = empty_heap" using \<open>Rep_virtual_state (Abs_virtual_state uuu) = uuu\<close>
-    by (smt (verit) snd_conv u_virtual_state_def uuu_def)
-qed
+lemma virtual_state_ext :
+  assumes "get_vm x = get_vm y" "get_vh x = get_vh y"
+  shows "x = y"
+  by (metis assms(1) assms(2) core_is_smaller option.simps(1) vstate_add_iff)
 
 instance proof
-  fix x a :: "'v virtual_state"
-  show "Some x = stabilize_rel a x \<oplus> |x|"
-    by (smt (verit, ccfv_SIG) EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) core_is_smaller core_structure(2) plus_funE plus_funI plus_option.simps(1) vstate_add_iff)
-  show "stable_rel a (stabilize_rel a x)"
-  proof (rule stable_rel_rule)
-    fix hl :: heap_loc
-    assume "get_vh (stabilize_rel a x) hl \<noteq> None"
-    show "0 < get_vm (stabilize_rel a x) hl \<or> 0 < get_vm a hl"
-    proof (rule ccontr)
-      assume "\<not>(0 < get_vm (stabilize_rel a x) hl \<or> 0 < get_vm a hl)"
-      then have "get_vm x hl = 0 \<and> get_vm a hl = 0"
-        by (metis EquiSemAuxLemma.vstate_stabilize_structure(1) not_gr_0)
-      then have "get_vh (stabilize_rel a x) hl = None"
-        by (meson EquiSemAuxLemma.vstate_stabilize_structure(2))
-      then show False
-        using \<open>get_vh (stabilize_rel a x) hl \<noteq> None\<close> by auto
-    qed
-  qed
-  show "Some x = x \<oplus> sep_algebra_class.u" using vstate_add_iff zero_mask_identity empty_heap_identity
-    by (smt (verit) EquiSemAuxLemma.vstate_u_structure(1) EquiSemAuxLemma.vstate_u_structure(2))
-  assume "stable_rel a x"
-  have "get_vh (stabilize_rel a x) = get_vh x"
-  proof (rule ext)
-    fix hl
-    have LHS: "get_vh (stabilize_rel a x) hl = (if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
-      by (meson EquiSemAuxLemma.vstate_stabilize_structure(2))
-    show "get_vh (stabilize_rel a x) hl = get_vh x hl"
-    proof (cases "get_vh x hl")
-      case None
-      then show ?thesis
-        using LHS by auto
-    next
-      case (Some v)
-      then have "get_vm x hl > 0 \<or> get_vm a hl > 0"
-        using EquiSemAuxLemma.stable_rel_imp \<open>stable_rel a x\<close> by blast
-      then show ?thesis
-        using LHS by auto
-    qed
-  qed
-  then show "stabilize_rel a x = x"
-    by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(1) core_is_smaller option.inject vstate_add_iff)
-next
-  fix a b x :: "'v virtual_state"
-  assume "a \<succeq> b"
-  have "get_vm (stabilize_rel a x) = get_vm (stabilize_rel b x)"
-    by (metis EquiSemAuxLemma.vstate_stabilize_structure(1))
-  then have "get_vm (stabilize_rel a x) \<succeq> get_vm (stabilize_rel b x)"
-    by (simp add: succ_refl)
-  moreover have "get_vh (stabilize_rel a x) \<succeq> get_vh (stabilize_rel b x)"
-  proof (rule greater_heap_rule)
-    fix hl v
-    assume "get_vh (stabilize_rel b x) hl = Some v"
-    then have "get_vh x hl = Some v"
-      by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) option.distinct(1))
-    have "\<not>(get_vm b hl = 0 \<and> get_vm x hl = 0)"
-      by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>get_vh (stabilize_rel b x) hl = Some v\<close> option.distinct(1))
-    then have "get_vm b hl > 0 \<or> get_vm x hl > 0"
-      by (simp add: not_gr_0)
-    then show "get_vh (stabilize_rel a x) hl = Some v"
-    proof
-      assume "get_vm b hl > 0"
-      then have "get_vm a hl > 0"
-      proof -
-        have "get_vm a \<succeq> get_vm b"
-          by (meson \<open>a \<succeq> b\<close> get_vm_additive greater_def)
-        then have "get_vm a hl \<succeq> get_vm b hl"
-          by (simp add: greaterE)
-        then obtain r where "Some (get_vm a hl) = get_vm b hl \<oplus> r"
-          using greater_def by auto
-        then have "get_vm a hl = get_vm b hl + r"
-          by (simp add: plus_preal_def)
-        then have "get_vm a hl \<ge> get_vm b hl"
-          by (metis add.right_neutral not_gr_0 order_le_less padd_mono)
-        then show ?thesis
-          using \<open>0 < get_vm b hl\<close> by auto
-      qed
-      then show ?thesis
-        by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>get_vh x hl = Some v\<close> not_gr_0)
-    next
-      assume "get_vm x hl > 0"
-      then show ?thesis
-        by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>get_vh x hl = Some v\<close> not_gr_0)
-    qed
-  qed
-  moreover have "\<And> (a :: 'v virtual_state) x. stabilize2pre a x = (get_vm (stabilize_rel a x), get_vh (stabilize_rel a x))"
-    by (simp add: EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) stabilize2pre_def)
-  ultimately have "stabilize2pre a x \<succeq> stabilize2pre b x" using greater_two_comp
-    by fastforce
-  then show "stabilize_rel a x \<succeq> stabilize_rel b x"
-    by (simp add: stabilize_rel_virtual_state_def stabilize_wf wf_greater_preserve)
-next
-  fix x a b y :: "'v virtual_state"
-  assume "Some x = a \<oplus> b"
-  have "Some (get_vm (stabilize_rel y x)) = get_vm (stabilize_rel y a) \<oplus> get_vm (stabilize_rel y b)"
-    by (metis EquiSemAuxLemma.vstate_stabilize_structure(1) \<open>Some x = a \<oplus> b\<close> get_vm_additive)
-  moreover have "Some (get_vh (stabilize_rel y x)) = get_vh (stabilize_rel y a) \<oplus> get_vh (stabilize_rel y b)"
-  proof (rule plus_funI)
-    fix hl
-    show "Some (get_vh (stabilize_rel y x) hl) = get_vh (stabilize_rel y a) hl \<oplus> get_vh (stabilize_rel y b) hl"
-    proof (cases "get_vm y hl = 0")
-      case True
-      then show ?thesis
-      proof (cases "get_vm a hl = 0 \<and> get_vm b hl = 0")
-        case True
-        then have "get_vm x hl = 0"
-          by (metis add_masks_def \<open>Some x = a \<oplus> b\<close> padd_pnone vstate_add_iff)
-        then show ?thesis
-          by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) True \<open>Some x = a \<oplus> b\<close> plus_funE plus_option.simps(1) vstate_add_iff)
-      next
-        case False
-        then have "get_vm a hl > 0 \<or> get_vm b hl > 0"
-          by (simp add: not_gr_0)
-        then show ?thesis
-        proof
-          assume "get_vm a hl > 0"
-          then have "get_vh a hl \<noteq> None"
-            using vstate_wf_imp by blast
-          moreover have plus_b: "Some (get_vh x hl) = get_vh a hl \<oplus> get_vh b hl"
-            using \<open>Some x = a \<oplus> b\<close> plus_funE vstate_add_iff by fastforce
-          ultimately have plus_None: "Some (get_vh x hl) = get_vh a hl \<oplus> None"
-            using val_option_sum by blast
-          have "get_vm x hl > 0" using \<open>get_vm a hl > 0\<close>
-            by (metis EquiViper.add_masks_def \<open>Some x = a \<oplus> b\<close> not_gr_0 padd_pos vstate_add_iff)
-          then have x_eq: "get_vh (stabilize_rel y x) hl = get_vh x hl"
-            by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-          moreover have a_eq: "get_vh (stabilize_rel y a) hl = get_vh a hl"
-            by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>0 < get_vm a hl\<close> not_gr_0)
-          ultimately show ?thesis
-          proof (cases "get_vm b hl > 0")
-            case True
-            then have "get_vh (stabilize_rel y b) hl = get_vh b hl"
-              by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-            then show ?thesis
-              using a_eq x_eq plus_b by auto
-          next
-            case False
-            then have "get_vh (stabilize_rel y b) hl = None"
-              by (meson EquiSemAuxLemma.vstate_stabilize_structure(2) True not_gr_0)
-            then show ?thesis
-              using a_eq plus_None x_eq by auto
-          qed
-        next
-          assume "get_vm b hl > 0"
-          then have "get_vh b hl \<noteq> None"
-            using vstate_wf_imp by blast
-          moreover have a_plus: "Some (get_vh x hl) = get_vh a hl \<oplus> get_vh b hl"
-            using \<open>Some x = a \<oplus> b\<close> plus_funE vstate_add_iff by fastforce
-          ultimately have None_plus: "Some (get_vh x hl) = None \<oplus> get_vh b hl"
-            by (metis commutative val_option_sum)
-          have "get_vm x hl > 0" using \<open>get_vm b hl > 0\<close>
-            by (metis EquiViper.add_masks_def \<open>Some x = a \<oplus> b\<close> commutative not_gr_0 padd_pos vstate_add_iff)
-          then have x_eq: "get_vh (stabilize_rel y x) hl = get_vh x hl"
-            by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-          moreover have b_eq: "get_vh (stabilize_rel y b) hl = get_vh b hl"
-            by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>0 < get_vm b hl\<close> not_gr_0)
-          ultimately show ?thesis
-          proof (cases "get_vm a hl > 0")
-            case True
-            then have "get_vh (stabilize_rel y a) hl = get_vh a hl"
-              by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-            then show ?thesis
-              using b_eq x_eq a_plus by auto
-          next
-            case False
-            then have "get_vh (stabilize_rel y a) hl = None"
-              by (meson EquiSemAuxLemma.vstate_stabilize_structure(2) True not_gr_0)
-            then show ?thesis
-              using b_eq None_plus x_eq by auto
-          qed
-        qed
-      qed
-    next
-      case False
-      then show ?thesis
-        by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) \<open>Some x = a \<oplus> b\<close> plus_funE vstate_add_iff)
-    qed
-  qed
-  ultimately show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    by (simp add: vstate_add_iff)
+  fix x y a b :: "'v virtual_state"
 
-  let ?ux = "stabilize_rel sep_algebra_class.u x"
-  let ?ua = "stabilize_rel sep_algebra_class.u a"
-  let ?ab = "stabilize_rel a b"
-  have "Some (get_vm ?ux) = get_vm ?ua \<oplus> get_vm ?ab"
-    by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(1) \<open>Some (get_vm (stabilize_rel y x)) = get_vm (stabilize_rel y a) \<oplus> get_vm (stabilize_rel y b)\<close>)
-  moreover have "Some (get_vh ?ux) = get_vh ?ua \<oplus> get_vh ?ab"
-  proof (rule plus_funI)
-    fix hl
-    show "Some (get_vh ?ux hl) = get_vh ?ua hl \<oplus> get_vh ?ab hl"
-    proof (cases "get_vm a hl > 0")
-      case True
-      then have "get_vh ?ab hl = get_vh b hl"
-        by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-      moreover have "get_vh ?ua hl = get_vh a hl"
-        by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(2) True not_gr_0)
-      moreover have "get_vh ?ux hl = get_vh x hl"
-        by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) EquiViper.add_masks_def True \<open>Some (get_vm ?ux) = get_vm ?ua \<oplus> get_vm ?ab\<close> not_gr_0 padd_pos)
-      ultimately show ?thesis
-        by (metis \<open>Some x = a \<oplus> b\<close> plus_funE vstate_add_iff)
-    next
-      case False
-      then have "get_vh ?ua hl = None"
-        by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(2) EquiSemAuxLemma.vstate_u_structure(1) not_gr_0 zero_mask_def)
-      then show ?thesis
-      proof (cases "get_vm b hl > 0")
-        case True
-        then have "get_vm x hl > 0"
-          by (metis EquiSemAuxLemma.vstate_stabilize_structure(1) EquiViper.add_masks_def \<open>Some (get_vm (stabilize_rel y x)) = get_vm (stabilize_rel y a) \<oplus> get_vm (stabilize_rel y b)\<close> commutative not_gr_0 padd_pos)
-        then have "get_vh ?ux hl = get_vh x hl"
-          by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(2) not_gr_0)
-        moreover have "get_vh ?ab hl = get_vh b hl"
-          by (metis EquiSemAuxLemma.vstate_stabilize_structure(2) False True)
-        moreover have "Some (get_vh x hl) = None \<oplus> get_vh b hl"
-        proof -
-          have "get_vh b hl \<noteq> None"
-            using True vstate_wf_imp by blast
-          then show ?thesis
-            by (metis \<open>Some x = a \<oplus> b\<close> commutative plus_funE val_option_sum vstate_add_iff)
-        qed
-        ultimately show ?thesis
-          using \<open>get_vh ?ua hl = None\<close> by auto
-      next
-        case False
-        then show ?thesis
-          by (smt (verit) EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) EquiSemAuxLemma.vstate_u_structure(1) EquiViper.add_masks_def \<open>get_vh ?ua hl = None\<close> add_0 calculation core_is_pure core_option.simps(1) not_gr_0 vstate_wf_imp zero_mask_def)
-      qed
-    qed
-  qed
-  ultimately show "Some (stabilize_rel sep_algebra_class.u x) = stabilize_rel sep_algebra_class.u a \<oplus> stabilize_rel a b"
-    by (simp add: vstate_add_iff)
+  show "sep_algebra_class.stable (stabilize x)"
+    by (simp add: EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) pperm_pnone_pgt stable_virtual_state_def restrict_map_def)
+  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
+    apply (rule virtual_state_ext)
+     apply (simp_all add: EquiSemAuxLemma.vstate_stabilize_structure stable_virtual_state_def)
+    apply (rule ext) 
+    by (metis core_option.cases eq_snd_iff mem_Collect_eq restrict_in restrict_out)
+  
+  show "Some x = stabilize x \<oplus> |x|"
+    sorry
+  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
+    apply (clarsimp simp add: vstate_add_iff EquiSemAuxLemma.vstate_stabilize_structure restrict_map_def)
+    apply (rule plus_funI)
+    apply (simp; safe; simp?)
+    sorry
+
+  show "Some x = a \<oplus> stabilize |b| \<Longrightarrow> x = a"
+    apply (clarsimp simp add: vstate_add_iff EquiSemAuxLemma.vstate_stabilize_structure
+           EquiSemAuxLemma.core_structure ValueAndBasicState.zero_mask_def)
+    sorry
 qed
 
 end
 
 
+lemma stable_rel_virtual_stateI:
+  assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
+  shows "stable_rel a x"
+  using assms
+  apply (clarsimp simp add: stable_rel_def stable_virtual_state_def)
+  sorry
+
+lemma stable_rel_virtual_stateE:
+  assumes "stable_rel a x"
+      and "get_vh x hl = Some v"
+    shows "get_vm x hl > 0 \<or> get_vm a hl > 0"
+  using assms apply (clarsimp simp add: stable_rel_def stable_virtual_state_def)
+(* This does not hold! But it also should not hold. If there is a contradiction between a and x, all locations become stable. *)
+  oops
+  (* by (metis assms option.discI stable_rel_virtual_state_def) *)
+
+(*
 datatype 'v ag_option = None_ag | Some_ag 'v
 
 type_synonym 'v ag_store = "nat \<Rightarrow> 'v val ag_option"
@@ -1748,6 +1537,6 @@ instance proof
 qed
 
 end
-
+*)
 
 end

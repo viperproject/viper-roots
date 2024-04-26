@@ -132,7 +132,7 @@ next
 next
   case (RedLet \<Delta> e1 \<omega> v1 e2 r)
   have s_not_change: "get_store (shift_and_add_equi_state \<omega> v1) = get_store (shift_and_add_equi_state \<omega>' v1)"
-    by (metis greater_state_has_greater_parts(1) neutral_smallest)
+    by (metis RedLet.prems(1) get_store_set_store set_store_def shift_and_add_equi_state_def)
   have v_not_change: "get_state (shift_and_add_equi_state \<omega> v1) = get_state (shift_and_add_equi_state \<omega>' v1)"
     by (simp add: RedLet.prems(2) shift_and_add_keep_vstate)
   have e1_eval_v1: "\<Delta> \<turnstile> \<langle>e1;\<omega>'\<rangle> [\<Down>] Val v1"
@@ -351,7 +351,7 @@ next
           a'_s: "get_store a' = get_store a"
       and a'_t: "get_trace a' = get_trace \<omega>'"
       and a'_v: "get_state a' = get_state a"      
-      by (metis full_add_defined option.discI u_neutral)
+      by (meson get_state_set_trace get_store_set_trace get_trace_set_trace)
     obtain b' where
           b'_s: "get_store b' = get_store b"
       and b'_t: "get_trace b' = (\<lambda>l. None)"
@@ -443,7 +443,7 @@ next
     moreover have "no_old_assertion A"
       using "6.prems"(2) by auto
     moreover have "get_store (shift_and_add_equi_state \<omega> v) = get_store (shift_and_add_equi_state \<omega>' v)"
-      by (metis greater_state_has_greater_parts(1) neutral_smallest)
+      by (metis "6.prems"(3) get_store_set_store set_store_def shift_and_add_equi_state_def)
     moreover have "get_state (shift_and_add_equi_state \<omega> v) = get_state (shift_and_add_equi_state \<omega>' v)"
       by (simp add: "6.prems"(4) shift_and_add_keep_vstate)
     ultimately show "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
@@ -460,7 +460,7 @@ next
   moreover have "no_old_assertion A"
     using "7.prems"(2) by auto
   moreover have "get_store (shift_and_add_equi_state \<omega> v) = get_store (shift_and_add_equi_state \<omega>' v)"
-    by (metis greater_state_has_greater_parts(1) neutral_smallest)
+    by (metis "7.prems"(3) get_store_set_store set_store_def shift_and_add_equi_state_def)
   moreover have "get_state (shift_and_add_equi_state \<omega> v) = get_state (shift_and_add_equi_state \<omega>' v)"
     by (simp add: "7.prems"(4) shift_and_add_keep_vstate)
   ultimately have "\<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega>' v\<rangle>"
