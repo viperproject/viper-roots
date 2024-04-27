@@ -1,5 +1,5 @@
 theory ExprWfRel
-imports ViperBoogieBasicRel ViperBoogieFunctionInst ExpRel Simulation TotalSemProperties
+imports ViperBoogieBasicRel ViperBoogieFunctionInst ExpRel Simulation TotalSemProperties ViperBoogieRelUtil
 begin
 
 subsection \<open>Semantic relation well-definedness\<close>
@@ -523,19 +523,23 @@ abbreviation wf_rel_old
             P ctxt"
 
 lemma old_expr_wf_rel:
-  assumes R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow>
+  (* assume ROld  holds implies  \<omega>_old = \<omega> \<lparr> \<rparr>  implies the current conclusion of this assumption *)
+  assumes ROld_implies_R: "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns.
+                               ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
+                               \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
+                               \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<Longrightarrow>
+                               R \<omega>def \<omega> ns"
+      and R_implies_ROld: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow>
                           (ROld
-                            (\<omega>def, \<omega>)
+                            (f \<omega>def \<omega>)
                             (\<omega>def \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
                             (\<omega> \<lparr> get_total_full := (the (get_trace_total \<omega> lbl)) \<rparr>)
                             ns \<and>
-                          expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>')"
-      and ROld_implies_R: "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
-                            R \<omega>def \<omega> ns"
+                          expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>')"
       and R_implies_trace_exists:"\<And> \<omega>def \<omega> ns.  R \<omega>def \<omega> ns \<Longrightarrow>
                                     get_trace_total \<omega>def lbl \<noteq> None \<and>
                                     get_trace_total \<omega> lbl \<noteq> None"
-  shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
+    shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
 proof (rule expr_wf_rel_intro)
   let ?IsNormal = "(\<lambda>\<omega>def \<omega>. \<exists>v. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t Val v))"
   let ?IsFailure = "(\<lambda>\<omega>def \<omega>. (ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>expr; \<omega>\<rangle> [\<Down>]\<^sub>t VFailure))"
@@ -553,18 +557,22 @@ proof (rule expr_wf_rel_intro)
       by(cases) simp
     let ?\<omega>_old = "\<omega> \<lparr> get_total_full := \<phi> \<rparr>"
     let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := \<phi> \<rparr>"
+    from trace_is_phi have \<omega>old_def:
+          "?\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl ) \<rparr> \<and>
+           ?\<omega>_old = \<omega> \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+      by simp
     from R R_implies_ROld trace_is_phi have
-      ROld_and_interior_expr_wf: "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
-             expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
-      by fastforce
+      ROld_and_interior_expr_wf: "ROld (f \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+             expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+      by force
     from old_judgement have is_normal: "?IsNormal ?\<omega>def_old ?\<omega>_old"
       by auto
     from is_normal ROld_and_interior_expr_wf obtain ns' where
-      ROld_ns': "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns'" and
+      ROld_ns': "ROld (f \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns'" and
       normal_termination: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
       using wf_rel_normal_elim
       by blast
-    from ROld_ns' ROld_implies_R have R_ns': "R \<omega>def \<omega> ns'" by simp
+    from ROld_ns' ROld_implies_R \<omega>old_def have R_ns': "R \<omega>def \<omega> ns'" by simp
     from normal_termination R_ns' show
       "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
       by auto
@@ -602,8 +610,8 @@ proof (rule expr_wf_rel_intro)
           hence "ctxt_vpr, StateCons, (Some ?\<omega>def_old) \<turnstile> \<langle>expr;?\<omega>_old\<rangle> [\<Down>]\<^sub>t VFailure" by simp
           hence is_failure: "?IsFailure ?\<omega>def_old ?\<omega>_old" by simp
           from R R_implies_ROld the_trace_is_phi have
-            ROld_and_interior_expr_wf: "ROld (\<omega>def, \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
-            expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+            ROld_and_interior_expr_wf: "ROld (f \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+            expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
             by fastforce
           from ROld_and_interior_expr_wf is_failure show ?conclusion
             using wf_rel_failure_elim
@@ -627,109 +635,77 @@ lemma old_expr_wf_rel_staterel:
            "\<And> \<omega>def \<omega> ns.
                 R \<omega>def \<omega> ns = state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and ROld_is_state_rel:
-           "\<And> \<omega>def \<omega> \<omega>def_old \<omega>_old ns.
-              ROld
-                (\<omega>def, \<omega>)
-                \<omega>def_old
-                \<omega>_old
-                ns =
-                (\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
-                (\<omega>_old    = \<omega> \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
-                state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns"
+           "\<And> (\<omega>def :: 'a full_total_state)
+               (\<omega>   :: 'a full_total_state)
+               (\<omega>def_old :: 'a full_total_state)
+               (\<omega>_old :: 'a full_total_state)
+               ns .
+                ROld
+                  (f \<omega>def \<omega>)
+                  \<omega>def_old
+                  \<omega>_old
+                  ns =
+                  \<comment>\<open>will have to change AuxPred here\<close>
+                  state_rel Pr StateCons TyRep Tr'
+                          (AuxPred 
+                            (m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)
+                            (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>))
+                            ctxt \<omega>def_old \<omega>_old ns"
       and label_hm_translation: "label_hm_translation Tr = lbls"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
+      and mh: "m = mask_var Tr \<and> h = heap_var Tr"
       and Tr': "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM \<rparr>"
+      (* TODO weaken these assumptions *)
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
 proof (rule old_expr_wf_rel)
-  show "\<And>\<omega>def \<omega> ns.
-           R \<omega>def \<omega> ns \<Longrightarrow>
-           ROld (\<omega>def, \<omega>)
-                (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-                (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-                ns \<and>
-       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+  fix \<omega>def \<omega> ns
+  show "\<And> \<omega>def_old \<omega>_old.
+       ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
+       \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr> \<and>
+       \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr> \<Longrightarrow>
+       R \<omega>def \<omega> ns"
   proof -
-    fix \<omega>def \<omega> ns
-    assume "R \<omega>def \<omega> ns"
-    from R_is_state_rel this have
-      "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      by simp
-    hence state_rel0: "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr AuxPred \<omega>def \<omega> ns"
-      using state_rel_def
-      by fast
-    let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
-    let ?\<omega>_old    = "\<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
-    have "state_rel0 Pr StateCons (type_interp ctxt) (var_context ctxt) TyRep Tr' AuxPred ?\<omega>def_old ?\<omega>_old ns"
-      using state_rel_state_rel0 ROld_is_state_rel
-      by fast
-    hence state_rel_\<omega>_old: "state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
-      using state_rel_def
-      by fast
-    hence "ROld (\<omega>def, \<omega>)
-               (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-               (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-               ns"
-      using ROld_is_state_rel
-      by simp
-    hence ROld: "ROld (\<omega>def, \<omega>)
-               (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-               (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-               ns"
-      by simp
-    have expr_wf_rel: "expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
-    proof (rule  wf_rel_intro)
-      show "\<And>\<omega>defa \<omega>' ns.
-       ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns \<Longrightarrow>
-       \<exists>v. ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
-       \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns'"
-      proof -
-        fix \<omega>defa \<omega>' ns
-        assume "ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns"
-        from ROld_is_state_rel this have
-          "(?\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
-           (?\<omega>_old    = \<omega> \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>) \<and>
-           state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
-          by simp
-        thus "\<exists>v. ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t Val v \<Longrightarrow>
-         \<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns'"
-          (* TODO make this more explicit *)
-          by (metis OldM Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-      qed
-      show " \<And>\<omega>defa \<omega>' ns.
-       ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns \<Longrightarrow>
-       ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure \<Longrightarrow>
-       \<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
-      proof -
-        fix \<omega>defa \<omega>' ns
-        assume "ROld (\<omega>def, \<omega>) \<omega>defa \<omega>' ns" and
-               "ctxt_vpr, StateCons, Some \<omega>defa \<turnstile> \<langle>expr;\<omega>'\<rangle> [\<Down>]\<^sub>t VFailure"
-        show "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure" 
-          (* TODO make this more explicit *)
-          by (smt (verit) OldM Tr' UnCI state_rel_\<omega>_old label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-      qed
-    qed
-    from expr_wf_rel ROld show "ROld (\<omega>def, \<omega>) (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-        (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns \<and>
-       expr_wf_rel (ROld (\<omega>def, \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
-      by simp
+    fix \<omega>def_old \<omega>_old
+    assume ROld: "ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns"
+       and \<omega>_old: "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
+                   \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+    (* somehow able to derive a contradiction here *)
+    have "False"
+      by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+    thm state_rel_capture_current_mask
+    thm state_rel_capture_total_state_change_eval_state
+    thm aux_vars_pred_sat_def
   qed
-  show "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns. ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow> R \<omega>def \<omega> ns"
+  show "R \<omega>def \<omega> ns \<Longrightarrow>
+           ROld (f \<omega>def \<omega>)
+                (\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+                (\<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
+                ns \<and>
+       expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
   proof -
-    fix \<omega>def \<omega> \<omega>def_old \<omega>_old ns
-    assume "ROld (\<omega>def, \<omega>) \<omega>def_old \<omega>_old ns"
-    from ROld_is_state_rel this have
-      "state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def_old \<omega>_old ns \<and>
-      \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
-      \<omega>_old = \<omega> \<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
-      by simp
-    hence "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      using state_rel_def
-      (* TODO clear this up *)
-      by (metis UnI1 assms(4) assms(6) heap_var_disjoint label_hm_translation ranI tr_vpr_bpl.simps(1) tr_vpr_bpl.simps(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-    thus "R \<omega>def \<omega> ns"
+    assume R: "R \<omega>def \<omega> ns"
+    hence state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       using R_is_state_rel
       by simp
+    have "False"
+      by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+    have "state_rel Pr StateCons TyRep Tr
+             (AuxPred(OldM \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt OldM \<omega>))
+             ctxt \<omega>def \<omega> ns"
+    proof (rule state_rel_capture_current_mask)
+      show "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+        using state_rel
+        by simp
+      show "type_interp ctxt = vbpl_absval_ty TyRep"
+        using state_rel state_rel_type_interp
+        by fast
+      show "lookup_var_ty (var_context ctxt) OldM = Some (TConSingle (TMaskId TyRep))"
+        using ROld ROld_is_state_rel Tr' state_rel_obtain_mask
+        by fastforce
+      show "lookup_var (var_context ctxt) ns OldM = lookup_var (var_context ctxt) ns (mask_var Tr)"
+        by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
+    qed
   qed
   show "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
   proof -
@@ -747,7 +723,6 @@ proof (rule old_expr_wf_rel)
            label_rel ?P ?LabelMap ?\<omega>_trace_total ns"
       using label_hm_rel_def
       by fast
-    thm label_rel_def
     hence LabelMap_implies_Some: "(\<forall> lbl h. ?LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega>) lbl = Some \<phi> \<and> ?P h \<phi> ns))"
       using label_rel_def
       by meson
