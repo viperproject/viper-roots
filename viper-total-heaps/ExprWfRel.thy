@@ -667,6 +667,7 @@ proof (rule old_expr_wf_rel)
        R \<omega>def \<omega> ns"
   proof -
     fix \<omega>def_old \<omega>_old
+    (* First assumption added here *)
     assume ROld: "ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns"
        and \<omega>_old: "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
                    \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
@@ -684,10 +685,12 @@ proof (rule old_expr_wf_rel)
                 ns \<and>
        expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
   proof -
+    (* Second assumption: assume R *)
     assume R: "R \<omega>def \<omega> ns"
     hence state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       using R_is_state_rel
       by simp
+    (* this also leads to a contradiction *)
     have "False"
       by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
     have "state_rel Pr StateCons TyRep Tr
