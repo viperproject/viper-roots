@@ -55,6 +55,20 @@ lemma get_state_set_state [simp] :
   "get_state (set_state \<omega> st) = st"
   by (simp add:get_state_def set_state_def)
 
+lemma get_store_stabilize[simp]:
+  "get_store (stabilize \<omega>) = get_store \<omega>"
+  by (metis agreement.collapse fst_conv get_store_def stabilize_ag stabilize_prod_def)
+lemma set_store_stabilize[simp]:
+  "set_store (stabilize \<omega>) s = stabilize (set_store \<omega> s)"
+  by (simp add: get_state_def get_trace_def set_store_def stabilize_ag stabilize_prod_def)
+lemma get_trace_stabilize[simp]:
+  "get_trace (stabilize \<omega>) = get_trace \<omega>"
+  by (metis agreement.collapse fst_conv get_trace_def snd_conv stabilize_ag stabilize_prod_def)
+lemma set_trace_stabilize[simp]:
+  "set_trace (stabilize \<omega>) t = stabilize (set_trace \<omega> t)"
+  by (metis (no_types, lifting) fst_conv get_state_def get_store_stabilize set_trace_def snd_conv stabilize_ag stabilize_prod_def)
+
+
 (*
 lemma pcm_agreement_compatible:
   fixes a :: "('v  :: pcm_agreement) ag_store"
