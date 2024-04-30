@@ -1290,19 +1290,89 @@ proof -
 qed
 
 lemma state_rel_capture_total_state_change_eval_and_def_state:
-  assumes AuxPred': "AuxPred' = (\<lambda>\<omega> \<omega>def.(AuxPred 
-                            (mdef \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>def)
-                            (hdef \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt hdef \<omega>def)
-                            (m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>)                    
-                            (h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>)
-                            ))"
-      and StateRel: "state_rel Pr StateCons TyRep Tr' (AuxPred' \<omega>def0 \<omega>0) ctxt \<omega>def \<omega> ns"      
-      and "{m,mdef} \<inter> {h,hdef} = {}"
+  assumes AuxPred': "AuxPred' = AuxPred 
+                            (mdef \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt mdef \<omega>def0)
+                            (hdef \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt hdef \<omega>def0)
+                            (m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m (\<omega>0 :: 'a full_total_state))                    
+                            (h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>0)"
+      and StateRel: "state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega>def \<omega> ns"
+      and MaskRelEquiv: "mdef = m \<Longrightarrow> (\<And>mb :: 'a bpl_mask_ty.  
+                                             (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>0)  mb) =
+                                             (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def0) mb))"
+      and HeapRelEquiv: "hdef = h \<Longrightarrow> (\<And>hb :: 'a bpl_heap_ty.  
+                                             (pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>0 hb =
+                                              pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>def0 hb) \<and>
+                                             (total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>0) =
+                                              total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def0)))"
+      and DisjMaskHeap: "{m,mdef} \<inter> {h,hdef} = {}"
       and "FieldTr0 = field_translation Tr"
-      and DisjAuxPred: "{m,h,m,mdef} \<inter> dom AuxPred = {}"
+      and DisjAuxPred: "{m,h,mdef,hdef} \<inter> dom AuxPred = {}"
       and "Tr = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := mdef, heap_var_def := hdef\<rparr>"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def0 \<omega>0 ns"
-  sorry
+proof -
+  from state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=m] DisjMaskHeap
+  obtain mb where LookupMask: "lookup_var (var_context ctxt) ns m = Some (AbsV (AMask mb))" and
+                  LookupVarTyMask: "lookup_var_ty (var_context ctxt) m = Some (TConSingle (TMaskId TyRep))" and
+                  MaskRel: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>0) mb"
+    using \<open>FieldTr0 = _\<close> \<open>AuxPred' =_\<close>
+    unfolding pred_eq_mask_def 
+    by auto
+
+  from state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=h] DisjMaskHeap
+  obtain hb where LookupVarTyHeap: "lookup_var_ty (var_context ctxt) h = Some (TConSingle (THeapId TyRep))" and
+                  LookupHeap: "lookup_var (var_context ctxt) ns h = Some (AbsV (AHeap hb))" and
+                  PredEqHeapAux: "pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>0 hb" and
+                  TotalHeapWellTy: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>0)"
+    using \<open>FieldTr0 = _\<close> \<open>AuxPred' =_\<close>
+    unfolding pred_eq_heap_def \<open>Tr = _\<close> 
+    by auto  
+
+  obtain mbdef where 
+              LookupMaskDef: "lookup_var (var_context ctxt) ns mdef = Some (AbsV (AMask mbdef))" and
+              LookupVarTyMaskDef: "lookup_var_ty (var_context ctxt) mdef = Some (TConSingle (TMaskId TyRep))" and
+              MaskRelDef: "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def0) mbdef" 
+  proof (cases "mdef = m")
+    case True
+    with that[where ?mbdef = mb] show ?thesis 
+      using LookupMask LookupVarTyMask MaskRel MaskRelEquiv
+      by fast
+  next
+    case False
+    hence Pred: "AuxPred' mdef = Some (pred_eq_mask Pr TyRep FieldTr0 ctxt mdef \<omega>def0)"
+      using \<open>AuxPred' =_\<close> DisjMaskHeap
+      by simp
+    with that state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=mdef, OF Pred] 
+    show ?thesis
+      using \<open>FieldTr0 = _\<close>
+      unfolding pred_eq_mask_def 
+      by blast
+  qed
+      
+  obtain hbdef where 
+        LookupVarTyHeapDef: "lookup_var_ty (var_context ctxt) hdef = Some (TConSingle (THeapId TyRep))" and
+        LookupHeapDef: "lookup_var (var_context ctxt) ns hdef = Some (AbsV (AHeap hbdef))" and
+        PredEqHeapAuxDef: "pred_eq_heap_aux Pr TyRep (field_translation Tr) \<omega>def0 hbdef" and
+        TotalHeapWellTyDef: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def0)"
+  proof (cases "hdef = h")
+    case True
+    with that[where ?hbdef = hb, simplified True, OF LookupVarTyHeap LookupHeap] show ?thesis 
+      using LookupVarTyHeap LookupHeap PredEqHeapAux TotalHeapWellTy HeapRelEquiv
+      by auto      
+  next
+    case False
+    hence Pred: "AuxPred' hdef = Some (pred_eq_heap Pr TyRep FieldTr0 ctxt hdef \<omega>def0)"
+      using \<open>AuxPred' =_\<close> DisjMaskHeap
+      by simp
+    with that state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=hdef, OF Pred] 
+    show ?thesis
+      using \<open>FieldTr0 = _\<close>
+      unfolding pred_eq_heap_def 
+      by blast
+  qed
+
+  show ?thesis
+    sorry \<comment>\<open>don't prove this for now, we first need to make sure the clients can use the lemma\<close>
+qed
 
 lemma state_rel_capture_total_state_change_eval_state_alt:
   assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' FieldTr0 AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
@@ -1316,9 +1386,9 @@ proof (rule state_rel_capture_total_state_change_eval_and_def_state[where ?mdef=
                                                               and ?\<omega>def = \<omega>def and ?\<omega> = \<omega> and ?Tr' = Tr' ], 
        simp)
   from StateRel 
-  show "state_rel Pr StateCons TyRep Tr' (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>def, h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>def)) ctxt
-     \<omega>def \<omega> ns"
-    by (simp add: aux_pred_capture_state_def \<open>\<omega>0 = \<omega>def\<close>)
+  show " state_rel Pr StateCons TyRep Tr' (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>0, h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>0)) ctxt \<omega>def
+     \<omega> ns"
+    by (simp add: aux_pred_capture_state_def)    
 qed (insert assms, auto)
 
 lemma state_rel_capture_total_state_change_eval_state:
