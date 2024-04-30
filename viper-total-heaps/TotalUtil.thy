@@ -756,6 +756,18 @@ lemma map_upds_distinct_rev:
   apply simp
   by (metis distinct_rev length_rev map_fst_zip map_of_inject_set set_rev zip_rev)
 
+lemma ran_map_upd_subset: "ran (m(x \<mapsto> y)) \<subseteq> ran m \<union> {y}"
+proof
+  fix y1
+  assume "y1 \<in> ran (m(x \<mapsto> y))"
+  from this obtain x1 where "(m(x \<mapsto> y)) x1 = Some y1"
+    unfolding ran_def
+    by blast
+
+  thus "y1 \<in> ran m \<union> {y}"
+    by (metis UnI1 UnI2 map_upd_Some_unfold ranI singletonI)
+qed
+
 subsection \<open>Distinct\<close>
 
 lemma distinct_map_inj_on_subset:
