@@ -1289,6 +1289,38 @@ proof -
     by blast
 qed
 
+lemma state_rel_capture_total_state_change_eval_and_def_state:
+  assumes AuxPred': "AuxPred' = (\<lambda>\<omega> \<omega>def.(AuxPred 
+                            (mdef \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>def)
+                            (hdef \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt hdef \<omega>def)
+                            (m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>)                    
+                            (h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>)
+                            ))"
+      and StateRel: "state_rel Pr StateCons TyRep Tr' (AuxPred' \<omega>def0 \<omega>0) ctxt \<omega>def \<omega> ns"      
+      and "{m,mdef} \<inter> {h,hdef} = {}"
+      and "FieldTr0 = field_translation Tr"
+      and DisjAuxPred: "{m,h,m,mdef} \<inter> dom AuxPred = {}"
+      and "Tr = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := mdef, heap_var_def := hdef\<rparr>"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def0 \<omega>0 ns"
+  sorry
+
+lemma state_rel_capture_total_state_change_eval_state_alt:
+  assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' FieldTr0 AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
+      and "m \<noteq> h"
+      and "FieldTr0 = field_translation Tr"
+      and DisjAuxPred: "{m,h} \<inter> dom AuxPred = {}"
+      and "\<omega>0 = \<omega>def"
+      and "Tr = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := m, heap_var_def := h\<rparr>"
+    shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega>0 ns"
+proof (rule state_rel_capture_total_state_change_eval_and_def_state[where ?mdef=m and ?hdef = h and ?m = m and ?h =h 
+                                                              and ?\<omega>def = \<omega>def and ?\<omega> = \<omega> and ?Tr' = Tr' ], 
+       simp)
+  from StateRel 
+  show "state_rel Pr StateCons TyRep Tr' (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>def, h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>def)) ctxt
+     \<omega>def \<omega> ns"
+    by (simp add: aux_pred_capture_state_def \<open>\<omega>0 = \<omega>def\<close>)
+qed (insert assms, auto)
+
 lemma state_rel_capture_total_state_change_eval_state:
   assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' FieldTr0 AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
       and "m \<noteq> h"
