@@ -56,12 +56,15 @@ proof -
   let ?A = "type_interp ctxt"
   let ?FieldTr = "field_translation Tr"
   let ?FieldTr' = "field_translation Tr'"
+  have FieldTr_is_FieldTr': "?FieldTr = ?FieldTr'"
+    using Tr'
+    by simp
   let ?m = "mask_var Tr"
   let ?\<omega>_trace_total = "get_trace_total \<omega>"
   let ?Tr_heap_labels = "fst (label_hm_translation Tr)"
   let ?Tr_mask_labels = "snd (label_hm_translation Tr)"
-  let ?Tr'_heap_labels = "fst f"
-  let ?Tr'_mask_labels = "snd f"
+  let ?Tr'_heap_labels = "fst (label_hm_translation Tr')"
+  let ?Tr'_mask_labels = "snd (label_hm_translation Tr')"
   from StateRel obtain mask_value where
     lookup_var: "lookup_var ?\<Lambda> ns ?m = Some (AbsV (AMask mask_value))" and
     lookup_var_type: "lookup_var_ty ?\<Lambda> ?m = Some (TConSingle (TMaskId TyRep))"
@@ -233,14 +236,15 @@ proof -
       by (metis (no_types, lifting) DisjAux StateRel Sup_insert Tr' UnCI insertCI list.simps(15) mask_var_rel_stable state_rel_mask_var_def_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
     
     show "field_rel Pr ?\<Lambda> ?FieldTr' ?ns'"
-    proof -
+      unfolding field_rel_def
+    proof (intro conjI)
       have field_tr_equal: "?FieldTr' = ?FieldTr"
         using Tr'
         by simp
-      have sg1: "inj_on ?FieldTr' (dom ?FieldTr)"
+      show "inj_on ?FieldTr' (dom ?FieldTr')"
         using StateRel field_rel_def state_rel_field_rel field_tr_equal
         by metis
-      have sg2: "(\<forall>f f_vty.
+      show "(\<forall>f f_vty.
         declared_fields Pr f = Some f_vty \<longrightarrow>
         has_Some
          (\<lambda>f_bpl.
@@ -290,10 +294,6 @@ proof -
               has_Some (\<lambda>f_bpl. lookup_var ?\<Lambda> ?ns' f_bpl = Some (AbsV (AField (NormalField f_bpl f_vty)))) (?FieldTr' f))"
           by simp
       qed
-      show "field_rel Pr ?\<Lambda> ?FieldTr' ?ns'"
-        unfolding field_rel_def
-        using sg1 sg2 field_tr_equal
-        by simp
     qed
 
     show "boogie_const_rel (const_repr Tr') ?\<Lambda> ?ns'"
@@ -352,51 +352,53 @@ proof -
     qed
 
     show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr' (label_hm_translation Tr') ?\<omega>_trace_total ?ns'"
-    proof -
+      unfolding label_hm_rel_def
+    proof (intro conjI)
       let ?HeapPred =  "\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>)"
-      have label_rel_heap: "label_rel ?HeapPred ?Tr'_heap_labels ?\<omega>_trace_total ?ns'"
+      let ?HeapPred' =  "\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr' h (get_hh_total \<phi>)"
+      show "label_rel ?HeapPred' ?Tr'_heap_labels ?\<omega>_trace_total ?ns'"
       proof -
-        have label_rel: "label_rel ?HeapPred (fst (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
-          using StateRel label_hm_rel_def state_rel_label_hm_rel
-          by fast
-        have "\<And> l h. ?Tr'_heap_labels l = Some h \<Longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ?ns')"
+        have "label_rel ?HeapPred (fst (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
+          using StateRel Tr'
+          by (simp add: label_hm_rel_def state_rel0_def state_rel_def)
+        hence label_rel: "label_rel ?HeapPred' ?Tr_heap_labels (get_trace_total \<omega>) ns"
+          using FieldTr_is_FieldTr'
+          by simp
+        have "\<And> l h. ?Tr_heap_labels l = Some h \<Longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ?ns')"
         proof -
           fix l h
-          assume l_in_heap: "?Tr'_heap_labels l = Some h"
-          show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ?ns'"
+          assume l_in_heap: "?Tr_heap_labels l = Some h"
+          show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ?ns'"
           proof (cases)
             assume l_is_lbl: "l = lbl"
             have sg1: "?\<omega>_trace_total l = Some \<phi>"
               using l_is_lbl trace_defined
               by simp
-            have sg2: "?HeapPred h \<phi> ?ns'"
-            proof -
-              have "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ?ns'"
-                by (metis (mono_tags, lifting) DisjAux Sup_insert UnCI f fst_conv heap_var_rel_stable l_in_heap l_is_lbl label_rel label_rel_def list.simps(15) option.sel ranI trace_defined update_var_other vars_label_hm_tr_def)
-              thus "?HeapPred h \<phi> ?ns'"
-                by simp
-            qed
-            show "(\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ?ns')"
+            have "?HeapPred h \<phi> ns"
+              by (metis (mono_tags, lifting) FieldTr_is_FieldTr' l_in_heap l_is_lbl label_rel label_rel_def option.sel trace_defined)
+            hence sg2: "?HeapPred' h \<phi> ?ns'"
+              by (metis (no_types, lifting) DisjAux FieldTr_is_FieldTr' Sup_insert UnCI heap_var_rel_def l_in_heap list.simps(15) ranI update_var_opt_other update_var_update_var_opt vars_label_hm_tr_def)
+            show "(\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ?ns')"
               using sg1 sg2
               by simp
           next
             assume l_is_not_lbl: "l \<noteq> lbl"
-            have label_rel_contents: "(\<forall> l h. ?Tr_heap_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ns))"
+            have label_rel_contents: "(\<forall> l h. ?Tr_heap_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ns))"
               using label_rel label_rel_def
               by meson
             have tr_heap_labels_defined: "?Tr_heap_labels l = Some h"
-              using l_in_heap f
+              using l_in_heap f Tr'
               by simp
             obtain \<phi> where
-              sg1: "?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ns"
+              sg1: "?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ns"
               using label_rel_contents tr_heap_labels_defined
               by fast
-            have sg2: "?HeapPred h \<phi> ?ns'"
+            have sg2: "?HeapPred' h \<phi> ?ns'"
             proof -
-              have "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ?ns'"
+              have "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr' h (get_hh_total \<phi>) ?ns'"
               proof -
                 have h_is_not_old_m: "h \<noteq> old_m"
-                  by (metis DisjAux Sup_insert UnCI f l_in_heap list.simps(15) prod.sel(1) ranI vars_label_hm_tr_def)
+                  by (metis (mono_tags, opaque_lifting) DisjAux Sup_insert UnCI list.simps(15) ranI tr_heap_labels_defined vars_label_hm_tr_def)
                 obtain hb where lookup_var: "lookup_var ?\<Lambda> ?ns' h = Some (AbsV (AHeap hb))"
                   by (metis h_is_not_old_m heap_var_rel_def sg1 update_var_other)
                 have lookup_var_ty: "lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep))"
@@ -404,80 +406,79 @@ proof -
                   by fast
                 have vbpl_absval_ty_opt: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])"
                   by (metis Semantics.val.inject(2) h_is_not_old_m heap_var_rel_def lookup_var option.sel sg1 update_var_other)
-                have heap_rel: "heap_rel Pr ?FieldTr (get_hh_total \<phi>) hb"
+                have heap_rel: "heap_rel Pr ?FieldTr' (get_hh_total \<phi>) hb"
                   by (metis Semantics.val.inject(2) h_is_not_old_m heap_var_rel_def lookup_var option.sel sg1 update_var_other vbpl_absval.simps(4))
                 have total_heap_well_typed: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total \<phi>)"
                   using heap_var_rel_def sg1 by blast
-                show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ?ns'"
+                show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr' h (get_hh_total \<phi>) ?ns'"
                   using lookup_var lookup_var_ty vbpl_absval_ty_opt heap_rel total_heap_well_typed heap_var_rel_def
-                  by fast
+                  by blast
               qed
-              thus "?HeapPred h \<phi> ?ns'"
+              thus "?HeapPred' h \<phi> ?ns'"
+                using Tr'
                 by simp
             qed
-            show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ?ns'"
+            show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ?ns'"
               using sg1 sg2
               by simp
           qed
         qed
-        hence "\<forall>l h. ?Tr'_heap_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred h \<phi> ?ns')"
+        hence "\<forall>l h. ?Tr'_heap_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?HeapPred' h \<phi> ?ns')"
+          using Tr' f
           by simp
-        thus "label_rel ?HeapPred ?Tr'_heap_labels ?\<omega>_trace_total ?ns'"
-          using label_rel_def
-          by blast
+        thus "label_rel ?HeapPred' ?Tr'_heap_labels ?\<omega>_trace_total ?ns'"
+          unfolding label_rel_def
+          by simp
       qed
- 
       let ?MaskPred = "\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)"
-      have label_rel_mask: "label_rel ?MaskPred ?Tr'_mask_labels ?\<omega>_trace_total ?ns'"
+      let ?MaskPred' = "\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr' m (get_mh_total \<phi>)"
+      show "label_rel ?MaskPred' ?Tr'_mask_labels ?\<omega>_trace_total ?ns'"
       proof -
-        have label_rel: "label_rel ?MaskPred ?Tr_mask_labels ?\<omega>_trace_total ns"
+        have "label_rel ?MaskPred ?Tr_mask_labels ?\<omega>_trace_total ns"
           using StateRel label_hm_rel_def state_rel_label_hm_rel
-          by fast
-        have "\<And> l h. ?Tr'_mask_labels l = Some h \<Longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred h \<phi> ?ns')"
+          by blast
+        hence label_rel: "label_rel ?MaskPred ?Tr_mask_labels ?\<omega>_trace_total ns"
+          using FieldTr_is_FieldTr'
+          by simp
+        have "\<And> l h. ?Tr'_mask_labels l = Some h \<Longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' h \<phi> ?ns')"
         proof -
           fix l m
           assume l_in_mask: "?Tr'_mask_labels l = Some m"
-          show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred m \<phi> ?ns'"
+          show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' m \<phi> ?ns'"
           proof (cases)
             assume l_is_lbl: "l = lbl"
             have sg1: "?\<omega>_trace_total l = Some \<phi>"
               using l_is_lbl trace_defined
               by simp
-            have sg2: "?MaskPred m \<phi> ?ns'"
+            have sg2: "?MaskPred' m \<phi> ?ns'"
               using l_in_mask l_is_lbl f lbl_not_previously_defined
-              by (metis StateRel fun_upd_same get_mh_total_full.simps lookup_var mask_var_rel_def old_m_type option.sel sndI state_rel_obtain_mask trace_defined update_var_same)
-            show "(\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred m \<phi> ?ns')"
+              by (metis (no_types, lifting) FieldTr_is_FieldTr' StateRel Tr' fun_upd_same get_mh_total_full.simps lookup_var mask_var_rel_def old_m_type option.sel snd_conv state_rel_obtain_mask tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) trace_defined update_var_same)
+            show "(\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' m \<phi> ?ns')"
               using sg1 sg2
               by simp
           next
             fix \<phi>
             assume l_is_not_lbl: "l \<noteq> lbl"
-            have label_rel_contents: "(\<forall> lbl m. ?Tr_mask_labels lbl = Some m \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total lbl = Some \<phi> \<and> ?MaskPred m \<phi> ns))"
-              using label_rel label_rel_def
-              by meson
+            have label_rel_contents: "(\<forall> lbl m. ?Tr_mask_labels lbl = Some m \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total lbl = Some \<phi> \<and> ?MaskPred' m \<phi> ns))"
+              using label_rel label_rel_def FieldTr_is_FieldTr'
+              by (metis (mono_tags, lifting))
             have tr_mask_labels_defined: "?Tr_mask_labels l = Some m"
-              using l_in_mask f l_is_not_lbl
+              using l_in_mask f l_is_not_lbl Tr'
               by simp
             obtain \<phi> where
-              sg1: "?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred m \<phi> ns"
+              sg1: "?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' m \<phi> ?ns'"
               using label_rel_contents tr_mask_labels_defined
-              by fast
-            have sg2: "?MaskPred m \<phi> ?ns'"
-              by (metis (mono_tags, lifting) DisjAux Sup_insert UnCI list.simps(15) mask_var_rel_stable ranI sg1 tr_mask_labels_defined update_var_opt_apply update_var_update_var_opt vars_label_hm_tr_def)
-            show "\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred m \<phi> ?ns'"
-              using sg1 sg2
+              by (metis (mono_tags, lifting) DisjAux Sup_insert UnCI list.simps(15) mask_var_rel_stable ranI update_var_other vars_label_hm_tr_def)
+            thus "(\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' m \<phi> ?ns')"
+              using sg1
               by simp
           qed
         qed
-        hence "\<forall> l h. ?Tr'_mask_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred h \<phi> ?ns')" by simp
-        thus "label_rel ?MaskPred ?Tr'_mask_labels ?\<omega>_trace_total ?ns'"
+        hence "\<forall> l h. ?Tr'_mask_labels l = Some h \<longrightarrow> (\<exists>\<phi>. ?\<omega>_trace_total l = Some \<phi> \<and> ?MaskPred' h \<phi> ?ns')" by simp
+        thus "label_rel ?MaskPred' ?Tr'_mask_labels ?\<omega>_trace_total ?ns'"
           using label_rel_def
           by blast
       qed
-      show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr' (label_hm_translation Tr') (get_trace_total \<omega>) ?ns'"
-        unfolding label_hm_rel_def
-        using Tr' label_rel_heap label_rel_mask
-        by (simp)
     qed
 
     show "valid_heap_mask (get_mh_total_full \<omega>def)"
