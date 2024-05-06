@@ -53,8 +53,6 @@ locale semantics =
   fixes set_value :: "'a \<Rightarrow> 'r \<Rightarrow> 'v \<Rightarrow> 'a"
   fixes well_typed_heap :: "('r \<rightharpoonup> 'v abs_vtyp) \<Rightarrow> 'a \<Rightarrow> bool"
 
-
-
 (* Axioms
 - TODO: Add smth about has_value
 *)
@@ -290,7 +288,7 @@ lemma mono_and_Stable_then_self_framing:
     shows "self_framing A"
 proof -
   have "Stabilize A \<subseteq> A"
-  proof 
+  proof
     fix x assume "x \<in> Stabilize A"
     moreover have "x \<succeq> stabilize x"
       using max_projection_prop_stable_stabilize mpp_smaller by auto
