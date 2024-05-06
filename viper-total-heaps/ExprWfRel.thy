@@ -523,8 +523,9 @@ abbreviation wf_rel_old
             P ctxt"
 
 lemma old_expr_wf_rel:
-  (* assume ROld  holds implies  \<omega>_old = \<omega> \<lparr> \<rparr>  implies the current conclusion of this assumption *)
   assumes ROld_implies_R: "\<And>\<omega>def \<omega> \<omega>def_old \<omega>_old ns.
+                               \<comment>\<open>the first premise gives us information from the state relation that does not depend on the Boogie state\<close>
+                               (\<exists>ns'. R \<omega>def \<omega> ns') \<Longrightarrow> 
                                ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
                                \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
                                \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<Longrightarrow>
@@ -572,7 +573,9 @@ proof (rule expr_wf_rel_intro)
       normal_termination: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns')"
       using wf_rel_normal_elim
       by blast
-    from ROld_ns' ROld_implies_R \<omega>old_def have R_ns': "R \<omega>def \<omega> ns'" by simp
+    from ROld_ns' ROld_implies_R \<omega>old_def have R_ns': "R \<omega>def \<omega> ns'" 
+      using R 
+      by blast
     from normal_termination R_ns' show
       "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R \<omega>def \<omega> ns'"
       by auto
@@ -630,114 +633,290 @@ proof (rule expr_wf_rel_intro)
   qed
 qed
 
+
+\<comment>\<open>You could split this theorem into two (one for m and one for h), I proved it here (except for one sorry) to show 
+  how it can be done concisely. Also: This theorem should be moved to ViperBoogieBasicRel.thy\<close>
+
+lemma state_rel_add_label:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" 
+      and "lbls = label_hm_translation Tr"
+      and "lbls' = (((fst lbls)(lbl \<mapsto> h)), ((snd lbls)(lbl \<mapsto> m)))"
+      and LabelExists: "get_trace_total \<omega> lbl = Some \<phi>"
+      and HeapRel: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
+      and MaskRel: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>) ns"
+      and Disj: "{m,h} \<inter>  ( {heap_var Tr, heap_var_def Tr} \<union>
+                                      {mask_var Tr, mask_var_def Tr} \<union>
+                                       ran (var_translation Tr) \<union>
+                                       ran (field_translation Tr) \<union>
+                                       range (const_repr Tr) \<union>
+                                       dom AuxPred) = {}"
+      and "Tr' = Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+    shows "state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def \<omega> ns"
+  unfolding state_rel_def state_rel0_def
+proof (intro conjI, simp_all add: \<open>Tr' = _\<close>) 
+  show "disjoint_list
+     [{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr), range (const_repr Tr), dom AuxPred,
+      vars_label_hm_tr lbls']" (is "disjoint_list ?A'")
+  proof -
+    have "disjoint_list
+     ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
+        range (const_repr Tr), dom AuxPred]@(vars_label_hm_tr lbls # []))" 
+      using state_rel_disjoint[OF StateRel] \<open>lbls = _\<close>
+      by auto
+    hence "disjoint_list
+     ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr), ran (field_translation Tr),
+        range (const_repr Tr), dom AuxPred]@((vars_label_hm_tr lbls \<union> {m,h}) # []))" (is "disjoint_list ?A")
+      apply (rule disjoint_list_add_set)
+      using Disj
+      by fastforce
+    thus ?thesis
+    proof (rule disjoint_list_subset, simp)
+      have *: "vars_label_hm_tr lbls' \<subseteq> vars_label_hm_tr lbls \<union> {m,h}"
+        unfolding \<open>lbls' = _\<close> vars_label_hm_tr_def
+        using ran_map_upd_subset
+        by force
+      fix i j
+      assume "0 \<le> i" and
+             "i < length ?A"
+      show "?A' ! i \<subseteq> ?A ! i"            
+      apply (cases i)
+       apply simp
+      apply (rename_tac i1)
+      apply (case_tac i1)
+       apply simp
+      apply (rename_tac i2)
+      apply (case_tac i2)
+      apply simp
+      apply (rename_tac i3)
+      apply (case_tac i3)
+       apply simp
+      apply (rename_tac i4)
+      apply (case_tac i4)
+       apply simp
+      apply (rename_tac i5)
+      apply (case_tac i5)
+       apply simp
+      apply (rename_tac i6)
+      apply (case_tac i6)
+      using *
+       apply simp
+      by simp
+    qed
+  qed
+  show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) lbls' (get_trace_total \<omega>) ns"
+    unfolding label_hm_rel_def
+      unfolding label_rel_def
+      using \<open>lbls' = _\<close> \<open>lbls = _\<close> LabelExists HeapRel MaskRel state_rel_label_hm_rel[OF StateRel, simplified label_hm_rel_def label_rel_def]
+      by auto
+qed (insert StateRel[simplified state_rel_def state_rel0_def], (simp | argo)+)
+\<comment>\<open>"insert StateRel[simplified state_rel_def state_rel0_def]" adds the state relation assumption in unfolded
+form to all subgoals and (simp | argo)+ applies simp or argo until neither works\<close>
+                   
+
 lemma old_expr_wf_rel_staterel:
-  assumes R_is_state_rel:
-           "\<And> \<omega>def \<omega> ns.
-                R \<omega>def \<omega> ns = state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      and ROld_is_state_rel:
-           "\<And> (\<omega>def :: 'a full_total_state)
-               (\<omega>   :: 'a full_total_state)
-               (\<omega>def_old :: 'a full_total_state)
-               (\<omega>_old :: 'a full_total_state)
-               ns .
-                ROld
-                  (f \<omega>def \<omega>)
-                  \<omega>def_old
-                  \<omega>_old
-                  ns =
-                  \<comment>\<open>will have to change AuxPred here\<close>
-                  state_rel Pr StateCons TyRep Tr'
-                          (AuxPred 
-                            (m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)
-                            (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>))
-                            ctxt \<omega>def_old \<omega>_old ns"
-      and label_hm_translation: "label_hm_translation Tr = lbls"
+  assumes "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
+      and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
-      and mh: "m = mask_var Tr \<and> h = heap_var Tr"
-      and Tr': "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM \<rparr>"
-      (* TODO weaken these assumptions *)
+      and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
+      and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
+      and Tr': "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
+      and BodyRel:
+         "\<And>p1 p2 p3 p4. expr_wf_rel (state_rel Pr StateCons TyRep Tr' (AuxPred(mdef \<mapsto> p1, hdef \<mapsto> p2, m \<mapsto> p3, h \<mapsto> p4)) ctxt)
+                                      ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
   shows "expr_wf_rel R ctxt_vpr StateCons P ctxt (pure_exp.Old lbl expr) \<gamma> \<gamma>'"
-proof (rule old_expr_wf_rel)
-  fix \<omega>def \<omega> ns
+proof -
+  let ?AuxPredFun = "(\<lambda>\<omega>def \<omega>.(AuxPred 
+                            (mdef \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def)
+                            (hdef \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt hdef \<omega>def)
+                            (m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)                    
+                            (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>)
+                            ))"
+
+  show ?thesis
+  proof (rule old_expr_wf_rel[where ?f = ?AuxPredFun])
+
+  let ?ROld = "\<lambda>AuxPred. state_rel Pr StateCons TyRep Tr' AuxPred ctxt"
+
+  fix \<omega>def :: "'a full_total_state"
+  fix \<omega> :: "'a full_total_state"
+  fix ns  
   show "\<And> \<omega>def_old \<omega>_old.
-       ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
+       \<exists>ns'. R \<omega>def \<omega> ns' \<Longrightarrow>
+       ?ROld (?AuxPredFun \<omega>def \<omega>) \<omega>def_old \<omega>_old ns \<Longrightarrow>
        \<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr> \<and>
        \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr> \<Longrightarrow>
        R \<omega>def \<omega> ns"
   proof -
     fix \<omega>def_old \<omega>_old
     (* First assumption added here *)
-    assume ROld: "ROld (f \<omega>def \<omega>) \<omega>def_old \<omega>_old ns"
+    assume RPrev: "\<exists>ns0. R \<omega>def \<omega> ns0"
+       and ROld: "?ROld (?AuxPredFun \<omega>def \<omega>) \<omega>def_old \<omega>_old ns"
        and \<omega>_old: "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
                    \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
-    (* somehow able to derive a contradiction here *)
-    have "False"
-      by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-    thm state_rel_capture_current_mask
-    thm state_rel_capture_total_state_change_eval_state
-    thm aux_vars_pred_sat_def
-  qed
-  show "R \<omega>def \<omega> ns \<Longrightarrow>
-           ROld (f \<omega>def \<omega>)
-                (\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-                (\<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>)
-                ns \<and>
-       expr_wf_rel (ROld (f \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
-  proof -
-    (* Second assumption: assume R *)
-    assume R: "R \<omega>def \<omega> ns"
-    hence state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      using R_is_state_rel
-      by simp
-    (* this also leads to a contradiction *)
-    have "False"
-      by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-    have "state_rel Pr StateCons TyRep Tr
-             (AuxPred(OldM \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt OldM \<omega>))
-             ctxt \<omega>def \<omega> ns"
-    proof (rule state_rel_capture_current_mask)
-      show "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-        using state_rel
-        by simp
-      show "type_interp ctxt = vbpl_absval_ty TyRep"
-        using state_rel state_rel_type_interp
-        by fast
-      show "lookup_var_ty (var_context ctxt) OldM = Some (TConSingle (TMaskId TyRep))"
-        using ROld ROld_is_state_rel Tr' state_rel_obtain_mask
-        by fastforce
-      show "lookup_var (var_context ctxt) ns OldM = lookup_var (var_context ctxt) ns (mask_var Tr)"
-        by (metis OldM ROld ROld_is_state_rel Tr' UnCI label_hm_translation ranI state_rel_mask_var_disjoint tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) vars_label_hm_tr_def)
-    qed
-  qed
-  show "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
-  proof -
-    fix \<omega>def \<omega> ns
-    assume R: "R \<omega>def \<omega> ns"
-    let ?\<omega>_trace_total = "get_trace_total \<omega>"
-    let ?\<omega>def_trace_total = "get_trace_total \<omega>def"
-    let ?P = "(\<lambda>m \<phi>. mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>))"
-    let ?LabelMap = "(snd (label_hm_translation Tr))"
-    from R_is_state_rel R have state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" by simp
-    hence "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) ?\<omega>_trace_total ns"
-      using state_rel_def state_rel0_label_hm_rel
-      by fast
-    hence "label_rel ?P ?LabelMap ?\<omega>_trace_total ns \<and>
-           label_rel ?P ?LabelMap ?\<omega>_trace_total ns"
-      using label_hm_rel_def
-      by fast
-    hence LabelMap_implies_Some: "(\<forall> lbl h. ?LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega>) lbl = Some \<phi> \<and> ?P h \<phi> ns))"
-      using label_rel_def
-      by meson
-    from label_hm_translation OldM have LabelMap: "?LabelMap lbl = Some OldM"
-      by simp
-    from LabelMap_implies_Some LabelMap have \<omega>_not_none: "?\<omega>_trace_total lbl \<noteq> None"
+
+    from RPrev \<open>R =_\<close> obtain ns0 where RPrevInst: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns0"
       by auto
-    from state_rel_def state_rel0_def state_rel have \<omega>_trace_is_\<omega>def_trace: "?\<omega>def_trace_total = ?\<omega>_trace_total"
-      by blast
-    from \<omega>_not_none \<omega>_trace_is_\<omega>def_trace
-      show "get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
-      by simp
+
+    from RPrevInst and OldH OldM obtain \<phi>
+      where LabelExists: "get_trace_total \<omega> lbl = Some \<phi>"
+        and HeapRelOld: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
+        and MaskRelOld: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
+      sorry \<comment>\<open>There should be an auxiliary lemma in ViperBoogieBasicRel that shows this 
+              (this lemma can then also be used for the final goal of this theorem)\<close>
+
+    \<comment>\<open>In a first step, let's revert the heap and mask, while leaving the labels.\<close>
+
+    let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+    have "state_rel Pr StateCons TyRep ?Tr2 AuxPred ctxt \<omega>def \<omega> ns"
+    proof (rule state_rel_capture_total_state_change_eval_and_def_state[OF _ ROld], simp)
+      show "{m, mdef} \<inter> {h, hdef} = {}"
+        using RPrev[simplified \<open>R = _\<close>] mh state_rel_mask_var_disjoint
+        by blast
+    next
+      show "field_translation Tr = field_translation ?Tr2"
+        using \<open>Tr' = _\<close>
+        by auto
+    next
+      show "{m, h, mdef, hdef} \<inter> dom AuxPred = {}"
+      proof -
+        have "{m, mdef} \<inter> dom AuxPred = {}"
+          using RPrev[simplified \<open>R = _\<close>] mh state_rel_mask_var_disjoint 
+          by blast
+        moreover have "{h, hdef} \<inter> dom AuxPred = {}"
+          using RPrev[simplified \<open>R = _\<close>] mh state_rel_heap_var_disjoint
+          by blast
+        ultimately show ?thesis
+          by auto
+      qed
+    next
+      fix mb :: "'a bpl_mask_ty"
+      assume "mdef = m" 
+      show "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb =
+            mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb"
+        sorry \<comment>\<open>this one might be nontrivial\<close>
+    next
+      fix hb :: "'a bpl_heap_ty"
+      show "pred_eq_heap_aux Pr TyRep (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<omega> hb =
+          pred_eq_heap_aux Pr TyRep (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<omega>def hb \<and>
+          total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>) =
+          total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def)"
+        sorry \<comment>\<open>this one should be easier than the previous one, but potentially still nontrivial\<close>
+    qed (simp add: \<open>Tr' = _\<close> mh)
+
+    \<comment>\<open>In a second step, let's revert the labels\<close>
+    
+    thus "R \<omega>def \<omega> ns"
+    proof (subst \<open>R = _\<close>, rule state_rel_add_label, simp, simp)
+      show "(get_trace_total \<omega> lbl) = Some \<phi>"
+        using LabelExists
+        by simp
+    next
+      show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) OldH (get_hh_total \<phi>) ns"
+        using HeapRelOld
+        by simp
+    next
+      show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) OldM (get_mh_total \<phi>) ns"
+        using MaskRelOld
+        by simp
+    next
+      show "{OldM, OldH} \<inter>
+              ({heap_var (Tr\<lparr>label_hm_translation := lbls'\<rparr>), heap_var_def (Tr\<lparr>label_hm_translation := lbls'\<rparr>)} \<union>
+               {mask_var (Tr\<lparr>label_hm_translation := lbls'\<rparr>), mask_var_def (Tr\<lparr>label_hm_translation := lbls'\<rparr>)} \<union>
+               ran (var_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<union>
+               ran (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<union>
+               range (const_repr (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<union>
+               dom AuxPred) = {}"
+      proof -
+        have "{OldM, OldH} \<subseteq> vars_label_hm_tr (label_hm_translation Tr)"
+          using OldH OldM \<open>lbls = _\<close>
+          unfolding vars_label_hm_tr_def
+          by (simp add: ranI)
+
+        with state_rel_label_hm_disjoint[OF RPrevInst]
+        show ?thesis
+          by force 
+      qed 
+      next
+        show "Tr = Tr\<lparr>label_hm_translation := lbls', label_hm_translation := (fst lbls'(lbl \<mapsto> OldH), snd lbls'(lbl \<mapsto> OldM))\<rparr>"
+        proof -
+          have "lbls = (fst lbls'(lbl \<mapsto> OldH), snd lbls'(lbl \<mapsto> OldM))"
+            unfolding \<open>lbls' = _\<close>
+            using OldH OldM
+            by (simp add: map_upd_triv)
+          thus ?thesis
+            using \<open>lbls = label_hm_translation Tr\<close>
+            by fastforce        
+        qed
+      qed
+    qed
+
+    let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
+    let ?\<omega>_old = "\<omega>\<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
+    show "R \<omega>def \<omega> ns \<Longrightarrow>
+             ?ROld (?AuxPredFun \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+         expr_wf_rel (?ROld (?AuxPredFun \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+    proof -    
+      \<comment>\<open>Second assumption: assume R\<close>
+      assume R: "R \<omega>def \<omega> ns"
+      note RInst = R[simplified \<open>R = _\<close>]    
+    
+      let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+      
+      \<comment>\<open>Step 1: remove OldM and OldH from the translation record so we don't require disjointness with them\<close>
+      have "state_rel Pr StateCons TyRep ?Tr2 AuxPred ctxt \<omega>def \<omega> ns"
+        sorry
+    
+      thm \<open>Tr' = _\<close>
+      \<comment>\<open>Step 2: change to old state\<close>
+      have "state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
+        sorry
+    
+      \<comment>\<open>Step 3: capture original heap and mask variables in auxiliary variables\<close>
+      have "state_rel Pr StateCons TyRep Tr' (?AuxPredFun \<omega>def \<omega>) ctxt ?\<omega>def_old ?\<omega>_old ns"
+        sorry
+    
+      \<comment>\<open>first conjunct is done (side remark: the previous and the following are the same theorems (otherwise "by assumption" would not work)\<close>
+      hence "?ROld (?AuxPredFun \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns"
+        by assumption
+    
+      moreover have "expr_wf_rel (?ROld (?AuxPredFun \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+        using BodyRel
+        by blast
+      ultimately show  
+        "?ROld (?AuxPredFun \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns \<and>
+         expr_wf_rel (?ROld (?AuxPredFun \<omega>def \<omega>)) ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
+        by auto
+    qed
+    show "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+    proof -
+      fix \<omega>def \<omega> ns
+      assume R: "R \<omega>def \<omega> ns"
+      let ?\<omega>_trace_total = "get_trace_total \<omega>"
+      let ?\<omega>def_trace_total = "get_trace_total \<omega>def"
+      let ?P = "(\<lambda>m \<phi>. mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>))"
+      let ?LabelMap = "(snd (label_hm_translation Tr))"
+      from \<open>R = _\<close> R have state_rel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" by simp
+      hence "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) ?\<omega>_trace_total ns"
+        using state_rel_def state_rel0_label_hm_rel
+        by fast
+      hence "label_rel ?P ?LabelMap ?\<omega>_trace_total ns \<and>
+             label_rel ?P ?LabelMap ?\<omega>_trace_total ns"
+        using label_hm_rel_def
+        by fast
+      hence LabelMap_implies_Some: "(\<forall> lbl h. ?LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega>) lbl = Some \<phi> \<and> ?P h \<phi> ns))"
+        using label_rel_def
+        by meson
+      from \<open>lbls = _\<close> OldM have LabelMap: "?LabelMap lbl = Some OldM"
+        by simp
+      from LabelMap_implies_Some LabelMap have \<omega>_not_none: "?\<omega>_trace_total lbl \<noteq> None"
+        by auto
+      from state_rel_def state_rel0_def state_rel have \<omega>_trace_is_\<omega>def_trace: "?\<omega>def_trace_total = ?\<omega>_trace_total"
+        by blast
+      from \<omega>_not_none \<omega>_trace_is_\<omega>def_trace
+        show "get_trace_total \<omega>def lbl \<noteq> None \<and> get_trace_total \<omega> lbl \<noteq> None"
+        by simp
+    qed
   qed
 qed
 
