@@ -427,6 +427,25 @@ lemma disjoint_list_subset:
   unfolding disjoint_list_def
   by (metis disjnt_subset1 disjnt_subset2)
 
+lemma disjoint_list_one_subset:
+  assumes "disjoint_list (xs @ (M # ys))"
+      and "M' \<subseteq> M"
+  shows "disjoint_list (xs @ (M' # ys))"
+proof (rule disjoint_list_subset)
+  let ?l = "xs @ (M # ys)"
+  let ?l' = "xs @ (M' # ys)"
+  show "disjoint_list (xs @ (M # ys))" using assms(1) by simp
+  show "length (xs @ M # ys) = length (xs @ M' # ys)" by simp
+  show "\<And> i j. 0 \<le> i \<Longrightarrow> i < length ?l \<Longrightarrow>  ?l' ! i \<subseteq> ?l ! i"
+    by (simp add: assms(2) nth_Cons' nth_append)
+qed
+
+lemma disjoint_list_remove_one_item:
+  assumes "disjoint_list (xs @ (M # ys))"
+  shows "disjoint_list (xs @ ((M - {m}) # ys))"
+  using assms disjoint_list_one_subset
+  by fastforce
+
 lemma disjoint_list_subset_list_all2: 
   assumes "disjoint_list xs" and
           "list_all2 (\<lambda>x y. x \<subseteq> y) xs' xs"

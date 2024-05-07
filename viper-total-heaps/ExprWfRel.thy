@@ -865,7 +865,149 @@ proof -
       
       \<comment>\<open>Step 1: remove OldM and OldH from the translation record so we don't require disjointness with them\<close>
       have "state_rel Pr StateCons TyRep ?Tr2 AuxPred ctxt \<omega>def \<omega> ns"
-        sorry
+        unfolding state_rel_def state_rel0_def
+      proof(intro conjI)
+        show "valid_heap_mask (get_mh_total_full \<omega>def)"
+          using RInst state_rel_wf_mask_def_simple
+          by blast
+        show "valid_heap_mask (get_mh_total_full \<omega>)"
+          using RInst state_rel_wf_mask_simple
+          by blast
+        show "consistent_state_rel_opt (state_rel_opt ?Tr2) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
+          using RInst state_rel_consistent
+          by fastforce
+        show "type_interp ctxt = vbpl_absval_ty TyRep"
+          using RInst state_rel_type_interp
+          by blast
+        show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation ?Tr2) (get_store_total \<omega>)
+     ns"
+          using RInst state_rel_store_rel
+          by fastforce
+        show "disjoint_list (state_rel0_disj_list ?Tr2 AuxPred)"
+        proof -
+          let ?list_Tr = "state_rel0_disj_list Tr AuxPred"
+          let ?list_Tr2 = "state_rel0_disj_list ?Tr2 AuxPred"
+          have disjoint_list_Tr: "disjoint_list ?list_Tr"
+            using RInst state_rel_disjoint
+            by blast
+          thus "disjoint_list ?list_Tr2"
+          proof (cases "lbls' = lbls")
+            case True
+            show ?thesis
+              using True disjoint_list_Tr \<open>lbls = _ \<close>
+              by simp
+          next
+            case False
+            let ?xs = "[{heap_var Tr, heap_var_def Tr},
+                      {mask_var Tr, mask_var_def Tr},
+                      (ran (var_translation Tr)), 
+                      (ran (field_translation Tr)),
+                      (range (const_repr Tr)),
+                      dom AuxPred]"
+            let ?xs' = "[{heap_var ?Tr2, heap_var_def ?Tr2},
+                      {mask_var ?Tr2, mask_var_def ?Tr2},
+                      (ran (var_translation ?Tr2)), 
+                      (ran (field_translation ?Tr2)),
+                      (range (const_repr ?Tr2)),
+                      dom AuxPred]"
+            have xs_equals_xs': "?xs = ?xs'"
+              by simp
+            let ?M = "vars_label_hm_tr (label_hm_translation Tr)"
+            let ?M' = "vars_label_hm_tr (label_hm_translation ?Tr2)"
+            let ?ys = "[]"
+            have "?list_Tr = ?xs @ ?M # ?ys"
+              by force
+            have "?list_Tr2 = ?xs' @ ?M' # ?ys"
+              by simp
+            have "disjoint_list (?xs' @ ?M' # ?ys)"
+            proof (rule disjoint_list_one_subset)
+              show "disjoint_list (?xs' @ ?M # ?ys)"
+                using disjoint_list_Tr by fastforce
+              show "?M' \<subseteq> ?M"
+              proof -
+                have heap_subset: "ran (fst lbls') \<subseteq> ran (fst lbls)"
+                  by (metis (mono_tags, lifting) OldH assms(6) fst_conv fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd subset_insertI2)
+                have map_subset: "ran (snd lbls') \<subseteq> ran (snd lbls)"
+                  by (metis (mono_tags, lifting) OldM assms(6) fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd snd_conv subset_insertI2)
+                show "?M' \<subseteq> ?M" 
+                  using assms(2) heap_subset map_subset vars_label_hm_tr_def
+                  by auto
+              qed
+            qed
+            hence "disjoint_list ?list_Tr2" by simp
+            thus ?thesis by simp
+          qed
+        qed
+        show "get_store_total \<omega>def = get_store_total \<omega>"
+          using RInst state_rel_eval_welldef_eq
+          by fastforce
+        show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
+          using RInst state_rel_eval_welldef_eq
+          by fast
+        show "get_trace_total \<omega>def = get_trace_total \<omega>"
+          using RInst state_rel_eval_welldef_eq
+          by blast
+        show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) (heap_var ?Tr2) (get_hh_total_full \<omega>) ns"
+          using RInst state_rel_heap_var_rel by fastforce
+        show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2)(mask_var ?Tr2) (get_mh_total_full \<omega>) ns"
+          using RInst state_rel_mask_var_rel
+          by force
+        show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) (heap_var_def ?Tr2) (get_hh_total_full \<omega>def) ns"
+          using RInst state_rel_heap_var_def_rel
+          by fastforce
+        show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) (mask_var_def ?Tr2) (get_mh_total_full \<omega>def) ns"
+          using RInst state_rel_mask_var_def_rel
+          by force
+        show "field_rel Pr (var_context ctxt) (field_translation ?Tr2) ns"
+          using RInst state_rel_field_rel
+          by fastforce
+        show "boogie_const_rel (const_repr ?Tr2) (var_context ctxt) ns"
+          using RInst state_rel_boogie_const_rel
+          by force
+        show "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns"
+          using RInst state_rel_state_well_typed
+          by blast
+        show "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
+          using RInst state_rel_aux_vars_pred_sat
+          by fast
+        show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) (label_hm_translation ?Tr2) (get_trace_total \<omega>) ns"
+          unfolding label_hm_rel_def
+        proof (intro conjI)
+          let ?HeapPred = "\<lambda>h \<phi>. heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>)"
+          show "label_rel ?HeapPred (fst (label_hm_translation ?Tr2)) (get_trace_total \<omega>) ns"
+            unfolding label_rel_def
+          proof (intro allI, rule impI)
+            fix lbl h
+            assume "fst (label_hm_translation ?Tr2) lbl = Some h"
+            then obtain \<phi> where
+              trace_defined: "get_trace_total \<omega> lbl = Some \<phi>"
+              by (smt (verit, best) RInst assms(2) assms(6) fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
+            show "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
+            proof (rule exI)
+              show "get_trace_total \<omega> lbl = Some \<phi> \<and> heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
+              proof (intro conjI)
+                show "get_trace_total \<omega> lbl = Some \<phi>"
+                  using trace_defined
+                  by simp
+                show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
+                  by (smt (verit, ccfv_SIG) RInst \<open>fst (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> assms(2) assms(6) fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI option.sel state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) trace_defined)
+              qed
+            qed
+          qed
+          let ?MaskPred = "\<lambda>m \<phi>. mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) m (get_mh_total \<phi>)"
+          show "label_rel ?MaskPred (snd (label_hm_translation ?Tr2)) (get_trace_total \<omega>) ns"
+            unfolding label_rel_def
+          proof (intro allI, rule impI)
+            fix lbl h
+            assume "snd (label_hm_translation ?Tr2) lbl = Some h"
+            then obtain \<phi> where
+              trace_defined: "get_trace_total \<omega> lbl = Some \<phi>"
+              by (smt (verit, ccfv_threshold) RInst assms(2) assms(6) domI label_hm_rel_def label_rel_def map_le_def snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) upd_None_map_le)
+            show "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> mask_var_rel Pr (var_context ctxt) TyRep (field_translation  ?Tr2) h (get_mh_total \<phi>) ns"
+              by (smt (z3) RInst \<open>snd (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> assms(2) assms(6) fun_upd_apply label_hm_rel_def label_rel_def option.distinct(1) snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
+          qed
+        qed
+      qed
     
       thm \<open>Tr' = _\<close>
       \<comment>\<open>Step 2: change to old state\<close>
