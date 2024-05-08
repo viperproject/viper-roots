@@ -720,7 +720,7 @@ lemma old_expr_wf_rel_staterel:
       and OldM: "snd lbls lbl = Some OldM"
       and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
-      and Tr': "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
+      and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
       and BodyRel:
          "\<And>p1 p2 p3 p4. expr_wf_rel (state_rel Pr StateCons TyRep Tr' (AuxPred(mdef \<mapsto> p1, hdef \<mapsto> p2, m \<mapsto> p3, h \<mapsto> p4)) ctxt)
                                       ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
@@ -732,11 +732,12 @@ proof -
                             (m \<mapsto> pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)                    
                             (h \<mapsto> pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>)
                             ))"
+  let ?\<Lambda> = "var_context ctxt"
 
   show ?thesis
   proof (rule old_expr_wf_rel[where ?f = ?AuxPredFun])
 
-  let ?ROld = "\<lambda>AuxPred. state_rel Pr StateCons TyRep Tr' AuxPred ctxt"
+    let ?ROld = "\<lambda>AuxPred. state_rel Pr StateCons TyRep Tr' AuxPred ctxt"
 
   fix \<omega>def :: "'a full_total_state"
   fix \<omega> :: "'a full_total_state"
@@ -850,7 +851,7 @@ proof -
         qed
       qed
     qed
-
+                            
     let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
     let ?\<omega>_old = "\<omega>\<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>"
     show "R \<omega>def \<omega> ns \<Longrightarrow>
@@ -859,8 +860,11 @@ proof -
     proof -    
       \<comment>\<open>Second assumption: assume R\<close>
       assume R: "R \<omega>def \<omega> ns"
-      note RInst = R[simplified \<open>R = _\<close>]    
-    
+      note RInst = R[simplified \<open>R = _\<close>]
+        
+      obtain \<phi> where "get_trace_total \<omega> lbl = Some \<phi>"
+        by (metis (mono_tags, lifting) OldM RInst assms(2) label_hm_rel_def label_rel_def state_rel_label_hm_rel)
+
       let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
       
       \<comment>\<open>Step 1: remove OldM and OldH from the translation record so we don't require disjointness with them\<close>
@@ -1011,12 +1015,159 @@ proof -
     
       thm \<open>Tr' = _\<close>
       \<comment>\<open>Step 2: change to old state\<close>
-      have "state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
-        sorry
+      have state_rel_\<omega>_old: "state_rel Pr StateCons TyRep Tr' AuxPred ctxt ?\<omega>def_old ?\<omega>_old ns"
+        unfolding state_rel_def state_rel0_def
+      proof (intro conjI)
+        show "valid_heap_mask (get_mh_total_full ?\<omega>def_old)"
+          unfolding wf_mask_simple_def
+        proof (intro allI)
+          fix hl
+          (* This may not be provable, because state_rel0 doesn't say anything about the trace being well-formed *)
+          show "get_mh_total_full ?\<omega>def_old  hl \<le> PosReal.pwrite"
+            sorry
+        qed
+        (* This may not be provable either *)
+        show "valid_heap_mask (get_mh_total_full (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>))"
+          sorry
+        show "consistent_state_rel_opt (state_rel_opt Tr') \<longrightarrow> StateCons ?\<omega>def_old \<and> StateCons ?\<omega>_old"
+        proof (intro impI)
+          assume premise: "consistent_state_rel_opt (state_rel_opt Tr')"
+          show "StateCons ?\<omega>def_old \<and> StateCons ?\<omega>_old"
+          proof (intro conjI)
+            have "state_rel_opt Tr' = state_rel_opt Tr"
+              using \<open>Tr' = _\<close>
+              by (simp)
+            hence "consistent_state_rel_opt (state_rel_opt Tr)"
+              using premise
+              by simp
+            hence a: "StateCons \<omega>def \<and> StateCons \<omega>"
+              using RInst state_rel_consistent by blast
+            (* Unsure if this is true, because StateCons may not be true for this specific value *)
+            show "StateCons ?\<omega>def_old" sorry
+            show "StateCons ?\<omega>_old" sorry
+          qed
+        qed
+        show "type_interp ctxt = vbpl_absval_ty TyRep"
+          using RInst state_rel_type_interp by blast
+        show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr') (get_store_total ?\<omega>_old) ns"
+        proof -
+          have "var_translation Tr' = var_translation Tr"
+            using \<open>Tr' = _\<close>
+            by simp
+          thus "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr') (get_store_total ?\<omega>_old) ns"
+            using RInst state_rel_store_rel
+            by force
+        qed
+        show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+        proof -
+          have "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+            using RInst state_rel_disjoint by blast
+          (* This **should** be provable *)
+          show ?thesis sorry
+        qed
+        show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old"
+          using RInst state_rel_eval_welldef_eq by fastforce
+        show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old"
+          using RInst state_rel_eval_welldef_eq by fastforce
+        show "get_h_total_full ?\<omega>def_old = get_h_total_full ?\<omega>_old" by simp
+        (* Figure out why this one is true \<longrightarrow> what do we actually know about \<phi>? *)
+        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full ?\<omega>_old) ns"
+        proof -
+          have "?\<omega>_old = \<omega>\<lparr> get_total_full := the (get_trace_total \<omega> lbl)\<rparr>" by simp
+          hence "get_hh_total_full ?\<omega>_old = get_hh_total \<phi>" by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
+          have "heap_var Tr' = OldH" using \<open>Tr' = _\<close> by simp                       
+          thm \<open>Tr' = _\<close>
+          show ?thesis sorry
+        qed
+        show "field_rel Pr ?\<Lambda> (field_translation Tr') ns"
+          using RInst \<open>Tr' = _\<close> state_rel_field_rel
+          by force
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full ?\<omega>_old) ns" sorry
+        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full ?\<omega>def_old) ns" sorry
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full ?\<omega>def_old) ns" sorry
+        show "boogie_const_rel (const_repr Tr') ?\<Lambda> ns"
+          using RInst state_rel_boogie_const_rel \<open>Tr' = _\<close>
+          by fastforce
+        show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ns"
+          using RInst state_rel_state_well_typed
+          by fast
+        show "aux_vars_pred_sat  ?\<Lambda> AuxPred ns"
+          using RInst state_rel_aux_vars_pred_sat
+          by fast
+        show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns" sorry
+      qed
     
       \<comment>\<open>Step 3: capture original heap and mask variables in auxiliary variables\<close>
       have "state_rel Pr StateCons TyRep Tr' (?AuxPredFun \<omega>def \<omega>) ctxt ?\<omega>def_old ?\<omega>_old ns"
-        sorry
+        unfolding state_rel_def state_rel0_def
+      proof (intro conjI)
+        show "valid_heap_mask (get_mh_total_full ?\<omega>def_old)"
+          using state_rel_\<omega>_old state_rel_wf_mask_def_simple by blast
+        show "valid_heap_mask (get_mh_total_full ?\<omega>_old)"
+          using state_rel_\<omega>_old state_rel_wf_mask_simple by blast
+        show "consistent_state_rel_opt (state_rel_opt Tr') \<longrightarrow> StateCons ?\<omega>def_old \<and> StateCons ?\<omega>_old"
+          using state_rel_\<omega>_old state_rel_consistent by blast
+        show "type_interp ctxt = vbpl_absval_ty TyRep"
+          using RInst state_rel_type_interp
+          by fast
+        show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr') (get_store_total ?\<omega>_old) ns"
+          using state_rel_\<omega>_old state_rel_store_rel
+          by fast
+        show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old"
+          using state_rel_\<omega>_old state_rel_eval_welldef_eq by blast
+        show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old"
+          using state_rel_\<omega>_old state_rel_eval_welldef_eq by blast
+        show "get_h_total_full ?\<omega>def_old = get_h_total_full ?\<omega>_old"
+          by simp
+        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full ?\<omega>_old) ns"
+          using state_rel_\<omega>_old state_rel_heap_var_rel by blast
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full ?\<omega>_old) ns"
+          using state_rel_\<omega>_old state_rel_mask_var_rel by blast
+        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full ?\<omega>def_old) ns"
+          using state_rel_\<omega>_old state_rel_heap_var_def_rel by blast
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full ?\<omega>def_old) ns"
+          using state_rel_\<omega>_old state_rel_mask_var_def_rel by blast
+        show "field_rel Pr ?\<Lambda> (field_translation Tr') ns"
+          using state_rel_\<omega>_old state_rel_field_rel by blast
+        show "boogie_const_rel (const_repr Tr') ?\<Lambda> ns"
+          using state_rel_\<omega>_old state_rel_boogie_const_rel by blast
+        show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ns"
+          using RInst state_rel_state_well_typed by blast
+        show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns "
+          using state_rel_\<omega>_old state_rel_label_hm_rel by blast
+        show "disjoint_list (state_rel0_disj_list Tr' (?AuxPredFun \<omega>def \<omega>))"
+          sorry
+        show "aux_vars_pred_sat (var_context ctxt) (?AuxPredFun \<omega>def \<omega>) ns"
+          unfolding aux_vars_pred_sat_def
+        proof(intro allI, rule impI)
+          fix x P
+          assume premise: "?AuxPredFun \<omega>def \<omega> x = Some P"
+
+          show "has_Some P (lookup_var (var_context ctxt) ns x)"
+          proof (cases)
+            assume "x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h"
+            thus ?thesis
+              by (metis (no_types, lifting) RInst aux_vars_pred_sat_def fun_upd_other premise state_rel_aux_vars_pred_sat)
+          next
+            assume "\<not>(x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h)"
+            hence "x = mdef \<or> x = m \<or> x = hdef \<or> x = h" by simp
+            thus ?thesis sorry
+            (*proof (elim disjE)
+              show "x = mdef \<Longrightarrow> ?thesis"
+              proof -
+                assume "x = mdef"
+                thus ?thesis
+                  by (smt (verit, del_insts) RInst has_Some_iff map_upd_Some_unfold mask_var_rel_def mh pred_eq_mask_def premise state_rel_mask_var_def_rel state_rel_mask_var_disjoint state_rel_obtain_mask)
+              qed
+              show "x = h \<Longrightarrow> ?thesis"
+              proof -
+                assume "x = h"
+                show ?thesis sorry
+              qed
+            qed*)
+          qed
+        qed
+      qed
     
       \<comment>\<open>first conjunct is done (side remark: the previous and the following are the same theorems (otherwise "by assumption" would not work)\<close>
       hence "?ROld (?AuxPredFun \<omega>def \<omega>) ?\<omega>def_old ?\<omega>_old ns"
