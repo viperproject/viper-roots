@@ -15,10 +15,8 @@ section \<open>Properties of the semantics: States are always wf_state\<close>
 lemma equiv_compo_singleton:
   "red_stmt \<Delta> s \<omega> (b) \<longleftrightarrow> sequential_composition \<Delta> {\<omega>} s b" (is "?A \<longleftrightarrow> ?B")
 proof -
-  have "?B \<Longrightarrow> ?A" sorry
-(*
+  have "?B \<Longrightarrow> ?A"
     by (smt ccpo_Sup_singleton image_empty image_insert sequential_composition.cases singletonI)
-*)
   moreover have "?A \<Longrightarrow> ?B"
   proof -
     assume ?A
@@ -26,10 +24,8 @@ proof -
       by simp
     show ?B
     proof (rule SeqComp)
-      show "\<And>\<omega>'. \<omega>' \<in> {\<omega>} \<Longrightarrow> red_stmt \<Delta> s \<omega>' (f \<omega>')" sorry
-(*
+      show "\<And>\<omega>'. \<omega>' \<in> {\<omega>} \<Longrightarrow> red_stmt \<Delta> s \<omega>' (f \<omega>')"
         using \<open>f \<omega> = b\<close> \<open>red_stmt \<Delta> s \<omega> (b)\<close> by blast
-*)
       show "b = \<Union> (f ` {\<omega>})"
         using \<open>f \<omega> = b\<close> by blast
     qed
@@ -62,8 +58,8 @@ lemma red_stmt_induct_simple [consumes 3, case_names Inhale Exhale FieldAssign H
 
       and "\<And>\<Delta> r \<omega> hl e v ty. r \<omega> = Some hl \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> has_write_perm (get_state \<omega>) hl
   \<Longrightarrow> heap_locs \<Delta> hl = Some ty \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_state \<omega> (set_value (get_state \<omega>) hl v))"
-      and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
-      and "\<And>\<Delta> e \<omega> v x ty. variables \<Delta> x = Some ty \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
+      and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
+      and "\<And>\<Delta> e \<omega> v x ty. variables \<Delta> x = Some ty \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
       and "\<And>\<Delta> l \<omega>. P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_trace \<omega> ((get_trace \<omega>)(l:= Some (get_state \<omega>))))"
   shows "P \<Delta> \<omega>'"
   using assms(1)
@@ -117,12 +113,12 @@ proof (induct rule: red_stmt_induct_simple)
     by (metis get_state_def get_state_set_state set_value_stable stable_snd)
 next
   case (Havoc \<Delta> x ty \<omega> v)
-  then show "sep_algebra_class.stable (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
-    by (simp add: get_state_def set_store_def stable_snd)
+  then show "sep_algebra_class.stable (assign_var_state x (Some v) \<omega>)"
+    by (metis assign_var_state_def get_state_def get_state_set_store stable_snd)
 next
   case (LocalAssign \<Delta> e \<omega> v x)
   then show ?case
-    by (simp add: get_state_def set_store_def stable_snd)
+    by (metis assign_var_state_def get_state_def get_state_set_store stable_snd)
 next
   case (Label \<Delta> l \<omega>)
   then show ?case
@@ -153,16 +149,16 @@ next
   case (Havoc \<Delta> x ty \<omega> v)
   show ?case
   proof (rule typed_storeI)
-    show "dom (variables \<Delta>) = dom (get_store (set_store \<omega> ((get_store \<omega>)(x := Some v))))"
-      using Havoc.hyps(1) Havoc.hyps(2) typed_store_def by auto
-    fix x' v' ty' assume asm0: "get_store (set_store \<omega> ((get_store \<omega>)(x := Some v))) x' = Some v'" "variables \<Delta> x' = Some ty'"
+    show "dom (variables \<Delta>) = dom (get_store (assign_var_state x (Some v) \<omega>))"
+      using Havoc.hyps(1) Havoc.hyps(2) typed_store_def assign_var_state_def by auto
+    fix x' v' ty' assume asm0: "get_store (assign_var_state x (Some v) \<omega>) x' = Some v'" "variables \<Delta> x' = Some ty'"
     then show "v' \<in> ty'"
-      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) fun_upd_other fun_upd_same get_store_set_store option.inject typed_store_def)
+      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) assign_var_state_def fun_upd_other fun_upd_same get_store_set_store option.inject typed_store_def)
   qed
 next
   case (LocalAssign \<Delta> e \<omega> v x ty)
-  then show "typed_store \<Delta> (get_store (set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))))"
-    using typed_store_def by auto
+  then show "typed_store \<Delta> (get_store (assign_var_state x (Some v) \<omega>))"
+    using typed_store_def assign_var_state_def by auto
 qed (auto)
 
 lemma red_stmt_induct_simple_wf [consumes 4, case_names Inhale Exhale FieldAssign Havoc LocalAssign Label]:
@@ -176,8 +172,8 @@ lemma red_stmt_induct_simple_wf [consumes 4, case_names Inhale Exhale FieldAssig
 
       and "\<And>\<Delta> r \<omega> hl e v ty. r \<omega> = Some hl \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> has_write_perm (get_state \<omega>) hl
   \<Longrightarrow> heap_locs \<Delta> hl = Some ty \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_state \<omega> (set_value (get_state \<omega>) hl v))"
-      and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
-      and "\<And>\<Delta> e \<omega> v x ty. variables \<Delta> x = Some ty \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_store \<omega> ((get_store \<omega>)(x := Some v)))"
+      and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
+      and "\<And>\<Delta> e \<omega> v x ty. variables \<Delta> x = Some ty \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
       and "\<And>\<Delta> l \<omega>. P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (set_trace \<omega> ((get_trace \<omega>)(l:= Some (get_state \<omega>))))"
   shows "P \<Delta> \<omega>'"
 proof -
@@ -244,7 +240,7 @@ next
   case (FieldAssign \<Delta> r \<omega> hl e v)
   then show ?case
     by (simp add: typed_def well_typed_heap_update)
-qed (auto simp add: typed_def)
+qed (auto simp add: typed_def assign_var_state_def)
 
 
 lemma red_wf_state:
@@ -285,8 +281,88 @@ lemma wf_set_subset:
 
 
 
-
 section \<open>Viper implies SL proof\<close>
+
+lemma stable_assign_var_state:
+  "stable \<omega> \<longleftrightarrow> stable (assign_var_state x v \<omega>)"
+  by (metis assign_var_state_def get_state_def get_state_set_store stable_snd)
+
+lemma stable_substitute_var:
+  "stable \<omega> \<longleftrightarrow> stable (substitute_var_state x e \<omega>)"
+  by (simp add: get_state_def assign_var_state_def set_store_def stable_snd substitute_var_state_def)
+
+lemma wf_exp_stabilize:
+  assumes "e (stabilize \<omega>) = Some v"
+      and "wf_exp e"
+    shows "e \<omega> = Some v"
+  by (meson assms(1) assms(2) decompose_stabilize_pure greater_def wf_exp_def)
+
+lemma pure_larger_stabilize:
+  "pure_larger \<omega> (stabilize \<omega>)"
+  by (metis decompose_stabilize_pure max_projection_prop_def max_projection_prop_pure_core pure_larger_def)
+
+lemma wf_assertion_stabilize:
+  assumes "wf_assertion \<Delta> A"
+      and "stabilize \<omega> \<in> A"
+    shows "\<omega> \<in> A"
+  using assms wf_assertion_def pure_larger_stabilize by blast
+
+lemma stabilize_assign_var:
+  "stabilize (assign_var_state x v \<omega>) = assign_var_state x v (stabilize \<omega>)"
+  using assign_var_state_def by auto
+
+lemma stabilize_substitute_var:
+  assumes "e (stabilize \<omega>) \<noteq> None"
+    and "wf_exp e"
+    shows "stabilize (substitute_var_state x e \<omega>) = substitute_var_state x e (stabilize \<omega>)"
+proof -
+  obtain v where "e (stabilize \<omega>) = Some v"
+    using assms(1) by blast
+  then have "e \<omega> = Some v"
+    by (meson assms(2) wf_exp_stabilize)
+  then show ?thesis
+    by (simp add: \<open>e (stabilize \<omega>) = Some v\<close> stabilize_assign_var substitute_var_state_def)
+qed
+
+lemma self_framing_post_substitute_var_assert:
+  assumes "self_framing A"
+      and "wf_exp e"
+      and "framed_by_exp A e"
+    shows "self_framing (post_substitute_var_assert x e A)"
+proof (rule self_framingI)
+  fix \<omega>
+  show "\<omega> \<in> post_substitute_var_assert x e A \<longleftrightarrow> stabilize \<omega> \<in> post_substitute_var_assert x e A" (is "?P \<longleftrightarrow> ?Q")
+  proof
+    assume ?P
+    then obtain a where "a \<in> A" "\<omega> = substitute_var_state x e a"
+      using post_substitute_var_assert_def by blast
+    then have "stabilize \<omega> = substitute_var_state x e (stabilize a)"
+      by (meson assms(1) assms(2) assms(3) framed_by_exp_def self_framing_def stabilize_substitute_var)
+    then show ?Q
+      by (metis \<open>a \<in> A\<close> assms(1) image_eqI post_substitute_var_assert_def self_framing_def)
+  next
+    assume ?Q
+    then obtain a where "a \<in> A" "stabilize \<omega> = substitute_var_state x e a"
+      using post_substitute_var_assert_def by auto
+    then obtain v where "e a = Some v"
+      by (meson assms(3) framed_by_exp_def not_Some_eq)
+    then have "stabilize \<omega> = set_store a ((get_store a)(x \<mapsto> v))"
+      by (simp add: \<open>stabilize \<omega> = substitute_var_state x e a\<close> assign_var_state_def substitute_var_state_def)
+    then have "a = set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x := get_store a x))"
+      by (simp add: full_state_ext)
+
+    let ?a = "set_store \<omega> ((get_store \<omega>)(x := get_store a x))"
+    have "stabilize ?a = a"
+      using \<open>a = set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x := get_store a x))\<close> by fastforce
+    then have "?a \<in> A"
+      using \<open>a \<in> A\<close> assms(1) self_framing_def by fastforce
+    moreover have "\<omega> = set_store ?a ((get_store ?a)(x \<mapsto> v))"
+      by (metis \<open>stabilize (set_store \<omega> ((get_store \<omega>)(x := get_store a x))) = a\<close> \<open>stabilize \<omega> = set_store a ((get_store a)(x \<mapsto> v))\<close> full_state_ext get_state_set_store get_store_set_store get_store_stabilize get_trace_set_store)
+    ultimately show ?P
+      by (smt (verit, best) \<open>e a = Some v\<close> assign_var_state_def \<open>stabilize (set_store \<omega> ((get_store \<omega>)(x := get_store a x))) = a\<close> assms(2) image_eqI post_substitute_var_assert_def substitute_var_state_def wf_exp_stabilize)
+  qed
+qed
+
 
 lemma framed_by_expI:
   assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> e \<omega> \<noteq> None"
@@ -386,14 +462,14 @@ lemma exists_assertI:
       and "get_store \<omega> x = Some v0"
       and "variables \<Delta> x = Some ty"
       and "v \<in> ty"
-      and "set_store \<omega> ((get_store \<omega>)(x \<mapsto> v)) \<in> A"
+      and "assign_var_state x (Some v) \<omega> \<in> A"
     shows "\<omega> \<in> exists_assert \<Delta> x A"
-  using assms(1) assms(2) assms(3) assms(4) assms(5) exists_assert_def by auto
+  using assms(1) assms(2) assms(3) assms(4) assms(5) exists_assert_def assign_var_state_def by auto
 
 lemma exists_assertE:
   assumes "\<omega> \<in> exists_assert \<Delta> x A"
-  shows "\<exists>v0 v ty. v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
-  using assms exists_assert_def by auto
+  shows "\<exists>v0 v ty. v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (assign_var_state x (Some v) \<omega>) \<in> A"
+  using assms exists_assert_def assign_var_state_def by auto
 
 lemma self_framing_exists_assert:
   assumes "self_framing A"
@@ -403,18 +479,18 @@ proof (rule self_framingI)
   show "\<omega> \<in> exists_assert \<Delta> x A \<longleftrightarrow> stabilize \<omega> \<in> exists_assert \<Delta> x A" (is "?A \<longleftrightarrow> ?B")
   proof
     assume "\<omega> \<in> exists_assert \<Delta> x A"
-    then obtain v v0 ty where r: "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
-      using exists_assert_def by auto
-    then have "get_store (stabilize \<omega>) x = Some v0 \<and> set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x \<mapsto> v)) = stabilize (set_store \<omega> ((get_store \<omega>)(x \<mapsto> v)))"
-      by simp
+    then obtain v v0 ty where r: "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (assign_var_state x (Some v) \<omega>) \<in> A"
+      using exists_assert_def assign_var_state_def by auto
+    then have "get_store (stabilize \<omega>) x = Some v0 \<and> set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x \<mapsto> v)) = stabilize (assign_var_state x (Some v) \<omega>)"
+      by (simp add: assign_var_state_def)
     then show ?B
-      by (metis (mono_tags, lifting) assms exists_assertI r self_framing_def)
+      by (metis (mono_tags, lifting) assign_var_state_def assms exists_assertI r self_framing_def)
   next
     assume asm0: ?B
-    then obtain v v0 ty where r: "v0 \<in> ty \<and> get_store (stabilize \<omega>) x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x \<mapsto> v))) \<in> A"
-      by (meson exists_assertE)
-    then have "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
-      using assms self_framing_def by auto
+    then obtain v v0 ty where r: "v0 \<in> ty \<and> get_store (stabilize \<omega>) x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x \<mapsto> v))) \<in> A"      
+      by (metis assign_var_state_def exists_assertE)
+    then have "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (assign_var_state x (Some v) \<omega>) \<in> A"
+      using assms self_framing_def assign_var_state_def by auto
     then show ?A
       using exists_assertI by blast
   qed
@@ -515,6 +591,7 @@ qed
 
 lemma proofs_are_self_framing:
   assumes "\<Delta> \<turnstile> [P] C [Q]"
+      and "wf_abs_stmt \<Delta> C"
   shows "self_framing P \<and> self_framing Q"
   using assms
 proof (induct rule: SL_proof.induct)
@@ -524,16 +601,20 @@ proof (induct rule: SL_proof.induct)
 next
   case (RuleIf A b \<Delta> C1 B1 C2 B2)
   then have "self_framing A"
-    using self_framing_if by blast
+    using self_framing_if by auto
   then show ?case
-    using RuleIf.hyps(3) RuleIf.hyps(5) self_framing_union by blast
+    using RuleIf self_framing_union by auto
 next
   case (RuleHavoc A \<Delta> x)
   then show ?case
     using self_framing_exists_assert by force
 next
+  case (RuleLocalAssign A e \<Delta> x)
+  then show ?case
+    by (simp add: self_framing_post_substitute_var_assert)
+next
   case (RuleFieldAssign A r e uy)
-  then show ?case sorry
+  then show ?case sorry (* TODO: FieldAssign *)
 qed (simp_all)
 
 lemma wf_set_after_union:
@@ -545,6 +626,18 @@ lemma entailsI:
   assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
   shows "entails A B"
   by (simp add: assms entails_def subsetI)
+
+lemma assign_var_state_inverse:
+  assumes "\<omega> = assign_var_state x v \<alpha>"
+  shows "\<alpha> = assign_var_state x (get_store \<alpha> x) \<omega>"
+  by (simp add: assign_var_state_def assms full_state_ext)
+
+
+lemma wf_state_then_value:
+  assumes "variables \<Delta> x = Some ty"
+      and "wf_state \<Delta> \<omega>"
+    shows "\<exists>v \<in> ty. get_store \<omega> x = Some v"
+  by (metis assms(1) assms(2) domD domI typed_def typed_store_def wf_state_def)
 
 lemma Viper_implies_SL_proof_aux:
   fixes f :: "(('v, 'a) abs_state list \<times> ('v, 'a) abs_state) \<Rightarrow> ('v, 'a) abs_state set"
@@ -875,7 +968,7 @@ next
       by (simp add: Stabilize_self_framing)
   qed (simp add: r)
   moreover have "self_framing (?A \<otimes> P)"
-    using calculation proofs_are_self_framing by presburger
+    using Inhale(2) calculation proofs_are_self_framing by presburger
   moreover have "Set.filter sep_algebra_class.stable (snd ` SA) \<subseteq> ?A"
     using Stabilize_filter_stable by blast
 
@@ -978,10 +1071,7 @@ next
       using Stabilize_def by blast
     then have "stabilize \<omega> \<in> P"
       using r by force
-    then show "\<omega> \<in> P" sorry (* TODO: Needs something from wf_assertion *)
-(*
-      by (metis Assert.prems(2) pure_larger_stabilize stabilize_def wf_assertionE wf_abs_stmt.simps(4))
-*)
+    then show "\<omega> \<in> P" using wf_assertion_stabilize Assert(2) by simp
   qed
   moreover have "\<Union> (f ` SA) = snd ` SA"
   proof
@@ -993,9 +1083,140 @@ next
   ultimately show ?case
     by (metis RuleAssert Stabilize_self_framing)
 next
-  case (LocalAssign x1a x2a)
-  then show ?case sorry
+  case (LocalAssign x e)
+
+  let ?ty = "the (variables \<Delta> x)"
+  let ?A = "post_substitute_var_assert x e (Stabilize (snd ` SA))"
+
+  have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (\<exists>v. variables \<Delta> x = Some ?ty \<and> e (snd \<omega>) = Some v \<and> v \<in> ?ty
+  \<and> f \<omega> = { assign_var_state x (Some v) (snd \<omega>) })"
+    using LocalAssign.prems(1) by fastforce
+
+  have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.LocalAssign x e [?A]"
+  proof (rule RuleLocalAssign)
+    show "self_framing (Stabilize (snd ` SA))"
+      using Stabilize_self_framing by blast
+    show "framed_by_exp (Stabilize (snd ` SA)) e"
+    proof (rule framed_by_expI)
+      fix \<omega> assume "\<omega> \<in> Stabilize (snd ` SA)"
+      then have "stabilize \<omega> \<in> snd ` SA"
+        using in_Stabilize by blast
+      then obtain v where "variables \<Delta> x = Some ?ty \<and> e (stabilize \<omega>) = Some v \<and> v \<in> ?ty"
+        using r by fastforce
+      moreover have "wf_exp e"
+        using LocalAssign(2) by auto
+      ultimately have "e \<omega> = Some v"
+        by (meson max_projection_prop_stable_stabilize mpp_smaller wf_expE)
+      then show "e \<omega> \<noteq> None" by simp
+    qed
+  qed
+  moreover have "?A = Stabilize (\<Union> (f ` SA))" (is "?A = ?B")
+  proof (rule self_framing_ext)
+    show "self_framing (Stabilize (\<Union> (f ` SA)))"
+      using Stabilize_self_framing by auto
+    then show "self_framing (post_substitute_var_assert x e (Stabilize (snd ` SA)))"
+      using LocalAssign(2) calculation proofs_are_self_framing by blast
+    fix \<omega> assume asm0: "stable \<omega>" "\<omega> \<in> post_substitute_var_assert x e (Stabilize (snd ` SA))"
+    then obtain \<omega>' where "\<omega>' \<in> Stabilize (snd ` SA)" "\<omega> = assign_var_state x (e \<omega>') \<omega>'"
+      using post_substitute_var_assert_def substitute_var_state_def by auto
+    then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' = snd \<alpha>"
+      by (meson image_iff in_Stabilize)
+    then obtain v where "variables \<Delta> x = Some ?ty \<and> e (stabilize \<omega>') = Some v \<and> v \<in> ?ty
+  \<and> f \<alpha> = {assign_var_state x (Some v) (stabilize \<omega>')}"
+      using r by presburger
+    moreover have "stable \<omega>'"
+      using \<open>\<omega> = assign_var_state x (e \<omega>') \<omega>'\<close> asm0(1) stable_assign_var_state by auto
+    then show "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+      by (metis (no_types, opaque_lifting) SUP_upper \<open>\<alpha> \<in> SA\<close> \<open>\<omega> = assign_var_state x (e \<omega>') \<omega>'\<close> already_stable calculation in_Stabilize insert_subset stabilize_assign_var)
+  next
+    fix \<omega> assume "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+    then obtain \<alpha> where "\<alpha> \<in> SA" "\<omega> \<in> f \<alpha>"
+      using already_stable by fastforce
+    then obtain v where "variables \<Delta> x = Some ?ty \<and> e (snd \<alpha>) = Some v \<and> v \<in> ?ty
+  \<and> f \<alpha> = {assign_var_state x (Some v) (snd \<alpha>) }"
+      using r by blast
+    then have "\<omega> = assign_var_state x (Some v) (snd \<alpha>)"
+      using \<open>\<omega> \<in> f \<alpha>\<close> by blast
+    then have "\<omega> = substitute_var_state x e (snd \<alpha>)"
+      using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> e (snd \<alpha>) = Some v \<and> v \<in> the (variables \<Delta> x) \<and> f \<alpha> = {assign_var_state x (Some v) (snd \<alpha>)}\<close> substitute_var_state_def by presburger
+    moreover have "snd \<alpha> \<in> Stabilize (snd ` SA)"
+      by (metis (no_types, lifting) LocalAssign(3) Range.intros \<open>\<alpha> \<in> SA\<close> already_stable in_Stabilize prod.collapse semantics.wf_set_def semantics.wf_state_def semantics_axioms snd_eq_Range)
+    ultimately show "\<omega> \<in> post_substitute_var_assert x e (Stabilize (snd ` SA))"
+      using post_substitute_var_assert_def by fast
+  qed
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.LocalAssign x e [Stabilize (\<Union> (f ` SA))]"
+    by argo
 next
+  case Skip
+  then have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] Skip [Stabilize (snd ` SA)]"
+    using RuleSkip Stabilize_self_framing by blast
+  moreover have "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> f \<omega> = {snd \<omega>}"
+    using Skip.prems(1) by blast
+  ultimately show ?case
+    by (metis (no_types, lifting) SUP_cong UNION_singleton_eq_range)
+next
+  case (Havoc x)
+
+  let ?ty = "the (variables \<Delta> x)"
+  let ?A = "Stabilize (snd ` SA)"
+  let ?B = "exists_assert \<Delta> x ?A"
+
+  have r: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> (variables \<Delta> x = Some ?ty \<and> f \<alpha> = { assign_var_state x (Some v) (snd \<alpha>) |v. v \<in> ?ty})"
+    using Havoc by fastforce
+(*
+    ?\<omega>7 \<in> SA \<Longrightarrow> red_stmt \<Delta> (abs_stmt.Havoc x) (snd ?\<omega>7) (f ?\<omega>7)
+    wf_abs_stmt \<Delta> (abs_stmt.Havoc x)
+    wf_set \<Delta> (snd ` SA)
+*)
+  have "\<Delta> \<turnstile> [?A] abs_stmt.Havoc x [?B]"
+  proof (rule RuleHavoc)
+    show "self_framing (Stabilize (snd ` SA))"
+      using Stabilize_self_framing by blast
+  qed
+  moreover have "?B = Stabilize (\<Union> (f ` SA))"
+  proof (rule self_framing_ext)
+    show "self_framing (exists_assert \<Delta> x (Stabilize (snd ` SA)))"
+      using self_framing_exists_assert Stabilize_self_framing by blast
+    show "self_framing (Stabilize (\<Union> (f ` SA)))"
+      using Stabilize_self_framing by blast
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> exists_assert \<Delta> x (Stabilize (snd ` SA))"
+    then obtain v0 v ty where asm1: "v0 \<in> ty" "get_store \<omega> x = Some v0" "variables \<Delta> x = Some ty"
+      "v \<in> ty" "assign_var_state x (Some v) \<omega> \<in> ?A" using exists_assertE[of \<omega> \<Delta> x] by meson
+    then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize (assign_var_state x (Some v) \<omega>) = snd \<alpha>"
+      by auto
+    then have "assign_var_state x (Some v) \<omega> = snd \<alpha>"
+      by (metis already_stable asm0(1) stable_assign_var_state)
+    then have "\<omega> = assign_var_state x (Some v0) (snd \<alpha>)"
+      by (metis asm1(2) assign_var_state_inverse)
+    then have "stabilize \<omega> \<in> f \<alpha>"
+      using \<open>\<alpha> \<in> SA\<close> already_stable asm0(1) asm1(1) asm1(3) r by auto
+    then show "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+      using \<open>\<alpha> \<in> SA\<close> by auto
+  next
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+    then obtain \<alpha> where "\<alpha> \<in> SA" "\<omega> \<in> f \<alpha>"
+      by (metis UN_E already_stable in_Stabilize)
+    then obtain v where "variables \<Delta> x = Some ?ty \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)" "v \<in> ?ty"
+      using r by blast
+    then have "wf_state \<Delta> (snd \<alpha>)"
+      using Havoc.prems(3) \<open>\<alpha> \<in> SA\<close> wf_set_def by auto
+    then obtain v' where "get_store (snd \<alpha>) x = Some v'" "v' \<in> ?ty"
+      using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> wf_state_then_value by blast
+    show "\<omega> \<in> exists_assert \<Delta> x (Stabilize (snd ` SA))"
+      using \<open>v \<in> ?ty\<close>
+    proof (rule exists_assertI)
+      show "get_store \<omega> x = Some v"
+        by (simp add: \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> assign_var_state_def)
+      show "variables \<Delta> x = Some (the (variables \<Delta> x))"
+        using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> by blast
+      show "assign_var_state x (Some v') \<omega> \<in> Stabilize (snd ` SA)"
+        by (metis (no_types, lifting) \<open>\<And>thesis. (\<And>v. \<lbrakk>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>); v \<in> the (variables \<Delta> x)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> \<open>\<alpha> \<in> SA\<close> \<open>get_store (snd \<alpha>) x = Some v'\<close> already_stable asm0(1) in_Stabilize insert_iff insert_image semantics.assign_var_state_inverse semantics.stabilize_assign_var semantics_axioms)
+    qed (simp add: \<open>v' \<in> ?ty\<close>)
+  qed
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.Havoc x [Stabilize (\<Union> (f ` SA))]"
+    by argo
+next
+
   case (FieldAssign r e)
 
   then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow>
@@ -1369,14 +1590,6 @@ wf_set \<Delta> (snd ` SA)
 next
   case (Scope x1a x2a C)
   then show ?case sorry
-next
-  case Skip
-  then have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] Skip [Stabilize (snd ` SA)]"
-    using RuleSkip Stabilize_self_framing by blast
-  moreover have "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> f \<omega> = {snd \<omega>}"
-    using Skip.prems(1) by blast
-  ultimately show ?case
-    by (metis (no_types, lifting) SUP_cong UNION_singleton_eq_range)
 next
   case (Assume A)
   then show ?case sorry

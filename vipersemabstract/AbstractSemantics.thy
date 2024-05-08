@@ -188,7 +188,8 @@ definition rel_stable_assertion where
 definition wf_set where
   "wf_set \<Delta> S \<longleftrightarrow> (\<forall>x \<in> S. wf_state \<Delta> x)"
 
-
+definition assign_var_state :: "var \<Rightarrow> 'v option \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
+  "assign_var_state x v \<omega> = set_store \<omega> ((get_store \<omega>)(x := v))"
 
 section \<open>Operational semantics\<close>
 
@@ -216,12 +217,10 @@ where
 
 \<comment>\<open>No need to handle the case where the variable is not defined, since it is part of well-definedness of a program\<close>
 | RedLocalAssign: "\<lbrakk>variables \<Delta> x = Some ty; e \<omega> = Some v; v \<in> ty \<rbrakk> \<Longrightarrow>
-   red_stmt \<Delta> (LocalAssign x e) \<omega> ({set_store \<omega> ((get_store \<omega>)(x := Some v)) })"
-
+   red_stmt \<Delta> (LocalAssign x e) \<omega> ({assign_var_state x (Some v) \<omega>})"
 
 | RedHavoc: "variables \<Delta> x = Some ty \<Longrightarrow>
-  red_stmt \<Delta> (Havoc x) \<omega> ({set_store \<omega> ((get_store \<omega>)(x := Some v)) |v. v \<in> ty})"
-
+  red_stmt \<Delta> (Havoc x) \<omega> ({ assign_var_state x (Some v) \<omega> |v. v \<in> ty})"
 
 | RedFieldAssign: "\<lbrakk> r \<omega> = Some hl ; e \<omega> = Some v ; has_write_perm (get_state \<omega>) hl; heap_locs \<Delta> hl = Some ty; v \<in> ty \<rbrakk>
   \<Longrightarrow> red_stmt \<Delta> (FieldAssign r e) \<omega> {set_state \<omega> (set_value (get_state \<omega>) hl v)}"
@@ -277,6 +276,11 @@ Needs type context to havoc
 
 definition self_framing where
   "self_framing A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"
+
+lemma self_framingI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A"
+  shows "self_framing A"
+  using self_framing_def assms by blast
 
 lemma self_framing_eq:
   "self_framing A \<longleftrightarrow> A = Stabilize A"
@@ -354,7 +358,25 @@ subsection \<open>wf_assertion\<close>
 
 (* TODO: Is it needed? *)
 definition wf_assertion :: "('v, 'r) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> undefined A" (*(\<forall>x' x. pure_larger x' x \<and> A x \<longrightarrow> A x')" *)
+  "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+
+lemma self_framing_wfI:
+  assumes "wf_assertion \<Delta> A"
+      and "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> stabilize \<omega> \<in> A"
+    shows "self_framing A"
+  unfolding self_framing_def
+proof -
+  have "\<And>\<omega>. stabilize \<omega> \<in> A \<Longrightarrow> \<omega> \<in> A"
+  proof -
+    fix \<omega> assume "stabilize \<omega> \<in> A"
+    then have "pure_larger \<omega> (stabilize \<omega>)"
+      using core_is_pure decompose_stabilize_pure pure_def pure_larger_def by blast
+    then show "\<omega> \<in> A"
+      using \<open>stabilize \<omega> \<in> A\<close> assms(1) wf_assertion_def by blast
+  qed
+  then show "\<forall>\<omega>. (\<omega> \<in> A) = (stabilize \<omega> \<in> A)" using assms(2) by blast
+qed
+
 
 definition wf_exp where
   "wf_exp e \<longleftrightarrow> (\<forall>a b v. a \<succeq> b \<and> e b = Some v \<longrightarrow> e a = Some v) \<and> (\<forall>a. e a = e |a| )"
@@ -453,11 +475,11 @@ substitute_state should be used only when \<^prop>\<open>e \<omega> \<noteq> Non
 definition assertion_frame_exp :: "('v, 'a) abs_state assertion \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> bool" where
   "assertion_frame_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> = e (stabilize \<omega>))"
 
-definition substitute_var_state :: "var \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
-  "substitute_var_state x e \<omega> = ((Ag ((get_store \<omega>)(x := e \<omega>)), Ag (get_trace \<omega>)), get_state \<omega>)"
+definition substitute_var_state where
+  "substitute_var_state x e \<omega> = assign_var_state x (e \<omega>) \<omega>"
 
 definition post_substitute_var_assert :: "var \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
-  "post_substitute_var_assert x e A = { \<omega>' |\<omega> \<omega>'. \<omega> \<in> A \<and> \<omega>' = substitute_var_state x e \<omega>}"
+  "post_substitute_var_assert x e A = substitute_var_state x e ` A"
 
 definition set_value_state :: "'r \<Rightarrow> 'v \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
   "set_value_state l v \<omega> = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)), set_value (get_state \<omega>) l v)"
@@ -540,6 +562,33 @@ Replaced by the new uniform one below in Hongyi's thesis.\<close>
 \<comment> \<open>Replaced to the new one above in Hongyi's thesis. The new one simply simulates reduction of this statement, with assumptions ensuring the simulation doesn't cause error.
 | RuleFieldAssign: "\<lbrakk> self_framing (A && points_to_value r e') ; framed_by_exp (A && points_to r) e \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A && points_to_value r e'] FieldAssign r e [A && points_to_value r e]"\<close>
+
+
+
+\<comment> \<open>
+| RuleLocalAssign: "\<lbrakk> self_framing A; framed_by_exp A e; x \<notin> free_vars \<Delta> A \<rbrakk> \<Longrightarrow>  \<Delta> \<turnstile> [A] LocalAssign x e [ A && var_equal_exp x e ]"
+Change to new one for Hongyi's thesis. The reason not to do substitution in precondition is that it is hard to express framing requirements.
+Intuitively, since \<^term>\<open>e\<close> is not evaluated in post-condition, it is not reasonable to express "post-condition \<^term>\<open>A\<close> frames \<^term>\<open>e\<close>".
+Assuming "A[x \<mapsto> e] frames e" makes the rule even more complicated than the one below.
+Moreover, \<^prop>\<open>framed_by_exp A e\<close> doesn't work here: assume we want to have rule as "\<turnstile> {A[x \<mapsto> e]} x := e {A}",
+then simply requiring \<^prop>\<open>framed_by_exp A e\<close> is wrong: due to the additional characterization of evaluation error case of \<^const>\<open>framed_by_exp\<close>,
+this rule cannot express "\<turnstile> {x \<noteq> 0} x := 0/x {x = 0}" (if \<^term>\<open>A\<close> is \<^prop>\<open>x = 0\<close>,
+then "0/x" always evaluates to \<^const>\<open>None\<close>, and \<^term>\<open>A\<close> can never \<^const>\<open>framed_by_exp\<close> "0/x").
+Explanation of assumptions:
+- To guarantee that \<^const>\<open>assign_var_state\<close> works under \<^prop>\<open>e \<omega> \<noteq> None\<close>, \<^prop>\<open>framed_by_exp A e\<close> is necessary.
+- To get self-framingness of post-condition, \<^prop>\<open>assertion_frame_exp A e\<close> is necessary.
+This rule is sound because: for every state \<^term>\<open>\<omega>\<close> satisfying \<^term>\<open>A\<close>. \<^term>\<open>e \<omega>\<close> evaluates to \<^term>\<open>Some v\<close>, and for the post-state \<^term>\<open>\<omega>'\<close>, the existence of \<^term>\<open>\<omega>\<close> makes it satisfy \<^term>\<open>post_substitute_assert x e A\<close>.
+This rule should be complete (maybe not yet): as long as the LocalAssign statement reduces for pre-condition \<^term>\<open>A\<close>, \<^term>\<open>e\<close> must evaluate to not \<^const>\<open>None\<close> for every state in \<^term>\<open>A\<close>, thus \<^prop>\<open>framed_by_exp A e\<close>. \<^prop>\<open>assertion_frame_exp A e\<close> is a framing requirement, and a correct reduction should satisfy it.
+\<close>
+| RuleLocalAssign: "\<lbrakk> self_framing A; framed_by_exp A e \<rbrakk> \<Longrightarrow> _ \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
+
+(*
+  assumes "wf_exp e"
+      and "self_framing A"
+      and "framed_by_exp A e"
+    shows "assertion_frame_exp A e"
+*)
+
 
 
 \<comment>\<open>Like inhale and the if rule, needs to frame r and e.
