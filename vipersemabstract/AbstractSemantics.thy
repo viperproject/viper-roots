@@ -29,11 +29,14 @@ datatype ('a, 'v, 'r) abs_stmt =
 \<comment>\<open>Assignments\<close>
 | LocalAssign var "('a, 'v) exp"
 | Havoc var
+
 | FieldAssign "('a, 'r) exp" "('a, 'v) exp"
+(* TODO: Probably should be a parameter of the locale! *)
 
 
 \<comment>\<open>Misc\<close>
-| Label label
+| Label label (* Should this one be a parameter of the locale as well? *)
+
 | Scope "'v abs_vtyp" "('a, 'v, 'r) abs_stmt"
 | Skip
 
@@ -61,6 +64,7 @@ locale semantics =
   assumes frame_preserving_writing_orig: "Some x = a \<oplus> b \<Longrightarrow> stable b \<Longrightarrow> has_write_perm_only a hl \<Longrightarrow> Some (set_value x hl v) = set_value a hl v \<oplus> b"
       and has_write_perm_only_same: "has_write_perm_only a hl \<Longrightarrow> has_write_perm_only b hl \<Longrightarrow> stabilize a = stabilize b"
   (* TODO: WRONG! Needs something about the value! *)
+      and has_perm_only_stabilize: "has_write_perm_only a hl \<longleftrightarrow> has_write_perm_only (stabilize a) hl"
 
       and set_value_then_has_value: "has_write_perm_only a hl \<Longrightarrow> has_value (set_value a hl v) hl v"
 
@@ -191,6 +195,11 @@ definition wf_set where
 definition assign_var_state :: "var \<Rightarrow> 'v option \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
   "assign_var_state x v \<omega> = set_store \<omega> ((get_store \<omega>)(x := v))"
 
+
+definition stable_on where
+  "stable_on \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
+
+
 section \<open>Operational semantics\<close>
 
 inductive red_stmt :: "('v, 'r) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 'r) abs_stmt \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state set \<Rightarrow> bool"
@@ -203,8 +212,8 @@ where
 | RedSkip: "red_stmt \<Delta> Skip \<omega> ({\<omega>})"
 
 | RedAssertTrue: "\<lbrakk> \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assert A) \<omega> ({\<omega>})"
-| RedAssumeTrue: "\<lbrakk> rel_stable_assertion \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
-| RedAssumeFalse: "\<lbrakk> rel_stable_assertion \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
+| RedAssumeTrue: "\<lbrakk> stable_on \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
+| RedAssumeFalse: "\<lbrakk> stable_on \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
 
 | RedInhale: "\<lbrakk> rel_stable_assertion \<omega> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Inhale A) \<omega> (Set.filter stable ({\<omega>} \<otimes> A))"
 | RedExhale: "\<lbrakk> a \<in> A ; Some \<omega> = \<omega>' \<oplus> a ; stable \<omega>' \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Exhale A) \<omega> {\<omega>'}"
@@ -238,6 +247,7 @@ inductive_cases red_stmt_Havoc_elim[elim!]: "red_stmt \<Delta> (Havoc x) \<omega
 inductive_cases red_stmt_Assign_elim[elim!]: "red_stmt \<Delta> (LocalAssign x e) \<omega> S"
 inductive_cases red_stmt_If_elim[elim!]: "red_stmt \<Delta> (If b C1 C2) \<omega> S"
 inductive_cases red_stmt_Assert_elim[elim!]: "red_stmt \<Delta> (Assert A) \<omega> S"
+inductive_cases red_stmt_Assume_elim[elim!]: "red_stmt \<Delta> (Assume A) \<omega> S"
 inductive_cases red_stmt_FieldAssign_elim[elim!]: "red_stmt \<Delta> (FieldAssign l e) \<omega> S"
 
 
@@ -327,8 +337,6 @@ subsection \<open>General concepts\<close>
 definition framed_by where
   "framed_by A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion \<omega> B)"
 
-
-
 definition framed_by_exp where
   "framed_by_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> \<noteq> None)"
 
@@ -381,6 +389,18 @@ qed
 definition wf_exp where
   "wf_exp e \<longleftrightarrow> (\<forall>a b v. a \<succeq> b \<and> e b = Some v \<longrightarrow> e a = Some v) \<and> (\<forall>a. e a = e |a| )"
 
+lemma wf_expI:
+  assumes "\<And>a. e a = e |a|"
+      and "\<And>a b v. a \<succeq> b \<and> e b = Some v \<Longrightarrow> e a = Some v"
+    shows "wf_exp e"
+  using assms(1) assms(2) wf_exp_def by blast
+
+lemma wf_exp_coreE:
+  assumes "wf_exp e"
+  shows "e a = e |a|"
+  by (meson assms wf_exp_def)
+
+
 fun wf_abs_stmt where
   "wf_abs_stmt \<Delta> Skip \<longleftrightarrow> True"
 | "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
@@ -412,7 +432,35 @@ fun havoc_list where
 subsection \<open>Assertion connectives\<close>
 
 definition pure_Stabilize where
-  "pure_Stabilize b = { \<omega> |\<omega>. b \<omega> = Some True}"
+  "pure_Stabilize b = { \<omega> |\<omega>. b \<omega> = Some True \<and> pure \<omega>}"
+
+lemma pure_Stabilize_eq:
+  assumes "wf_exp b"
+      and "self_framing A" (* or wf_assertion A *)
+  shows "A \<otimes> pure_Stabilize b = Set.filter (\<lambda>\<omega>. b \<omega> = Some True) A" (is "?P = ?Q")
+proof
+  show "?P \<subseteq> ?Q"
+  proof
+    fix x assume "x \<in> ?P"
+    then obtain a p where "Some x = a \<oplus> p" "a \<in> A" "b p = Some True" "pure p"
+      by (smt (verit, ccfv_SIG) mem_Collect_eq pure_Stabilize_def x_elem_set_product)
+    then have "b x = Some True"
+      by (meson assms(1) greater_equiv wf_exp_def)
+    moreover have "x \<in> A"
+      by (metis CollectD CollectI Stabilize_def \<open>Some x = a \<oplus> p\<close> \<open>a \<in> A\<close> \<open>pure p\<close> assms(2) cancellative core_is_pure core_is_smaller greater_equiv plus_pure_stabilize_eq pure_def self_framing_eq smaller_than_core)
+    ultimately show "x \<in> ?Q"
+      by simp
+  qed
+  show "?Q \<subseteq> ?P"
+  proof
+    fix x assume "x \<in> ?Q"
+    then have "Some x = x \<oplus> |x|"
+      using core_is_smaller by auto
+    then show "x \<in> ?P"
+      by (smt (verit, ccfv_threshold) CollectI \<open>x \<in> Set.filter (\<lambda>\<omega>. b \<omega> = Some True) A\<close> assms(1) max_projection_prop_def max_projection_prop_pure_core member_filter pure_Stabilize_def wf_exp_def x_elem_set_product)
+  qed
+qed
+
 
 definition negate where
   "negate b \<omega> = (if b \<omega> = None then None else Some (\<not> (the (b \<omega>))))"
@@ -481,11 +529,13 @@ definition substitute_var_state where
 definition post_substitute_var_assert :: "var \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
   "post_substitute_var_assert x e A = substitute_var_state x e ` A"
 
+(*
 definition set_value_state :: "'r \<Rightarrow> 'v \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
   "set_value_state l v \<omega> = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)), set_value (get_state \<omega>) l v)"
+*)
 
 definition substitute_field_state :: "(('v, 'a) abs_state \<rightharpoonup> 'r) \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
-  "substitute_field_state r e \<omega> = set_value_state (the (r \<omega>)) (the (e \<omega>)) \<omega>"
+  "substitute_field_state r e \<omega> = set_state \<omega> (set_value (get_state \<omega>) (the (r \<omega>)) (the (e \<omega>)))"
 
 definition post_substitute_field_assert :: "(('v, 'a) abs_state \<rightharpoonup> 'r) \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
   "post_substitute_field_assert r e A = { \<omega>' |\<omega>' \<omega>. \<omega> \<in> A \<and> \<omega>' = substitute_field_state r e \<omega>}"
@@ -515,12 +565,32 @@ proof
 qed
 
 
-
+definition self_framing_on where
+  "self_framing_on A P \<longleftrightarrow> (\<forall>\<omega> \<in> A. stabilize \<omega> \<in> P \<longleftrightarrow> \<omega> \<in> P)"
 
 section \<open>SL Proof\<close>
 
 definition depends_on_ag_store_only where
   "depends_on_ag_store_only e \<longleftrightarrow> (\<forall>\<sigma> \<gamma> \<gamma>'. e (\<sigma>, \<gamma>) = e (\<sigma>, \<gamma>'))"
+
+(*
+set_state \<omega> (set_value (get_state \<omega>) (the (r \<omega>)) (the (e \<omega>)))"
+*)
+(*
+(* \<exists>l v. b[r \<rightarrow> v] \<inter> r = e[r \<rightarrow> v] 
+r and *r
+TODO TODO TODO
+*)
+
+*)
+
+(* What if r depends on e? b can also mention this! *)
+
+(* \<omega>' is the old state! *)
+definition pure_post_field_assign where
+  "pure_post_field_assign r e b = { \<omega> |\<omega> l v. let \<omega>' = set_state \<omega> (set_value (get_state \<omega>) l v) in
+  (b \<omega>' = Some True \<and> has_write_perm_only (get_state \<omega>) (the (r \<omega>')) \<and> has_value (get_state \<omega>) (the (r \<omega>')) (the (e \<omega>')))}"
+
 
 inductive SL_proof :: "('v, 'r) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> (('v, 'a) abs_state, 'v, 'r) abs_stmt \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool"
    ("_ \<turnstile> [_] _ [_]" [51,0,0] 81)
@@ -543,6 +613,9 @@ Example:
 \<comment>\<open>Assert does not behave like exhale: It forces the *whole* heap to satisfy P.
 Because there is not frame rule, it can be used to express leak checks, or absence of obligations.\<close>
 
+| RuleAssume: "self_framing A \<Longrightarrow> self_framing_on A P \<Longrightarrow> _ \<turnstile> [A] Assume P [A \<inter> P]"
+
+
 | RuleHavoc: "self_framing A \<Longrightarrow> \<Delta> \<turnstile> [A] Havoc x [exists_assert \<Delta> x A]"
 
 (*
@@ -556,10 +629,35 @@ Because there is not frame rule, it can be used to express leak checks, or absen
   \<Longrightarrow> \<Delta> \<turnstile> [A && points_to r] FieldAssign r e [A && points_to_value r e]"
 Replaced by the new uniform one below in Hongyi's thesis.\<close>
 
-| RuleFieldAssign: "\<lbrakk> self_framing (A \<otimes> points_to r); framed_by_exp (A \<otimes> points_to r) e; assertion_frame_exp (A \<otimes> points_to r) e \<rbrakk>
-  \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r] FieldAssign r e [post_substitute_field_assert r e (A \<otimes> points_to r)]"
+ (* ; assertion_frame_exp (A \<otimes> points_to r) e *)
+(* Precondition should be A \<otimes> points_to_r e' for some e', framed_by A *)
 
-\<comment> \<open>Replaced to the new one above in Hongyi's thesis. The new one simply simulates reduction of this statement, with assumptions ensuring the simulation doesn't cause error.
+(* Cannot split acc(x.f) * acc(y.f) * x.f = y.f *)
+(* Needs a pure equation b on the side *)
+(* or entails... *)
+
+(*
+| RuleFieldAssignWithEntails: "\<lbrakk> entails B (A \<otimes> points_to r); self_framing A; framed_by_exp (A \<otimes> points_to r) b; framed_by_exp (A \<otimes> points_to r) e \<rbrakk>
+  \<Longrightarrow> _ \<turnstile> [B] FieldAssign r e [post_substitute_field_assert r e (A \<otimes> points_to r)]"
+*)
+
+| RuleFieldAssign: "\<lbrakk> self_framing A; framed_by_exp A r; framed_by_exp (A \<otimes> points_to r) b; wf_exp b;
+  framed_by_exp (A \<otimes> points_to r \<otimes> pure_Stabilize b) e \<rbrakk>
+  \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r \<otimes> pure_Stabilize b] FieldAssign r e [A \<otimes> pure_post_field_assign r e b]"
+
+
+(* Postcondition should be:
+A \<otimes> points_to r \<otimes> (\<exists>v. b[r \<rightarrow> v] \<inter> r = e[r \<rightarrow> v])
+*)
+
+
+(*
+| RuleFieldAssignOld: "\<lbrakk> self_framing (A \<otimes> points_to r); framed_by_exp (A \<otimes> points_to r) e \<rbrakk>
+  \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r] FieldAssign r e [post_substitute_field_assert r e (A \<otimes> points_to r)]"
+*)
+
+\<comment> \<open>Replaced to the new one above in Hongyi's thesis. The new one simply simulates reduction of this statement,
+  with assumptions ensuring the simulation doesn't cause error.
 | RuleFieldAssign: "\<lbrakk> self_framing (A && points_to_value r e') ; framed_by_exp (A && points_to r) e \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A && points_to_value r e'] FieldAssign r e [A && points_to_value r e]"\<close>
 
@@ -636,7 +734,7 @@ Might need an entailment...\<close>
 
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile> [A] C1 [R] ; \<Delta> \<turnstile> [R] C2 [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Seq C1 C2 [B]"
 
-| RuleIf: "\<lbrakk> framed_by_exp A b; \<Delta> \<turnstile> [A \<inter> pure_Stabilize b] C1 [B1] ; \<Delta> \<turnstile> [A \<inter> pure_Stabilize (negate b)] C2 [B2] \<rbrakk>
+| RuleIf: "\<lbrakk> self_framing A; framed_by_exp A b; \<Delta> \<turnstile> [A \<otimes> pure_Stabilize b] C1 [B1] ; \<Delta> \<turnstile> [A \<otimes> pure_Stabilize (negate b)] C2 [B2] \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A] If b C1 C2 [B1 \<union> B2]"
 
 (*

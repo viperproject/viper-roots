@@ -415,6 +415,7 @@ proof
     by (metis (mono_tags, lifting) assms(1) max_projection_prop_def max_projection_prop_stable_stabilize wf_expE)
 qed
 
+(*
 lemma self_framing_conj_framed_by_exp:
   assumes "framed_by_exp A b"
       and "self_framing A"
@@ -422,6 +423,7 @@ lemma self_framing_conj_framed_by_exp:
       and "wf_exp b"
     shows "self_framing (A \<inter> pure_Stabilize b)"
   by (smt (verit, del_insts) Int_Collect assms(1) assms(2) assms(4) pure_Stabilize_def self_framing_def wf_exp_framed_by_stabilize)
+*)
 
 lemma framed_by_negate:
   assumes "framed_by_exp A b"
@@ -453,7 +455,7 @@ goal (1 subgoal):
 
 
 lemma negate_sat_equiv:
-  "\<omega> \<in> pure_Stabilize (negate b) \<longleftrightarrow> b \<omega> = Some False"
+  "\<omega> \<in> pure_Stabilize (negate b) \<longleftrightarrow> pure \<omega> \<and> b \<omega> = Some False"
   by (smt (verit, del_insts) mem_Collect_eq negate_def option.collapse option.discI pure_Stabilize_def)
 
 
@@ -559,10 +561,25 @@ lemma self_framing_union:
     shows "self_framing (A \<union> B)"
   using assms(1) assms(2) self_framing_def by auto
 
+lemma in_star_pure_stab:
+  assumes "\<omega> \<in> A"
+      and "b \<omega> = Some True"
+      and "wf_exp b"
+    shows "\<omega> \<in> A \<otimes> pure_Stabilize b"
+proof -
+  have "Some \<omega> = \<omega> \<oplus> |\<omega>|"
+    using core_is_smaller by auto
+  then show ?thesis
+    by (smt (verit, ccfv_threshold) CollectI assms(1) assms(2) assms(3) core_is_pure pure_def semantics.pure_Stabilize_def semantics_axioms wf_exp_def x_elem_set_product)
+qed
+
+
+(*
 lemma self_framing_if:
   assumes "framed_by_exp A b"
-      and "self_framing (A \<inter> pure_Stabilize b)"
-      and "self_framing (A \<inter> pure_Stabilize (negate b))"
+      and "self_framing (A \<otimes> pure_Stabilize b)"
+      and "self_framing (A \<otimes> pure_Stabilize (negate b))"
+      and "wf_exp b"
     shows "self_framing A"
 proof (rule self_framingI)
   fix \<omega>
@@ -572,22 +589,142 @@ proof (rule self_framingI)
     then show ?B
     proof (cases "b \<omega> = Some True")
       case True
+      then have "\<omega> \<in> A \<otimes> pure_Stabilize b"
+        by (simp add: \<open>\<omega> \<in> A\<close> assms(4) in_star_pure_stab)
       then show ?thesis
-        by (smt (verit, best) Int_Collect \<open>\<omega> \<in> A\<close> assms(2) pure_Stabilize_def self_framing_def)
+        by (smt (verit, del_insts) CollectD assms(2) prove_in_up_close_core pure_Stabilize_def self_framing_def stabilize_is_stable stable_in_up_close_core x_elem_set_product)
     next
       case False
       then have "negate b \<omega> = Some True"
         by (smt (verit, del_insts) \<open>\<omega> \<in> A\<close> assms(1) option.exhaust option.sel framed_by_exp_def negate_def)
       then show ?thesis
-        by (smt (verit, ccfv_SIG) False Int_iff \<open>\<omega> \<in> A\<close> assms(1) assms(3) framed_by_expE negate_sat_equiv option.inject self_framing_def)
+        by (meson \<open>\<omega> \<in> A\<close> assms(3) assms(4) in_star_pure_stab negate_sat_equiv prove_in_up_close_core self_framing_def stabilize_is_stable stable_in_up_close_core wf_exp_negate x_elem_set_product)
     qed
   next
     assume ?B
     then show ?A
+    proof (cases "b (stabilize \<omega>) = Some True")
+      case True
+      then have "stabilize \<omega> \<in> A \<otimes> pure_Stabilize b"
+        by (simp add: \<open>stabilize \<omega> \<in> A\<close> assms(4) in_star_pure_stab)
+      then have "\<omega> \<in> A \<otimes> pure_Stabilize b"
+        using assms(2) self_framing_def by blast
+
+
+
+      then show ?thesis sorry
+      
       by (smt (verit, best) Int_Collect Int_iff assms(1) assms(2) assms(3) framed_by_expE negate_sat_equiv pure_Stabilize_def self_framing_def)
   qed
 qed
+*)
 
+lemma self_framing_and:
+  assumes "self_framing A"
+      and "self_framing_on A P"
+    shows "self_framing (A \<inter> P)"
+proof (rule self_framingI)
+  fix \<omega> 
+  show "\<omega> \<in> A \<inter> P \<longleftrightarrow> stabilize \<omega> \<in> A \<inter> P" (is "?P \<longleftrightarrow> ?Q")
+    by (metis IntD1 IntD2 IntI assms(1) assms(2) self_framing_def self_framing_on_def)
+qed
+
+lemma extract_from_points_to:
+  assumes "\<omega> \<in> A \<otimes> points_to r"
+  shows "\<exists>a p hl. Some \<omega> = a \<oplus> p \<and> a \<in> A \<and> r p = Some hl \<and> has_write_perm_only (get_state p) hl"
+proof -
+  obtain a p where "Some \<omega> = a \<oplus> p \<and> a \<in> A \<and> p \<in> points_to r"
+    by (meson assms x_elem_set_product)
+  then show ?thesis
+    by (smt (verit, best) mem_Collect_eq points_to_def)
+qed
+
+lemma self_framing_points_to:
+  assumes "self_framing A"
+      and "framed_by_exp A r"
+      and "wf_exp r"
+    shows "self_framing (A \<otimes> points_to r)"
+proof (rule self_framingI)
+  fix \<omega> show "\<omega> \<in> A \<otimes> points_to r \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> points_to r" (is "?P \<longleftrightarrow> ?Q")
+  proof
+    assume ?P
+    then obtain a p hl where "Some \<omega> = a \<oplus> p" "a \<in> A" "r p = Some hl" "has_write_perm_only (get_state p) hl"
+      using extract_from_points_to by blast
+    then obtain p' where "Some p' = |stabilize a| \<oplus> stabilize p"
+      by (metis (no_types, opaque_lifting) asso3 commutative core_is_smaller option.exhaust_sel stabilize_sum)
+    then have "Some (stabilize \<omega>) = stabilize a \<oplus> p'"
+      by (smt (verit) \<open>Some \<omega> = a \<oplus> p\<close> asso1 core_is_smaller stabilize_sum)
+    moreover have "stabilize a \<in> A"
+      using \<open>a \<in> A\<close> assms(1) self_framing_def by blast
+    ultimately have "r p' = Some hl" 
+    proof -
+      obtain v where "r (stabilize a) = Some v"
+        using framed_by_expE[OF assms(2) \<open>stabilize a \<in> A\<close>] by blast
+      then have "v = hl"
+        by (metis (no_types, lifting) \<open>Some \<omega> = a \<oplus> p\<close> \<open>r p = Some hl\<close> assms(3) commutative greater_equiv option.inject wf_expE wf_exp_stabilize)
+      then show ?thesis
+        by (metis (no_types, lifting) \<open>Some p' = |stabilize a| \<oplus> stabilize p\<close> \<open>r (stabilize a) = Some v\<close> assms(3) commutative greater_equiv wf_exp_def)
+    qed
+    moreover have "has_write_perm_only (get_state p') hl"
+      using has_perm_only_stabilize
+      by (metis (no_types, opaque_lifting) \<open>Some p' = |stabilize a| \<oplus> stabilize p\<close> \<open>has_write_perm_only (get_state p) hl\<close> commutative core_charact(2) decompose_stabilize_pure full_add_charact(2) plus_pure_stabilize_eq)
+    ultimately show ?Q
+      by (metis (mono_tags, lifting) \<open>Some (stabilize \<omega>) = stabilize a \<oplus> p'\<close> \<open>stabilize a \<in> A\<close> mem_Collect_eq points_to_def x_elem_set_product)
+  next
+    assume ?Q
+    then obtain a p hl where "Some (stabilize \<omega>) = a \<oplus> p" "a \<in> A" "r p = Some hl" "has_write_perm_only (get_state p) hl"
+      using extract_from_points_to by blast
+    then obtain p' where "Some p' = p \<oplus> |\<omega>|"
+      by (metis (no_types, opaque_lifting) asso2 core_option.elims decompose_stabilize_pure)
+    then have "r p' = Some hl"
+      by (meson \<open>r p = Some hl\<close> assms(3) greater_def wf_expE)
+    moreover have "has_write_perm_only (get_state p') hl"
+      by (metis \<open>Some p' = p \<oplus> |\<omega>|\<close> \<open>has_write_perm_only (get_state p) hl\<close> core_charact(2) full_add_charact(2) has_perm_only_stabilize plus_pure_stabilize_eq)
+    moreover have "Some \<omega> = a \<oplus> p'"
+      by (metis (no_types, lifting) \<open>Some (stabilize \<omega>) = a \<oplus> p\<close> \<open>Some p' = p \<oplus> |\<omega>|\<close> asso1 decompose_stabilize_pure)
+    ultimately show ?P
+      by (metis (mono_tags, lifting) \<open>a \<in> A\<close> mem_Collect_eq points_to_def x_elem_set_product)
+  qed
+qed
+
+lemma self_framing_post_field_assign:
+  assumes "self_framing A"
+      and "framed_by_exp A r"
+      and "framed_by_exp (A \<otimes> points_to r) b"
+      and "framed_by_exp (A \<otimes> points_to r \<otimes> pure_Stabilize b) e"
+    shows "self_framing (A \<otimes> pure_post_field_assign r e b)"
+  sorry
+
+lemma wf_exp_framed_by:
+  assumes "wf_exp b"
+      and "framed_by_exp A b"
+      and "self_framing A"
+    shows "self_framing (A \<otimes> pure_Stabilize b)"
+proof (rule self_framingI)
+  fix \<omega> show "\<omega> \<in> A \<otimes> pure_Stabilize b \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> pure_Stabilize b" (is "?P \<longleftrightarrow> ?Q")
+  proof
+    assume ?P
+    then obtain a r where "Some \<omega> = a \<oplus> r" "a \<in> A" "b r = Some True"
+      by (smt (verit, ccfv_SIG) mem_Collect_eq pure_Stabilize_def x_elem_set_product)
+    then obtain r' where "Some r' = stabilize r \<oplus> |stabilize a|"
+      by (metis commutative defined_def max_projection_prop_def max_projection_prop_pure_core max_projection_prop_stable_stabilize option.exhaust_sel smaller_compatible)
+    then show ?Q
+      by (smt (verit) \<open>\<omega> \<in> A \<otimes> pure_Stabilize b\<close> assms(1) assms(2) assms(3) member_filter pure_Stabilize_eq self_framing_def wf_exp_framed_by_stabilize)
+  next
+    assume ?Q
+    then show ?P
+      using assms(1) assms(3) pure_Stabilize_eq self_framing_def wf_exp_stabilize by fastforce
+  qed
+qed
+
+(*
+
+definition framed_by where
+  "framed_by A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion \<omega> B)"
+
+definition framed_by_exp where
+  "framed_by_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> \<noteq> None)"
+*)
 
 lemma proofs_are_self_framing:
   assumes "\<Delta> \<turnstile> [P] C [Q]"
@@ -600,8 +737,6 @@ proof (induct rule: SL_proof.induct)
     by (simp add: self_framing_star)
 next
   case (RuleIf A b \<Delta> C1 B1 C2 B2)
-  then have "self_framing A"
-    using self_framing_if by auto
   then show ?case
     using RuleIf self_framing_union by auto
 next
@@ -613,8 +748,13 @@ next
   then show ?case
     by (simp add: self_framing_post_substitute_var_assert)
 next
-  case (RuleFieldAssign A r e uy)
-  then show ?case sorry (* TODO: FieldAssign *)
+  case (RuleFieldAssign A r b e \<Delta>)
+  then show ?case
+    by (simp add: self_framing_points_to self_framing_post_field_assign self_framing_star wf_exp_framed_by)
+next
+  case (RuleAssume A P \<Delta>)
+  then show ?case
+    using self_framing_and by auto
 qed (simp_all)
 
 lemma wf_set_after_union:
@@ -861,34 +1001,73 @@ next
       by (smt (verit, ccfv_SIG) If.prems(1) If.prems(2) imageE max_projection_prop_def max_projection_prop_stable_stabilize option.distinct(1) semantics.red_stmt_If_elim semantics.wf_abs_stmt.simps(6) semantics_axioms wf_expE)
   qed
 
-  have "?A1 = Stabilize (snd ` SA) \<inter> pure_Stabilize b"
-  proof (rule self_framing_ext)
-    show "self_framing ?A1"
+  have rtrue: "Stabilize (snd ` SA) \<otimes> pure_Stabilize b = Set.filter (\<lambda>\<omega>. b \<omega> = Some True) (Stabilize (snd ` SA))"
+    using If.prems(2) Stabilize_self_framing pure_Stabilize_eq wf_abs_stmt.simps(6) by blast
+  moreover have rfalse: "Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b) = Set.filter (\<lambda>\<omega>. negate b \<omega> = Some True) (Stabilize (snd ` SA))"
+  proof (rule pure_Stabilize_eq[of "negate b" "Stabilize (snd ` SA)"])
+    show "wf_exp (negate b)"
+      using If.prems(2) semantics.wf_abs_stmt.simps(6) semantics_axioms wf_exp_negate by blast
+    show "self_framing (Stabilize (snd ` SA))"
       using Stabilize_self_framing by blast
-    show "self_framing (Stabilize (snd ` SA) \<inter> pure_Stabilize b)"
-      using If(4) Stabilize_self_framing \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> self_framing_conj_framed_by_exp by auto
-
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A1"
-    show "\<omega> \<in> Stabilize (snd ` SA) \<inter> pure_Stabilize b"
-    proof
-      show "\<omega> \<in> (Stabilize (snd ` SA))"
-        using asm0(2) Stabilize_def by auto
-      have "stabilize \<omega> \<in> snd ` ?S1"
-        using asm0(2) Stabilize_def by blast
-      then have "stabilize \<omega> \<in> pure_Stabilize b"
-        using pure_Stabilize_def by fastforce
-      then show "\<omega> \<in> (pure_Stabilize b)"
-        by (simp add: already_stable asm0(1))
-    qed
-  next
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (snd ` SA) \<inter> pure_Stabilize b"
-    then show "\<omega> \<in> ?A1"
-      by (smt (verit, best) IntD1 IntD2 already_stable image_iff in_Stabilize mem_Collect_eq member_filter pure_Stabilize_def)
   qed
 
 
+  have "?A1 = Stabilize (snd ` SA) \<otimes> pure_Stabilize b"
+  proof (rule self_framing_ext)
+    show "self_framing ?A1"
+      using Stabilize_self_framing by blast
+    show "self_framing (Stabilize (snd ` SA) \<otimes> pure_Stabilize b)"
+      using If.prems(2) \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> semantics.Stabilize_self_framing semantics.wf_abs_stmt.simps(6) semantics.wf_exp_framed_by semantics_axioms by blast
+
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A1"
+    show "\<omega> \<in> Stabilize (snd ` SA) \<otimes> pure_Stabilize b"
+    proof -
+      have "\<omega> \<in> (Stabilize (snd ` SA))"
+        using asm0(2) Stabilize_def by auto
+      moreover have "b |\<omega>| = Some True" using wf_exp_coreE[of b \<omega>]
+        using If.prems(2) already_stable asm0(1) asm0(2) by fastforce        
+      ultimately show ?thesis
+        by (metis (no_types, lifting) If.prems(2) semantics.in_star_pure_stab semantics.wf_abs_stmt.simps(6) semantics_axioms wf_exp_coreE)
+    qed
+  next
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (snd ` SA) \<otimes> pure_Stabilize b"
+    then have "\<omega> \<in> Stabilize (snd ` SA) \<and> b \<omega> = Some True"
+      by (simp add: rtrue)
+    then show "\<omega> \<in> ?A1"
+      using already_stable asm0(1) by force
+  qed
+
   let ?A2 = "Stabilize (snd ` ?S2)"
   let ?B2 = "Stabilize (\<Union> (f ` ?S2))"
+
+  have "?A2 = Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b)"
+  proof (rule self_framing_ext)
+    show "self_framing ?A2"
+      using Stabilize_self_framing by blast
+    show "self_framing (Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b))"
+      by (meson If.prems(2) \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> semantics.Stabilize_self_framing semantics.framed_by_negate semantics.wf_abs_stmt.simps(6) semantics.wf_exp_framed_by semantics.wf_exp_negate semantics_axioms)
+
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A2"
+    show "\<omega> \<in> Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b)"
+    proof -
+      have "\<omega> \<in> (Stabilize (snd ` SA))"
+        using asm0(2) Stabilize_def by auto
+      moreover have "b |\<omega>| = Some False"
+        by (smt (verit) If.prems(2) already_stable asm0(1) asm0(2) image_iff in_Stabilize member_filter semantics.wf_abs_stmt.simps(6) semantics_axioms wf_exp_def)
+      ultimately show ?thesis
+        by (smt (verit, del_insts) If.prems(2) \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> framed_by_exp_def in_star_pure_stab negate_def option.sel wf_abs_stmt.simps(6) wf_exp_def wf_exp_negate)
+    qed
+  next
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b)"
+    then have "\<omega> \<in> Stabilize (snd ` SA) \<and> negate b \<omega> = Some True"
+      by (simp add: rfalse)
+    then show "\<omega> \<in> ?A2"
+      by (smt (z3) \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> already_stable asm0(1) framed_by_expE framed_by_exp_def image_iff in_Stabilize member_filter negate_def option.sel)
+  qed
+
+
+
+
 
 
   have "\<Delta> \<turnstile> [?A2] C2 [?B2]"
@@ -900,12 +1079,13 @@ next
     show "\<And>\<omega>. \<omega> \<in> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA \<Longrightarrow> red_stmt \<Delta> C2 (snd \<omega>) (f \<omega>)"
       using If.prems(1) by fastforce
   qed
-
+(*
   have "?A2 = Stabilize (snd ` SA) \<inter> pure_Stabilize (negate b)"
   proof (rule self_framing_ext)
     show "self_framing ?A2"
       using Stabilize_self_framing by blast
     show "self_framing (Stabilize (snd ` SA) \<inter> pure_Stabilize (negate b))"
+
       using If(4) Stabilize_self_framing \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> framed_by_negate self_framing_conj_framed_by_exp semantics.wf_abs_stmt.simps(6) semantics_axioms wf_exp_negate by blast
 
     fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A2"
@@ -927,9 +1107,10 @@ next
     then show "\<omega> \<in> ?A2"
       by (smt (verit, del_insts) already_stable asm0(1) image_iff in_Stabilize member_filter)
   qed
+*)
 
   moreover have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.If b C1 C2 [?B1 \<union> ?B2]"
-    using RuleIf \<open>\<Delta> \<turnstile> [Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA)] C2 [Stabilize (\<Union> (f ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA))]\<close> \<open>\<Delta> \<turnstile> [Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)] C1 [Stabilize (\<Union> (f ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA))]\<close> \<open>Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA) = Stabilize (snd ` SA) \<inter> pure_Stabilize b\<close> \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> calculation by auto
+    by (metis Stabilize_self_framing \<open>Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA) = Stabilize (snd ` SA) \<otimes> pure_Stabilize (negate b)\<close> \<open>Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA) = Stabilize (snd ` SA) \<otimes> pure_Stabilize b\<close> \<open>\<Delta> \<turnstile> [Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)] C1 [Stabilize (\<Union> (f ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA))]\<close> \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> calculation(2) semantics.RuleIf semantics_axioms)
 
   moreover have "?B1 \<union> ?B2 = Stabilize (\<Union> (f ` SA))"
   proof (rule self_framing_ext)
@@ -1216,24 +1397,203 @@ next
   ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.Havoc x [Stabilize (\<Union> (f ` SA))]"
     by argo
 next
+  case (Assume P)
+  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (stable_on (snd \<omega>) P \<and> f \<omega> = {snd \<omega>} \<inter> P)"
+    by fastforce
 
+  let ?A = "Stabilize (snd ` SA)"
+
+  have "\<Delta> \<turnstile> [?A] Assume P [?A \<inter> P]"
+  proof (rule RuleAssume)
+    show "self_framing (Stabilize (snd ` SA))"
+      using Stabilize_self_framing by blast
+    show "self_framing_on (Stabilize (snd ` SA)) P"
+      by (metis (no_types, lifting) RangeE in_Stabilize pure_larger_stabilize r self_framing_on_def snd_conv snd_eq_Range stable_on_def)
+  qed
+  moreover have "?A \<inter> P = Stabilize (\<Union> (f ` SA))" (is "?A \<inter> P = ?B")
+  proof
+    show "?A \<inter> P \<subseteq> ?B"
+    proof
+      fix \<omega> assume "\<omega> \<in> ?A \<inter> P"
+      then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
+        by auto
+      then have "stable_on (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P" using r by blast
+      then have "f \<alpha> = {stabilize \<omega>}"
+        by (metis (no_types, lifting) Assume.prems(1) IntD2 \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize (snd ` SA) \<inter> P\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> pure_larger_stabilize red_stmt_Assume_elim stable_on_def)
+      then show "\<omega> \<in> ?B"
+        using \<open>\<alpha> \<in> SA\<close> by auto
+    qed
+    show "?B \<subseteq> ?A \<inter> P"
+    proof
+      fix \<omega> assume "\<omega> \<in> ?B"
+      then obtain \<alpha> where "stabilize \<omega> \<in> f \<alpha>" "\<alpha> \<in> SA" by auto
+      then show "\<omega> \<in> ?A \<inter> P"
+        by (metis (no_types, lifting) Assume.prems(2) Int_iff calculation image_insert in_Stabilize insertCI mk_disjoint_insert proofs_are_self_framing r self_framing_def singletonD)
+    qed
+  qed
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.Assume P [Stabilize (\<Union> (f ` SA))]" by argo
+next
   case (FieldAssign r e)
-
-  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow>
-  (\<exists>\<sigma> hl v ptr \<gamma>. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> ptr \<and> has_write_perm_only ptr hl)"
-    using has_write_perm_def sorry (* by fast *)
+(*
+| RedFieldAssign: "\<lbrakk> r \<omega> = Some hl ; e \<omega> = Some v ; has_write_perm (get_state \<omega>) hl; heap_locs \<Delta> hl = Some ty; v \<in> ty \<rbrakk>
+  \<Longrightarrow> red_stmt \<Delta> (FieldAssign r e) \<omega> {set_state \<omega> (set_value (get_state \<omega>) hl v)}"
+*)
+  then have r: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> (\<exists>hl v ty. r (snd \<alpha>) = Some hl \<and> e (snd \<alpha>) = Some v \<and> has_write_perm (get_state (snd \<alpha>)) hl
+  \<and> heap_locs \<Delta> hl = Some ty \<and> v \<in> ty \<and> f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) hl v)} )"
+    by blast
 
   define eval_r :: "('v, 'a) abs_state \<Rightarrow> 'r" where "eval_r = (\<lambda>\<omega>. SOME v. r \<omega> = Some v)"
   then have eval_r_prop: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> r (snd \<omega>) = Some (eval_r (snd \<omega>))"
     using r by force
+
+  define get_ptr :: "(('v, 'a) abs_state list \<times> ('v, 'a) abs_state) \<Rightarrow> ('v, 'a) abs_state"
+    where "get_ptr = (\<lambda>\<alpha>. SOME ptr. has_write_perm_only (get_state ptr) (the (r (snd \<alpha>))) \<and> snd \<alpha> \<succeq> ptr)"
+  have get_ptr_prop: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> has_write_perm_only (get_state (get_ptr \<alpha>)) (the (r (snd \<alpha>))) \<and> snd \<alpha> \<succeq> (get_ptr \<alpha>)"
+    sorry
+
+  define get_rm where "get_rm = (\<lambda>\<alpha>. stabilize (snd \<alpha> \<ominus> get_ptr \<alpha>))"
+(*
+  define get_rm where "get_rm = (\<lambda>\<alpha>. stabilize (snd \<alpha> \<ominus> get_ptr \<alpha>))"
+*)
+  have get_rm_prop: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> Some (snd \<alpha>) = get_rm \<alpha> \<oplus> get_ptr \<alpha>"
+    by (smt (z3) FieldAssign.prems(3) commutative get_ptr_prop get_rm_def image_insert insertCI minus_equiv_def mk_disjoint_insert stabilize_sum_result_stable wf_set_def wf_state_def)
+
+
+  let ?A = "Stabilize (get_rm ` SA)"
+  let ?b = "\<lambda>\<omega>. if (\<exists>\<omega>' \<in> snd ` SA. \<omega> \<succeq> |\<omega>'| ) then Some True else None"
+(*  let ?b = "\<lambda>\<omega>. if (\<exists>\<omega>' \<in> snd ` SA. |\<omega>| \<succeq> |\<omega>'| ) then Some True else None" *)
+
+(* not this,
+|\<omega>| \<in> snd ` SA then Some True else Some False"
+rather if \<exists>\<omega>' \<in> snd ` SA such that |\<omega>'| = |\<omega>|...
+TODO: Think about it
+*)
+
+  have "\<Delta> \<turnstile> [?A \<otimes> points_to r \<otimes> pure_Stabilize ?b] abs_stmt.FieldAssign r e [?A \<otimes> pure_post_field_assign r e ?b]"
+  proof (rule RuleFieldAssign)
+    show "self_framing (Stabilize (get_rm ` SA))"
+      using Stabilize_self_framing by blast
+    show "wf_exp ?b"
+    proof (rule wf_expI)
+      fix a show "\<And>a. (if \<exists>\<omega>'\<in>snd ` SA. a \<succeq> |\<omega>'| then Some True else None) = (if \<exists>\<omega>'\<in>snd ` SA. |a| \<succeq> |\<omega>'| then Some True else None)"
+        by (metis (no_types, lifting) max_projection_prop_def max_projection_prop_pure_core succ_trans)
+      show "\<And>b v. a \<succeq> b \<and> (if \<exists>\<omega>'\<in>snd ` SA. b \<succeq> |\<omega>'| then Some True else None) = Some v \<Longrightarrow> (if \<exists>\<omega>'\<in>snd ` SA. a \<succeq> |\<omega>'| then Some True else None) = Some v"
+        by (meson core_stabilize_mono(1) option.distinct(1) succ_trans)
+    qed
+
+    show "framed_by_exp (Stabilize (get_rm ` SA)) r"
+    proof (rule framed_by_expI)
+      fix \<omega> assume "\<omega> \<in> Stabilize (get_rm ` SA)"
+      then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> \<succeq> |snd \<alpha>|"
+        using get_ptr_prop get_rm_def minus_equiv_def by fastforce
+      moreover have "r (snd \<alpha>) \<noteq> None"
+        by (simp add: calculation(1) eval_r_prop)
+      ultimately show "r \<omega> \<noteq> None" using wf_exp_def[of r]
+        by (smt (verit, ccfv_SIG) FieldAssign.prems(2) r wf_abs_stmt.simps(9) wf_exp_stabilize)
+    qed
+
+    show "framed_by_exp (Stabilize (get_rm ` SA) \<otimes> points_to r) ?b"
+    proof (rule framed_by_expI)
+      fix \<omega> assume "\<omega> \<in> Stabilize (get_rm ` SA) \<otimes> points_to r"
+      then obtain \<alpha> \<omega>' ptr where "\<alpha> \<in> SA" "stabilize \<omega>' = get_rm \<alpha>" "Some \<omega> = \<omega>' \<oplus> ptr" "ptr \<in> points_to r"
+        by (meson image_iff in_Stabilize x_elem_set_product)
+      then have "Some (snd \<alpha>) = get_rm \<alpha> \<oplus> get_ptr \<alpha>"   
+        using get_rm_prop by blast
+      then have "get_ptr \<alpha> = ptr"
+        sorry
+      then have "\<exists>\<omega>'\<in>snd ` SA. \<omega> \<succeq> |\<omega>'|"
+        sorry
+
+      then have "stabilize \<omega>' = stabilize (snd \<alpha> \<ominus> get_ptr \<alpha>)"
+        using get_rm_def by force
+
+        using get_rm_def by blast
+      then have "|\<omega>| \<succeq> |snd \<alpha>|"
+        by (metis (no_types, opaque_lifting) \<open>Some \<omega> = \<omega>' \<oplus> ptr\<close> core_stabilize_mono(1) greater_def max_projection_prop_def max_projection_prop_stable_stabilize minus_core succ_trans)
+      then show "(if \<exists>\<omega>'\<in>snd ` SA. |\<omega>| \<succeq> |\<omega>'| then Some True else None) \<noteq> None"
+        using \<open>\<alpha> \<in> SA\<close> by auto
+    qed
+
+    show "framed_by_exp (Stabilize (get_rm ` SA) \<otimes> points_to r \<otimes> pure_Stabilize ?b) e"
+    proof (rule framed_by_expI)
+      fix \<omega> assume "\<omega> \<in> (Stabilize (get_rm ` SA) \<otimes> points_to r) \<otimes> pure_Stabilize (\<lambda>\<omega>. if \<exists>\<omega>'\<in>snd ` SA. |\<omega>| \<succeq> |\<omega>'| then Some True else None)"
+      then obtain p where "\<omega> \<succeq> p" "p \<in> pure_Stabilize ?b"
+        using add_set_commm in_set_sum by blast
+      then obtain \<omega>' where "\<omega>'\<in>snd ` SA" "|p| \<succeq> |\<omega>'|" "pure p"
+        by (smt (verit, ccfv_threshold) mem_Collect_eq option.distinct(1) pure_Stabilize_def)
+      then obtain \<alpha> where "\<alpha> \<in> SA" "\<omega>' = snd \<alpha>"
+        by blast
+      then have "e (snd \<alpha>) \<noteq> None" using r by fast
+      then have "e p \<noteq> None" using wf_exp_def[of e]
+        by (metis FieldAssign.prems(2) \<open>\<alpha> \<in> SA\<close> \<open>\<omega>' = snd \<alpha>\<close> \<open>|p| \<succeq> |\<omega>'|\<close> r wf_abs_stmt.simps(9))
+      then show "e \<omega> \<noteq> None" using wf_exp_def[of e]
+        using FieldAssign.prems(2) \<open>\<omega> \<succeq> p\<close> wf_abs_stmt.simps(9) by blast
+    qed
+  qed
+  moreover have "Stabilize (snd ` SA) = ?A \<otimes> points_to r \<otimes> pure_Stabilize ?b" (is "?P = ?Q")
+  proof
+    show "?P \<subseteq> ?Q"
+    proof
+      fix \<omega> assume "\<omega> \<in> ?P"
+      then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
+        by auto
+      then have "Some (stabilize \<omega>) = get_rm \<alpha> \<oplus> get_ptr \<alpha>"
+        using get_rm_prop by presburger
+(*
+      then have "Some (stabilize \<omega>) = get_rm \<alpha> \<oplus> get_ptr \<alpha>"
+        using stabilize_is_stable stabilize_sum_result_stable by blast
+*)
+      moreover have "get_ptr \<alpha> \<in> points_to r"
+        sorry
+      moreover have "get_rm \<alpha> \<in> ?A"
+        by (simp add: \<open>\<alpha> \<in> SA\<close> already_stable get_rm_def stabilize_is_stable)
+
+      moreover have "Some \<omega> = stabilize \<omega> \<oplus> |\<omega>|"
+        using decompose_stabilize_pure by auto
+      moreover have "\<exists>\<omega>'\<in>snd ` SA. |\<omega>| \<succeq> |\<omega>'|"
+        by (meson \<open>\<omega> \<in> Stabilize (snd ` SA)\<close> calculation(4) core_sum greater_def in_Stabilize)
+      then have "\<exists>\<omega>'\<in>snd ` SA. ||\<omega>|| \<succeq> |\<omega>'|"
+        by (metis (no_types, lifting) calculation(4) minusI minus_core succ_refl)
+
+      then have "|\<omega>| \<in> pure_Stabilize ?b"        
+        by (simp add: core_is_pure pure_Stabilize_def pure_def)
+      ultimately show "\<omega> \<in> ?Q"
+        by (meson x_elem_set_product)
+    qed
+    show "?Q \<subseteq> ?P" sorry
+  qed
+
+  moreover have "Stabilize (\<Union> (f ` SA)) = ?A \<otimes> pure_post_field_assign r e ?b"
+    sorry
+
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.FieldAssign r e [Stabilize (\<Union> (f ` SA))]" by argo
+next
+
+
+
+
+(* TODO: Split snd ` SA into [?A \<otimes> points_to r \<otimes> pure_Stabilize ?b] *)
+
+
+
+(*
+b = |\<omega>| ?
+
+*)
+
+
+
+
+
+  thm RuleFieldAssign[of _ r _ e \<Delta>]
+
 
   show ?case
   proof (cases "depends_on_ag_store_only r \<and> depends_on_ag_store_only e")
     case True
     
     
-    define get_ptr where "get_ptr = (\<lambda>\<omega>. SOME ptr. \<exists>\<sigma> \<gamma> hl v. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v
-    \<and> \<gamma> \<succeq> ptr \<and> has_write_perm_only ptr hl \<and> stable ptr )"
+
     moreover have r_ptr: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow>
     (\<exists>\<sigma> \<gamma> hl v. snd \<omega> = (\<sigma>, \<gamma>) \<and> f \<omega> = {(\<sigma>, set_value \<gamma> hl v)} \<and> r (\<sigma>, \<gamma>) = Some hl \<and> e (\<sigma>, \<gamma>) = Some v \<and> \<gamma> \<succeq> get_ptr \<omega> \<and> has_write_perm_only (get_ptr \<omega>) hl \<and> stable (get_ptr \<omega>))"
     proof -
@@ -1496,12 +1856,9 @@ next
     
     ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] FieldAssign r e [Stabilize (\<Union> (f ` SA))]"
       by presburger
-  next
-    case False
-(* TODO?
-Completely different rule...
- *)
-    then show ?thesis sorry
+
+
+
   qed
 next
   case (Havoc x)
