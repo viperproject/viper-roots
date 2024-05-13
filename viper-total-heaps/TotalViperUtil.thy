@@ -20,22 +20,8 @@ lemma prat_non_negative: "\<And>q. Rep_preal q \<ge> 0"
 lemma psub_smaller:
   assumes "(p :: preal) \<ge> q"
   shows "p \<ge> (p - q)"
-  unfolding minus_preal_def
-proof -
-  from assms have DiffNonNegative: "Rep_preal p - Rep_preal q \<ge> 0"
-    by (transfer) simp
-
-  have "Rep_preal p \<ge> Rep_preal p - Rep_preal q"
-    by (transfer) simp
-  
-
-  hence "(Rep_preal p) \<ge> Rep_preal (Abs_preal (Rep_preal p - Rep_preal q))"
-    using Abs_preal_inverse DiffNonNegative
-    by fastforce
-    
-  thus "p \<ge> (Abs_preal (Rep_preal p - Rep_preal q))"    
-    by (simp add: less_eq_preal.rep_eq)
-qed
+  using assms
+  by (simp add: less_eq_preal.rep_eq minus_preal.rep_eq prat_non_negative)
 
 subsection \<open>Recursive predicates on assertions\<close>
 

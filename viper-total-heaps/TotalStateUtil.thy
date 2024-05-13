@@ -226,8 +226,7 @@ proof
     by (simp add: add_masks_def)
 
   thus "m3 x = m1 x - m2 x"
-    unfolding minus_preal_def
-    by (simp add: Rep_preal_inverse plus_preal.rep_eq)    
+    by (simp add: Rep_preal_inverse minus_preal.abs_eq plus_preal.rep_eq pos_perm_class.sum_larger)
 qed
 
 lemma minus_masks_empty:
@@ -243,25 +242,7 @@ qed
 lemma minus_preal_gte:
   assumes "p \<ge> (q :: preal)" 
   shows "p - (p - q) = q"
-proof -
-  have "p - q = Abs_preal (Rep_preal p - Rep_preal q)" (is "_ = ?pminusq")
-    by (simp add: minus_preal_def)
-
-  have "Rep_preal p \<ge> Rep_preal q"
-    using assms
-    apply transfer
-    by simp
-
-  hence "Rep_preal ?pminusq = (Rep_preal p - Rep_preal q)"
-    by (metis Rep_preal_inverse add_diff_cancel_left' assms plus_preal.rep_eq pperm_gte_padd)
-
-  hence "Rep_preal p - Rep_preal ?pminusq = Rep_preal q"
-    by simp
-
-  thus ?thesis
-    unfolding minus_preal_def
-    by (simp add: Rep_preal_inverse)
-qed
+  using assms Rep_preal_inject minus_preal.rep_eq psub_smaller by fastforce
 
 lemma mask_plus_Some:
   shows "(m1 :: ('a, preal) abstract_mask) \<oplus> m2 = Some (add_masks m1 m2)"
@@ -718,8 +699,7 @@ next
     by (simp add: le_funD)
 
     thus "get_mh_total \<omega> hl = padd (get_mh_total \<omega>' hl) (get_mh_total \<omega> hl - get_mh_total \<omega>' hl)"
-      unfolding minus_preal_def
-      by (metis Rep_preal_inverse add.commute add_diff_cancel plus_preal.rep_eq preal_gte_padd)
+      by (simp add:Rep_preal_inject[symmetric] minus_preal.rep_eq plus_preal.rep_eq)
   qed
 
   have MpEq: "get_mp_total \<omega> = add_masks (get_mp_total \<omega>') ?mp2"
@@ -731,8 +711,7 @@ next
     by (simp add: le_funD)
 
     thus "get_mp_total \<omega> hl = padd (get_mp_total \<omega>' hl) (get_mp_total \<omega> hl - get_mp_total \<omega>' hl)"
-      unfolding minus_preal_def
-      by (metis Rep_preal_inverse add.commute add_diff_cancel plus_preal.rep_eq preal_gte_padd)
+      by (simp add:Rep_preal_inject[symmetric] minus_preal.rep_eq plus_preal.rep_eq)
   qed  
 
   have "Some \<omega> = \<omega>' \<oplus> (\<omega> \<lparr> get_mh_total := ?mh2, get_mp_total := ?mp2 \<rparr>)"
