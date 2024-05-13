@@ -901,9 +901,8 @@ next
     using EnoughPerm
      apply simp
 
-    apply simp
-    using \<open>p \<ge> 0\<close> Abs_preal_inverse EnoughPerm minus_preal_def 
-    by auto
+    apply (simp)
+    using Abs_preal_inverse EnoughPerm \<open>0 \<le> p\<close> less_eq_preal.rep_eq minus_preal.rep_eq by auto
 
   moreover have "(r \<noteq> Null \<longrightarrow> pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p)))" 
         (is ?conjunct2)
