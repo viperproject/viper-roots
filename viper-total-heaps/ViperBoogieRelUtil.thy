@@ -436,7 +436,7 @@ proof -
       proof -
         have "label_rel ?MaskPred ?Tr_mask_labels ?\<omega>_trace_total ns"
           using StateRel label_hm_rel_def state_rel_label_hm_rel
-          by blast
+          by metis
         hence label_rel: "label_rel ?MaskPred ?Tr_mask_labels ?\<omega>_trace_total ns"
           using FieldTr_is_FieldTr'
           by simp
@@ -479,6 +479,8 @@ proof -
           using label_rel_def
           by blast
       qed
+      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+        by (meson StateRel label_hm_rel_def state_rel_label_hm_rel)
     qed
 
     show "valid_heap_mask (get_mh_total_full \<omega>def)"
