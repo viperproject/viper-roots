@@ -1504,18 +1504,9 @@ lemma mask_update_greater_aux:
 proof (simp add: le_fun_def)
   show "m l - p \<le> m l"
     unfolding minus_prat_def
-  proof (simp add: less_eq_preal.rep_eq)
-    have "Rep_preal (m l) - Rep_preal p \<le> Rep_preal (m l)" (is "?lhs \<le> ?rhs")
-      by (simp add: prat_non_negative)
-
-    moreover have "?lhs \<ge> 0"
-      using assms
-      by (simp add: pgte.rep_eq)
-
-    ultimately show "Rep_preal (m l - p) \<le> ?rhs"
-      using Abs_preal_inverse[of ?lhs] minus_preal_def 
-      by auto
-  qed
+    apply (simp add: less_eq_preal.rep_eq minus_preal.rep_eq)
+    apply (transfer)
+    by (auto)
 qed
 
 lemma mask_update_greater_aux_2:
@@ -1939,9 +1930,9 @@ next
       by simp
 
     from \<open>pgt (mh ?loc) q\<close> have "get_mh_total_full \<omega> ?loc - q \<noteq> pnone"
-        unfolding minus_preal_def \<open>mh = _\<close>
-        by (simp add: pgt.rep_eq positive_real_preal)
-      
+      unfolding \<open>mh = _\<close>
+      by (simp add: pgt.rep_eq positive_real_preal Rep_preal_inject[symmetric] minus_preal.rep_eq less_eq_preal.rep_eq zero_preal.rep_eq)
+
     let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc None"
 
     have "\<omega>_inh' \<in> ?W"
@@ -2085,8 +2076,8 @@ next
       by blast
 
     hence "get_mp_total_full \<omega> ?loc - q \<noteq> pnone"
-        unfolding minus_preal_def \<open>mp = _\<close>
-        by (simp add: pgt.rep_eq positive_real_preal)
+      unfolding \<open>mp = _\<close>
+      by (simp add: pgt.rep_eq positive_real_preal Rep_preal_inject[symmetric] minus_preal.rep_eq less_eq_preal.rep_eq zero_preal.rep_eq)
 
     from ExhAccPredWildcard have "StateCons \<omega>_inh'"
       by simp

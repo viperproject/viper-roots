@@ -179,8 +179,9 @@ lift_definition ppos :: "preal \<Rightarrow> bool" is "\<lambda>p. p > 0" done
 instantiation preal :: minus
 begin
 
-definition minus_preal :: "preal \<Rightarrow> preal \<Rightarrow> preal"  where
-  "minus_preal a b = Abs_preal ((Rep_preal a) - (Rep_preal b))"
+lift_definition minus_preal :: "preal \<Rightarrow> preal \<Rightarrow> preal"  is
+  "\<lambda> a b. (if a \<ge> b then Rep_preal a - Rep_preal b else 0)"
+  by (simp; transfer; simp)
 
 instance proof
 qed
