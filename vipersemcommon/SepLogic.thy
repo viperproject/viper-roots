@@ -691,6 +691,29 @@ lemma split_star_singleton_stabilize :
   "{\<omega>} = {stabilize \<omega>} \<otimes> {|\<omega>|}"
   by (simp add:sum_then_singleton[symmetric] decompose_stabilize_pure)
 
+lemma star_to_singleton_stabilizeE :
+  assumes "x \<in> A \<otimes> B"
+  assumes "stable x"
+  assumes "\<And> a. a \<in> A \<Longrightarrow> x \<in> {stabilize a} \<otimes> B \<Longrightarrow> P"
+  shows "P"
+proof -
+  obtain a where "a \<in> A" "x \<in> {a} \<otimes> B"
+    using star_to_singletonE assms by blast
+  from \<open>x \<in> {a} \<otimes> B\<close> have "x \<in> up_close_core ({stabilize a} \<otimes> B)"
+    (* This proof is a lot more painful than it should be. *)
+    apply (simp add:split_star_singleton_stabilize[of "a"])
+    apply (simp add:add_set_commm[of "{stabilize a}"] add_set_asso)
+    apply (simp add:up_close_core_def add_set_commm[of _ emp_core])
+    apply (simp add:emp_core_def)
+    apply (rule set_mp[OF add_set_mono])
+      prefer 3 apply (assumption)
+    apply (simp add: core_is_pure pure_def)
+    by blast
+  from this assms \<open>a \<in> A\<close> show "?thesis"
+    (* TODO: Why does local.stable_in_up_close_core not work here? *)
+    by (metis local.in_up_close_core_decompose local.stable_and_sum_pure_same) 
+qed
+
 lemma star_to_singleton_stableE :
   assumes "x \<in> A \<otimes> B"
   assumes "stable x"

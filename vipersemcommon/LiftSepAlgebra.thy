@@ -55,6 +55,29 @@ lemma get_state_set_state [simp] :
   "get_state (set_state \<omega> st) = st"
   by (simp add:get_state_def set_state_def)
 
+
+definition make_abs_state :: "(var \<rightharpoonup> 'v) \<Rightarrow> (label \<rightharpoonup> 'a) \<Rightarrow> 'a \<Rightarrow> ('v, 'a) abs_state" where
+"make_abs_state s t st = set_store (set_trace (set_state undefined st) t) s"
+
+lemma get_store_make_abs_state[simp] :
+  "get_store (make_abs_state s t st) = s"
+  by (simp add:make_abs_state_def)
+lemma get_trace_make_abs_state[simp] :
+  "get_trace (make_abs_state s t st) = t"
+  by (simp add:make_abs_state_def)
+lemma get_state_make_abs_state[simp] :
+  "get_state (make_abs_state s t st) = st"
+  by (simp add:make_abs_state_def)
+lemma set_store_make_abs_state[simp] :
+  "set_store (make_abs_state s t st) s' = make_abs_state s' t st"
+  by (simp add:make_abs_state_def set_store_def get_trace_def get_state_def)
+lemma set_trace_make_abs_state[simp] :
+  "set_trace (make_abs_state s t st) t' = make_abs_state s t' st"
+  by (simp add:make_abs_state_def set_trace_def set_store_def get_trace_def get_store_def get_state_def)
+lemma set_state_make_abs_state[simp] :
+  "set_state (make_abs_state s t st) st' = make_abs_state s t st'"
+  by (simp add:make_abs_state_def set_trace_def set_state_def set_store_def get_trace_def get_store_def get_state_def)
+
 (*
 lemma pcm_agreement_compatible:
   fixes a :: "('v  :: pcm_agreement) ag_store"
@@ -366,9 +389,9 @@ qed
 
 lemma core_charact:
   shows "get_store |\<omega>| = get_store \<omega>"
+    and "get_trace |\<omega>| = get_trace \<omega>"
     and "get_state |\<omega>| = |get_state \<omega>|"
-   apply (simp add: full_core_def get_store_def)
-  by (simp add: full_core_def get_state_def)
+  by (simp_all add: full_core_def get_store_def get_state_def get_trace_def)
 
 (*
 lemma mult_charact:
