@@ -395,10 +395,10 @@ next
     by (simp add: calculation(8) shift_and_add_equi_state_preserve_greater)
   ultimately have "\<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega>1 va\<rangle> [\<Down>] Val (VBool True)"
     by presburger
-  moreover have "\<And>v'. \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega>1 v'\<rangle> [\<Down>] Val (VBool b)"
+  moreover have "\<And>v'. v' \<in> set_from_type (interp.domains \<Delta>) ty \<Longrightarrow> \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega>1 v'\<rangle> [\<Down>] Val (VBool b)"
   proof -
-    fix v'
-    obtain b where
+    fix v' assume "v' \<in> set_from_type (interp.domains \<Delta>) ty"
+    then obtain b where
           "\<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v'\<rangle> [\<Down>] Val (VBool b)"
       and "\<forall>x xa.
             Val (VBool b) = Val xa \<longrightarrow>
@@ -444,11 +444,12 @@ next
 next
   case (RedForallFalse va \<Delta> ty e \<omega>)
   moreover have "shift_and_add_equi_state \<omega>1 va \<succeq> shift_and_add_equi_state \<omega> va"
-    by (simp add: calculation(7) shift_and_add_equi_state_preserve_greater)
+    by (simp add: calculation(8) shift_and_add_equi_state_preserve_greater)
   ultimately have "\<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega>1 va\<rangle> [\<Down>] Val (VBool False)"
     by presburger
   then show ?case
-    using RedForallFalse.hyps(1) red_pure_red_pure_exps.RedForallFalse by blast
+    using RedForallFalse.hyps(1) red_pure_red_pure_exps.RedForallFalse
+    by (metis RedForallFalse.hyps(4) RedForallFalse.prems(2) RedForallFalse.prems(3) RedForallFalse.prems(4) shift_and_add_equi_state_preserve_greater)
 next
   case (RedCondExpTrue \<Delta> e1 \<omega> e2 r e3)
   then have "\<Delta> \<turnstile> \<langle>e1; \<omega>1\<rangle> [\<Down>] Val (VBool True)"

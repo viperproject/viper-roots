@@ -16,9 +16,21 @@ definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> 
   then Some (SOME v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v)), f)
   else None)"
 
-
 definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
   "make_semantic_assertion \<Delta> A \<omega> \<longleftrightarrow> \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle>"
+
+lemma make_semantic_bexp_Some[simp]:
+  shows "make_semantic_bexp \<Delta> b \<omega> = Some vb \<longleftrightarrow> \<Delta> \<turnstile> \<langle>b; \<omega>\<rangle> [\<Down>] Val (VBool vb)"
+  by (simp add:make_semantic_bexp_def split:if_splits; cases vb; auto dest:red_pure_val_unique)
+
+lemma make_semantic_exp_Some[simp]:
+  shows "make_semantic_exp \<Delta> b \<omega> = Some v \<longleftrightarrow> \<Delta> \<turnstile> \<langle>b; \<omega>\<rangle> [\<Down>] Val v"
+  by (simp add:make_semantic_exp_def split:if_splits; auto intro:someI dest:red_pure_val_unique)
+
+lemma make_semantic_rexp_Some[simp]:
+  shows "make_semantic_rexp \<Delta> r f \<omega> = Some av \<longleftrightarrow> (\<exists> a. (\<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address a))) \<and> av = (a, f))"
+  by (simp add:make_semantic_rexp_def split:if_splits; auto dest:red_pure_val_unique)
+
 
 fun make_semantic_vtyp :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> 'a val abs_vtyp" where
   "make_semantic_vtyp _ TInt = { VInt n |n. True }"
