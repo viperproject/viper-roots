@@ -140,6 +140,21 @@ setup_lifting type_definition_virtual_state
 definition get_vh :: "'a virtual_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = snd (Rep_virtual_state \<phi>)"
 definition get_vm :: "'a virtual_state \<Rightarrow> preal mask" where "get_vm \<phi> = fst (Rep_virtual_state \<phi>)"
 
+lemma virtual_state_ext:
+  assumes "get_vh a = get_vh b"
+      and "get_vm a = get_vm b"
+    shows "a = b"
+  by (metis Rep_virtual_state_inject assms(1) assms(2) get_vh_def get_vm_def prod.expand)
+
+
+(*
+definition set_vh where
+  "set_vh \<phi> h = Abs_virtual_state (get_vm \<phi>, h)"
+definition set_vm where
+  "set_vm \<phi> m = Abs_virtual_state (m, get_vh \<phi>)"
+*)
+
+
 definition uu :: "'a virtual_state" where "uu = Abs_virtual_state uuu"
 
 
@@ -257,10 +272,14 @@ fun get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state
 fun get_t :: "'a equi_state \<Rightarrow> 'a trace" where "get_t \<omega> = fst (snd \<omega>)"
 *)
 
+abbreviation get_h where "get_h \<omega> \<equiv> get_vh (get_state \<omega>)"
+abbreviation get_m where "get_m \<omega> \<equiv> get_vm (get_state \<omega>)"
+
+(*
 fun get_h :: "'a equi_state \<Rightarrow> 'a partial_heap" where "get_h \<omega> = get_vh (get_state \<omega>)"
 fun get_m :: "'a equi_state \<Rightarrow> preal mask" where "get_m \<omega> = get_vm (get_state \<omega>)"
+*)
 fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_virtual_state" where "get_pv \<omega> = Rep_virtual_state (get_state \<omega>)"
-
 
 definition u :: "'a equi_state" where "u = ((Ag Map.empty, Ag Map.empty), uu)"
 
@@ -512,7 +531,6 @@ lemma no_old_indep_trace:
   and       "fst x = fst x'" and
         "get_state x = get_state x'"
   shows "e x = Some v \<longleftrightarrow> e x' = Some v"
-
   sorry
 
 (*
@@ -547,8 +565,6 @@ section \<open>Restrictions\<close>
 fun all_predicate_have_bodies where
   "all_predicate_have_bodies Pr \<longleftrightarrow> (\<forall>P decl. program.predicates Pr P = Some decl \<longrightarrow> predicate_decl.body decl \<noteq> None)"
 
-fun wf_exp where
-  "wf_exp _ = undefined"
 
 fun wf_assert where
   "wf_assert Pr (AccPredicate P arg p) \<longleftrightarrow> (program.predicates Pr P \<noteq> None)"

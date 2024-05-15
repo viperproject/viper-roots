@@ -1091,6 +1091,57 @@ lemma stabilize_core_right_id :
   "Some a = a \<oplus> stabilize |a|"
   by (metis local.asso1 local.commutative local.core_is_smaller local.decompose_stabilize_pure)
 
+
+
+subsection \<open>Expressions\<close>
+
+definition wf_exp where
+  "wf_exp e \<longleftrightarrow> (\<forall>a b v. a \<succeq> b \<and> e b = Some v \<longrightarrow> e a = Some v) \<and> (\<forall>a. e a = e |a| )"
+
+lemma wf_expI:
+  assumes "\<And>a. e a = e |a|"
+      and "\<And>a b v. a \<succeq> b \<and> e b = Some v \<Longrightarrow> e a = Some v"
+    shows "wf_exp e"
+  using assms(1) assms(2) wf_exp_def by blast
+
+lemma wf_expE:
+  assumes "wf_exp e"
+      and "a \<succeq> b"
+      and "e b = Some v"
+    shows "e a = Some v"
+  by (meson assms(1) assms(2) assms(3) wf_exp_def)
+
+lemma wf_exp_coreE:
+  assumes "wf_exp e"
+  shows "e a = e |a|"
+  by (meson assms wf_exp_def)
+
+definition negate where
+  "negate b \<omega> = (if b \<omega> = None then None else Some (\<not> (the (b \<omega>))))"
+
+lemma wf_exp_negate:
+  assumes "wf_exp b"
+  shows "wf_exp (negate b)"
+  by (smt (verit, del_insts) assms negate_def option.collapse wf_exp_def)
+
+lemma wf_exp_stabilize:
+  assumes "e (stabilize \<omega>) = Some v"
+      and "wf_exp e"
+    shows "e \<omega> = Some v"
+  by (meson assms(1) assms(2) decompose_stabilize_pure greater_def wf_exp_def)
+
+lemma pure_larger_stabilize:
+  "pure_larger \<omega> (stabilize \<omega>)"
+  by (metis decompose_stabilize_pure max_projection_prop_def max_projection_prop_pure_core pure_larger_def)
+
+lemma wf_exp_combinedE:
+  assumes "wf_exp e"
+      and "e \<omega> = Some v"
+      and "|\<omega>'| \<succeq> |\<omega>|"
+    shows "e \<omega>' = Some v"
+  using assms(1) assms(2) assms(3) wf_expE wf_exp_coreE by fastforce
+
+
 end
 
 

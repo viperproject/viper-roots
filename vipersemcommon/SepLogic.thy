@@ -783,6 +783,276 @@ lemma and_entails_star:
 end
 *)
 
+
+text \<open>The truth of A in a only depends on parts of a (for a ## \<omega>) that:
+1) are stable, or
+2) are given by |\<omega>|\<close>
+definition rel_stable_assertion where
+(*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>\<omega>'. \<omega> ## \<omega>' \<longrightarrow> (A \<omega>' \<longleftrightarrow> A (stabilize_rel \<omega> \<omega>')))" *)
+  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (a \<in> A \<longleftrightarrow> x \<in> A))"
+
+
+definition stable_on where
+  "stable_on \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
+
+definition self_framing where
+  "self_framing A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"
+
+lemma self_framingI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A"
+  shows "self_framing A"
+  using self_framing_def assms by blast
+
+lemma self_framing_eq:
+  "self_framing A \<longleftrightarrow> A = Stabilize A"
+  unfolding self_framing_def Stabilize_def by blast
+
+lemma mono_and_Stable_then_self_framing:
+  assumes "up_closed A"
+      and "Stable A"
+    shows "self_framing A"
+proof -
+  have "Stabilize A \<subseteq> A"
+  proof
+    fix x assume "x \<in> Stabilize A"
+    moreover have "x \<succeq> stabilize x"
+      using max_projection_prop_stable_stabilize mpp_smaller by auto
+    ultimately show "x \<in> A"
+      using assms(1) up_closed_def by auto
+  qed
+  then show ?thesis
+    by (meson Stable_def assms(2) dual_order.eq_iff self_framing_eq)
+qed
+
+lemma up_closed_core_stable_self_framing:
+  assumes "up_close_core A = A" (* should be true for all assertions? *)
+      and "Stable A"
+    shows "self_framing A"
+proof -
+  have "Stabilize A \<subseteq> A"
+  proof 
+    fix x assume "x \<in> Stabilize A"
+    moreover have "pure_larger x (stabilize x)"
+      by (metis decompose_stabilize_pure max_projection_prop_def max_projection_prop_pure_core pure_larger_def)
+    ultimately show "x \<in> A"
+      using assms(1) prove_in_up_close_core pure_larger_def by fastforce
+  qed
+  then show ?thesis
+    by (meson Stable_def assms(2) dual_order.eq_iff self_framing_eq)
+qed
+
+definition framed_by where
+  "framed_by A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion \<omega> B)"
+
+definition framed_by_exp where
+  "framed_by_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> \<noteq> None)"
+
+definition entails where
+  "entails A B \<longleftrightarrow> A \<subseteq> B"
+
+definition pure_Stabilize where
+  "pure_Stabilize b = { \<omega> |\<omega>. b \<omega> = Some True \<and> pure \<omega> }"
+
+lemma pure_Stabilize_eq:
+  assumes "wf_exp b"
+      and "self_framing A" (* or wf_assertion A *)
+  shows "A \<otimes> pure_Stabilize b = Set.filter (\<lambda>\<omega>. b \<omega> = Some True) A" (is "?P = ?Q")
+proof
+  show "?P \<subseteq> ?Q"
+  proof
+    fix x assume "x \<in> ?P"
+    then obtain a p where "Some x = a \<oplus> p" "a \<in> A" "b p = Some True" "pure p"
+      by (smt (verit, ccfv_SIG) mem_Collect_eq pure_Stabilize_def x_elem_set_product)
+    then have "b x = Some True"
+      by (meson assms(1) greater_equiv wf_exp_def)
+    moreover have "x \<in> A"
+      by (metis CollectD CollectI Stabilize_def \<open>Some x = a \<oplus> p\<close> \<open>a \<in> A\<close> \<open>pure p\<close> assms(2) cancellative core_is_pure core_is_smaller greater_equiv plus_pure_stabilize_eq pure_def self_framing_eq smaller_than_core)
+    ultimately show "x \<in> ?Q"
+      by simp
+  qed
+  show "?Q \<subseteq> ?P"
+  proof
+    fix x assume "x \<in> ?Q"
+    then have "Some x = x \<oplus> |x|"
+      using core_is_smaller by auto
+    then show "x \<in> ?P"
+      by (smt (verit, ccfv_threshold) CollectI \<open>x \<in> Set.filter (\<lambda>\<omega>. b \<omega> = Some True) A\<close> assms(1) max_projection_prop_def max_projection_prop_pure_core member_filter pure_Stabilize_def wf_exp_def x_elem_set_product)
+  qed
+qed
+
+definition self_framing_on where
+  "self_framing_on A P \<longleftrightarrow> (\<forall>\<omega> \<in> A. stabilize \<omega> \<in> P \<longleftrightarrow> \<omega> \<in> P)"
+
+lemma self_framing_union:
+  assumes "self_framing A"
+      and "self_framing B"
+    shows "self_framing (A \<union> B)"
+  using assms(1) assms(2) self_framing_def by auto
+
+lemma in_star_pure_stab:
+  assumes "\<omega> \<in> A"
+      and "b \<omega> = Some True"
+      and "wf_exp b"
+    shows "\<omega> \<in> A \<otimes> pure_Stabilize b"
+proof -
+  have "Some \<omega> = \<omega> \<oplus> |\<omega>|"
+    using core_is_smaller by auto
+  then show ?thesis
+    by (smt (verit, ccfv_threshold) CollectI assms(1) assms(2) assms(3) core_is_pure pure_def pure_Stabilize_def wf_exp_def x_elem_set_product)
+qed
+
+lemma rel_stable_assertionE:
+  assumes "rel_stable_assertion \<omega> A"
+      and "\<omega> ## a"
+      and "pure_larger x (stabilize a)"
+      and "x \<succeq> |\<omega>|"
+    shows "a \<in> A \<longleftrightarrow> x \<in> A"
+  using assms(1) assms(2) assms(3) assms(4) rel_stable_assertion_def by blast
+
+lemma self_framing_star:
+  assumes "self_framing A"
+      and "framed_by A P"
+    shows "self_framing (A \<otimes> P)"
+proof (rule self_framingI)
+  fix \<omega>
+  show "\<omega> \<in> A \<otimes> P \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> P" (is "?A \<longleftrightarrow> ?B")
+  proof
+    assume ?A
+    then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
+      by (meson x_elem_set_product)
+    then have "stabilize a \<in> A"
+      using assms(1) self_framing_def by blast
+    moreover have "Some (stabilize \<omega>) = stabilize a \<oplus> stabilize p"
+      by (simp add: \<open>Some \<omega> = a \<oplus> p\<close> stabilize_sum)
+    then have "|stabilize a| ## stabilize p"
+      by (meson core_stabilize_mono(1) defined_comm greater_def greater_equiv smaller_compatible smaller_compatible_core)
+    then obtain pp where "Some pp = |stabilize a| \<oplus> stabilize p"
+      by (metis defined_def not_Some_eq)
+    then have "Some (stabilize \<omega>) = stabilize a \<oplus> pp"
+      by (metis (no_types, lifting) \<open>Some (stabilize \<omega>) = stabilize a \<oplus> stabilize p\<close> asso1 core_is_smaller)
+    moreover have "(p \<in> P) = (pp \<in> P)"
+    proof (rule rel_stable_assertionE[of "stabilize a" P p pp])
+      show "rel_stable_assertion (stabilize a) P"
+        using assms(2) framed_by_def stabilize_is_stable \<open>stabilize a \<in> A\<close> by blast
+      show "stabilize a ## p"
+        by (metis \<open>Some \<omega> = a \<oplus> p\<close> asso2 commutative decompose_stabilize_pure defined_def not_None_eq)
+      show "pure_larger pp (stabilize p)"
+        by (metis \<open>Some pp = |stabilize a| \<oplus> stabilize p\<close> commutative core_is_pure pure_def pure_larger_def)
+      show "pp \<succeq> |stabilize a|"
+        using \<open>Some pp = |stabilize a| \<oplus> stabilize p\<close> greater_def by auto
+    qed
+    ultimately show ?B
+      using \<open>p \<in> P\<close> x_elem_set_product by blast
+  next
+    assume ?B
+    then obtain a p where "a \<in> A" "p \<in> P" "Some (stabilize \<omega>) = a \<oplus> p"
+      by (meson x_elem_set_product)
+    moreover obtain aa where "Some aa = a \<oplus> |\<omega>|"      
+      by (metis calculation(3) local.asso2 local.commutative local.decompose_stabilize_pure option.exhaust_sel)
+    then have "Some \<omega> = aa \<oplus> p"
+      by (metis (no_types, lifting) asso1 calculation(3) commutative decompose_stabilize_pure)
+    moreover have "aa \<in> A"
+      by (metis \<open>Some aa = a \<oplus> |\<omega>|\<close> assms(1) calculation(1) plus_pure_stabilize_eq self_framing_def)
+    ultimately show ?A
+      using x_elem_set_product by blast
+  qed
+qed
+
+
+
+lemma framed_by_negate:
+  assumes "framed_by_exp A b"
+  shows "framed_by_exp A (negate b)"
+  by (metis assms framed_by_exp_def negate_def not_Some_eq)
+
+lemma framed_by_expI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> e \<omega> \<noteq> None"
+  shows "framed_by_exp A e"
+  by (simp add: assms framed_by_exp_def)
+
+lemma framed_by_expE:
+  assumes "framed_by_exp A e"
+      and "\<omega> \<in> A"
+    shows "\<exists>v. e \<omega> = Some v"
+  by (meson assms(1) assms(2) framed_by_exp_def not_Some_eq)
+
+lemma self_framing_ext:
+  assumes "self_framing A"
+      and "self_framing B"
+      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
+      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> \<omega> \<in> B \<Longrightarrow> \<omega> \<in> A"
+    shows "A = B"
+proof -
+  have "\<And>\<omega>. \<omega> \<in> A \<longleftrightarrow> \<omega> \<in> B"
+    by (metis assms(1) assms(2) assms(3) assms(4) in_Stabilize self_framing_eq stabilize_is_stable)
+  then show ?thesis by blast
+qed
+
+lemma Stabilize_self_framing:
+  "self_framing (Stabilize S)"
+proof (rule self_framingI)
+  fix \<omega> show "\<omega> \<in> Stabilize S \<longleftrightarrow> stabilize \<omega> \<in> Stabilize S"
+    by (simp add: already_stable Stabilize_def stabilize_is_stable)
+qed
+
+lemma wf_exp_framed_by_stabilize:
+  assumes "wf_exp e"
+      and "framed_by_exp A e"
+      and "\<omega> \<in> A"
+      and "self_framing A"
+    shows "e \<omega> = Some b \<longleftrightarrow> e (stabilize \<omega>) = Some b"
+proof
+  show "e (stabilize \<omega>) = Some b \<Longrightarrow> e \<omega> = Some b"
+    by (metis (no_types, lifting) assms(1) max_projection_prop_def max_projection_prop_stable_stabilize wf_expE)
+  assume "e \<omega> = Some b"
+  moreover obtain v where "e (stabilize \<omega>) = Some v"
+    by (metis assms(2) assms(3) assms(4) framed_by_exp_def option.collapse self_framing_def)
+  ultimately show "e (stabilize \<omega>) = Some b"
+    by (metis (mono_tags, lifting) assms(1) max_projection_prop_def max_projection_prop_stable_stabilize wf_expE)
+qed
+
+lemma negate_sat_equiv:
+  "\<omega> \<in> pure_Stabilize (negate b) \<longleftrightarrow> pure \<omega> \<and> b \<omega> = Some False"
+  by (smt (verit, del_insts) mem_Collect_eq negate_def option.collapse option.discI pure_Stabilize_def)
+
+lemma self_framing_and:
+  assumes "self_framing A"
+      and "self_framing_on A P"
+    shows "self_framing (A \<inter> P)"
+proof (rule self_framingI)
+  fix \<omega> 
+  show "\<omega> \<in> A \<inter> P \<longleftrightarrow> stabilize \<omega> \<in> A \<inter> P" (is "?P \<longleftrightarrow> ?Q")
+    by (metis IntD1 IntD2 IntI assms(1) assms(2) self_framing_def self_framing_on_def)
+qed
+
+lemma wf_exp_framed_by:
+  assumes "wf_exp b"
+      and "framed_by_exp A b"
+      and "self_framing A"
+    shows "self_framing (A \<otimes> pure_Stabilize b)"
+proof (rule self_framingI)
+  fix \<omega> show "\<omega> \<in> A \<otimes> pure_Stabilize b \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> pure_Stabilize b" (is "?P \<longleftrightarrow> ?Q")
+  proof
+    assume ?P
+    then obtain a r where "Some \<omega> = a \<oplus> r" "a \<in> A" "b r = Some True"
+      by (smt (verit, ccfv_SIG) mem_Collect_eq pure_Stabilize_def x_elem_set_product)
+    then obtain r' where "Some r' = stabilize r \<oplus> |stabilize a|"
+      by (metis commutative defined_def max_projection_prop_def max_projection_prop_pure_core max_projection_prop_stable_stabilize option.exhaust_sel smaller_compatible)
+    then show ?Q
+      by (smt (verit) \<open>\<omega> \<in> A \<otimes> pure_Stabilize b\<close> assms(1) assms(2) assms(3) member_filter pure_Stabilize_eq self_framing_def wf_exp_framed_by_stabilize)
+  next
+    assume ?Q
+    then show ?P
+      using assms(1) assms(3) pure_Stabilize_eq self_framing_def wf_exp_stabilize by fastforce
+  qed
+qed
+
+lemma entailsI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
+  shows "entails A B"
+  by (simp add: assms entails_def subsetI)
+
+
 end
 
 end

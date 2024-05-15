@@ -118,6 +118,13 @@ begin
 definition plus_agreement :: "'a agreement \<Rightarrow> 'a agreement \<Rightarrow> 'a agreement option" where
   "plus_agreement a b = (if a = b then Some a else None)"
 
+lemma plus_AgI:
+  fixes \<omega> :: "'v agreement"
+  assumes "\<omega> = a"
+      and "\<omega> = b"
+    shows "Some \<omega> = a \<oplus> b"
+  by (metis SepAlgebra.plus_agreement_def assms(1) assms(2))
+
 instance proof
   fix a b c ab bc :: "'a agreement"
   show "a \<oplus> b = b \<oplus> a"

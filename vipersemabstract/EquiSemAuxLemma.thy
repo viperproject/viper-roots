@@ -684,7 +684,7 @@ qed
 lemma get_m_additive:
   assumes "Some a = b \<oplus> c"
   shows "get_m a hl = get_m b hl + get_m c hl"
-  by (metis EquiViper.add_masks_def assms full_add_charact(2) get_m.elims get_vm_additive)
+  by (metis EquiViper.add_masks_def assms full_add_charact(2) get_vm_additive)
 
 lemma val_option_sum:
   assumes "Some (x :: 'v val option) = a \<oplus> b"
@@ -832,7 +832,7 @@ qed
 
 lemma mult_get_m:
   "get_m (p \<odot> \<omega>) hl = p * (get_m \<omega> hl)"
-  by (metis get_m.elims mult_fun_def mult_get_v_interchange mult_get_vm mult_preal_def)
+  by (metis mult_fun_def mult_get_v_interchange mult_get_vm mult_preal_def)
 
 lemma get_m_combine:
   assumes "(v \<le> get_m \<alpha> hl) = (v \<le> get_m \<beta> hl)"
@@ -1327,6 +1327,16 @@ subsection \<open>Instantiation of state as sep_algebra\<close>
 instantiation virtual_state :: (type) sep_algebra
 begin
 
+definition stable_virtual_state :: "'v virtual_state \<Rightarrow> bool" where
+  "stable_virtual_state x \<longleftrightarrow> (\<forall>hl :: heap_loc. get_vh x hl \<noteq> None \<longrightarrow> get_vm x hl > 0)"
+
+definition stabilize2pre :: "'v virtual_state \<Rightarrow> 'v pre_virtual_state" where
+  "stabilize2pre x = (get_vm x, \<lambda>hl. if get_vm x hl = 0 then None else get_vh x hl)"
+
+definition stabilize_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state" where
+  "stabilize_virtual_state x = Abs_virtual_state (stabilize2pre x)"
+
+(*
 definition u_virtual_state where "u_virtual_state = Abs_virtual_state uuu"
 
 definition stable_rel_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state \<Rightarrow> bool" where
@@ -1337,10 +1347,12 @@ definition stabilize2pre :: "'v virtual_state \<Rightarrow> 'v virtual_state \<R
 
 definition stabilize_rel_virtual_state :: "'v virtual_state \<Rightarrow> 'v virtual_state \<Rightarrow> 'v virtual_state" where
   "stabilize_rel_virtual_state a x = Abs_virtual_state (stabilize2pre a x)"
+*)
 
+(*
 lemma stable_rel_rule:
   assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
-    shows "stable_rel a x"
+  shows "stable_rel a x"
   using assms stable_rel_virtual_state_def by blast
 
 lemma stable_rel_imp:
@@ -1348,11 +1360,11 @@ lemma stable_rel_imp:
       and "get_vh x hl = Some v"
     shows "get_vm x hl > 0 \<or> get_vm a hl > 0"
   by (metis assms option.discI stable_rel_virtual_state_def)
-
+*)
 lemma stabilize_wf:
-  "wf_pre_virtual_state (stabilize2pre a x)"
+  "wf_pre_virtual_state (stabilize2pre x)"
 proof -
-  obtain \<pi> h where "stabilize2pre a x = (\<pi>, h)" "\<pi> = get_vm x" "h = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
+  obtain \<pi> h where "stabilize2pre x = (\<pi>, h)" "\<pi> = get_vm x" "h = (\<lambda>hl. if get_vm x hl = 0 then None else get_vh x hl)"
     by (simp add: stabilize2pre_def)
   moreover have "wf_pre_virtual_state (\<pi>, h)"
   proof (rule wf_pre_virtual_stateI)
@@ -1374,12 +1386,13 @@ proof -
     moreover have "get_vm x hl \<noteq> 0"
       by (metis \<open>\<pi> = get_vm x\<close> \<open>ppos (\<pi> hl)\<close> empty_heap_def wf_pre_virtual_state.simps wf_uuu zero_mask_def)
     ultimately show "h hl \<noteq> None"
-      by (simp add: \<open>h = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)\<close>)
+      by (simp add: \<open>h = (\<lambda>hl. if get_vm x hl = PosReal.pnone then None else get_vh x hl)\<close>)
   qed
   ultimately show ?thesis
     by simp
 qed
 
+(*
 lemma vstate_stabilize_structure:
   shows "get_vm (stabilize_rel a x) = get_vm x"
     and "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
@@ -1393,7 +1406,8 @@ proof -
   show "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)" using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x\<close>
     by (simp add: get_vh_def stabilize2pre_def stabilize_rel_virtual_state_def)
 qed
-
+*)
+(*
 lemma vstate_u_structure:
   shows "get_vm sep_algebra_class.u = zero_mask"
     and "get_vh sep_algebra_class.u = empty_heap"
@@ -1409,9 +1423,24 @@ proof -
   then show "get_vh sep_algebra_class.u = empty_heap" using \<open>Rep_virtual_state (Abs_virtual_state uuu) = uuu\<close>
     by (smt (verit) snd_conv u_virtual_state_def uuu_def)
 qed
+*)
 
 instance proof
-  fix x a :: "'v virtual_state"
+  fix x a b c :: "'v virtual_state"
+  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
+    sorry
+  show "sep_algebra_class.stable (stabilize x)"
+    by (smt (verit, del_insts) Abs_virtual_state_inverse get_vh_def get_vm_def mem_Collect_eq not_gr_0 prod.sel(1) prod.sel(2) stabilize2pre_def stabilize_virtual_state_def stabilize_wf stable_virtual_state_def)
+  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
+    sorry
+  show "Some x = stabilize x \<oplus> |x|"
+    sorry
+  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
+    sorry
+qed
+(*
+
+
   show "Some x = stabilize_rel a x \<oplus> |x|"
     by (smt (verit, ccfv_SIG) EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) core_is_smaller core_structure(2) plus_funE plus_funI plus_option.simps(1) vstate_add_iff)
   show "stable_rel a (stabilize_rel a x)"
@@ -1642,6 +1671,7 @@ next
   ultimately show "Some (stabilize_rel sep_algebra_class.u x) = stabilize_rel sep_algebra_class.u a \<oplus> stabilize_rel a b"
     by (simp add: vstate_add_iff)
 qed
+*)
 
 end
 
@@ -1715,10 +1745,12 @@ qed
 
 end
 
+(*
 
 instantiation ag_option :: (type) sep_algebra
 begin
 
+(*
 definition u_ag_option :: "'v ag_option" where
   "u_ag_option = None_ag"
 
@@ -1727,9 +1759,30 @@ definition stable_rel_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option \<Ri
 
 definition stabilize_rel_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option \<Rightarrow> 'v ag_option" where
   "stabilize_rel_ag_option _ x = x"
+*)
+
+definition stable_ag_option :: "'v ag_option \<Rightarrow> bool" where
+  "stable_ag_option _ \<longleftrightarrow> True"
+
+definition stabilize_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option" where
+  "stabilize_ag_option x = x"
 
 instance proof
-  fix x a b y :: "'v ag_option"
+  fix x a b c :: "'v ag_option"
+  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
+    by (simp add: stabilize_ag_option_def)
+  show "sep_algebra_class.stable (stabilize x)"
+    by (simp add: stable_ag_option_def)
+  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
+    by (simp add: stabilize_ag_option_def)
+  show "Some x = stabilize x \<oplus> |x|"
+    by (simp add: core_is_smaller stabilize_ag_option_def)
+  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
+    oops
+(*
+
+
+
   show "stabilize_rel a x = x"
     by (simp add: stabilize_rel_ag_option_def)
   then show "Some x = stabilize_rel a x \<oplus> |x|"
@@ -1745,9 +1798,9 @@ instance proof
     by (simp add: stabilize_rel_ag_option_def)
   show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
     by (simp add: \<open>Some x = a \<oplus> b\<close> stabilize_rel_ag_option_def)
-qed
+*)
 
 end
-
+*)
 
 end
