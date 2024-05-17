@@ -95,6 +95,23 @@ inductive pure_exp_typing :: "program \<Rightarrow> type_env \<Rightarrow> pure_
      "\<lbrakk> pure_exp_typing Pr (shift_and_add \<Lambda> \<tau>x) qbody TBool \<rbrakk> \<Longrightarrow>
        pure_exp_typing Pr \<Lambda> (PForall \<tau>x qbody) TBool"
 
+inductive_simps pure_exp_typing_simps :
+  "pure_exp_typing Pr \<Lambda> (ELit l) ty"
+  "pure_exp_typing Pr \<Lambda> (Var v) ty"
+  "pure_exp_typing Pr \<Lambda> (Unop op e) ty"
+  "pure_exp_typing Pr \<Lambda> (Binop e1 op e2) ty"
+  "pure_exp_typing Pr \<Lambda> (CondExp e1 e2 e3) ty"
+  "pure_exp_typing Pr \<Lambda> (FieldAcc e1 f) ty"
+  "pure_exp_typing Pr \<Lambda> (Old l e1) ty"
+  "pure_exp_typing Pr \<Lambda> (Perm e f) ty"
+  "pure_exp_typing Pr \<Lambda> (PermPred p es) ty"
+  "pure_exp_typing Pr \<Lambda> (FunApp f es) ty"
+  "pure_exp_typing Pr \<Lambda> Result ty"
+  "pure_exp_typing Pr \<Lambda> (Unfolding p es e) ty"
+  "pure_exp_typing Pr \<Lambda> (Let e1 e2) ty"
+  "pure_exp_typing Pr \<Lambda> (PExists vt e1) ty"
+  "pure_exp_typing Pr \<Lambda> (PForall vt e1) ty"
+
 inductive exp_or_wildcard_typing :: "program \<Rightarrow> type_env \<Rightarrow> pure_exp exp_or_wildcard \<Rightarrow> vtyp \<Rightarrow> bool"
   for Pr :: program and \<Lambda> :: type_env
   where
@@ -116,6 +133,11 @@ inductive atomic_assertion_typing :: "program \<Rightarrow> type_env \<Rightarro
        exp_or_wildcard_typing Pr \<Lambda> e TPerm \<rbrakk> \<Longrightarrow>
        atomic_assertion_typing Pr \<Lambda> (AccPredicate P es p)"
 
+inductive_simps atomic_assertion_typing_simps :
+  "atomic_assertion_typing Pr \<Lambda> (Pure e)"
+  "atomic_assertion_typing Pr \<Lambda> (Acc e f ep)"
+  "atomic_assertion_typing Pr \<Lambda> (AccPredicate P es ep)"
+
 inductive assertion_typing :: "program \<Rightarrow> type_env \<Rightarrow> assertion \<Rightarrow> bool"
   for Pr :: program
   where
@@ -136,6 +158,17 @@ inductive assertion_typing :: "program \<Rightarrow> type_env \<Rightarrow> asse
       assertion_typing Pr \<Lambda> (ForAll \<tau>x A)"
   | TypExists: "\<lbrakk> assertion_typing Pr (shift_and_add \<Lambda> \<tau>x) A \<rbrakk> \<Longrightarrow>
       assertion_typing Pr \<Lambda> (Exists \<tau>x A)"
+
+inductive_simps assertion_typing_simps :
+  "assertion_typing Pr \<Lambda> (Atomic a)"
+  "assertion_typing Pr \<Lambda> (Imp p A)"
+  "assertion_typing Pr \<Lambda> (CondAssert p A1 A2)"
+  "assertion_typing Pr \<Lambda> (ImpureAnd A1 A2)"
+  "assertion_typing Pr \<Lambda> (ImpureOr A1 A2)"
+  "assertion_typing Pr \<Lambda> (Star A1 A2)"
+  "assertion_typing Pr \<Lambda> (Wand A1 A2)"
+  "assertion_typing Pr \<Lambda> (ForAll ty A)"
+  "assertion_typing Pr \<Lambda> (Exists ty A)"
 
 inductive stmt_typing :: "program \<Rightarrow> type_env \<Rightarrow> stmt \<Rightarrow> bool"
   for Pr :: program
@@ -182,6 +215,26 @@ inductive stmt_typing :: "program \<Rightarrow> type_env \<Rightarrow> stmt \<Ri
   | TypSkip: "stmt_typing Pr \<Lambda> Skip"
 
 inductive_cases stmt_typing_elim :
+  "stmt_typing Pr \<Lambda> (stmt.Inhale e)"
+  "stmt_typing Pr \<Lambda> (stmt.Exhale e)"
+  "stmt_typing Pr \<Lambda> (stmt.Assert e)"
+  "stmt_typing Pr \<Lambda> (stmt.Assume e)"
+  "stmt_typing Pr \<Lambda> (stmt.If e C1 C2)"
+  "stmt_typing Pr \<Lambda> (stmt.Seq C1 C2)"
+  "stmt_typing Pr \<Lambda> (stmt.LocalAssign v e)"
+  "stmt_typing Pr \<Lambda> (stmt.FieldAssign e1 f e2)"
+  "stmt_typing Pr \<Lambda> (stmt.Havoc v)"
+  "stmt_typing Pr \<Lambda> (stmt.MethodCall ys f es)"
+  "stmt_typing Pr \<Lambda> (stmt.While e I C)"
+  "stmt_typing Pr \<Lambda> (stmt.Unfold P es p)"
+  "stmt_typing Pr \<Lambda> (stmt.Fold P es p)"
+  "stmt_typing Pr \<Lambda> (stmt.Package A1 A2)"
+  "stmt_typing Pr \<Lambda> (stmt.Apply A1 A2)"
+  "stmt_typing Pr \<Lambda> (stmt.Label l)"
+  "stmt_typing Pr \<Lambda> (stmt.Scope v C)"
+  "stmt_typing Pr \<Lambda> (stmt.Skip)"
+
+inductive_simps stmt_typing_simps :
   "stmt_typing Pr \<Lambda> (stmt.Inhale e)"
   "stmt_typing Pr \<Lambda> (stmt.Exhale e)"
   "stmt_typing Pr \<Lambda> (stmt.Assert e)"
