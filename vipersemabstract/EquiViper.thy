@@ -1,5 +1,6 @@
 theory EquiViper
-  imports Main  ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.LiftSepAlgebra ViperCommon.Binop ViperCommon.DeBruijn
+  imports Main  ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.Binop ViperCommon.DeBruijn
+  ViperCommon.PosReal ViperCommon.SepAlgebra AbstractSemantics
 begin
 
 subsection \<open>Pre-virtual equi_states\<close>
@@ -251,6 +252,8 @@ end
 
 subsection \<open>Normal equi_states\<close>
 
+type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement"
+
 (* Normal equi_state *)
 
 (*
@@ -259,7 +262,10 @@ type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 (*
 type_synonym 'a trace = "label \<rightharpoonup> 'a virtual_state"
 *)
-type_synonym 'a equi_state = "('a val, 'a virtual_state) abs_state"
+type_synonym 'a equi_state = "('a val, ('a ag_trace \<times> 'a virtual_state)) abs_state"
+(*
+type_synonym ('v, 'a) abs_state = "'v ag_store \<times> 'a"
+*)
                                     
 (*
 = 'a val ag_store \<times> ('a virtual_state \<times> 'a trace)"
@@ -268,23 +274,60 @@ type_synonym 'a equi_state = "('a val, 'a virtual_state) abs_state"
 
 (*
 fun get_store :: "'a equi_state \<Rightarrow> (var \<rightharpoonup> 'a val)" where "get_store \<omega> = get_store \<omega>"
-fun get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
 fun get_t :: "'a equi_state \<Rightarrow> 'a trace" where "get_t \<omega> = fst (snd \<omega>)"
+*)
+(*
+definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
+
+*)
+definition get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
+definition get_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state)" where "get_trace \<omega> = the_ag (fst (snd \<omega>))"
+definition set_state :: "'a equi_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
+  "set_state \<omega> \<phi> = (Ag (get_store \<omega>), (Ag (get_trace \<omega>), \<phi>))"
+definition set_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state) \<Rightarrow> 'a equi_state" where
+  "set_trace \<omega> \<tau> = (Ag (get_store \<omega>), (Ag \<tau>, get_state \<omega>))"
+
+lemma get_store_set_trace [simp] :
+  "get_store (set_trace \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_trace_def)
+lemma get_store_set_state [simp] :
+  "get_store (set_state \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_state_def)
+
+lemma get_trace_set_store [simp] :
+  "get_trace (set_store \<omega> st) = get_trace \<omega>"
+  by (simp add: get_abs_state_def get_trace_def set_store_def)
+lemma get_trace_set_trace [simp] :
+  "get_trace (set_trace \<omega> t) = t"
+  by (simp add:get_trace_def set_trace_def)
+lemma get_trace_set_state [simp] :
+  "get_trace (set_state \<omega> st) = get_trace \<omega>"
+  by (simp add:get_trace_def set_state_def)
+
+lemma get_state_set_store [simp] :
+  "get_state (set_store \<omega> st) = get_state \<omega>"
+  by (metis get_abs_state_def get_abs_state_set_store get_state_def)
+lemma get_state_set_trace [simp] :
+  "get_state (set_trace \<omega> st) = get_state \<omega>"
+  by (simp add:get_state_def set_trace_def)
+lemma get_state_set_state [simp] :
+  "get_state (set_state \<omega> st) = st"
+  by (simp add:get_state_def set_state_def)
+
+(*
+(* TODO vipersemabstract/EquiSemAuxLemma.thy *)
+
+
 *)
 
 abbreviation get_h where "get_h \<omega> \<equiv> get_vh (get_state \<omega>)"
 abbreviation get_m where "get_m \<omega> \<equiv> get_vm (get_state \<omega>)"
 
-(*
-fun get_h :: "'a equi_state \<Rightarrow> 'a partial_heap" where "get_h \<omega> = get_vh (get_state \<omega>)"
-fun get_m :: "'a equi_state \<Rightarrow> preal mask" where "get_m \<omega> = get_vm (get_state \<omega>)"
-*)
+
 fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_virtual_state" where "get_pv \<omega> = Rep_virtual_state (get_state \<omega>)"
 
-definition u :: "'a equi_state" where "u = ((Ag Map.empty, Ag Map.empty), uu)"
-
 definition shift_and_add_equi_state where
-  "shift_and_add_equi_state \<omega> x = ((Ag (shift_and_add (get_store \<omega>) x), Ag (get_trace \<omega>)), get_state \<omega>)"
+  "shift_and_add_equi_state \<omega> x = set_store \<omega> (shift_and_add (get_store \<omega>) x)"
 
 subsection \<open>Assertions\<close>
 
@@ -305,6 +348,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 
 | RedBinop: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v2 ; eval_binop v1 bop v2 = BinopNormal v \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] Val v"
+
 
 | RedOld: "\<lbrakk> get_trace \<omega> l = Some \<phi> ; \<Delta> \<turnstile> \<langle>e; set_state \<omega> \<phi>\<rangle> [\<Down>] v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e; \<omega>\<rangle> [\<Down>] v" (* Implicitly propagates failures *)
 
@@ -332,8 +376,6 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 
 | RedResult: "\<lbrakk> get_store \<omega> 0 = Some v \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Result; \<omega>\<rangle> [\<Down>] Val v"
 
-
-
 | RedBinopRightFailure: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] VFailure ;  eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] VFailure"
 | RedBinopFailure: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v2 ; eval_binop v1 bop v2 = BinopOpFailure ; eval_binop_lazy v1 bop = None \<rbrakk>
@@ -355,20 +397,6 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 | RedFunAppFailure: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals ; (funs \<Delta>) f vals (get_state \<omega>) = None \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>FunApp f exps; \<omega>\<rangle> [\<Down>] VFailure"
 
-
-(*
-(*
-| RedPermField: "\<lbrakk> \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VRef (Address a)) \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Perm e f; \<omega>\<rangle> [\<Down>] Val (VPerm (Rep_preal (get_m \<omega> (a, f))))"
-| RedPermPred: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>PermPred p exps; \<omega>\<rangle> [\<Down>] Val (VPerm (Rep_preal (get_m \<omega> (p, vals))))"
-*)
-
-(*
-| RedUnfolding: "\<lbrakk> red_pure_exps \<Delta> (\<sigma>, \<tau>, \<phi>) exps vals ; unfold_pure \<phi> (P, vals) = Some \<phi>' ; \<Delta> \<turnstile> \<langle>e; (\<sigma>, \<tau>, \<phi>')\<rangle> [\<Down>] r \<rbrakk>
-   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Unfolding P exps e; (\<sigma>, \<tau>, \<phi>)\<rangle> [\<Down>] r"
-| RedUnfoldingFail: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals ; unfold_pure (get_state \<omega>) (P, vals) = None \<rbrakk>
-  \<Longrightarrow> \<Delta> \<turnstile> \<langle>Unfolding P exps e; \<omega>\<rangle> [\<Down>] VFailure"
-*)
-*)
 
 text \<open>The following lemma proves that the meaning of pure expressions is independent from the interpretation of predicates.\<close>
 

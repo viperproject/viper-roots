@@ -105,12 +105,31 @@ next
   then show ?A
     using greater_def by auto
 qed
+lemma comp_prod:
+  "a ## b \<longleftrightarrow> (fst a ## fst b \<and> snd a ## snd b)" (is "?A \<longleftrightarrow> ?B")
+proof
+  assume ?A
+  then obtain x where "Some x = a \<oplus> b"
+    by (metis defined_def not_Some_eq)
+  then have "Some (fst x) = fst a \<oplus> fst b \<and> Some (snd x) = snd a \<oplus> snd b"
+    by (metis SepAlgebra.plus_prodE)
+  then show ?B
+    by (metis defined_def option.discI)
+next
+  assume ?B
+  then obtain r1 r2 where "Some r1 = fst a \<oplus> fst b \<and> Some r2 = snd a \<oplus> snd b"
+    by (metis defined_def option.exhaust_sel)
+  then show ?A
+    using defined_def SepAlgebra.plus_prodIAlt by fastforce
+qed    
+
 
 end
 
 subsection \<open>Function\<close>
 
 datatype 'v agreement = Ag (the_ag: 'v)
+
 
 instantiation "agreement" :: (type) pcm
 begin
@@ -136,6 +155,11 @@ instance proof
   show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a "
     by (metis plus_agreement_def)
 qed
+
+lemma greater_Ag:
+  fixes a b :: "'a agreement"
+  shows "a \<succeq> b \<longleftrightarrow> a = b"
+  by (simp add: SepAlgebra.plus_agreement_def greater_def)
 
 
 end

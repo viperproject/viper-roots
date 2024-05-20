@@ -204,11 +204,11 @@ lemma real_mult_permexpr_case_split:
   using assms
   by (auto elim: real_mult_permexpr.elims)
 
-lemma shift_and_add_keep_vstate:
+lemma shift_and_add_keep_vstate[simp]:
   shows "\<And>\<omega> v. get_state (shift_and_add_equi_state \<omega> v) = get_state \<omega>"
   using shift_and_add_equi_state_def
-  by (metis get_state_def snd_conv)
-
+  by (metis get_state_set_store)
+  
 
 lemma read_field_mono:
   assumes "\<phi>2 \<succeq> \<phi>1"
@@ -684,7 +684,7 @@ qed
 lemma get_m_additive:
   assumes "Some a = b \<oplus> c"
   shows "get_m a hl = get_m b hl + get_m c hl"
-  by (metis EquiViper.add_masks_def assms full_add_charact(2) get_vm_additive)
+  using EquiViper.add_masks_def assms get_vm_additive state_add_iff by blast
 
 lemma val_option_sum:
   assumes "Some (x :: 'v val option) = a \<oplus> b"
@@ -916,13 +916,23 @@ lemma greater_state_has_greater_parts:
   shows "get_store \<omega>1 = get_store \<omega>0"
     and "get_trace \<omega>1 = get_trace \<omega>0"
     and "get_state \<omega>1 \<succeq> get_state \<omega>0"
-  using greater_charact assms by metis+
+    apply (metis assms greater_charact)
+proof -
+  have "get_abs_state \<omega>1 \<succeq> get_abs_state \<omega>0"
+    using assms greater_charact by blast
+  then have "Ag (get_trace \<omega>1) \<succeq> Ag (get_trace \<omega>0)"
+    by (simp add: get_abs_state_def get_trace_def greater_prod_eq)
+  then show "get_trace \<omega>1 = get_trace \<omega>0"
+    by (simp add: greater_Ag)
+  show "get_state \<omega>1 \<succeq> get_state \<omega>0"
+    by (metis \<open>get_abs_state \<omega>1 \<succeq> get_abs_state \<omega>0\<close> get_abs_state_def get_state_def greater_prod_eq)
+qed
 
 lemma greater_cover_store:
   assumes "\<omega>1 \<succeq> \<omega>0"
       and "get_store \<omega>0 l = Some v"
     shows "get_store \<omega>1 l = Some v"
-  by (metis assms(1) assms(2) greater_state_has_greater_parts(1))
+  by (metis assms(1) assms(2) greater_charact)
 
 
 
@@ -1438,6 +1448,14 @@ instance proof
   show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
     sorry
 qed
+
+lemma get_trace_stabilize[simp]:
+  "get_trace (stabilize \<omega>) = get_trace \<omega>"
+  by (metis agreement.collapse fst_conv get_trace_def snd_conv stabilize_ag stabilize_prod_def)
+lemma set_trace_stabilize[simp]:
+  "set_trace (stabilize \<omega>) t = stabilize (set_trace \<omega> t)"
+  by (metis (no_types, lifting) fst_conv get_state_def get_store_stabilize set_trace_def snd_conv stabilize_ag stabilize_prod_def)
+
 (*
 
 
@@ -1679,7 +1697,7 @@ end
 datatype 'v ag_option = None_ag | Some_ag 'v
 
 type_synonym 'v ag_store = "nat \<Rightarrow> 'v val ag_option"
-type_synonym 'v ag_trace = "label \<Rightarrow> 'v virtual_state ag_option"
+type_synonym 'v ag_trace = "(label \<rightharpoonup> 'v virtual_state) agreement"
 type_synonym 'v ag_state = "'v ag_store \<times> 'v ag_trace \<times> 'v virtual_state"
 
 instantiation ag_option :: (type) pcm
