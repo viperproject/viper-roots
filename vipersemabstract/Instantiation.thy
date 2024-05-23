@@ -124,7 +124,7 @@ qed
 definition owns_only where
   "owns_only \<omega> l \<longleftrightarrow> get_vm (get_state \<omega>) l = 1 \<and> (\<forall>l'. l' \<noteq> l \<longrightarrow> get_vm (get_state \<omega>) l' = 0)"
 
-lemma owns_onlyI:
+lemma owns_onlyI[intro]:
   assumes "get_vm (get_state \<omega>) l = 1"
       and "\<And>l'. l' \<noteq> l \<Longrightarrow> get_vm (get_state \<omega>) l' = 0"
     shows "owns_only \<omega> l"
@@ -177,7 +177,7 @@ definition points_to where
 definition well_typed_heap where
   "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (\<forall>hl v. get_vh \<phi> hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
 
-lemma well_typed_heapI:
+lemma well_typed_heapI[intro]:
   assumes "\<And>hl v. get_vh \<phi> hl = Some v \<Longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty)"
   shows "well_typed_heap \<Gamma> \<phi>"
   by (simp add: Instantiation.well_typed_heap_def assms)
@@ -305,11 +305,13 @@ definition well_typed :: "(field_ident \<rightharpoonup> 'a val set) \<Rightarro
 3. Prove rule label?
 *)
 
-lemma well_typedI:
+lemma well_typedI[intro]:
   assumes "well_typed_heap \<Gamma> (snd \<omega>)"
       and "\<And>l \<phi>. the_ag (fst \<omega>) l = Some \<phi> \<Longrightarrow> well_typed_heap \<Gamma> \<phi>"
     shows "well_typed \<Gamma> \<omega>"
   by (simp add: assms(1) assms(2) well_typed_def)
+
+thm well_typedI[elim_format]
 
 lemma well_typedE:
   assumes "well_typed \<Gamma> \<omega>"
@@ -317,6 +319,9 @@ lemma well_typedE:
     and "the_ag (fst \<omega>) l = Some \<phi> \<Longrightarrow> well_typed_heap \<Gamma> \<phi>"
   using assms well_typed_def apply blast
   by (meson assms well_typed_def)
+
+thm well_typedE(1)[elim_format]
+
 
 lemma well_typed_sum:
   assumes "Some x = a \<oplus> b"
@@ -359,7 +364,7 @@ proof (rule well_typedI)
     by (metis (mono_tags, lifting) assms core_is_smaller option.simps(3) plus_agreement_def plus_prodE well_typedE(2))
 qed
 
-
+                                   
 global_interpretation TypedEqui: typed_state well_typed
 proof
   fix x a b :: "('a ag_trace \<times> 'a virtual_state)"

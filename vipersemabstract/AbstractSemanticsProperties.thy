@@ -795,7 +795,7 @@ next
     show "wf_abs_stmt \<Delta> C1"
       using If.prems(2) wf_abs_stmt.simps(6) by blast
     show "wf_set \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)"
-      by (metis (no_types, lifting) If.prems(3) Un_upper1 \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> image_mono wf_set_subset)
+      by (metis (no_types, lifting) If.prems(3) \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> image_mono inf_sup_ord(3) wf_set_subset)
   qed
 
   have "framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) b"

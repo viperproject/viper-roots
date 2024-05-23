@@ -1694,7 +1694,7 @@ qed
 end
 
 
-datatype 'v ag_option = None_ag | Some_ag 'v
+datatype 'v ag_option = None_ag | Some_ag (ag_the: 'v)
 
 type_synonym 'v ag_store = "nat \<Rightarrow> 'v val ag_option"
 type_synonym 'v ag_trace = "(label \<rightharpoonup> 'v virtual_state) agreement"
