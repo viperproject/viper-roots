@@ -2,6 +2,8 @@ theory CSL_IDF
   imports ParImp ViperCommon.SepAlgebra ViperCommon.SepLogic "../vipersemabstract/Instantiation"
 begin
 
+subsection \<open>Safety\<close>
+
 definition binary_mask where
   "binary_mask \<omega> \<longleftrightarrow> (\<forall>l. get_m \<omega> l = 0 \<or> get_m \<omega> l = 1)"
 
@@ -54,7 +56,7 @@ where
   \<and> no_aborts C \<omega>0
   \<and> (\<forall>\<omega>0' \<omega>f C' \<sigma>'. sep_algebra_class.stable \<omega>f \<and> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and>
   (\<langle>C, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>)
-\<longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q))"
+\<longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q))"
 
 lemma safeI:
   assumes "C = Cskip \<Longrightarrow> \<omega>0 \<in> Q"
@@ -63,7 +65,7 @@ lemma safeI:
       and "no_aborts C \<omega>0"
       and "\<And>\<omega>0' \<omega>f C' \<sigma>'. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and>
   (\<langle>C, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>)
-\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
+\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
     shows "safe (Suc n) C \<omega>0 Q"
   using assms safe.simps(1) by auto
 
@@ -75,7 +77,7 @@ lemma safeI_alt:
       and "\<And>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<Longrightarrow> aborts C (concretize \<omega>0') \<Longrightarrow> False"
       and "\<And>\<omega>0' \<omega>f C' \<sigma>'. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<Longrightarrow>
   (\<langle>C, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>)
-\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
+\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
     shows "safe (Suc n) C \<omega>0 Q"
   using assms safe.simps(1) 
   by fastforce
@@ -87,24 +89,25 @@ lemma safeE:
       and "writes C (get_store \<omega>0) \<subseteq> write_dom \<omega>0"
       and "no_aborts C \<omega>0"
       and "sep_algebra_class.stable \<omega>f \<and> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and> (\<langle>C, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>)
-\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
+\<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q)"
   using assms safe.simps(1) apply simp_all
   by (metis prod.collapse)
 
 
-definition CSL_judgment where
-  "CSL_judgment P C Q \<longleftrightarrow> (\<forall>n \<omega>. \<omega> \<in> P \<longrightarrow> safe n C \<omega> Q)"
+definition CSL where
+  "CSL P C Q \<longleftrightarrow> (\<forall>n \<omega>. \<omega> \<in> P \<and> sep_algebra_class.stable \<omega> \<longrightarrow> safe n C \<omega> Q)"
 
 lemma CSL_I:
-  assumes "\<And>n \<omega>. \<omega> \<in> P \<Longrightarrow> safe n C \<omega> Q"
-  shows "CSL_judgment P C Q"
-  by (simp add: CSL_judgment_def assms)
+  assumes "\<And>n \<omega>. \<omega> \<in> P \<Longrightarrow> sep_algebra_class.stable \<omega> \<Longrightarrow> safe n C \<omega> Q"
+  shows "CSL P C Q"
+  by (simp add: CSL_def assms)
 
 lemma CSL_E:
-  assumes "CSL_judgment P C Q"
+  assumes "CSL P C Q"
       and "\<omega> \<in> P"
+      and "sep_algebra_class.stable \<omega>"
     shows "safe n C \<omega> Q"
-  using CSL_judgment_def assms(1) assms(2) by blast
+  using CSL_def assms by blast
 
 
 lemma safety_mono:
@@ -120,7 +123,7 @@ proof (induct m arbitrary: C n \<omega>)
     by (smt (verit, ccfv_threshold) Suc.hyps Suc.prems(1) Suc.prems(2) Suc_le_mono)
 qed (simp)
 
-(* Need to define the fvA Q... *)
+(* TODO: Need to define the fvA Q... *)
 
 lemma no_aborts_agrees:
   assumes "no_aborts C \<omega>"
@@ -161,12 +164,14 @@ proof (induct n arbitrary: C \<omega> \<omega>')
     fix \<omega>0' \<omega>f C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and> \<langle>C, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 
-    show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q"
+    show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q"
       sorry
   qed
 qed (simp)
 
-subsection Skip
+
+
+subsection \<open>Skip\<close>
 
 lemma safe_skip[intro!]:
   assumes "\<omega> \<in> Q"
@@ -181,14 +186,14 @@ proof (induct n)
       by (simp add: assms)
     fix \<omega>0' \<omega>f C' \<sigma>'
     assume "Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and> \<langle>Cskip, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-    show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q"
+    show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 Q"
       using \<open>Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<and> \<langle>Cskip, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>\<close> by auto
   qed (simp_all)
 qed (simp)
 
 proposition rule_skip:
-  "CSL_judgment P Cskip P"
-  by (simp add: CSL_judgment_def safe_skip)
+  "CSL P Cskip P"
+  by (simp add: CSL_def safe_skip)
 
 
 subsection \<open>Frame rule\<close>
@@ -235,7 +240,7 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f)
       by (metis (no_types, opaque_lifting) Suc.prems(3) asso2 option.collapse)
     then have "Some \<omega>0' = \<omega> \<oplus> \<omega>f''"
       using asm0 Suc.prems(3) asso1 by force
-    then obtain \<omega>1'' \<omega>1' where "Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1'" "safe n C' \<omega>1'' Q"
+    then obtain \<omega>1'' \<omega>1' where "Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1'" "safe n C' \<omega>1'' Q" "sep_algebra_class.stable \<omega>1''"
       using safeE(5)[OF Suc(2), of \<omega>0' \<omega>f'' C' \<sigma>'] asm0 
       by (meson Suc.prems(1) Suc.prems(5) \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> safeE(5) stable_sum)
     then obtain \<omega>1 where "Some \<omega>1 = \<omega>1'' \<oplus> \<omega>f"
@@ -248,11 +253,12 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f)
       show "Some \<omega>1 = \<omega>1'' \<oplus> \<omega>f"
         using calculation by auto
     qed (simp_all add: Suc.prems)
-    ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f' \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q \<otimes> R)"
-      by (metis (no_types, lifting) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> asso1)
+    ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f' \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q \<otimes> R)"
+      by (metis (no_types, lifting) Suc.prems(5) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>sep_algebra_class.stable \<omega>1''\<close> asso1 stable_sum)
   qed
 qed (simp)
 
+(*
 lemma self_framing_wf_split:
   assumes "\<omega> \<in> A \<otimes> B"
       and "TypedEqui.wf_assertion \<Delta> A"
@@ -268,21 +274,23 @@ proof -
   then show ?thesis
     by (metis (no_types, opaque_lifting) TypedEqui.wf_assertion_def \<open>Some a' = a \<oplus> |\<omega>|\<close> \<open>a \<in> A\<close> \<open>b \<in> B\<close> assms(2) assms(3) core_is_pure in_Stabilize pure_def pure_larger_def self_framing_eq stabilize_is_stable)
 qed
+*)
 
 proposition frame_rule:
-  assumes "CSL_judgment P C Q"
+  assumes "CSL P C Q"
       and "disjoint (fvA R) (wrC C)"
+      and "self_framing P"
       and "self_framing R"
-      and "TypedEqui.wf_assertion \<Delta> P"
-    shows "CSL_judgment (P \<otimes> R) C (Q \<otimes> R)"
+    shows "CSL (P \<otimes> R) C (Q \<otimes> R)"
 proof (rule CSL_I)
-  fix n \<omega> assume "\<omega> \<in> P \<otimes> R"
-  then obtain \<omega>p \<omega>r where r: "Some \<omega> = \<omega>p \<oplus> \<omega>r" "\<omega>p \<in> P" "\<omega>r \<in> R" "sep_algebra_class.stable \<omega>r"
-    using assms(3) assms(4) self_framing_wf_split by blast
-  then have "safe n C \<omega>p Q"
-    using CSL_E assms(1) by blast
+  fix n \<omega> assume "\<omega> \<in> P \<otimes> R" "sep_algebra_class.stable \<omega>"
+  then obtain \<omega>p \<omega>r where r: "Some \<omega> = \<omega>p \<oplus> \<omega>r" "\<omega>p \<in> P" "\<omega>r \<in> R"
+    by (meson x_elem_set_product)
+  then have "Some \<omega> = stabilize \<omega>p \<oplus> stabilize \<omega>r"
+    using \<open>sep_algebra_class.stable \<omega>\<close> stabilize_sum_of_stable by blast
   then show "safe n C \<omega> (Q \<otimes> R)"
-    by (meson \<open>Some \<omega> = \<omega>p \<oplus> \<omega>r\<close> \<open>\<omega>r \<in> R\<close> assms(2) disjoint_def frame_safe r)
+    using frame_safe[of n C "stabilize \<omega>p" Q R \<omega> "stabilize \<omega>r"]
+    by (meson CSL_E assms(1) assms(2) assms(3) assms(4) disjoint_def r(2) r(3) self_framing_def stabilize_is_stable)
 qed
 
 
@@ -402,11 +410,16 @@ lemma in_read_dom_write_dom:
   apply (metis CollectI assms not_gr_0 read_dom_def zero_neq_one)
   by (simp add: assms write_dom_def)
 
+lemma stable_before_then_update_stable:
+  assumes "sep_algebra_class.stable \<omega>"
+      and "get_h \<omega> l \<noteq> None"
+  shows "sep_algebra_class.stable (update_heap_val \<omega> l v)"
+  sorry
 
 proposition rule_write:
-  "CSL_judgment (full_ownership r) (Cwrite r e) (full_ownership_with_val r e)"
+  "CSL (full_ownership r) (Cwrite r e) (full_ownership_with_val r e)"
 proof (rule CSL_I)
-  fix n \<omega> assume "\<omega> \<in> full_ownership r"
+  fix n \<omega> assume "\<omega> \<in> full_ownership r" "sep_algebra_class.stable \<omega>"
   then obtain l where asm0: "get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1"
     using full_ownership_def by blast
   show "safe n (Cwrite r e) \<omega> (full_ownership_with_val r e)"
@@ -421,7 +434,7 @@ proof (rule CSL_I)
         by (metis \<open>\<And>thesis. (\<And>l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = PosReal.pwrite \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> get_address_simp in_read_dom_write_dom(2) singletonD subsetI writes.simps(4))
       
       fix \<omega>0' \<omega>f
-      assume asm1: "Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
+      assume asm1: "Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0'" "sep_algebra_class.stable \<omega>f"
       then have "get_store \<omega>0' r = Some (VRef (Address l)) \<and> get_m \<omega>0' (l, field_val) = 1"
         by (metis asm0 binary_mask_def full_add_charact(1) get_m_additive padd_pos)
       then have "get_h \<omega>0' (l, field_val) \<noteq> None"
@@ -448,14 +461,141 @@ proof (rule CSL_I)
         show "update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>0'))) \<in> full_ownership_with_val r e"
           by (simp add: asm0 asm1 full_add_charact(1) full_ownership_with_val_def)
       qed
-      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe m C' \<omega>1 (full_ownership_with_val r e)"
-        by (metis asm1 binary_mask_def get_state_set_state set_value_charact(1))
+      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe m C' \<omega>1 (full_ownership_with_val r e)"
+        by (metis \<open>sep_algebra_class.stable \<omega>\<close> asm0 asm1(1) binary_mask_def get_state_set_state not_gr_0 one_neq_zero set_value_charact(1) stable_before_then_update_stable vstate_wf_imp)
     qed (simp)
     ultimately show ?thesis by blast
   qed (simp)
 qed
 
 
+subsection \<open>Parallel rule\<close>
+
+lemma disj_conv:
+  assumes "\<omega>1 ## \<omega>2"
+  shows "disjoint (write_dom \<omega>1) (read_dom \<omega>2)"
+  sorry
+(*
+TODO: Need the \<le> 1 assumption
+proof (rule disjointI)
+*)
+
+lemma read_dom_union:
+  assumes "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
+  shows "read_dom \<omega> = read_dom \<omega>1 \<union> read_dom \<omega>2"
+  sorry
+
+lemma write_dom_union:
+  assumes "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
+  shows "write_dom \<omega>1 \<union> write_dom \<omega>2 \<subseteq> write_dom \<omega>"
+  sorry
+
+lemma safe_par:
+  assumes "safe n C1 \<omega>1 Q1"
+      and "safe n C2 \<omega>2 Q2"
+      and "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
+      and "disjoint (fvC C1 \<union> fvA Q1) (wrC C2)"
+      and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
+      and "sep_algebra_class.stable \<omega>1"
+      and "sep_algebra_class.stable \<omega>2"
+    shows "safe n (C1 || C2) \<omega> (Q1 \<otimes> Q2)"
+  using assms
+proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega>)
+  case (Suc n)
+  show "safe (Suc n) (C1 || C2) \<omega> (Q1 \<otimes> Q2)"
+  proof (rule safeI_alt)
+    show "accesses (C1 || C2) (get_store \<omega>) \<subseteq> read_dom \<omega>"
+      by (metis Suc.prems(1) Suc.prems(2) Suc.prems(3) Un_mono accesses.simps(8) full_add_charact(1) full_add_defined read_dom_union safeE(2))
+    show "writes (C1 || C2) (get_store \<omega>) \<subseteq> write_dom \<omega>"
+    proof -
+      have "writes C1 (get_store \<omega>) \<subseteq> write_dom \<omega> \<and> writes C2 (get_store \<omega>) \<subseteq> write_dom \<omega>"
+        by (metis (no_types, lifting) Suc.prems(1) Suc.prems(2) Suc.prems(3) commutative dual_order.trans full_add_charact(1) le_supE safeE(3) write_dom_union)
+      then show ?thesis
+        by simp
+    qed
+    fix \<omega>0' \<omega>f
+    assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
+    show "aborts (C1 || C2) (concretize \<omega>0') \<Longrightarrow> False"
+    proof -
+      assume "aborts (C1 || C2) (concretize \<omega>0')"
+      then show "False"
+      proof (rule aborts_par_elim)
+        show "aborts C1 (concretize \<omega>0') \<Longrightarrow> False"
+          using Suc.prems(1) Suc.prems(3) asm0(1) asm0(2) greater_def no_aborts_def no_aborts_mono safe.simps(2) by blast
+        show "aborts C2 (concretize \<omega>0') \<Longrightarrow> False"
+          using Suc.prems(2) Suc.prems(3) asm0(1) asm0(2) greater_def no_aborts_def no_aborts_mono safe.simps(2)
+          by (metis commutative)
+        have r1: "accesses C1 (fst (concretize \<omega>1)) \<subseteq> read_dom \<omega>1 \<and> writes C1 (fst (concretize \<omega>1)) \<subseteq> write_dom \<omega>1"
+          using Suc.prems(1) concretize_def by auto
+        moreover have r2: "accesses C2 (fst (concretize \<omega>2)) \<subseteq> read_dom \<omega>2 \<and> writes C2 (fst (concretize \<omega>2)) \<subseteq> write_dom \<omega>2"
+          using Suc.prems(2) concretize_def by auto
+        ultimately show "\<not> disjoint (accesses C1 (fst (concretize \<omega>0'))) (writes C2 (fst (concretize \<omega>0'))) \<Longrightarrow> False"
+          by (metis (no_types, lifting) Pair_inject Suc.prems(3) asm0(2) commutative concretize_def defined_def disj_conv disjoint_search(3) disjoint_search(4) full_add_charact(1) option.simps(3) prod.exhaust_sel)
+        show "\<not> disjoint (writes C1 (fst (concretize \<omega>0'))) (accesses C2 (fst (concretize \<omega>0'))) \<Longrightarrow> False"
+          by (metis (no_types, lifting) Pair_inject Suc.prems(3) asm0(2) concretize_def defined_def disj_conv disjoint_search(5) full_add_charact(1) full_add_defined option.discI r1 r2 surjective_pairing)
+      qed
+    qed
+
+    fix C' \<sigma>'
+    assume asm1: "\<langle>C1 || C2, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q1 \<otimes> Q2)"
+    proof (rule red_par_cases)
+      show "C' = Cskip \<Longrightarrow> \<sigma>' = concretize \<omega>0' \<Longrightarrow> C1 = Cskip \<Longrightarrow> C2 = Cskip
+  \<Longrightarrow> \<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q1 \<otimes> Q2)"
+        by (metis (no_types, lifting) Suc.prems(1) Suc.prems(2) Suc.prems(3) Suc.prems(6) Suc.prems(7) asm0(2) is_in_set_sum safeE(1) safe_skip stable_sum star_to_singletonI)
+      fix C1'
+      assume asm2: "C' = C1' || C2" "\<langle>C1, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle>"
+      obtain \<omega>f' where "Some \<omega>f' = \<omega>2 \<oplus> \<omega>f"
+        by (metis (no_types, opaque_lifting) Suc.prems(3) asm0(2) asso2 option.exhaust_sel)
+      then have "Some \<omega>0' = \<omega>1 \<oplus> \<omega>f'"
+        using Suc.prems(3) asm0(2) asso1 by force
+      then obtain \<omega>a \<omega>a' where ra: "Some \<omega>a' = \<omega>a \<oplus> \<omega>f' \<and> binary_mask \<omega>a' \<and> \<sigma>' = concretize \<omega>a'" "safe n C1' \<omega>a Q1"
+        "sep_algebra_class.stable \<omega>a"
+        using safeE(5)[OF Suc(2), of \<omega>f' \<omega>0' C1' \<sigma>'] asm0 asm2(2)
+        using Suc.prems(7) \<open>Some \<omega>f' = \<omega>2 \<oplus> \<omega>f\<close> stable_sum by blast
+      moreover have "safe n C2 \<omega>2 Q2"
+        by (meson Suc.prems(2) Suc_n_not_le_n nat_le_linear safety_mono)
+      moreover obtain \<omega>' where "Some \<omega>' = \<omega>a \<oplus> \<omega>2"
+        by (metis (no_types, opaque_lifting) \<open>Some \<omega>f' = \<omega>2 \<oplus> \<omega>f\<close> asso2 calculation(1) commutative option.exhaust_sel)
+      then have "Some \<omega>a' = \<omega>' \<oplus> \<omega>f"
+        by (metis \<open>Some \<omega>f' = \<omega>2 \<oplus> \<omega>f\<close> asso1 calculation(1))
+      ultimately have "safe n C' \<omega>' (Q1 \<otimes> Q2)"
+        using Suc(1)[OF ra(2) \<open>safe n C2 \<omega>2 Q2\<close>]
+        by (metis (no_types, lifting) Suc.prems(4) Suc.prems(5) Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> asm2(1) asm2(2) disjoint_search(2) disjoint_search(4) disjoint_simps(3) red_properties)
+      then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q1 \<otimes> Q2)"
+        using \<open>Some \<omega>a' = \<omega>' \<oplus> \<omega>f\<close> ra(1)
+        using Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> \<open>sep_algebra_class.stable \<omega>a\<close> stable_sum by blast
+    next
+      show "\<And>C2'. C' = C1 || C2' \<Longrightarrow>
+           \<langle>C2, concretize \<omega>0'\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<Longrightarrow>
+           \<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> \<sigma>' = concretize \<omega>1' \<and> safe n C' \<omega>1 (Q1 \<otimes> Q2)"
+        sorry
+(* TODO: same proof *)
+    qed
+  qed (simp)
+qed (simp)
+
+
+
+
+proposition rule_par:
+  assumes "CSL P1 C1 Q1"
+      and "CSL P2 C2 Q2"
+      and "disjoint (fvC C1 \<union> fvA Q1) (wrC C2)"
+      and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
+      and "self_framing P1"
+      and "self_framing P2"
+    shows "CSL (P1 \<otimes> P2) (C1 || C2) (Q1 \<otimes> Q2)"
+proof (rule CSL_I)
+  fix n \<omega>
+  assume asm0: "\<omega> \<in> P1 \<otimes> P2" "sep_algebra_class.stable \<omega>"
+  then obtain p1 p2 where "Some \<omega> = p1 \<oplus> p2" "p1 \<in> P1" "p2 \<in> P2"
+    by (meson x_elem_set_product)
+  then have "Some \<omega> = stabilize p1 \<oplus> stabilize p2"
+    using asm0(2) stabilize_sum_of_stable by blast
+  then show "safe n (C1 || C2) \<omega> (Q1 \<otimes> Q2)"
+    by (meson CSL_def \<open>\<And>thesis. (\<And>p1 p2. \<lbrakk>Some \<omega> = p1 \<oplus> p2; p1 \<in> P1; p2 \<in> P2\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> asm0(2) assms(1) assms(2) assms(3) assms(4) assms(5) assms(6) safe_par self_framing_def stabilize_is_stable stabilize_sum_of_stable)
+qed
 
 
 end

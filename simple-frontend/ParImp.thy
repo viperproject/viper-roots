@@ -132,8 +132,8 @@ inductive
   aborts :: "cmd \<Rightarrow> state \<Rightarrow> bool"
 where
   aborts_Seq[intro]:   "aborts C1 \<sigma> \<Longrightarrow> aborts (Cseq C1 C2) \<sigma>" 
-| aborts_Par1[intro]:  "aborts C1 \<sigma> \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>" 
-| aborts_Par2[intro]:  "aborts C2 \<sigma> \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>"
+| aborts_Par1[intro]:  "aborts C1 \<sigma> \<Longrightarrow> aborts (C1 || C2) \<sigma>" 
+| aborts_Par2[intro]:  "aborts C2 \<sigma> \<Longrightarrow> aborts (C1 || C2) \<sigma>"
 
 | aborts_Race1[intro]:  "\<not> disjoint (accesses C1 (fst \<sigma>)) (writes C2 (fst \<sigma>)) \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>"
 | aborts_Race2[intro]:  "\<not> disjoint (writes C1 (fst \<sigma>)) (accesses C2 (fst \<sigma>)) \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>"
@@ -148,6 +148,7 @@ where
 
 
 inductive_cases aborts_write_elim[elim]: "aborts (Cwrite r e) \<sigma>"
+inductive_cases aborts_par_elim[elim]: "aborts (C1 || C2) \<sigma>"
 
 subsection \<open>Free variables, updated variables and substitutions\<close>
 
