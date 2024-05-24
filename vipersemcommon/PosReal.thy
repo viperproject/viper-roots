@@ -188,6 +188,45 @@ qed
 
 end
 
+lemma pgt_gt :
+  "pgt = (>)"
+  apply (rule ext, rule ext)
+  by (simp add: PosReal.pgt.rep_eq less_preal.rep_eq)
+
+lemma pgte_gte :
+  "pgte = (\<ge>)"
+  apply (rule ext, rule ext)
+  by (simp add: PosReal.pgte.rep_eq less_eq_preal.rep_eq)
+
+lemma preal_not_0_gt_0 :
+  "(p::preal) \<noteq> 0 \<longleftrightarrow> 0 < p"
+  apply (transfer) by fastforce
+
+lemma gr_0_is_ppos:
+  "(x :: preal) > 0 \<longleftrightarrow> ppos x"
+  apply transfer
+  by simp
+
+lemmas norm_preal =
+  gr_0_is_ppos[symmetric]
+  pgt_gt
+  pgte_gte
+  preal_not_0_gt_0
+
+lemmas preal_to_real =
+  less_eq_preal.rep_eq
+  less_preal.rep_eq
+  inf_preal.rep_eq
+  sup_preal.rep_eq
+  minus_preal.rep_eq
+  plus_preal.rep_eq
+  zero_preal.rep_eq
+  one_preal.rep_eq
+  divide_preal.rep_eq
+  Rep_preal_inject[symmetric]
+  Rep_preal_inverse
+  Abs_preal_inverse
+
 lemma preal_pgt_pnone: "pgt p1 pnone \<Longrightarrow> p1 \<noteq> pnone"
   by (transfer) simp
 
