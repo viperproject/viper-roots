@@ -79,11 +79,6 @@ lemma not_gr_0:
   apply transfer
   by auto
 
-lemma gr_0_is_ppos:
-  "(x :: preal) > 0 \<longleftrightarrow> ppos x"
-  apply transfer
-  by simp
-
 lemma mult_abs_preal_homomorphic:
   assumes "x > 0"
       and "y > 0"
