@@ -1519,6 +1519,13 @@ lemma mask_update_greater_aux_2:
 lemmas mask_update_succ_aux = succ_maskI[OF mask_update_greater_aux]
 lemmas mask_update_succ_aux_2 = succ_maskI[OF mask_update_greater_aux_2]
 
+lemma psub_strictly_smaller:
+  assumes "(p :: preal) > q" 
+      and "q > 0"
+    shows "p > (p - q)"
+  using assms
+  by (simp add: preal_to_real)
+
 lemma exhale_normal_result_smaller:
   assumes "red_exhale ctxt StateCons \<omega>def A \<omega> res" and
           "res = RNormal \<omega>'"
@@ -1548,20 +1555,24 @@ proof (induction arbitrary: \<omega>')
     qed (simp_all add: succ_refl)
   qed
 next
-  case (ExhAccWildcard mh \<omega> e_r r a q f)
-  hence "mh (a, f) \<noteq> pnone" and "\<omega>' = update_mh_total_full \<omega> (mh((a, f) := q))"
+  case (ExhAccWildcard mh \<omega> e_r r a f q)
+  let ?p' = "(mh (a, f) - q)"
+  from ExhAccWildcard have "mh (a, f) \<noteq> pnone" and "\<omega>' = update_mh_total_full \<omega> (mh((a, f) := ?p'))"
     by (auto elim: exh_if_total.elims)
 
-  have "pgt (mh (a, f)) q" 
-    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mh (a, f) \<noteq> pnone\<close>]]
-    by blast
+  with ExhAccWildcard have qprop: "PosReal.pnone < q \<and> mh (a, f) > q"
+    by fastforce
+  
+  hence "mh (a, f) > ?p'"
+    using psub_strictly_smaller
+    by simp
 
   show ?case 
   proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
-    from \<open>pgt (mh (a, f)) q\<close>
-    show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_total_full \<omega> (mh((a, f) := q)))"      
-      using mask_update_succ_aux_2[OF pgt_implies_pgte]
-      unfolding  \<open>mh = _\<close>
+    from \<open>mh (a, f) > ?p'\<close>
+    show "get_mh_total_full \<omega> \<succeq> get_mh_total_full (update_mh_total_full \<omega> (mh((a, f) := ?p')))"      
+      using mask_update_succ_aux_2[OF pgt_implies_pgte, simplified pgt_gt]
+      unfolding \<open>mh = _\<close>
       by fastforce
   qed (simp_all add: succ_refl)
 next
@@ -1579,20 +1590,22 @@ next
       by fastforce
   qed (simp_all add: succ_refl)
 next
-  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
-  hence *: "mp (pred_id, v_args) \<noteq> pnone" and 
-        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := q))"
+  case (ExhAccPredWildcard mp \<omega> e_args v_args pred_id q)
+  let ?pnew = "mp (pred_id, v_args) - q"
+  from ExhAccPredWildcard
+  have *: "mp (pred_id, v_args) \<noteq> pnone" and 
+        "\<omega>' = update_mp_total_full \<omega> (mp((pred_id, v_args) := ?pnew))" and
+        qprop:"PosReal.pnone < q \<and> q < mp (pred_id, v_args)"
     by (auto elim: exh_if_total.elims)
 
-  hence SufficientPerm: "pgt (mp (pred_id, v_args)) q"
-    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF *]]
-    by blast
+  hence SufficientPerm: "mp (pred_id, v_args) > ?pnew"
+    by (simp add: psub_strictly_smaller)
 
   show ?case
   proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
     from SufficientPerm
-    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := q)))"
-      using mask_update_succ_aux_2[OF pgt_implies_pgte]
+    show "get_mp_total_full \<omega> \<succeq> get_mp_total_full (update_mp_total_full \<omega> (mp((pred_id, v_args) := ?pnew)))"
+      using mask_update_succ_aux_2[OF pgt_implies_pgte, simplified pgt_gt]
       unfolding \<open>mp = _\<close>
       by fastforce
   qed (simp_all add: succ_refl)      
@@ -1882,19 +1895,20 @@ proof (induction arbitrary: \<omega>_inh \<omega>_inh' \<omega>')
       by auto
   qed
 next
-  case (ExhAccWildcard mh \<omega> e_r r a q f)
+  case (ExhAccWildcard mh \<omega> e_r r a f q)
   let ?loc = "(a,f)"
-  from ExhAccWildcard have "mh ?loc \<noteq> pnone" and "\<omega>' = update_mh_loc_total_full \<omega> ?loc q"
+  let ?p_exh_new = "mh (a,f) - q"
+  from ExhAccWildcard have "mh ?loc \<noteq> pnone" and "\<omega>' = update_mh_loc_total_full \<omega> ?loc ?p_exh_new"
     by (auto elim: exh_if_total.elims)
 
-  with ExhAccWildcard have "r = Address a"
+  with ExhAccWildcard have "r = Address a" and qprop: "q > 0 \<and> mh (a, f) > q"
     using exh_if_total_normal ref.exhaust_sel 
-    by blast
+    by blast+
 
-  have "pgt (mh ?loc) q" 
-    using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mh ?loc \<noteq> pnone\<close>]]
+  hence "mh ?loc > ?p_exh_new" 
+    using psub_strictly_smaller
     by blast
-
+    
   let ?A = "Acc e_r f Wildcard"
   note AssertionFramed = \<open>assertion_framing_state ctxt StateCons (Atomic ?A) \<omega>_inh\<close>
 
@@ -1916,7 +1930,7 @@ next
       
   show ?case
   proof -
-    let ?p' = "(padd (get_mh_total_full \<omega>_inh ?loc) (get_mh_total_full \<omega> ?loc - q))"
+    let ?p' = "(padd (get_mh_total_full \<omega>_inh ?loc) (get_mh_total_full \<omega> ?loc - ?p_exh_new))"
     have "\<omega>_inh' = update_mh_loc_total_full \<omega>_inh ?loc ?p'" (is "_ = ?upd_\<omega>_inh")    
       using plus_diff_full_total_state_upd_aux_1[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close> \<open>\<omega>' = _\<close> \<open>\<omega> \<succeq> \<omega>'\<close>]
       by blast
@@ -1929,16 +1943,24 @@ next
       unfolding \<open>\<omega>_inh' = _\<close>
       by simp
 
-    from \<open>pgt (mh ?loc) q\<close> have "get_mh_total_full \<omega> ?loc - q \<noteq> pnone"
+    from \<open>mh ?loc > ?p_exh_new\<close> 
+    have "get_mh_total_full \<omega> ?loc - ?p_exh_new \<noteq> pnone"
       unfolding \<open>mh = _\<close>
-      by (simp add: pgt.rep_eq positive_real_preal Rep_preal_inject[symmetric] minus_preal.rep_eq less_eq_preal.rep_eq zero_preal.rep_eq)
+      using positive_real_preal Rep_preal_inject[symmetric] minus_preal.rep_eq zero_preal.rep_eq
+            \<open>mh (a, f) > mh (a, f) - q\<close>
+      by (simp add: order_less_le)
 
     let ?W = "inhale_perm_single StateCons \<omega>_inh ?loc None"
 
-    have "\<omega>_inh' \<in> ?W"
+    have "get_mh_total_full \<omega> ?loc - ?p_exh_new \<noteq> pnone"
+      apply (simp add: preal_to_real)
+      using  \<open>mh (a, f) > ?p_exh_new\<close> \<open>mh (a, f) \<noteq> 0\<close> qprop
+      unfolding \<open>mh = _\<close>
+      by (metis PosReal.ppos.rep_eq Rep_preal_inverse diff_add_cancel diff_left_mono diff_zero dual_order.irrefl get_mh_total_full.simps gr_0_is_ppos less_add_same_cancel1 prat_non_negative zero_preal_def)
+
+    hence "\<omega>_inh' \<in> ?W"
       unfolding inhale_perm_single_def
       using \<open>StateCons \<omega>_inh'\<close> 
-            \<open>get_mh_total_full \<omega> ?loc - q \<noteq> pnone\<close> 
             PermConstraint' 
             \<open>\<omega>_inh' = _\<close> 
       by auto     
@@ -2032,8 +2054,8 @@ next
       by auto
   qed
 next
-  case (ExhAccPredWildcard mp \<omega> e_args v_args q pred_id)
-    let ?A = "AccPredicate pred_id e_args Wildcard"
+  case (ExhAccPredWildcard mp \<omega> e_args v_args pred_id q)
+  let ?A = "AccPredicate pred_id e_args Wildcard"
   note AssertionFramed = \<open>assertion_framing_state ctxt StateCons (Atomic ?A) \<omega>_inh\<close>
 
   have SubExp: "e_args = sub_expressions_atomic ?A"
@@ -2061,9 +2083,12 @@ next
   show ?case
   proof -
     let ?loc = "(pred_id, v_args)"
-    let ?p' = "(padd (get_mp_total_full \<omega>_inh ?loc) (get_mp_total_full \<omega> ?loc - q))"
+    let ?pnew = "mp (pred_id, v_args) - q"
+    let ?p' = "(padd (get_mp_total_full \<omega>_inh ?loc) (get_mp_total_full \<omega> ?loc - ?pnew))"
 
-    have "mp ?loc \<noteq> pnone" and "\<omega>' = update_mp_loc_total_full \<omega> (pred_id, v_args) q"
+    have "mp ?loc \<noteq> pnone" and 
+         "\<omega>' = update_mp_loc_total_full \<omega> (pred_id, v_args) ?pnew" and
+         qprop: "PosReal.pnone < q \<and> q < mp (pred_id, v_args)"
       using ExhAccPredWildcard
       by (auto elim: exh_if_total.elims)
 
@@ -2071,13 +2096,14 @@ next
       using plus_diff_full_total_state_upd_aux_2[OF \<open>\<omega>_inh \<oplus> (\<omega> \<ominus> \<omega>') = Some \<omega>_inh'\<close> \<open>\<omega>' = _\<close> \<open>\<omega> \<succeq> \<omega>'\<close>]
       by blast
 
-    have "pgt (mp ?loc) q" 
-      using \<open>q = _\<close> someI_ex[OF preal_exists_stricly_smaller_nonzero[OF \<open>mp ?loc \<noteq> pnone\<close>]]
-      by blast
+    from qprop
+    have "mp ?loc > ?pnew" 
+      by (simp add: psub_strictly_smaller)
 
-    hence "get_mp_total_full \<omega> ?loc - q \<noteq> pnone"
+    hence "get_mp_total_full \<omega> ?loc - ?pnew \<noteq> pnone"
       unfolding \<open>mp = _\<close>
-      by (simp add: pgt.rep_eq positive_real_preal Rep_preal_inject[symmetric] minus_preal.rep_eq less_eq_preal.rep_eq zero_preal.rep_eq)
+      using qprop
+      by (simp add: preal_to_real)
 
     from ExhAccPredWildcard have "StateCons \<omega>_inh'"
       by simp
@@ -2087,7 +2113,7 @@ next
     have "\<omega>_inh' \<in> ?W"
       unfolding inhale_perm_single_pred_def
       using \<open>StateCons \<omega>_inh'\<close> 
-            \<open>get_mp_total_full \<omega> ?loc - q \<noteq> pnone\<close>             
+            \<open>get_mp_total_full \<omega> ?loc - ?pnew \<noteq> pnone\<close>             
             \<open>\<omega>_inh' = _\<close> 
       by auto     
       
