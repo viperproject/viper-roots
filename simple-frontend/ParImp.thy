@@ -40,7 +40,7 @@ datatype cmd =
 | Cread var var (* second var needs to be a non-null ref *)
 | Cwrite var exp 
 | Calloc var exp
-| Cdispose var
+| Cfree var
 | Cseq cmd cmd
 | Cpar cmd cmd (infixl "||" 60)
 | Cif bexp cmd cmd
@@ -70,8 +70,8 @@ inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state 
   where
   red_Seq1[intro]: "\<langle>Cseq Cskip C, \<sigma>\<rangle> \<rightarrow> \<langle>C, \<sigma>\<rangle>"
 | red_Seq2[elim]: "\<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<Longrightarrow> \<langle>Cseq C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>Cseq C1' C2, \<sigma>'\<rangle>"
-| red_If1[intro]: "bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif B C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1, \<sigma>\<rangle>"
-| red_If2[intro]: "\<not> bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif B C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2, \<sigma>\<rangle>"
+| red_If1[intro]: "bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1, \<sigma>\<rangle>"
+| red_If2[intro]: "\<not> bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2, \<sigma>\<rangle>"
 | red_Par1[elim]: "\<lbrakk> \<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1' || C2, \<sigma>'\<rangle>" 
 | red_Par2[elim]: "\<lbrakk> \<langle>C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1 || C2', \<sigma>'\<rangle>"
 | red_Par3[intro]: "\<langle>Cskip || Cskip, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>\<rangle>"
@@ -82,12 +82,19 @@ inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state 
   \<Longrightarrow> \<langle>Calloc x e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 | red_Read[intro]:  "\<lbrakk> \<sigma> = (s,h); s r = Some (VRef (Address l)); h (l, field_val) = Some (VInt v); \<sigma>' = (s(x \<mapsto> VInt v), h) \<rbrakk>
   \<Longrightarrow> \<langle>Cread x r, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
-| red_Free[intro]:  "\<lbrakk> \<sigma> = (s,h); s r = Some (VRef (Address l)); \<sigma>' = (s, h((l, field_val) := None)) \<rbrakk> \<Longrightarrow> \<langle>Cdispose r, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
+| red_Free[intro]:  "\<lbrakk> \<sigma> = (s,h); s r = Some (VRef (Address l)); \<sigma>' = (s, h((l, field_val) := None)) \<rbrakk> \<Longrightarrow> \<langle>Cfree r, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 | red_Write[intro]: "\<lbrakk> \<sigma> = (s,h); s r = Some (VRef (Address l)); (l, field_val) \<in> dom h; \<sigma>' = (s, h((l, field_val) \<mapsto> VInt (edenot e s))) \<rbrakk>
   \<Longrightarrow> \<langle>Cwrite r e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 
-inductive_cases red_par_cases: "\<langle>Cpar C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_par_cases: "\<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_seq_cases: "\<langle>Cseq C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_write_cases: "\<langle>Cwrite r e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_if_cases: "\<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_while_cases: "\<langle>Cwhile b C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_alloc_cases: "\<langle>Calloc r e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_assign_cases: "\<langle>Cassign x e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_free_cases: "\<langle>Cfree r, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_read_cases: "\<langle>Cread x r, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 
 
 subsubsection \<open>Abort semantics\<close>
@@ -95,10 +102,9 @@ subsubsection \<open>Abort semantics\<close>
 definition get_address where
   "get_address x = the_address (the_ref (the x))"
 
-lemma get_address_simp:
-  assumes "x = Some (VRef (Address l))"
-  shows "get_address x = l"
-  by (simp add: assms get_address_def)
+lemma get_address_simp[simp]:
+  shows "get_address (Some (VRef (Address l))) = l"
+  by (simp add: get_address_def)
 
 primrec
   accesses :: "cmd \<Rightarrow> stack \<Rightarrow> address set"
@@ -108,7 +114,7 @@ where
   | "accesses (Cread x r)      s = { get_address (s r) }"
   | "accesses (Cwrite r E)    s = { get_address (s r) }"
   | "accesses (Calloc x E)     s = {}"
-  | "accesses (Cdispose r)     s = {get_address (s r)}"
+  | "accesses (Cfree r)     s = {get_address (s r)}"
   | "accesses (Cseq C1 C2)     s = accesses C1 s"
   | "accesses (C1 || C2)     s = accesses C1 s \<union> accesses C2 s"
   | "accesses (Cif B C1 C2)    s = {}"
@@ -122,7 +128,7 @@ where
   | "writes (Cread x r)      s = {}"
   | "writes (Cwrite r E)    s = {get_address (s r)}"
   | "writes (Calloc x E)     s = {}"
-  | "writes (Cdispose r)     s = {get_address (s r)}"
+  | "writes (Cfree r)     s = {get_address (s r)}"
   | "writes (Cseq C1 C2)     s = writes C1 s"
   | "writes (C1 || C2)     s = writes C1 s \<union> writes C2 s"
   | "writes (Cif B C1 C2)    s = {}"
@@ -140,15 +146,24 @@ where
 
 | aborts_Read[intro]:  "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cread x r) \<sigma>"
 | aborts_Write[intro]: "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cwrite r E) \<sigma>"
-| aborts_Free[intro]:  "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cdispose r) \<sigma>"
+| aborts_Free[intro]:  "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cfree r) \<sigma>"
 
 | aborts_ReadNull[intro]: "fst \<sigma> r = Some (VRef Null) \<Longrightarrow> aborts (Cread x r) \<sigma>"
 | aborts_WriteNull[intro]: "fst \<sigma> r = Some (VRef Null) \<Longrightarrow> aborts (Cwrite r e) \<sigma>"
-| aborts_FreeNull[intro]: "fst \<sigma> r = Some (VRef Null) \<Longrightarrow> aborts (Cdispose r) \<sigma>"
+| aborts_FreeNull[intro]: "fst \<sigma> r = Some (VRef Null) \<Longrightarrow> aborts (Cfree r) \<sigma>"
 
 
 inductive_cases aborts_write_elim[elim]: "aborts (Cwrite r e) \<sigma>"
 inductive_cases aborts_par_elim[elim]: "aborts (C1 || C2) \<sigma>"
+inductive_cases aborts_seq_elim[elim]: "aborts (Cseq C1 C2) \<sigma>"
+inductive_cases aborts_while_elim[elim]: "aborts (Cwhile b C) \<sigma>"
+inductive_cases aborts_if_elim[elim]: "aborts (Cif b C1 C2) \<sigma>"
+inductive_cases aborts_alloc_elim[elim]: "aborts (Calloc r e) \<sigma>"
+inductive_cases aborts_assign_elim[elim]: "aborts (Cassign x e) \<sigma>"
+inductive_cases aborts_free_elim[elim]: "aborts (Cfree r) \<sigma>"
+inductive_cases aborts_read_elim[elim]: "aborts (Cread x r) \<sigma>"
+
+
 
 subsection \<open>Free variables, updated variables and substitutions\<close>
 
@@ -177,7 +192,7 @@ where
 | "fvC (Cread x r)    = ({x, r})"
 | "fvC (Cwrite r E) = ({r} \<union> fvE E)"
 | "fvC (Calloc r E)   = ({r} \<union> fvE E)"
-| "fvC (Cdispose r)   = {r}"
+| "fvC (Cfree r)   = {r}"
 | "fvC (Cseq C1 C2)     = (fvC C1 \<union> fvC C2)"
 | "fvC (Cpar C1 C2)     = (fvC C1 \<union> fvC C2)"
 | "fvC (Cif B C1 C2)    = (fvB B \<union> fvC C1 \<union> fvC C2)"
@@ -196,7 +211,7 @@ where
 | "wrC (Cread v E)     = {v}"
 | "wrC (Cwrite E1 E2)  = {}"
 | "wrC (Calloc v E)    = {v}"
-| "wrC (Cdispose E)    = {}"
+| "wrC (Cfree E)    = {}"
 | "wrC (Cseq C1 C2)    = (wrC C1 \<union> wrC C2)"
 | "wrC (Cpar C1 C2)    = (wrC C1 \<union> wrC C2)"
 | "wrC (Cif B C1 C2)   = (wrC C1 \<union> wrC C2)"
@@ -244,7 +259,7 @@ where
   | "rem_vars X (Cread x E)    = (if x \<in> X then Cseq Cskip Cskip else Cread x E)"
   | "rem_vars X (Cwrite E E')  = Cwrite E E'"
   | "rem_vars X (Calloc x E)   = Calloc x E"
-  | "rem_vars X (Cdispose E)   = Cdispose E"
+  | "rem_vars X (Cfree E)   = Cfree E"
   | "rem_vars X (Cseq C1 C2)   = Cseq (rem_vars X C1) (rem_vars X C2)"
   | "rem_vars X (Cpar C1 C2)   = Cpar (rem_vars X C1) (rem_vars X C2)"
   | "rem_vars X (Cif B C1 C2)  = Cif B (rem_vars X C1) (rem_vars X C2)"
@@ -331,12 +346,12 @@ lemma red_agrees[rule_format]:
     shows "\<exists>s' h'. red C (s, h) C' (s', h') \<and> agrees X (fst \<sigma>') s' \<and> snd \<sigma>' = h'"
   using assms
 proof (induct rule: red.induct)
-  case (red_If1 b \<sigma> B C1 C2)
+  case (red_If1 b \<sigma> C1 C2)
   then show ?case
-    using bdenot.simps(3) by blast
+    using bdenot.simps(3) sorry
 next
-  case (red_If2 b \<sigma> B C1 C2)
-  then show ?case using bdenot.simps(3) by blast
+  case (red_If2 b \<sigma> C1 C2)
+  then show ?case using bdenot.simps(3) sorry
 next
   case (red_Assign \<sigma> s h \<sigma>' x e)
   then show ?case sorry
