@@ -245,68 +245,13 @@ lemma subB_assign:
  "bdenot (subB x E b) s = bdenot b (s(x \<mapsto> VInt (edenot E s)))"
 by (induct b, simp_all add: subE_assign fun_upd_def)
 
-subsection \<open>Variable erasure\<close>
-
-text \<open>The following function erases all assignments and reads to
-  variables in the set @{term X}.\<close>
-
-(* TODO: What is the point? *)
-primrec 
-  rem_vars :: "var set \<Rightarrow> cmd \<Rightarrow> cmd"
-where
-    "rem_vars X Cskip          = Cskip"
-  | "rem_vars X (Cassign x E)  = (if x \<in> X then Cseq Cskip Cskip else Cassign x E)"
-  | "rem_vars X (Cread x E)    = (if x \<in> X then Cseq Cskip Cskip else Cread x E)"
-  | "rem_vars X (Cwrite E E')  = Cwrite E E'"
-  | "rem_vars X (Calloc x E)   = Calloc x E"
-  | "rem_vars X (Cfree E)   = Cfree E"
-  | "rem_vars X (Cseq C1 C2)   = Cseq (rem_vars X C1) (rem_vars X C2)"
-  | "rem_vars X (Cpar C1 C2)   = Cpar (rem_vars X C1) (rem_vars X C2)"
-  | "rem_vars X (Cif B C1 C2)  = Cif B (rem_vars X C1) (rem_vars X C2)"
-  | "rem_vars X (Cwhile B C)   = Cwhile B (rem_vars X C)"
-
-
-text \<open>Properties of variable erasure:\<close>
-
-lemma accesses_remvars: "accesses (rem_vars X C) s \<subseteq> accesses C s"
-by (induct C arbitrary: X s, simp_all, fast)
-
-lemma writes_remvars[simp]:
-  "writes (rem_vars X C) = writes C"
-by (rule ext, induct C arbitrary: X, simp_all)
-
 lemma skip_simps[simp]: 
   "\<not> red Cskip \<sigma> C' \<sigma>'"
   "\<not> aborts Cskip \<sigma>"
-  "(rem_vars X C = Cskip) \<longleftrightarrow> (C = Cskip)"
-  "(Cskip = rem_vars X C) \<longleftrightarrow> (C = Cskip)"
   by (auto elim: aborts.cases red.cases)
-   (induct C, auto split: if_split_asm)+
 
 lemma disjoint_minus: "disjoint (X - Z) Y = disjoint X (Y - Z)"
   by (auto simp add: disjoint_def)
-
-lemma aux_red[rule_format]:
-  "red C \<sigma> C' \<sigma>' \<Longrightarrow> \<forall>X C1. C = rem_vars X C1 \<longrightarrow> disjoint X (fvC C) \<longrightarrow> \<not> aborts C1 \<sigma> \<longrightarrow>
-   (\<exists>C2 s2. red C1 \<sigma> C2 (s2,snd \<sigma>') \<and> rem_vars X C2 = C' \<and> agrees (-X) (fst \<sigma>') s2)"
-  sorry
-(*
-apply (erule_tac red.induct, simp_all, tactic \<open>ALLGOALS (clarify_tac @{context})\<close>)
-apply (case_tac C1, simp_all split: if_split_asm, (fastforce simp add: agrees_def)+)
-apply (case_tac[1-5] C1a, simp_all split: if_split_asm, (fastforce intro: agrees_refl)+)
-apply (case_tac[!] C1, simp_all split: if_split_asm)
-apply (tactic \<open>TRYALL (clarify_tac @{context})\<close>, simp_all add: disjoint_minus [THEN sym])
-apply (fastforce simp add: agrees_def)+
-apply (intro exI conjI, rule_tac v=v in red_Alloc, (fastforce simp add: agrees_def)+)
-done
-*)
-
-lemma aborts_remvars:
-  "aborts (rem_vars X C) \<sigma> \<Longrightarrow> aborts C \<sigma>"
-apply (induct C arbitrary: X \<sigma>, erule_tac[!] aborts.cases, simp_all split: if_split_asm)
-apply (tactic \<open>TRYALL (fast_tac @{context})\<close>)
-apply (clarsimp, rule, erule contrapos_nn, simp, erule disjoint_search, rule accesses_remvars)+
-done
 
 subsection \<open>Basic properties of the semantics\<close>
 
@@ -337,6 +282,11 @@ lemma writes_agrees: "agrees (fvC C) s s' \<Longrightarrow> writes C s = writes 
   by (induct C arbitrary: s s', simp_all add: exp_agrees, clarsimp)
 
 
+lemma agrees_add:
+  assumes "agrees X s s'"
+      and "v1 = v2"
+    shows "agrees X (s(x \<mapsto> VInt v1)) (s(x \<mapsto> VInt v2))"
+  using agrees_refl assms(2) by auto
 
 lemma red_agrees[rule_format]:
   assumes "red C \<sigma> C' \<sigma>'"
@@ -345,28 +295,71 @@ lemma red_agrees[rule_format]:
       and "fvC C \<subseteq> X"
     shows "\<exists>s' h'. red C (s, h) C' (s', h') \<and> agrees X (fst \<sigma>') s' \<and> snd \<sigma>' = h'"
   using assms
-proof (induct rule: red.induct)
+proof (induct arbitrary: X s rule: red.induct)
+  case (red_Seq2 C1 \<sigma> C1' \<sigma>' C2)
+  then show ?case using fvC.simps(7) le_sup_iff red.red_Seq2
+    by metis
+next
   case (red_If1 b \<sigma> C1 C2)
   then show ?case
-    using bdenot.simps(3) sorry
+    by (metis Un_upper1 agrees_search(3) bexp_agrees fst_conv fvC.simps(9) red.red_If1)
 next
   case (red_If2 b \<sigma> C1 C2)
-  then show ?case using bdenot.simps(3) sorry
+  then show ?case
+    by (metis (no_types, lifting) agrees_search(2) agrees_simps(4) bexp_agrees fst_conv fvC.simps(9) red.red_If2)
 next
-  case (red_Assign \<sigma> s h \<sigma>' x e)
-  then show ?case sorry
+  case (red_Par1 C1 \<sigma> C1' \<sigma>' C2)
+  then show ?case
+    by (metis fvC.simps(8) le_sup_iff red.red_Par1)
 next
-  case (red_Read \<sigma> s h e v \<sigma>' x)
-  then show ?case sorry
+  case (red_Par2 C2 \<sigma> C2' \<sigma>' C1)
+  then show ?case
+    by (metis fvC.simps(8) le_sup_iff red.red_Par2)
 next
-  case (red_Write \<sigma> s h e \<sigma>' e')
-  then show ?case sorry
+  case (red_Assign \<sigma> s0 h0 \<sigma>' x e)
+  have "edenot e s0 = edenot e s"
+    by (metis agrees_search(3) agrees_simps(4) exp_agrees fst_eqD fvC.simps(2) red_Assign.hyps(1) red_Assign.prems(1) red_Assign.prems(3))
+  then have "\<langle>Cassign x e, (s, h)\<rangle> \<rightarrow> \<langle>Cskip, (s(x := Some (VInt (edenot e s))), h)\<rangle>"
+    by auto
+  moreover have "agrees X (fst \<sigma>') (s(x := Some (VInt (edenot e s))))"
+    by (smt (verit) \<open>edenot e s0 = edenot e s\<close> agrees_def fst_eqD fun_upd_other fun_upd_same red_Assign.hyps(1) red_Assign.hyps(2) red_Assign.prems(1))
+  ultimately show ?case
+    by (metis red_Assign.hyps(1) red_Assign.hyps(2) red_Assign.prems(2) snd_conv)
 next
-  case (red_Alloc \<sigma> s h v \<sigma>' x e)
-  then show ?case sorry
+  case (red_Alloc \<sigma> s0 h0 l \<sigma>' x e)
+  then have "edenot e s0 = edenot e s"
+    by (metis agrees_search(2) agrees_simps(4) exp_agrees fstI fvC.simps(5) red_Alloc.hyps(1))
+  then have "\<langle>Calloc x e, (s, snd \<sigma>)\<rangle> \<rightarrow> \<langle>Cskip, (s(x \<mapsto> VRef (Address l)), (snd \<sigma>)((l, field_val) \<mapsto> VInt (edenot e s)))\<rangle>"
+    using red.red_Alloc
+    by (metis red_Alloc.hyps(1) red_Alloc.hyps(2) sndI)
+  moreover have "agrees X (fst \<sigma>') (s(x \<mapsto> VRef (Address l)))"
+    by (smt (verit) agrees_def fst_conv fun_upd_other fun_upd_same red_Alloc)
+  ultimately show ?case
+    by (metis \<open>edenot e s0 = edenot e s\<close> red_Alloc.hyps(1) red_Alloc.hyps(3) red_Alloc.prems(2) snd_conv)
 next
-  case (red_Free \<sigma> s h \<sigma>' e)
-  then show ?case sorry
+  case (red_Read \<sigma> s0 h0 r l v \<sigma>' x)
+  moreover have "agrees X (fst \<sigma>') (s(x \<mapsto> VInt v))"
+    by (smt (verit, ccfv_SIG) agrees_def fst_eqD fun_upd_other fun_upd_same red_Read.hyps(1) red_Read.hyps(4) red_Read.prems(1))
+  moreover have "s r = Some (VRef (Address l))"
+    by (metis agrees_search(3) agrees_simps(3) fstI fvC.simps(3) red_Read.hyps(1) red_Read.hyps(2) red_Read.prems(1) red_Read.prems(3))
+  ultimately show ?case using red.red_Read[of _ s h r l v _ x]
+    by (metis snd_conv)
+next
+  case (red_Free \<sigma> s0 h0 r l \<sigma>')
+  then have "s r = Some (VRef (Address l))"
+    by (metis agrees_search(3) agrees_simps(2) fst_eqD fvC.simps(6))
+  then have "\<langle>Cfree r, (s, h)\<rangle> \<rightarrow> \<langle>Cskip, (s, h0((l, field_val) := None))\<rangle>"    
+    using red_Free.hyps(1) red_Free.prems(2) by auto
+  then show ?case
+    by (metis fst_eqD red_Free.hyps(1) red_Free.hyps(3) red_Free.prems(1) snd_eqD)
+next
+  case (red_Write \<sigma> s0 h0 r l \<sigma>' e)
+  then have "edenot e s0 = edenot e s"
+    by (metis agrees_search(2) agrees_simps(4) exp_agrees fstI fvC.simps(4))
+  then have "\<langle>Cwrite r e, (s, h)\<rangle> \<rightarrow> \<langle>Cskip, (s, h((l, field_val) \<mapsto> VInt (edenot e s0)))\<rangle>"
+    by (smt (verit, del_insts) agrees_search(2) agrees_simps(2) agrees_simps(4) domIff fst_eqD fvC.simps(4) red.red_Write red_Write.hyps(1) red_Write.hyps(2) red_Write.hyps(3) red_Write.prems(1) red_Write.prems(2) red_Write.prems(3) snd_conv)
+  then show ?case
+    by (metis fst_eqD red_Write.hyps(1) red_Write.hyps(4) red_Write.prems(1) red_Write.prems(2) snd_conv)
 qed (auto)
 
 
@@ -378,29 +371,31 @@ lemma aborts_agrees[rule_format]:
   using assms
 proof (induct rule: aborts.induct)
   case (aborts_Race1 C1 \<sigma> C2)
-  then show ?case sorry
+  then show ?case
+    using aborts.aborts_Race1 accesses_agrees writes_agrees by fastforce
 next
   case (aborts_Race2 C1 \<sigma> C2)
-  then show ?case sorry
+  then show ?case
+    by (metis aborts.aborts_Race2 accesses_agrees agrees_simps(4) fst_conv fvC.simps(8) writes_agrees)
 next
   case (aborts_Read E \<sigma> x)
-  then show ?case sorry
+  then show ?case
+    by (metis aborts.aborts_Read agrees_simps(3) fst_conv fvC.simps(3) snd_conv)
 next
   case (aborts_Write E \<sigma> E')
-  then show ?case sorry
+  then show ?case
+    by (metis Un_insert_left aborts.aborts_Write agrees_simps(3) fst_conv fvC.simps(4) snd_conv)
 next
   case (aborts_Free E \<sigma>)
-  then show ?case sorry
+  then show ?case
+    by (metis (mono_tags, lifting) aborts.aborts_Free agrees_def fst_conv fvC.simps(6) singletonI snd_conv)
 qed (auto)
-(*
-by (erule aborts.induct, simp_all, auto simp add: writes_agrees accesses_agrees exp_agrees, 
-    auto simp add: agrees_def)
-*)
+
 text \<open>Corollaries of Proposition 4.2, useful for automation.\<close>
 
 corollary exp_agrees2[simp]:
   "x \<notin> fvE E \<Longrightarrow> edenot E (s(x := v)) = edenot E s"
-by (rule exp_agrees, simp add: agrees_def)
+  by (rule exp_agrees, simp add: agrees_def)
 
 corollary bexp_agrees2[simp]:
   "x \<notin> fvB B \<Longrightarrow> bdenot B (s(x := v)) = bdenot B s"

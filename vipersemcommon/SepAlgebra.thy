@@ -123,6 +123,11 @@ next
     using defined_def SepAlgebra.plus_prodIAlt by fastforce
 qed    
 
+lemma compatible_prodI:
+  assumes "fst a ## fst b"
+      and "snd a ## snd b"
+    shows "a ## b"
+  using assms(1) assms(2) comp_prod by blast
 
 end
 

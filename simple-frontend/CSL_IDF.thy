@@ -4,13 +4,6 @@ begin
 
 subsection \<open>Safety\<close>
 
-(*
-('a ag_trace \<times> 'a virtual_state)
-*)
-(*
-type_synonym pheap = "int ag_trace \<times> int virtual_state"
-*)
-
 definition binary_mask where
   "binary_mask \<omega> \<longleftrightarrow> (\<forall>l. get_vm \<omega> l = 0 \<or> get_vm \<omega> l = 1)"
 
@@ -29,10 +22,10 @@ definition write_dom where
   "write_dom \<omega> = { l. get_vm \<omega> (l, field_val) = 1 }"
 
 definition no_aborts where
-  "no_aborts C s0 \<omega>0 \<longleftrightarrow> (\<forall>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>f \<and> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<longrightarrow> \<not> aborts C (s0, get_vh \<omega>0'))"
+  "no_aborts C s0 \<omega>0 \<longleftrightarrow> (\<forall>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>0' \<and> sep_algebra_class.stable \<omega>f \<and> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<longrightarrow> \<not> aborts C (s0, get_vh \<omega>0'))"
 
 lemma no_abortsI[intro]:
-  assumes "\<And>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<Longrightarrow> \<not> aborts C (s0, get_vh \<omega>0')"
+  assumes "\<And>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>0' \<Longrightarrow> sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<and> binary_mask \<omega>0' \<Longrightarrow> \<not> aborts C (s0, get_vh \<omega>0')"
   shows "no_aborts C s0 \<omega>0"
   using assms no_aborts_def by blast
 
@@ -72,7 +65,7 @@ lemma safeI_alt:
   assumes "C = Cskip \<Longrightarrow> (Ag s0, \<tau>, \<omega>0) \<in> Q"
       and "accesses C s0 \<subseteq> read_dom \<omega>0"
       and "writes C s0 \<subseteq> write_dom \<omega>0"
-      and "\<And>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<Longrightarrow> binary_mask \<omega>0' \<Longrightarrow> aborts C (concretize s0 \<omega>0') \<Longrightarrow> False"
+      and "\<And>\<omega>0' \<omega>f. sep_algebra_class.stable \<omega>0' \<Longrightarrow> sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<Longrightarrow> binary_mask \<omega>0' \<Longrightarrow> aborts C (concretize s0 \<omega>0') \<Longrightarrow> False"
       and "\<And>\<omega>0' \<omega>f C' \<sigma>'. sep_algebra_class.stable \<omega>f \<Longrightarrow> Some \<omega>0' = \<omega>0 \<oplus> \<omega>f \<Longrightarrow> binary_mask \<omega>0' \<Longrightarrow>
   (\<langle>C, concretize s0 \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>)
 \<Longrightarrow> (\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 Q)"
@@ -121,13 +114,16 @@ proof (induct m arbitrary: C n s \<omega>)
     by (smt (verit, ccfv_threshold) Suc.hyps Suc.prems(1) Suc.prems(2) Suc_le_mono)
 qed (simp)
 
-(* TODO: Need to define the fvA Q... *)
-
 lemma no_aborts_agrees:
   assumes "no_aborts C s \<omega>"
       and "agrees (fvC C) s s'"
     shows "no_aborts C s' \<omega>"
-  sorry
+proof (rule no_abortsI)
+  fix \<omega>0' \<omega>f
+  assume asm0: "sep_algebra_class.stable \<omega>0'" "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
+  then show "\<not> aborts C (concretize s' \<omega>0')"
+    by (metis aborts_agrees agrees_search(1) assms(1) assms(2) fst_conv no_aborts_def snd_conv)
+qed
 
 definition fvA where
   "fvA Q = undefined Q"
@@ -135,7 +131,7 @@ definition fvA where
 lemma fvA_agrees:
   assumes "agrees (fvA Q) s s'"
     shows "(Ag s, \<tau>, \<omega>) \<in> Q \<longleftrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
-  sorry
+  sorry (* TODO: free_vars... *)
 
 lemma safe_agrees:
   assumes "safe n C s \<tau> \<omega> Q"
@@ -157,9 +153,17 @@ proof (induct n arbitrary: C s s' \<omega>)
       by (meson Suc.prems(1) Suc.prems(2) agrees_simps(4) no_aborts_agrees safeE(4))
     fix \<omega>0' \<omega>f C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "\<langle>C, concretize s' \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-
+    then obtain s' h' where "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s' \<and> snd \<sigma>' = h'"
+      using red_agrees[OF asm0(4)]
+      by (metis Suc.prems(2) Un_upper1 agrees_search(1) fst_conv snd_conv)
+    then obtain \<omega>1 \<omega>1' where "Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'
+  \<and> snd (s', h') = get_vh \<omega>1' \<and> safe n C' (fst (s', h')) \<tau> \<omega>1 Q"
+      using safeE(5)[OF Suc(2), of \<omega>f \<omega>0' C']
+      using asm0(1) asm0(2) asm0(3) by blast
+    then have "safe n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+      by (smt (verit, ccfv_SIG) Suc.hyps \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s' \<and> snd \<sigma>' = h'\<close> agreesC agrees_search(2) agrees_simps(4) fstI red_properties)
     then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 Q"
-      sorry
+      using \<open>Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd (s', h') = get_vh \<omega>1' \<and> safe n C' (fst (s', h')) \<tau> \<omega>1 Q\<close> \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s' \<and> snd \<sigma>' = h'\<close> by auto
   qed
 qed (simp)
 
@@ -197,26 +201,71 @@ subsection \<open>Frame rule\<close>
 lemma read_dom_mono:
   assumes "\<omega>' \<succeq> \<omega>"
   shows "read_dom \<omega> \<subseteq> read_dom \<omega>'"
-  sorry
+  by (smt (verit, ccfv_SIG) EquiViper.add_masks_def antisym assms get_vm_additive greater_def mem_Collect_eq not_gr_0 order_less_le pos_perm_class.sum_larger read_dom_def subsetI)
+
 
 lemma write_dom_mono:
   assumes "\<omega>' \<succeq> \<omega>"
   shows "write_dom \<omega> \<subseteq> write_dom \<omega>'"
-  sorry
+proof -
+  have "\<And>l. get_vm \<omega>' l \<le> 1" sorry (* TODO: assumption \<le> 1 *)
+  moreover have "\<And>l. get_vm \<omega>' l \<ge> get_vm \<omega> l"
+    by (metis EquiViper.add_masks_def assms get_vm_additive greater_def pos_perm_class.sum_larger)
+  ultimately show ?thesis
+    by (metis (mono_tags, lifting) antisym mem_Collect_eq subsetI write_dom_def)
+qed
+
+lemma no_aborts_mono_aux:
+  assumes "aborts C \<sigma>'"
+      and "fst \<sigma>' = s"
+      and "snd \<sigma>' = h'"
+      and "h \<subseteq>\<^sub>m h'"
+    shows "aborts C (s, h)"
+  using assms
+proof (induct arbitrary:  rule: aborts.induct)
+  case (aborts_Read \<sigma> r l x)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Read fst_conv map_le_implies_dom_le snd_conv subsetD)
+next
+  case (aborts_Write \<sigma> r l E)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Write fst_conv map_le_implies_dom_le snd_conv subsetD)
+next
+  case (aborts_Free \<sigma> r l)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Free fst_conv map_le_implies_dom_le snd_conv subsetD)
+qed (auto)
+
 
 lemma no_aborts_mono:
   assumes "no_aborts C s \<omega>"
       and "\<omega>' \<succeq> \<omega>"
+      and "sep_algebra_class.stable \<omega>"
     shows "no_aborts C s \<omega>'"
-  sorry
-
+proof (rule no_abortsI)
+  fix \<omega>0' \<omega>f
+  assume asm0: "sep_algebra_class.stable \<omega>0'" "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
+  then obtain r where "Some \<omega>0' = \<omega> \<oplus> r"
+    using assms(2) bigger_sum_smaller by blast
+  then have "Some \<omega>0' = \<omega> \<oplus> stabilize r"
+    by (metis asm0(1) commutative stabilize_sum_result_stable)
+  then show "\<not> aborts C (concretize s \<omega>0')"
+    using asm0(1) asm0(3) assms(1) no_aborts_def stabilize_is_stable by blast
+qed
 
 lemma compatibleI:
   assumes "get_store a = get_store b"
       and "get_trace a = get_trace b"
       and "get_state a ## get_state b"
     shows "a ## b"
-  sorry
+proof (rule compatible_prodI)
+  show "fst a ## fst b"
+    using assms(1) get_store_trace_comp by blast
+  show "snd a ## snd b"
+    apply (rule compatible_prodI)
+    apply (metis ag_comp agreement.expand assms(2) get_trace_def)
+    by (metis assms(3) get_state_def)
+qed
 
 lemma sum_equi_statesI:
   assumes "get_store x = get_store a"
@@ -259,7 +308,12 @@ lemma sum_equi_states_easy_rev:
   fixes \<tau> :: "'a ag_trace"
   assumes "Some (Ag s, \<tau>, \<omega>) = (s1, \<tau>1, \<omega>1) \<oplus> (s2, \<tau>2, \<omega>2)"
   shows "s1 = Ag s \<and> s2 = Ag s \<and> \<tau>1 = \<tau> \<and> \<tau>2 = \<tau> \<and> Some \<omega> = \<omega>1 \<oplus> \<omega>2"
-  sorry
+proof -
+  have "fst (s1, \<tau>1, \<omega>1) \<oplus> fst (s2, \<tau>2, \<omega>2) = Some (fst (Ag s, \<tau>, \<omega>)) \<and> snd (s1, \<tau>1, \<omega>1) \<oplus> snd (s2, \<tau>2, \<omega>2) = Some (snd (Ag s, \<tau>, \<omega>))"
+    using plus_prodE[OF HOL.sym[OF assms(1)]] by simp
+  then show ?thesis using plus_prodE[of "snd (s1, \<tau>1, \<omega>1)" "snd (s2, \<tau>2, \<omega>2)" "snd (Ag s, \<tau>, \<omega>)"]
+    by (metis fst_conv option.discI option.inject plus_agreement_def snd_conv)
+qed
 
 lemma frame_safe:
   assumes "safe n C s \<tau> \<omega> Q"
@@ -267,6 +321,7 @@ lemma frame_safe:
       and "Some \<omega>' = \<omega> \<oplus> \<omega>f"
       and "(Ag s, \<tau>, \<omega>f) \<in> R"
       and "sep_algebra_class.stable \<omega>f"
+      and "sep_algebra_class.stable \<omega>"
     shows "safe n C s \<tau> \<omega>' (Q \<otimes> R)"
   using assms
 proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
@@ -282,7 +337,7 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
     show "writes C s \<subseteq> write_dom \<omega>'"
       by (metis (no_types, lifting) Suc.prems(1) Suc.prems(3) greater_def inf.absorb_iff2 inf.coboundedI1 safeE(3) write_dom_mono)
     show "no_aborts C s \<omega>'"
-      by (meson Suc.prems(1) Suc.prems(3) greater_def no_aborts_mono safeE(4))
+      by (meson Suc.prems(1) Suc.prems(3) Suc.prems(6) greater_def no_aborts_mono safeE(4))
     fix \<omega>0' \<omega>f' C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f'" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f'" "binary_mask \<omega>0'" "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
     then obtain \<omega>f'' where "Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'"
@@ -308,6 +363,8 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
         using Suc.prems(2) agrees_search(3) by auto
       then show "(Ag (fst \<sigma>'), \<tau>, \<omega>f) \<in> R"
         by (meson Suc.prems(4) fvA_agrees)
+      show "sep_algebra_class.stable \<omega>1''"
+        by (simp add: \<open>sep_algebra_class.stable \<omega>1''\<close>)
     qed (simp_all add: Suc.prems)
     ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f' \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (Q \<otimes> R)"
       by (metis Suc.prems(5) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>sep_algebra_class.stable \<omega>1''\<close> asso1 stable_sum)
@@ -336,7 +393,17 @@ lemma sum_equi_states_easy_decompose:
   fixes \<tau> :: "'a ag_trace"
   assumes "(Ag s, \<tau>, \<omega>) \<in> P \<otimes> R"
   shows "\<exists>\<omega>p \<omega>r. Some \<omega> = \<omega>p \<oplus> \<omega>r \<and> (Ag s, \<tau>, \<omega>p) \<in> P \<and> (Ag s, \<tau>, \<omega>r) \<in> R"
-  sorry
+proof -
+  obtain p r where "Some (Ag s, \<tau>, \<omega>) = p \<oplus> r" "p \<in> P" "r \<in> R"
+    by (meson assms x_elem_set_product)
+  then have "fst p = fst r \<and> fst p = Ag s"
+    by (metis eq_fst_iff sum_equi_states_easy_rev)
+  moreover have "fst (snd p) = fst (snd r) \<and> fst (snd p) = \<tau>"
+    by (metis \<open>Some (Ag s, \<tau>, \<omega>) = p \<oplus> r\<close> prod.exhaust_sel sum_equi_states_easy_rev)
+  ultimately show ?thesis
+    by (metis \<open>Some (Ag s, \<tau>, \<omega>) = p \<oplus> r\<close> \<open>p \<in> P\<close> \<open>r \<in> R\<close> prod.exhaust_sel sum_equi_states_easy_rev)
+qed
+
 
 lemma stabilize_equi_state:
   fixes \<tau> :: "'a ag_trace"
@@ -369,21 +436,42 @@ subsection \<open>Parallel rule\<close>
 lemma disj_conv:
   assumes "\<omega>1 ## \<omega>2"
   shows "disjoint (write_dom \<omega>1) (read_dom \<omega>2)"
-  sorry
-(*
-TODO: Need the \<le> 1 assumption
-proof (rule disjointI)
-*)
+  unfolding disjoint_def
+proof
+  show "write_dom \<omega>1 \<inter> read_dom \<omega>2 \<subseteq> {}"
+  proof
+    fix l assume "l \<in> write_dom \<omega>1 \<inter> read_dom \<omega>2"
+    then have "get_vm \<omega>1 (l, field_val) + get_vm \<omega>2 (l, field_val) > 1"
+      by (smt (verit) CollectD IntD1 add.commute comm_monoid_add_class.add_0 inf.absorb_iff2 inf_commute leI not_gr_0 pos_perm_class.padd_cancellative pos_perm_class.sum_larger read_dom_def write_dom_def)
+    then show "l \<in> {}"
+      sorry (* TODO: Need \<le> 1 assumption *)
+  qed
+qed (simp)
 
 lemma read_dom_union:
   assumes "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
-  shows "read_dom \<omega> = read_dom \<omega>1 \<union> read_dom \<omega>2"
-  sorry
+  shows "read_dom \<omega> = read_dom \<omega>1 \<union> read_dom \<omega>2" (is "?A = ?B")
+proof -
+  have "\<And>l. l \<in> ?A \<longleftrightarrow> l \<in> ?B"
+  proof -
+    fix l
+    have "l \<in> ?A \<longleftrightarrow> get_vm \<omega> (l, field_val) > 0"
+      unfolding read_dom_def by simp
+    also have "... \<longleftrightarrow> get_vm \<omega>1 (l, field_val) + get_vm \<omega>2 (l, field_val) > 0"
+      by (simp add: EquiViper.add_masks_def assms get_vm_additive)
+    also have "... \<longleftrightarrow> get_vm \<omega>1 (l, field_val) > 0 \<or> get_vm \<omega>2 (l, field_val) > 0"
+      by (metis add_0 padd_pos pperm_pnone_pgt)
+    finally show "l \<in> ?A \<longleftrightarrow> l \<in> ?B"
+      unfolding read_dom_def by blast
+  qed
+  then show ?thesis by blast
+qed
+
 
 lemma write_dom_union:
   assumes "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
   shows "write_dom \<omega>1 \<union> write_dom \<omega>2 \<subseteq> write_dom \<omega>"
-  sorry
+  by (meson Un_least assms greater_def greater_equiv write_dom_mono)
 
 lemma safe_par:
   assumes "safe n C1 s \<tau> \<omega>1 Q1"
@@ -417,10 +505,10 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
       proof (rule aborts_par_elim)
         show "aborts C1 (concretize s \<omega>0') \<Longrightarrow> False"
           using safeE(4)[OF Suc.prems(1)]
-          using Suc.prems(3) asm0 greater_def no_aborts_def no_aborts_mono by blast
+          by (metis Suc.prems(3) Suc.prems(6) Suc.prems(7) asm0(1) asm0(2) asm0(3) greater_def no_aborts_def no_aborts_mono stable_sum)
         show "aborts C2 (concretize s \<omega>0') \<Longrightarrow> False"
-          using Suc.prems(2) Suc.prems(3) asm0 greater_def no_aborts_def no_aborts_mono safe.simps(2)
-          by (metis commutative)
+          using safeE(4)[OF Suc.prems(2)]
+          by (metis Suc.prems(3) Suc.prems(6) Suc.prems(7) asm0(1) asm0(2) asm0(3) commutative greater_def no_aborts_def no_aborts_mono stable_sum)
         have r1: "accesses C1 s \<subseteq> read_dom \<omega>1 \<and> writes C1 s \<subseteq> write_dom \<omega>1"
           using Suc.prems(1) by auto
         moreover have r2: "accesses C2 s \<subseteq> read_dom \<omega>2 \<and> writes C2 s \<subseteq> write_dom \<omega>2"
@@ -471,11 +559,34 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
         using \<open>Some \<omega>a' = \<omega>' \<oplus> \<omega>f\<close> ra(1)
         using Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> \<open>sep_algebra_class.stable \<omega>a\<close> stable_sum by blast
     next
-      show "\<And>C2'. C' = C1 || C2' \<Longrightarrow>
-           \<langle>C2, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<Longrightarrow>
-           \<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (Q1 \<otimes> Q2)"
-        sorry
-(* TODO: same proof *)
+      fix C2'
+      assume asm2: "C' = C1 || C2'" "\<langle>C2, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle>"
+      obtain \<omega>f' where "Some \<omega>f' = \<omega>1 \<oplus> \<omega>f"
+        by (metis Suc.prems(3) asm0(2) asso2 commutative option.exhaust_sel)
+      then have "Some \<omega>0' = \<omega>2 \<oplus> \<omega>f'"
+        by (metis Suc.prems(3) asm0(2) asso1 commutative)
+      then obtain \<omega>b \<omega>b' where rb: "Some \<omega>b' = \<omega>b \<oplus> \<omega>f' \<and> binary_mask \<omega>b' \<and> snd \<sigma>' = get_vh \<omega>b'" "safe n C2' (fst \<sigma>') \<tau> \<omega>b Q2"
+        "sep_algebra_class.stable \<omega>b"
+        using safeE(5)[OF Suc(3), of \<omega>f' \<omega>0' C2' \<sigma>'] asm0 asm2(2)
+        using Suc.prems(6) \<open>Some \<omega>f' = \<omega>1 \<oplus> \<omega>f\<close> stable_sum by blast
+      moreover have "safe n C1 (fst \<sigma>') \<tau> \<omega>1 Q1"
+      proof -
+        have "safe n C1 s \<tau> \<omega>1 Q1"
+          by (meson Suc.prems(1) Suc_n_not_le_n nat_le_linear safety_mono)
+        moreover have "agrees (-wrC C2) s (fst \<sigma>')"
+          by (metis agrees_search(1) asm2(2) fst_conv red_properties)
+        ultimately show ?thesis
+          using Suc.prems(4) agrees_minusD disjoint_search(1) safe_agrees by blast
+      qed
+      moreover obtain \<omega>' where "Some \<omega>' = \<omega>b \<oplus> \<omega>1"
+        by (metis \<open>Some \<omega>f' = \<omega>1 \<oplus> \<omega>f\<close> asso3 option.exhaust_sel rb(1))
+      then have "Some \<omega>b' = \<omega>' \<oplus> \<omega>f"
+        by (metis \<open>Some \<omega>f' = \<omega>1 \<oplus> \<omega>f\<close> asso1 rb(1))
+      ultimately have "safe n C' (fst \<sigma>') \<tau> \<omega>' (Q1 \<otimes> Q2)"
+        using Suc(1)[OF \<open>safe n C1 (fst \<sigma>') \<tau> \<omega>1 Q1\<close> rb(2)]
+        by (metis (no_types, lifting) Suc.prems(4) Suc.prems(5) Suc.prems(6) \<open>Some \<omega>' = \<omega>b \<oplus> \<omega>1\<close> asm2(1) asm2(2) commutative disjoint_search(4) disjoint_simps(3) red_properties sup.orderE)      
+      then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (Q1 \<otimes> Q2)"
+        using Suc.prems(6) \<open>Some \<omega>' = \<omega>b \<oplus> \<omega>1\<close> \<open>Some \<omega>b' = \<omega>' \<oplus> \<omega>f\<close> rb(1) rb(3) stable_sum by blast
     qed
   qed (simp)
 qed (simp)
@@ -747,7 +858,8 @@ lemma write_helper:
 proof -
   have "get_vm \<omega>' l = get_vm \<omega> l + get_vm \<omega>f l"
     using EquiViper.add_masks_def assms(1) get_vm_additive by blast
-  moreover have "get_vm \<omega>' l \<le> 1" sorry
+  moreover have "get_vm \<omega>' l \<le> 1"
+    sorry (* TODO: Need assumption in def of virtual_state *)
   ultimately have "get_vm \<omega>f l = 0"
     by (metis PosReal.padd_cancellative add.commute add.right_neutral assms(3) nle_le pos_perm_class.sum_larger)
   moreover have "get_vh \<omega>f l = None"
@@ -1042,8 +1154,10 @@ lemma free_helper:
       and "get_vm \<omega> hl = 1"
     shows "Some (erase_perm_and_value \<omega>' hl) = erase_perm_and_value \<omega> hl \<oplus> \<omega>f"
 proof -
-  have asm: "get_vm \<omega>' hl = 1"
-    sorry
+  have asm: "get_vm \<omega>' hl \<le> 1"
+    sorry (* TODO: Need assumption in def of virtual_state *)
+  then have "get_vm \<omega>' hl = 1"
+    by (simp add: EquiViper.add_masks_def antisym assms(1) assms(3) get_vm_additive pos_perm_class.sum_larger)
   then have "get_vm \<omega>f hl = 0"
     by (smt (verit, ccfv_threshold) EquiViper.add_masks_def PosReal.ppos.rep_eq assms(1) assms(3) get_vm_additive gr_0_is_ppos not_gr_0 plus_preal.rep_eq)
   then have "get_vh \<omega>f hl = None"
