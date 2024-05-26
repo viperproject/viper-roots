@@ -491,15 +491,15 @@ lemma safe_par:
       and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
       and "sep_algebra_class.stable \<omega>1"
       and "sep_algebra_class.stable \<omega>2"
-    shows "safe n (C1 || C2) s \<tau> \<omega> (Q1 \<otimes> Q2)"
+    shows "safe n ({A1} C1 {B1} || {A2} C2 {B2}) s \<tau> \<omega> (Q1 \<otimes> Q2)"
   using assms
 proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
   case (Suc n)
-  show "safe (Suc n) (C1 || C2) s \<tau> \<omega> (Q1 \<otimes> Q2)"
+  show "safe (Suc n) ({A1} C1 {B1} || {A2} C2 {B2}) s \<tau> \<omega> (Q1 \<otimes> Q2)"
   proof (rule safeI_alt)
-    show "accesses (C1 || C2) s \<subseteq> read_dom \<omega>"
+    show "accesses ({A1} C1 {B1} || {A2} C2 {B2}) s \<subseteq> read_dom \<omega>"
       by (metis Suc.prems(1) Suc.prems(2) Suc.prems(3) Un_mono accesses.simps(8) read_dom_union safeE(2))
-    show "writes (C1 || C2) s \<subseteq> write_dom \<omega>"
+    show "writes ({A1} C1 {B1} || {A2} C2 {B2}) s \<subseteq> write_dom \<omega>"
     proof -
       have "writes C1 s \<subseteq> write_dom \<omega> \<and> writes C2 s \<subseteq> write_dom \<omega>"
         by (metis (no_types, lifting) Suc.prems(1) Suc.prems(2) Suc.prems(3) dual_order.trans le_supE safeE(3) write_dom_union)
@@ -508,9 +508,9 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
     qed
     fix \<omega>0' \<omega>f
     assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'"
-    show "aborts (C1 || C2) (concretize s \<omega>0') \<Longrightarrow> False"
+    show "aborts ({A1} C1 {B1} || {A2} C2 {B2}) (concretize s \<omega>0') \<Longrightarrow> False"
     proof -
-      assume "aborts (C1 || C2) (concretize s \<omega>0')"
+      assume "aborts ({A1} C1 {B1} || {A2} C2 {B2}) (concretize s \<omega>0')"
       then show "False"
       proof (rule aborts_par_elim)
         show "aborts C1 (concretize s \<omega>0') \<Longrightarrow> False"
@@ -531,7 +531,7 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
     qed
 
     fix C' \<sigma>'
-    assume asm1: "\<langle>C1 || C2, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    assume asm1: "\<langle>({A1} C1 {B1} || {A2} C2 {B2}), concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
     then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (Q1 \<otimes> Q2)"
     proof (rule red_par_cases)
       show "C' = Cskip \<Longrightarrow> \<sigma>' = concretize s \<omega>0' \<Longrightarrow> C1 = Cskip \<Longrightarrow> C2 = Cskip
@@ -539,7 +539,7 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
         using safeE(1)[OF Suc.prems(1)] safeE(1)[OF Suc.prems(2)]
         by (metis Suc.prems(3) Suc.prems(5) Suc.prems(6) Suc.prems(7) asm0(2) asm0(3) disjoint_def disjoint_simps(3) frame_safe fst_conv safe_skip snd_conv stable_sum)
       fix C1'
-      assume asm2: "C' = C1' || C2" "\<langle>C1, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle>"
+      assume asm2: "C' = ({A1} C1' {B1} || {A2} C2 {B2})" "\<langle>C1, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle>"
       obtain \<omega>f' where "Some \<omega>f' = \<omega>2 \<oplus> \<omega>f"
         by (metis (no_types, opaque_lifting) Suc.prems(3) asm0(2) asso2 option.exhaust_sel)
       then have "Some \<omega>0' = \<omega>1 \<oplus> \<omega>f'"
@@ -563,14 +563,14 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
         by (metis \<open>Some \<omega>f' = \<omega>2 \<oplus> \<omega>f\<close> asso1 calculation(1))
       ultimately have "safe n C' (fst \<sigma>') \<tau> \<omega>' (Q1 \<otimes> Q2)"
         using Suc(1)[OF ra(2) \<open>safe n C2 (fst \<sigma>') \<tau> \<omega>2 Q2\<close>]
-        by (metis (no_types, lifting) Suc.prems(4) Suc.prems(5) Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> asm2(1) asm2(2) disjoint_search(2) disjoint_search(4) disjoint_simps(3) red_properties)
-      
+        using Suc.prems(4) Suc.prems(5) Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> asm2(1) asm2(2) disjoint_search(2) disjoint_search(4) disjoint_simps(3) red_properties
+        by (metis (no_types, lifting))
       then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (Q1 \<otimes> Q2)"
         using \<open>Some \<omega>a' = \<omega>' \<oplus> \<omega>f\<close> ra(1)
         using Suc.prems(7) \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close> \<open>sep_algebra_class.stable \<omega>a\<close> stable_sum by blast
     next
       fix C2'
-      assume asm2: "C' = C1 || C2'" "\<langle>C2, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle>"
+      assume asm2: "C' = ({A1} C1 {B1} || {A2} C2' {B2})" "\<langle>C2, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle>"
       obtain \<omega>f' where "Some \<omega>f' = \<omega>1 \<oplus> \<omega>f"
         by (metis Suc.prems(3) asm0(2) asso2 commutative option.exhaust_sel)
       then have "Some \<omega>0' = \<omega>2 \<oplus> \<omega>f'"
@@ -611,7 +611,7 @@ proposition rule_par:
       and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
       and "self_framing P1"
       and "self_framing P2"
-    shows "CSL (P1 \<otimes> P2) (C1 || C2) (Q1 \<otimes> Q2)"
+    shows "CSL (P1 \<otimes> P2) ({A1} C1 {B1} || {A2} C2 {B2}) (Q1 \<otimes> Q2)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> P1 \<otimes> P2" "sep_algebra_class.stable \<omega>"
@@ -619,7 +619,7 @@ proof (rule CSL_I)
     by (meson sum_equi_states_easy_decompose)
   then have "Some \<omega> = stabilize p1 \<oplus> stabilize p2"
     using asm0(2) stabilize_sum_of_stable by blast
-  then show "safe (Suc n) (C1 || C2) s \<tau> \<omega> (Q1 \<otimes> Q2)"
+  then show "safe (Suc n) {A1} C1 {B1} || {A2} C2 {B2} s \<tau> \<omega> (Q1 \<otimes> Q2)"
     using safe_par[of "Suc n" C1 s \<tau> p1 Q1 C2 p2 Q2 \<omega>]
     by (metis CSL_def \<open>(Ag s, \<tau>, p1) \<in> P1\<close> \<open>(Ag s, \<tau>, p2) \<in> P2\<close> assms(1) assms(2) assms(3) assms(4) assms(5) assms(6) safe_par self_framing_def stabilize_equi_state stabilize_is_stable)
 qed
@@ -1312,7 +1312,7 @@ inductive CSL_syn :: "int equi_state set \<Rightarrow> cmd \<Rightarrow> int equ
   RuleSkip: "\<turnstile>CSL [P] Cskip [P]"
 | RuleFrame: "\<lbrakk> \<turnstile>CSL [P] C [Q]; disjoint (fvA R) (wrC C); self_framing P; self_framing R\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P \<otimes> R] C [Q \<otimes> R]"
 | RulePar: "\<lbrakk> disjoint (fvC C1 \<union> fvA Q1) (wrC C2); disjoint (fvC C2 \<union> fvA Q2) (wrC C1); self_framing P1; self_framing P2;
-    \<turnstile>CSL [P1] C1 [Q1]; \<turnstile>CSL [P2] C2 [Q2] \<rbrakk> \<Longrightarrow> \<turnstile>CSL [P1 \<otimes> P2] C1 || C2 [Q1 \<otimes> Q2]"
+    \<turnstile>CSL [P1] C1 [Q1]; \<turnstile>CSL [P2] C2 [Q2] \<rbrakk> \<Longrightarrow> \<turnstile>CSL [P1 \<otimes> P2] {_} C1 {_} || {_} C2 {_} [Q1 \<otimes> Q2]"
 | RuleSeq: "\<lbrakk> \<turnstile>CSL [P] C1 [Q]; \<turnstile>CSL [Q] C2 [R] \<rbrakk> \<Longrightarrow> \<turnstile>CSL [P] Cseq C1 C2 [R]"
 | RuleCons: "\<lbrakk>\<turnstile>CSL [P] C [Q]; P' \<subseteq> P; Q \<subseteq> Q'\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P'] C [Q']"
 | RuleIf: "\<lbrakk> \<turnstile>CSL [P \<inter> assertify_bexp b] C1 [Q]; \<turnstile>CSL [P \<inter> assertify_bexp (Bnot b)] C2 [Q]\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P] Cif b C1 C2 [Q]"
@@ -1475,9 +1475,6 @@ next
       by (metis binary_mask_and_stable_then_mk_virtual pure_def stable_and_sum_pure_same uu_neutral)
   qed (simp_all)
 qed
-
-
-
 
 
 theorem adequacy:

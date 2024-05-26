@@ -34,6 +34,8 @@ Beq exp exp
 | Band bexp bexp
 | Bnot bexp
 
+type_synonym f_assertion = "int equi_state set"
+
 datatype cmd =
   Cskip
 | Cassign var exp
@@ -42,7 +44,7 @@ datatype cmd =
 | Calloc var exp
 | Cfree var
 | Cseq cmd cmd
-| Cpar cmd cmd (infixl "||" 60)
+| Cpar f_assertion cmd f_assertion f_assertion cmd f_assertion ("{_} _ {_} || {_} _ {_}")
 | Cif bexp cmd cmd
 | Cwhile bexp cmd
 
@@ -72,9 +74,9 @@ inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state 
 | red_Seq2[elim]: "\<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<Longrightarrow> \<langle>Cseq C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>Cseq C1' C2, \<sigma>'\<rangle>"
 | red_If1[intro]: "bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1, \<sigma>\<rangle>"
 | red_If2[intro]: "\<not> bdenot b (fst \<sigma>) \<Longrightarrow> \<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2, \<sigma>\<rangle>"
-| red_Par1[elim]: "\<lbrakk> \<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1' || C2, \<sigma>'\<rangle>" 
-| red_Par2[elim]: "\<lbrakk> \<langle>C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C1 || C2', \<sigma>'\<rangle>"
-| red_Par3[intro]: "\<langle>Cskip || Cskip, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>\<rangle>"
+| red_Par1[elim]: "\<lbrakk> \<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>{A1} C1 {B1} || {A2} C2 {B2}, \<sigma>\<rangle> \<rightarrow> \<langle>{A1} C1' {B1} || {A2} C2 {B2}, \<sigma>'\<rangle>" 
+| red_Par2[elim]: "\<lbrakk> \<langle>C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>{A1} C1 {B1} || {A2} C2 {B2}, \<sigma>\<rangle> \<rightarrow> \<langle>{A1} C1 {B1} || {A2} C2' {B2}, \<sigma>'\<rangle>"
+| red_Par3[intro]: "\<langle>{_} Cskip {_} || {_} Cskip {_}, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>\<rangle>"
 | red_Loop[intro]: "\<langle>Cwhile b C, \<sigma>\<rangle> \<rightarrow> \<langle>Cif b (Cseq C (Cwhile b C)) Cskip, \<sigma>\<rangle>"
 | red_Assign[intro]:"\<lbrakk> \<sigma> = (s,h); \<sigma>' = (s(x \<mapsto> VInt (edenot e s)), h) \<rbrakk> \<Longrightarrow> \<langle>Cassign x e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 
@@ -86,7 +88,7 @@ inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state 
 | red_Write[intro]: "\<lbrakk> \<sigma> = (s,h); s r = Some (VRef (Address l)); (l, field_val) \<in> dom h; \<sigma>' = (s, h((l, field_val) \<mapsto> VInt (edenot e s))) \<rbrakk>
   \<Longrightarrow> \<langle>Cwrite r e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 
-inductive_cases red_par_cases: "\<langle>C1 || C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_par_cases: "\<langle>{P1} C1 {Q1} || {P2} C2 {Q2}, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_seq_cases: "\<langle>Cseq C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_write_cases: "\<langle>Cwrite r e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_if_cases: "\<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
@@ -116,7 +118,7 @@ where
   | "accesses (Calloc x E)     s = {}"
   | "accesses (Cfree r)     s = {get_address (s r)}"
   | "accesses (Cseq C1 C2)     s = accesses C1 s"
-  | "accesses (C1 || C2)     s = accesses C1 s \<union> accesses C2 s"
+  | "accesses ({_} C1 {_} || {_} C2 {_})     s = accesses C1 s \<union> accesses C2 s"
   | "accesses (Cif B C1 C2)    s = {}"
   | "accesses (Cwhile B C)     s = {}"
 
@@ -130,7 +132,7 @@ where
   | "writes (Calloc x E)     s = {}"
   | "writes (Cfree r)     s = {get_address (s r)}"
   | "writes (Cseq C1 C2)     s = writes C1 s"
-  | "writes (C1 || C2)     s = writes C1 s \<union> writes C2 s"
+  | "writes ({_} C1 {_} || {_} C2 {_})     s = writes C1 s \<union> writes C2 s"
   | "writes (Cif B C1 C2)    s = {}"
   | "writes (Cwhile B C)     s = {}"
 
@@ -138,11 +140,11 @@ inductive
   aborts :: "cmd \<Rightarrow> state \<Rightarrow> bool"
 where
   aborts_Seq[intro]:   "aborts C1 \<sigma> \<Longrightarrow> aborts (Cseq C1 C2) \<sigma>" 
-| aborts_Par1[intro]:  "aborts C1 \<sigma> \<Longrightarrow> aborts (C1 || C2) \<sigma>" 
-| aborts_Par2[intro]:  "aborts C2 \<sigma> \<Longrightarrow> aborts (C1 || C2) \<sigma>"
+| aborts_Par1[intro]:  "aborts C1 \<sigma> \<Longrightarrow> aborts ({_} C1 {_} || {_} C2 {_}) \<sigma>" 
+| aborts_Par2[intro]:  "aborts C2 \<sigma> \<Longrightarrow> aborts ({_} C1 {_} || {_} C2 {_}) \<sigma>"
 
-| aborts_Race1[intro]:  "\<not> disjoint (accesses C1 (fst \<sigma>)) (writes C2 (fst \<sigma>)) \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>"
-| aborts_Race2[intro]:  "\<not> disjoint (writes C1 (fst \<sigma>)) (accesses C2 (fst \<sigma>)) \<Longrightarrow> aborts (Cpar C1 C2) \<sigma>"
+| aborts_Race1[intro]:  "\<not> disjoint (accesses C1 (fst \<sigma>)) (writes C2 (fst \<sigma>)) \<Longrightarrow> aborts ({_} C1 {_} || {_} C2 {_}) \<sigma>"
+| aborts_Race2[intro]:  "\<not> disjoint (writes C1 (fst \<sigma>)) (accesses C2 (fst \<sigma>)) \<Longrightarrow> aborts ({_} C1 {_} || {_} C2 {_}) \<sigma>"
 
 | aborts_Read[intro]:  "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cread x r) \<sigma>"
 | aborts_Write[intro]: "\<lbrakk> fst \<sigma> r = Some (VRef (Address l)); (l, field_val) \<notin> dom (snd \<sigma>) \<rbrakk> \<Longrightarrow> aborts (Cwrite r E) \<sigma>"
@@ -154,7 +156,7 @@ where
 
 
 inductive_cases aborts_write_elim[elim]: "aborts (Cwrite r e) \<sigma>"
-inductive_cases aborts_par_elim[elim]: "aborts (C1 || C2) \<sigma>"
+inductive_cases aborts_par_elim[elim]: "aborts ({P1} C1 {Q1} || {P2} C2 {Q2}) \<sigma>"
 inductive_cases aborts_seq_elim[elim]: "aborts (Cseq C1 C2) \<sigma>"
 inductive_cases aborts_while_elim[elim]: "aborts (Cwhile b C) \<sigma>"
 inductive_cases aborts_if_elim[elim]: "aborts (Cif b C1 C2) \<sigma>"
@@ -194,7 +196,7 @@ where
 | "fvC (Calloc r E)   = ({r} \<union> fvE E)"
 | "fvC (Cfree r)   = {r}"
 | "fvC (Cseq C1 C2)     = (fvC C1 \<union> fvC C2)"
-| "fvC (Cpar C1 C2)     = (fvC C1 \<union> fvC C2)"
+| "fvC ({_} C1 {_} || {_} C2 {_})     = (fvC C1 \<union> fvC C2)"
 | "fvC (Cif B C1 C2)    = (fvB B \<union> fvC C1 \<union> fvC C2)"
 | "fvC (Cwhile B C)     = (fvB B \<union> fvC C)"
 
@@ -213,10 +215,27 @@ where
 | "wrC (Calloc v E)    = {v}"
 | "wrC (Cfree E)    = {}"
 | "wrC (Cseq C1 C2)    = (wrC C1 \<union> wrC C2)"
-| "wrC (Cpar C1 C2)    = (wrC C1 \<union> wrC C2)"
+| "wrC ({_} C1 {_} || {_} C2 {_})    = (wrC C1 \<union> wrC C2)"
 | "wrC (Cif B C1 C2)   = (wrC C1 \<union> wrC C2)"
 | "wrC (Cwhile B C)    = (wrC C)"
 
+primrec
+  wrL :: "cmd \<Rightarrow> var list"
+where
+  "wrL (Cskip)         = []"
+| "wrL (Cassign v E)   = [v]"
+| "wrL (Cread v E)     = [v]"
+| "wrL (Cwrite E1 E2)  = []"
+| "wrL (Calloc v E)    = [v]"
+| "wrL (Cfree E)    = []"
+| "wrL (Cseq C1 C2)    = (wrL C1 @ wrL C2)"
+| "wrL ({_} C1 {_} || {_} C2 {_})    = (wrL C1 @ wrL C2)"
+| "wrL (Cif B C1 C2)   = (wrL C1 @ wrL C2)"
+| "wrL (Cwhile B C)    = (wrL C)"
+
+lemma wrL_wrC_same:
+  "set (wrL C) = wrC C"
+  by (induct C) auto
 
 text \<open>We also define the operation of substituting an expression for
 a variable in expressions.\<close>
