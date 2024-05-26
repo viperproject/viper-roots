@@ -1519,13 +1519,6 @@ lemma mask_update_greater_aux_2:
 lemmas mask_update_succ_aux = succ_maskI[OF mask_update_greater_aux]
 lemmas mask_update_succ_aux_2 = succ_maskI[OF mask_update_greater_aux_2]
 
-lemma psub_strictly_smaller:
-  assumes "(p :: preal) > q" 
-      and "q > 0"
-    shows "p > (p - q)"
-  using assms
-  by (simp add: preal_to_real)
-
 lemma exhale_normal_result_smaller:
   assumes "red_exhale ctxt StateCons \<omega>def A \<omega> res" and
           "res = RNormal \<omega>'"
@@ -1564,7 +1557,7 @@ next
     by fastforce
   
   hence "mh (a, f) > ?p'"
-    using psub_strictly_smaller
+    using pminus_strictly_smaller
     by simp
 
   show ?case 
@@ -1599,7 +1592,7 @@ next
     by (auto elim: exh_if_total.elims)
 
   hence SufficientPerm: "mp (pred_id, v_args) > ?pnew"
-    by (simp add: psub_strictly_smaller)
+    by (simp add: pminus_strictly_smaller)
 
   show ?case
   proof (subst \<open>\<omega>' = _\<close>, rule succ_full_total_stateI)
@@ -1906,7 +1899,7 @@ next
     by blast+
 
   hence "mh ?loc > ?p_exh_new" 
-    using psub_strictly_smaller
+    using pminus_strictly_smaller
     by blast
     
   let ?A = "Acc e_r f Wildcard"
@@ -2098,7 +2091,7 @@ next
 
     from qprop
     have "mp ?loc > ?pnew" 
-      by (simp add: psub_strictly_smaller)
+      by (simp add: pminus_strictly_smaller)
 
     hence "get_mp_total_full \<omega> ?loc - ?pnew \<noteq> pnone"
       unfolding \<open>mp = _\<close>
