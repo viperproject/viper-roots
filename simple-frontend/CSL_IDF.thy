@@ -29,6 +29,16 @@ lemma no_abortsI[intro]:
   shows "no_aborts C s0 \<omega>0"
   using assms no_aborts_def by blast
 
+lemma no_abortsE:
+  assumes "no_aborts C s0 \<omega>0"
+      and "sep_algebra_class.stable \<omega>0'"
+      and "sep_algebra_class.stable \<omega>f"
+      and "Some \<omega>0' = \<omega>0 \<oplus> \<omega>f"
+      and "binary_mask \<omega>0'"
+    shows "\<not> aborts C (s0, get_vh \<omega>0')"
+  using assms(1) assms(2) assms(3) assms(4) assms(5) no_aborts_def by blast
+
+
 
 (*
 type_synonym 'v ag_store = "(var \<rightharpoonup> 'v) agreement"
@@ -1250,15 +1260,18 @@ lemma read_helper:
 definition read_result where
   "read_result x r = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val) }"
 
+definition read_perm where
+  "read_perm r = { \<omega> |\<omega> l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0 \<and> get_h \<omega> (l, field_val) = Some (VInt v)}"
+
 proposition rule_read:
   assumes "x \<notin> fvA A"
-      and "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> (\<exists>l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0 \<and> get_h \<omega> (l, field_val) = Some (VInt v))"
+      and "A \<subseteq> read_perm r"
     shows "CSL A (Cread x r) (A \<inter> read_result x r)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> A" "sep_algebra_class.stable \<omega>"
   then obtain l v where lv_def: "s r = Some (VRef (Address l))" "get_vm \<omega> (l, field_val) > 0" "get_vh \<omega> (l, field_val) = Some (VInt v)"
-    using assms(2) by force
+    using assms(2) unfolding read_perm_def by force
   show "safe (Suc n) (Cread x r) s \<tau> \<omega> (A \<inter> read_result x r)"
   proof (rule safeI_alt)
     show "accesses (Cread x r) s \<subseteq> read_dom \<omega>"
@@ -1283,7 +1296,7 @@ proof (rule CSL_I)
         using \<open>get_vh \<omega>0' (l, field_val) = Some (VInt v)\<close> lv_def(1) by auto
       moreover have "(Ag (s(x := Some (VInt v))), \<tau>, \<omega>) \<in> read_result x r"
         unfolding read_result_def
-        using \<open>(Ag (s(x \<mapsto> VInt v)), \<tau>, \<omega>) \<in> A\<close> assms(2) get_simps_unfolded(1) lv_def(1) lv_def(3) by fastforce
+        using \<open>(Ag (s(x \<mapsto> VInt v)), \<tau>, \<omega>) \<in> A\<close> assms(2) get_simps_unfolded(1) lv_def(1) lv_def(3) unfolding read_perm_def  by fastforce
       ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 (A \<inter> read_result x r)"
         using \<open>(Ag (s(x \<mapsto> VInt v)), \<tau>, \<omega>) \<in> A\<close> asm0(2) asm1(2) asm1(3) asm2(1) asm2(2) asm2(3) by auto
     qed
@@ -1291,5 +1304,191 @@ proof (rule CSL_I)
 qed
 
 
+section \<open>Actual logic\<close>
+
+inductive CSL_syn :: "int equi_state set \<Rightarrow> cmd \<Rightarrow> int equi_state set \<Rightarrow> bool" 
+  ("\<turnstile>CSL [_] _ [_]" [51,0,0] 81)
+  where
+  RuleSkip: "\<turnstile>CSL [P] Cskip [P]"
+| RuleFrame: "\<lbrakk> \<turnstile>CSL [P] C [Q]; disjoint (fvA R) (wrC C); self_framing P; self_framing R\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P \<otimes> R] C [Q \<otimes> R]"
+| RulePar: "\<lbrakk> disjoint (fvC C1 \<union> fvA Q1) (wrC C2); disjoint (fvC C2 \<union> fvA Q2) (wrC C1); self_framing P1; self_framing P2;
+    \<turnstile>CSL [P1] C1 [Q1]; \<turnstile>CSL [P2] C2 [Q2] \<rbrakk> \<Longrightarrow> \<turnstile>CSL [P1 \<otimes> P2] C1 || C2 [Q1 \<otimes> Q2]"
+| RuleSeq: "\<lbrakk> \<turnstile>CSL [P] C1 [Q]; \<turnstile>CSL [Q] C2 [R] \<rbrakk> \<Longrightarrow> \<turnstile>CSL [P] Cseq C1 C2 [R]"
+| RuleCons: "\<lbrakk>\<turnstile>CSL [P] C [Q]; P' \<subseteq> P; Q \<subseteq> Q'\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P'] C [Q']"
+| RuleIf: "\<lbrakk> \<turnstile>CSL [P \<inter> assertify_bexp b] C1 [Q]; \<turnstile>CSL [P \<inter> assertify_bexp (Bnot b)] C2 [Q]\<rbrakk> \<Longrightarrow> \<turnstile>CSL [P] Cif b C1 C2 [Q]"
+| RuleWhile: "\<lbrakk> \<turnstile>CSL [I \<inter> (assertify_bexp b)] C [I]; self_framing I \<rbrakk> \<Longrightarrow> \<turnstile>CSL [I] (Cwhile b C) [I \<inter> (assertify_bexp (Bnot b))]"
+| RuleWrite: "\<turnstile>CSL [full_ownership r] Cwrite r e [full_ownership_with_val r e]"
+| RuleAssign: "\<turnstile>CSL [sub_pre x e P] Cassign x e [P]"
+| RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<turnstile>CSL [UNIV] Calloc r e [full_ownership_with_val r e]"
+| RuleFree: "\<turnstile>CSL [full_ownership r] Cfree r [UNIV]"
+| RuleRead: "\<lbrakk> x \<notin> fvA A; A \<subseteq> read_perm r\<rbrakk> \<Longrightarrow> \<turnstile>CSL [A] Cread x r [A \<inter> read_result x r]"
+
+
+theorem CSL_sound:
+  assumes "\<turnstile>CSL [P] C [Q]"
+  shows "CSL P C Q"
+  using assms
+  by (induct rule: CSL_syn.induct)
+    (simp_all add: rule_skip frame_rule rule_par rule_seq rule_conseq rule_if rule_while
+      rule_write rule_assign rule_alloc rule_free rule_read)
+
+
+subsection \<open>Adequacy\<close>
+
+inductive n_steps where
+  NoStep: "n_steps C \<sigma> C \<sigma>"
+| OneStep: "\<lbrakk> \<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C'', \<sigma>''\<rangle>; n_steps C'' \<sigma>'' C' \<sigma>' \<rbrakk> \<Longrightarrow>  n_steps C \<sigma> C' \<sigma>'"
+
+
+definition assertify_store_assertion where
+  "assertify_store_assertion P = { (Ag s, \<tau>, h) |s \<tau> h. P s }"
+
+lemma in_assertify_equiv:
+  "(Ag s, \<tau>, \<omega>) \<in> assertify_store_assertion P \<longleftrightarrow> P s"
+  by (simp add: assertify_store_assertion_def)
+
+lemma uu_simps[simp]:
+  "get_vh uu = empty_heap"
+  "get_vm uu = zero_mask"
+  unfolding uu_def
+proof -
+  have r: "wf_pre_virtual_state uuu"
+    by (metis uuu_def wf_uuu)
+  then show "get_vh (Abs_virtual_state uuu) = empty_heap"
+    unfolding uuu_def
+    by (smt (verit) Abs_virtual_state_inverse get_vh_def mem_Collect_eq snd_conv)
+  show "get_vm (Abs_virtual_state uuu) = zero_mask"
+    by (metis Abs_virtual_state_inverse fst_conv get_vm_def mem_Collect_eq r uuu_def)
+qed
+
+
+lemma stable_uu:
+  "sep_algebra_class.stable uu"
+proof (rule stable_virtual_stateI)
+  show "\<And>hl. get_vh uu hl \<noteq> None \<Longrightarrow> PosReal.pnone < get_vm uu hl"
+    by (simp add: empty_heap_def)
+qed
+
+
+lemma uu_neutral:
+  "Some \<omega> = \<omega> \<oplus> uu"
+proof (rule plus_virtual_stateI)
+  show "Some (get_vh \<omega>) = get_vh \<omega> \<oplus> get_vh uu"
+    by (simp add: empty_heap_identity)
+  show "Some (get_vm \<omega>) = get_vm \<omega> \<oplus> get_vm uu"
+    using zero_mask_identity by auto
+qed
+
+
+
+lemma get_wf_easy:
+  assumes "wf_pre_virtual_state \<phi>"
+  shows "get_vm (Abs_virtual_state \<phi>) = fst \<phi> \<and> get_vh (Abs_virtual_state \<phi>) = snd \<phi>"
+  by (simp add: Abs_virtual_state_inverse assms get_vh_def get_vm_def)
+
+definition mk_virtual_state where
+  "mk_virtual_state h = Abs_virtual_state (\<lambda>l. if l \<in> dom h then 1 else 0, h)"
+
+lemma mk_virtual_state_simps[simp]:
+  "get_vm (mk_virtual_state h) = (\<lambda>l. if l \<in> dom h then 1 else 0)"
+  "get_vh (mk_virtual_state h) = h"
+proof -
+  have "wf_pre_virtual_state (\<lambda>l. if l \<in> dom h then 1 else 0, h)"
+    using gr_0_is_ppos by fastforce
+  then show "get_vm (mk_virtual_state h) = (\<lambda>l. if l \<in> dom h then 1 else 0)"
+    unfolding mk_virtual_state_def using get_wf_easy 
+    by (metis fst_conv)
+  show "get_vh (mk_virtual_state h) = h"
+    by (metis \<open>wf_pre_virtual_state (\<lambda>l. if l \<in> dom h then PosReal.pwrite else PosReal.pnone, h)\<close> get_wf_easy mk_virtual_state_def snd_conv)
+qed
+
+lemma mk_virtual_state_charact[simp]:
+  "sep_algebra_class.stable (mk_virtual_state h)"
+  "binary_mask (mk_virtual_state h)"
+  "concretize s (mk_virtual_state h) = (s, h)"
+  apply (metis domIff mk_virtual_state_simps(1) mk_virtual_state_simps(2) not_gr_0 one_neq_zero stable_virtual_stateI)
+  apply (simp add: binary_maskI)
+  by simp
+
+
+lemma safeE_no_frame:
+  assumes "safe (Suc n) C s \<tau> \<omega> Q"
+      and "binary_mask \<omega>"
+      and "\<langle>C, concretize s \<omega>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    shows "\<exists>\<omega>1. sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1 \<and> snd \<sigma>' = get_vh \<omega>1 \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+proof -
+  obtain \<omega>1 \<omega>1' where "Some \<omega>1' = \<omega>1 \<oplus> uu \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+    using safeE(5)[OF assms(1), of uu \<omega> C' \<sigma>']
+    using assms(2) assms(3) stable_uu uu_neutral by blast
+  then show ?thesis
+    by (metis pure_def stable_and_sum_pure_same uu_neutral)
+qed
+
+lemma binary_mask_and_stable_then_mk_virtual:
+  assumes "sep_algebra_class.stable \<omega>"
+      and "binary_mask \<omega>"
+    shows "\<omega> = mk_virtual_state (get_vh \<omega>)"
+proof (rule virtual_state_ext)
+  show "get_vm \<omega> = get_vm (mk_virtual_state (get_vh \<omega>))"
+  proof
+    fix l show "get_vm \<omega> l = get_vm (mk_virtual_state (get_vh \<omega>)) l"
+      by (metis assms(1) assms(2) binary_mask_def mk_virtual_state_charact(1) mk_virtual_state_simps(1) mk_virtual_state_simps(2) not_gr_0 stable_virtual_state_def vstate_wf_imp)
+  qed
+qed (simp)
+
+lemma safeE_no_frame_alt:
+  assumes "safe (Suc n) C s \<tau> (mk_virtual_state h) Q"
+      and "\<langle>C, (s, h)\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    shows "\<exists>\<omega>1. sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1 \<and> snd \<sigma>' = get_vh \<omega>1 \<and> safe n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+  by (metis assms(1) assms(2) mk_virtual_state_charact(2) mk_virtual_state_simps(2) safeE_no_frame)
+
+
+
+lemma safe_n_steps:
+  assumes "n_steps C \<sigma> C' \<sigma>'"
+      and "s = fst \<sigma>"
+      and "get_vh \<omega> = snd \<sigma>"
+      and "binary_mask \<omega>"
+      and "sep_algebra_class.stable \<omega>"       
+      and "\<And>n. safe n C s \<tau> \<omega> (assertify_store_assertion Q)"
+    shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q (fst \<sigma>'))"
+  using assms
+proof (induct arbitrary: s \<omega> rule: n_steps.induct)
+  case (NoStep C \<sigma>)
+  then have r: "safe (Suc 0) C s \<tau> \<omega> (assertify_store_assertion Q)"
+    by simp
+  then show ?case
+    using safeE(1)[OF r] no_abortsE[OF safeE(4)[OF r], of \<omega> uu]
+    using NoStep.prems(1) NoStep.prems(2) stable_uu uu_neutral
+    using NoStep.prems(3) NoStep.prems(4)
+    by (metis in_assertify_equiv surjective_pairing)
+next
+  case (OneStep C \<sigma> C'' \<sigma>'' C' \<sigma>')
+  show "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q (fst \<sigma>'))"
+  proof (rule OneStep(3)[of "fst \<sigma>''" "mk_virtual_state (snd \<sigma>'')"])
+    fix n
+    obtain \<omega>1 \<omega>1' where "Some \<omega>1' = \<omega>1 \<oplus> uu \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'"
+      "snd \<sigma>'' = get_vh \<omega>1' \<and> safe n C'' (fst \<sigma>'') \<tau> \<omega>1 (assertify_store_assertion Q)"
+      using safeE(5)[OF OneStep(8)[of "Suc n"], of uu \<omega> C'' \<sigma>'']
+      using OneStep.hyps(1) OneStep.prems(1) OneStep.prems(2) OneStep.prems(3) stable_uu uu_neutral by auto
+    then show "safe n C'' (fst \<sigma>'') \<tau> (mk_virtual_state (snd \<sigma>'')) (assertify_store_assertion Q)"
+      by (metis binary_mask_and_stable_then_mk_virtual pure_def stable_and_sum_pure_same uu_neutral)
+  qed (simp_all)
+qed
+
+
+
+
+
+theorem adequacy:
+  assumes "n_steps C \<sigma> C' \<sigma>'"
+      and "\<turnstile>CSL [assertify_store_assertion P] C [assertify_store_assertion Q]"
+      and "P (fst \<sigma>)"
+    shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q (fst \<sigma>'))"
+proof (rule safe_n_steps[OF assms(1), where ?Q = Q])
+  fix n
+  show "safe n C (fst \<sigma>) (Ag (Map.empty)) (mk_virtual_state (snd \<sigma>)) (assertify_store_assertion Q)"
+    by (metis CSL_E CSL_sound assms(2) assms(3) in_assertify_equiv mk_virtual_state_charact(1))
+qed (simp_all)
 
 end
