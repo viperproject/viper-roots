@@ -792,11 +792,29 @@ definition rel_stable_assertion where
   "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (a \<in> A \<longleftrightarrow> x \<in> A))"
 
 
+(*
+lemma refines_rel_stable:
+  assumes "rel_stable_assertion_alt \<omega> A"
+      and "\<And>\<omega> \<omega>'. \<omega> \<in> A \<and> pure_larger \<omega>' \<omega> \<longrightarrow> \<omega>' \<in> A" 
+    shows "rel_stable_assertion \<omega> A"
+  unfolding rel_stable_assertion_def
+proof (clarify)
+  fix x a assume asm0: "\<omega> ## a" "pure_larger x (stabilize a)" "x \<succeq> |\<omega>|"
+  show "(a \<in> A) = (x \<in> A)"
+  proof
+    show "x \<in> A \<Longrightarrow> a \<in> A"
+      sledgehammer
+
+  obtain \<omega> a where "Some \<omega> = 
+*)
+
+
 definition stable_on where
   "stable_on \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
 
 definition self_framing where
   "self_framing A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"
+
 
 lemma self_framingI:
   assumes "\<And>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A"
@@ -908,6 +926,49 @@ lemma rel_stable_assertionE:
       and "x \<succeq> |\<omega>|"
     shows "a \<in> A \<longleftrightarrow> x \<in> A"
   using assms(1) assms(2) assms(3) assms(4) rel_stable_assertion_def by blast
+
+
+
+definition rel_stable_assertion_alt where
+  "rel_stable_assertion_alt \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> A)"
+
+definition framed_by_alt where
+  "framed_by_alt A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion_alt \<omega> B)"
+
+
+lemma self_framing_star_alt:
+  assumes "self_framing A"
+      and "framed_by_alt A P"
+      and "\<And>\<omega> \<omega>'. \<omega> \<in> A \<and> pure_larger \<omega>' \<omega> \<longrightarrow> \<omega>' \<in> A" (* wf_assertion *)
+      and "\<And>\<omega> \<omega>'. \<omega> \<in> P \<and> pure_larger \<omega>' \<omega> \<longrightarrow> \<omega>' \<in> P" (* wf_assertion *)
+    shows "self_framing (A \<otimes> P)"
+proof (rule self_framingI)
+  fix \<omega>
+  show "(\<omega> \<in> A \<otimes> P) = (stabilize \<omega> \<in> A \<otimes> P)"
+  proof
+    assume "\<omega> \<in> A \<otimes> P"
+    then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
+      using local.x_elem_set_product by auto
+    then obtain \<omega>' where "Some \<omega>' = stabilize a \<oplus> p"
+      by (metis local.asso3 local.commutative local.decompose_stabilize_pure option.exhaust_sel)
+(*
+    then have "Some (stabilize \<omega>) = stabilize a \<oplus> stabilize p"
+      using local.stabilize_sum by auto
+*)
+    then have "rel_stable_assertion_alt (stabilize a) P"
+      using \<open>a \<in> A\<close> assms(1) assms(2) framed_by_alt_def self_framing_def by auto
+    then have "stabilize \<omega>' \<in> {stabilize a} \<otimes> P"
+      by (meson Stable_def \<open>Some \<omega>' = stabilize a \<oplus> p\<close> \<open>p \<in> P\<close> in_Stabilize local.is_in_set_sum rel_stable_assertion_alt_def subsetD)
+    moreover have "stabilize \<omega>' = stabilize \<omega>"
+      by (metis \<open>Some \<omega> = a \<oplus> p\<close> \<open>Some \<omega>' = stabilize a \<oplus> p\<close> local.max_projection_prop_stable_stabilize local.mpp_invo local.stabilize_sum option.inject)
+    ultimately show "stabilize \<omega> \<in> A \<otimes> P"
+      by (metis \<open>a \<in> A\<close> assms(1) local.star_to_singletonI self_framing_def)
+  next
+    assume "stabilize \<omega> \<in> A \<otimes> P"
+    then show "\<omega> \<in> A \<otimes> P"
+      sorry
+  qed
+qed
 
 lemma self_framing_star:
   assumes "self_framing A"

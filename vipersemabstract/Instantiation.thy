@@ -1,5 +1,5 @@
 theory Instantiation           
-  imports AbstractSemantics EquiViper EquiSemAuxLemma
+  imports AbstractSemanticsProperties EquiViper EquiSemAuxLemma
 begin
 
 definition make_semantic_bexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'a equi_state bexp" where
@@ -172,10 +172,23 @@ qed
 definition points_to where
   "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> owns_only \<omega> hl }"
                                                  
+abbreviation well_typed_concrete_heap where
+  "well_typed_concrete_heap \<Gamma> h \<equiv> (\<forall>hl v. h hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
 
+lemma well_typed_concrete_heap_update:
+  assumes "well_typed_concrete_heap \<Gamma> h"
+      and "\<Gamma> (snd hl) = Some ty"
+      and "v \<in> ty"
+    shows "well_typed_concrete_heap \<Gamma> (h(hl \<mapsto> v))"
+  using assms(1) assms(2) assms(3) by auto
+
+lemma well_typed_concrete_heap_remove:
+  assumes "well_typed_concrete_heap \<Gamma> h"
+    shows "well_typed_concrete_heap \<Gamma> (h(hl := None))"
+  using assms(1) by auto
 
 definition well_typed_heap where
-  "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (\<forall>hl v. get_vh \<phi> hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
+  "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (well_typed_concrete_heap \<Gamma> (get_vh \<phi>))"
 
 lemma well_typed_heapI[intro]:
   assumes "\<And>hl v. get_vh \<phi> hl = Some v \<Longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty)"
@@ -186,14 +199,16 @@ lemma well_typed_heapE:
   assumes "well_typed_heap \<Gamma> \<phi>"
       and "get_vh \<phi> hl = Some v"
     shows "\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty"
-  using Instantiation.well_typed_heap_def assms(1) assms(2) by blast
+  using assms
+  unfolding well_typed_heap_def by blast
 
 lemma well_typed_heap_sum:
   assumes "Some x = a \<oplus> b"
       and "well_typed_heap \<Gamma> a"
       and "well_typed_heap \<Gamma> b"
     shows "well_typed_heap \<Gamma> x"
-  using Instantiation.well_typed_heap_def assms(1) assms(2) assms(3) sum_val_defined by blast
+  using Instantiation.well_typed_heap_def assms(1) assms(2) assms(3) sum_val_defined
+  by blast
 
 lemma well_typed_heap_smaller:
   assumes "a \<succeq> b"
@@ -364,7 +379,7 @@ proof (rule well_typedI)
     by (metis (mono_tags, lifting) assms core_is_smaller option.simps(3) plus_agreement_def plus_prodE well_typedE(2))
 qed
 
-                                   
+
 global_interpretation TypedEqui: typed_state well_typed
 proof
   fix x a b :: "('a ag_trace \<times> 'a virtual_state)"
@@ -927,6 +942,7 @@ proof
     using asm0 by (induct rule: red_custom_stmt.induct) auto
   show "well_typed (custom_context \<Delta>) (get_abs_state \<omega>) \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> \<omega>' \<in> S \<Longrightarrow> well_typed (custom_context \<Delta>) (get_abs_state \<omega>')"
     using asm0 red_custom_well_typed by blast
+
 qed
 
 definition viper_prog_verifies where

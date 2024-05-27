@@ -312,6 +312,12 @@ lemma typed_assertionI:
   shows "typed_assertion \<Delta> A"
   using assms typed_assertion_def by blast
 
+lemma typed_assertionE:
+  assumes "typed_assertion \<Delta> A"
+      and "\<omega> \<in> A"
+    shows "typed \<Delta> \<omega>"
+  using assms typed_assertion_def by blast
+
 lemma typed_subset:
   assumes "A \<subseteq> A'"
       and "typed_assertion \<Delta> A'"
@@ -379,7 +385,6 @@ definition at_least_two_elems:
 
 subsection \<open>wf_assertion\<close>
 
-(* TODO: Is it needed? *)
 definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
   "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
 

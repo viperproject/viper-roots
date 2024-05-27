@@ -1255,7 +1255,7 @@ qed
 
 
 
-lemma Viper_implies_SL_proof:
+theorem Viper_implies_SL_proof:
   assumes "verifies_set \<Delta> A C"
       and "wf_abs_stmt \<Delta> C"
       and "self_framing_and_typed \<Delta> A"
@@ -1408,8 +1408,7 @@ proof (rule entailsI)
     by (metis \<open>typed \<Delta> \<omega>\<close> assign_var_state_def exists_assertI)
 qed
 
-
-lemma SL_proof_Havoc_elim:
+lemma SL_proof_Havoc_elim_entails:
   assumes "\<Delta> \<turnstile> [A] Havoc x [B]"
       and "typed_assertion \<Delta> A"
       and "variables \<Delta> x \<noteq> None"
@@ -1439,7 +1438,8 @@ next
     using Cons.prems(2) by force
 
   then have "entails A R \<and> free_vars \<Delta> R \<subseteq> free_vars \<Delta> A - {x}"
-    using SL_proof_Havoc_elim[OF r(1)] calculation by simp
+    using calculation SL_proof_Havoc_elim_entails by presburger
+
   ultimately show "self_framing_and_typed \<Delta> A \<and> self_framing_and_typed \<Delta> B \<and> entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - set (x # l)"
     by (metis Cons.prems(1) Cons.prems(2) Diff_empty Diff_insert0 Diff_mono dual_order.eq_iff dual_order.trans list.simps(15) entails_trans proofs_are_self_framing_and_typed subset_Diff_insert)
 qed

@@ -854,7 +854,7 @@ class sep_algebra = pcm_with_core +
   fixes stabilize :: "'a \<Rightarrow> 'a"
 
   assumes already_stable: "stable x \<Longrightarrow> stabilize x = x"
-    and stabilize_is_stable: "stable (stabilize x)"
+    and stabilize_is_stable[simp]: "stable (stabilize x)"
     and stabilize_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
     and decompose_stabilize_pure: "Some x = stabilize x \<oplus> |x|"
     and stabilize_core_emp : "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"

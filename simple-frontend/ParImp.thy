@@ -40,7 +40,7 @@ datatype cmd =
   Cskip
 | Cassign var exp
 | Cread var var (* second var needs to be a non-null ref *)
-| Cwrite var exp 
+| Cwrite var exp
 | Calloc var exp
 | Cfree var
 | Cseq cmd cmd
@@ -420,7 +420,83 @@ corollary bexp_agrees2[simp]:
   "x \<notin> fvB B \<Longrightarrow> bdenot B (s(x := v)) = bdenot B s"
 by (rule bexp_agrees, simp add: agrees_def)
 
+definition vints where
+  "vints = { VInt v |v. True }"
 
+definition vrefs where
+  "vrefs = { VRef v |v. True }"
+
+fun well_typed_cmd_aux where
+  "well_typed_cmd_aux _ Cskip \<longleftrightarrow> True"
+| "well_typed_cmd_aux \<Delta> (Cseq C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
+| "well_typed_cmd_aux \<Delta> (Cassign x e) \<longleftrightarrow> variables \<Delta> x = Some vints"
+| "well_typed_cmd_aux \<Delta> (Cread x r) \<longleftrightarrow> variables \<Delta> x = Some vints \<and> variables \<Delta> r = Some vrefs"
+| "well_typed_cmd_aux \<Delta> (Cwrite r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
+| "well_typed_cmd_aux \<Delta> (Calloc r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
+| "well_typed_cmd_aux \<Delta> (Cfree r) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
+| "well_typed_cmd_aux \<Delta> (Cif _ C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
+| "well_typed_cmd_aux \<Delta> ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
+| "well_typed_cmd_aux \<Delta> (Cwhile _ C) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C"
+
+(*
+lemma update_store_typed:
+  assumes "TypedEqui.typed_store \<Delta> s"
+      and "variables \<Delta> x = Some V"
+      and "v \<in> V"
+    shows "TypedEqui.typed_store \<Delta> (s(x \<mapsto> v))"
+  sledgehammer
+*)
+
+lemma red_keeps_typed_store:
+  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+      and "TypedEqui.typed_store \<Delta> (fst \<sigma>)"
+      and "well_typed_cmd_aux \<Delta> C"
+    shows "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
+  using assms
+proof (induct rule: red.induct)
+  case (red_Assign \<sigma> s h \<sigma>' x e)
+  then show ?case
+    using TypedEqui.typed_store_update[OF red_Assign(3), of x vints "VInt (edenot e s)"]
+    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(3))
+next
+  case (red_Alloc \<sigma> s h l \<sigma>' x e)
+  then show ?case
+    using TypedEqui.typed_store_update[OF red_Alloc(4), of x vrefs "VRef (Address l)"]
+    by (metis (mono_tags, lifting) CollectI fst_eqD vrefs_def well_typed_cmd_aux.simps(6))
+next
+  case (red_Read \<sigma> s h r l v \<sigma>' x)
+  then show ?case
+    using TypedEqui.typed_store_update[OF red_Read(5), of x vints "VInt v"]
+    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(4))
+qed (simp_all)
+
+
+definition type_ctxt_heap where
+  "type_ctxt_heap = (\<lambda>f. if f = field_val then Some vints else None)"
+
+lemma red_keeps_well_typed_cmd:
+  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    and "well_typed_concrete_heap type_ctxt_heap (snd \<sigma>)"
+  shows "well_typed_concrete_heap type_ctxt_heap (snd \<sigma>')"
+  using assms
+proof (induct rule: red.induct)
+  case (red_Alloc \<sigma> s h l \<sigma>' x e)
+  then show ?case
+    using well_typed_concrete_heap_update[OF red_Alloc(4), of "(l, field_val)" vints "VInt (edenot e s)"]
+    by (simp add: type_ctxt_heap_def vints_def)
+next
+  case (red_Write \<sigma> s h r l \<sigma>' e)
+  then show ?case
+    using well_typed_concrete_heap_update[OF red_Write(5), of "(l, field_val)" vints "VInt (edenot e s)"]
+    by (simp add: type_ctxt_heap_def vints_def)
+qed (auto)
+
+lemma well_typed_cmd_red:
+  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+      and "well_typed_cmd_aux \<Delta> C"
+    shows "well_typed_cmd_aux \<Delta> C'"
+  using assms
+  by (induct rule: red.induct) (auto)
 
 
 end
