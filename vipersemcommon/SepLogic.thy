@@ -71,9 +71,9 @@ proof -
       using x_elem_set_product by auto
     then obtain a b where "Some ab = a \<oplus> b" "a \<in> A" "b \<in> B"
       using x_elem_set_product by auto
-    then obtain bc where "Some bc = b \<oplus> c" 
+    then obtain bc where "Some bc = b \<oplus> c"
       by (metis \<open>Some x = ab \<oplus> c\<close> asso2 option.exhaust)
-    then show "x \<in> ?B" 
+    then show "x \<in> ?B"
       by (metis \<open>Some ab = a \<oplus> b\<close> \<open>Some x = ab \<oplus> c\<close> \<open>a \<in> A\<close> \<open>b \<in> B\<close> \<open>c \<in> C\<close> asso1 x_elem_set_product)
   qed
   moreover have "?B \<subseteq> ?A"
@@ -99,12 +99,12 @@ proof -
     assume ?A
     then have "{a} \<subseteq> {b} \<otimes> {c}"
       using add_set_elem by auto
-    moreover have "{b} \<otimes> {c} \<subseteq> {a}" 
+    moreover have "{b} \<otimes> {c} \<subseteq> {a}"
       using add_set_elem[of _ "{b}" "{c}"] calculation insert_subset option.sel singleton_iff subsetI
       by metis
     ultimately show ?thesis by blast
   qed
-  moreover have "?B \<Longrightarrow> ?A" 
+  moreover have "?B \<Longrightarrow> ?A"
     using add_set_elem by auto
   ultimately show ?thesis by blast
 qed
@@ -181,7 +181,7 @@ lemmas succ_set_trans = greater_set_trans
 lemma greater_setI:
   assumes "\<And>a. a \<in> A \<Longrightarrow> (\<exists>b \<in> B. a \<succeq> b)"
     shows "A \<ggreater> B"
-  by (simp add: assms greater_set_def)  
+  by (simp add: assms greater_set_def)
 
 lemma add_set_greater_set_mono:
   assumes "A' \<ggreater> A"
@@ -231,11 +231,11 @@ proof (rule up_closedI)
   assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> UNIV"
   then obtain r a b where "Some \<phi>' = \<phi> \<oplus> r" "Some \<phi> = a \<oplus> b" "a \<in> A"
     using greater_def x_elem_set_product by auto
-  then obtain br where "Some br = b \<oplus> r" 
+  then obtain br where "Some br = b \<oplus> r"
     by (metis asso2 option.exhaust_sel)
-  then have "Some \<phi>' = a \<oplus> br" 
+  then have "Some \<phi>' = a \<oplus> br"
     by (metis \<open>Some \<phi> = a \<oplus> b\<close> \<open>Some \<phi>' = \<phi> \<oplus> r\<close> splus.simps(3) splus_asso)
-  then show "\<phi>' \<in> A \<otimes> UNIV" 
+  then show "\<phi>' \<in> A \<otimes> UNIV"
     using \<open>a \<in> A\<close> x_elem_set_product by auto
 qed
 
@@ -250,15 +250,15 @@ lemma up_closed_add_set:
     shows "up_closed (A \<otimes> B)"
 proof (rule up_closedI)
   fix \<phi>' \<phi> assume asm: "\<phi>' \<succeq> \<phi> \<and> \<phi> \<in> A \<otimes> B"
-  then obtain a b where "a \<in> A" "b \<in> B" "Some \<phi> = a \<oplus> b" 
+  then obtain a b where "a \<in> A" "b \<in> B" "Some \<phi> = a \<oplus> b"
     using add_set_elem by auto
-  moreover obtain r where "Some \<phi>' = \<phi> \<oplus> r" 
+  moreover obtain r where "Some \<phi>' = \<phi> \<oplus> r"
     using asm greater_def by blast
-  then obtain ar where "Some ar = a \<oplus> r" 
+  then obtain ar where "Some ar = a \<oplus> r"
     by (metis asso2 calculation(3) commutative option.exhaust_sel option.simps(3))
-  then have "ar \<in> A" 
+  then have "ar \<in> A"
     by (meson assms calculation(1) greater_def up_closed_def  )
-  then show "\<phi>' \<in> A \<otimes> B" 
+  then show "\<phi>' \<in> A \<otimes> B"
     by (metis \<open>Some \<phi>' = \<phi> \<oplus> r\<close> \<open>Some ar = a \<oplus> r\<close> add_set_elem asso1 calculation(2) calculation(3) commutative)
 qed
 
@@ -309,9 +309,9 @@ lemma mono_prop_set_equiv:
 lemma setify_add_set:
   "setify P (A \<otimes> B) \<longleftrightarrow> (\<forall>x \<in> A. setify P ({x} \<otimes> B))" (is "?A \<longleftrightarrow> ?B")
 proof -
-  have "?A \<Longrightarrow> ?B" 
+  have "?A \<Longrightarrow> ?B"
     using local.setify_def add_set_elem   singletonD by fastforce
-  moreover have "?B \<Longrightarrow> ?A" 
+  moreover have "?B \<Longrightarrow> ?A"
     using add_set_elem local.setify_def by fastforce
   ultimately show ?thesis by blast
 qed
@@ -341,7 +341,7 @@ lemma wand_empty [simp] :
 
 subsubsection \<open>up_close\<close>
 
-lemma up_close_sum : 
+lemma up_close_sum :
   "up_close A \<otimes> B = up_close (A \<otimes> B)"
   by (simp add:up_close_def add_setAC)
 
@@ -398,11 +398,11 @@ lemma up_close_equiv:
       and "up_closed B"
     shows "A \<sim> B \<longleftrightarrow> A = B"
 proof -
-  have "A \<sim> B \<longleftrightarrow> A \<ggreater> B \<and> B \<ggreater> A" 
+  have "A \<sim> B \<longleftrightarrow> A \<ggreater> B \<and> B \<ggreater> A"
     using local.equiv_def by auto
-  also have "... \<longleftrightarrow> A \<subseteq> B \<and> B \<subseteq> A" 
+  also have "... \<longleftrightarrow> A \<subseteq> B \<and> B \<subseteq> A"
     by (metis assms(1) assms(2) greater_set_def set_eq_subset succ_refl up_closed_bigger_subset)
-  ultimately show ?thesis 
+  ultimately show ?thesis
     by blast
 qed
 
@@ -429,7 +429,7 @@ lemma core_in_emp_core :
 
 subsubsection \<open>up_close_core\<close>
 
-lemma up_close_core_sum : 
+lemma up_close_core_sum :
   "up_close_core A \<otimes> B = up_close_core (A \<otimes> B)"
   by (simp add:up_close_core_def add_setAC)
 
@@ -577,7 +577,7 @@ lemma bool_to_assertion_true [simp]:
   assumes "P"
   shows "\<llangle>P\<rrangle> = emp"
   using assms by (simp split:bool_to_assertion_splits)
-  
+
 lemma bool_to_assertion_false [simp]:
   assumes "\<not> P"
   shows "\<llangle>P\<rrangle> = {}"
@@ -599,16 +599,16 @@ lemma Stabilize_filter_stable :
   "Set.filter sep_algebra_class.stable A \<subseteq> Stabilize A"
   by (auto simp add:Stabilize_def already_stable)
 
-lemma Stabilize_star : 
+lemma Stabilize_star :
   "Stabilize A \<otimes> Stabilize B \<subseteq> Stabilize (A \<otimes> B)"
   apply (simp add:Stabilize_def add_set_def)
   using stabilize_sum by blast
 
-lemma Stabilize_UNIV [simp] : 
+lemma Stabilize_UNIV [simp] :
   "Stabilize UNIV = UNIV"
   by (simp add:Stabilize_def)
 
-lemma Stabilize_empty [simp] : 
+lemma Stabilize_empty [simp] :
   "Stabilize {} = {}"
   by (simp add:Stabilize_def)
 
@@ -616,7 +616,7 @@ lemma Stabilize_ex :
   "Stabilize (\<Union> x. A x) = (\<Union> x. Stabilize (A x))"
   by (auto simp add:Stabilize_def)
 
-lemma Stabilize_up_close_core : 
+lemma Stabilize_up_close_core :
   "Stabilize (up_close_core A) = Stabilize A" (is "?A = ?B")
 proof
   show "?A \<subseteq> ?B"
@@ -632,11 +632,11 @@ lemma StableI :
   shows "Stable A"
   using assms by (auto simp add:Stable_def)
 
-lemma Stable_UNIV [simp] : 
+lemma Stable_UNIV [simp] :
   "Stable UNIV"
   by (simp add:Stable_def)
 
-lemma Stable_emp [simp] : 
+lemma Stable_emp [simp] :
   "Stable emp"
   unfolding Stable_def Stabilize_def emp_def
   using already_stable stabilize_is_stable by blast
@@ -647,11 +647,11 @@ lemma Stable_emp_core [simp] :
   using local.max_projection_prop_def local.max_projection_prop_stable_stabilize local.pure_smaller by force
 
 
-lemma Stable_empty [simp] : 
+lemma Stable_empty [simp] :
   "Stable {}"
   by (simp add:Stable_def)
 
-lemma Stable_bool_to_assertion [simp] : 
+lemma Stable_bool_to_assertion [simp] :
   "Stable (\<llangle>P\<rrangle>)"
   by (simp split:bool_to_assertion_splits)
 
@@ -659,7 +659,7 @@ lemma Stable_star :
   assumes "Stable A"
   assumes "Stable B"
   shows "Stable (A \<otimes> B)"
-  unfolding Stable_def 
+  unfolding Stable_def
 proof -
   have "A \<otimes> B \<subseteq> Stabilize A \<otimes> Stabilize B"
     using assms unfolding Stable_def by (rule add_set_mono)
@@ -735,7 +735,7 @@ lemma star_to_singleton_stableE :
 proof -
   obtain a where "a \<in> A" "x \<in> {a} \<otimes> B"
     using star_to_singletonE assms by blast
-  from \<open>x \<in> {a} \<otimes> B\<close> have "x \<in> up_close_core ({stabilize a} \<otimes> B)" 
+  from \<open>x \<in> {a} \<otimes> B\<close> have "x \<in> up_close_core ({stabilize a} \<otimes> B)"
     (* This proof is a lot more painful than it should be. *)
     apply (simp add:split_star_singleton_stabilize[of "a"])
     apply (simp add:add_set_commm[of "{stabilize a}"] add_set_asso)
@@ -772,7 +772,7 @@ proof (rule StableI)
       prefer 3 apply (assumption)
     apply (simp add: local.core_is_pure local.pure_def)
     by blast
-  then have "stabilize x \<in> {stabilize a} \<otimes> B" 
+  then have "stabilize x \<in> {stabilize a} \<otimes> B"
     using Stable_def \<open>Stable ({stabilize a} \<otimes> B)\<close>
     using Stabilize_up_close_core Stable_up_close_core
     by (metis in_Stabilize subsetD)
@@ -805,14 +805,14 @@ lemma star_entails_and:
       and "monotonic B"
     shows "conj A B \<omega>"
   by (metis (no_types, lifting) assms(1) assms(2) assms(3) conj_def local.commutative local.greater_equiv monotonic_def star_def)
-  
+
 
 lemma and_entails_star:
   assumes "A \<omega>"
       and "B \<omega>"
       and "non_overlapping A B"
     shows "star A B \<omega>"
-  using non_overlapping_def star_def[of A B \<omega>] assms(1) assms(2) assms(3) 
+  using non_overlapping_def star_def[of A B \<omega>] assms(1) assms(2) assms(3)
   by metis
 
 end
