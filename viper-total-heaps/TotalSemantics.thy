@@ -64,6 +64,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
   "\<lbrakk> mh = get_mh_total_full \<omega>;
      ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r);
      a = the_address r;
+     \<comment>\<open>If the reduction leads to failure (i.e. the left-hand side \<^prop>\<open>mh (a,f) \<noteq> 0 \<and> r \<noteq> Null\<close> is false),
+        then any instantiation of \<^term>\<open>q\<close> works (\<^term>\<open>q\<close> is relevant only in the case of success).\<close>
      mh (a,f) \<noteq> 0 \<and> r \<noteq> Null \<Longrightarrow> q > 0 \<and> mh (a,f) > q 
    \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega>
@@ -80,6 +82,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
 | ExhAccPredWildcard:
   "\<lbrakk> mp = get_mp_total_full \<omega>;
      red_pure_exps_total ctxt R (Some \<omega>0) e_args \<omega> (Some v_args);
+     \<comment>\<open>If the reduction leads to failure (i.e. the left-hand side \<^prop>\<open>mp (pred_id, v_args) \<noteq> 0\<close> is false),
+       then any instantiation of \<^term>\<open>q\<close> works (\<^term>\<open>q\<close> is relevant only in the case of success).\<close>
      mp (pred_id, v_args) \<noteq> 0 \<Longrightarrow> q > 0 \<and> mp (pred_id, v_args) > q    
    \<rbrakk> \<Longrightarrow>
      red_exhale ctxt R \<omega>0 (Atomic (AccPredicate pred_id e_args Wildcard)) \<omega>
