@@ -257,6 +257,13 @@ proof transfer
     by blast
 qed
 
+lemma pminus_strictly_smaller:
+  assumes "(p :: preal) > q" 
+      and "q > 0"
+    shows "p > (p - q)"
+  using assms
+  by (simp add: preal_to_real)
+
 lemma positive_real_preal:
   assumes "p > 0"
   shows "(Abs_preal p) \<noteq> pnone"
