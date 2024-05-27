@@ -47,6 +47,25 @@ fun pure_exp_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> pure_exp \
 | "pure_exp_pred_rec p (PExists ty e) \<longleftrightarrow> pure_exp_pred p e"
 | "pure_exp_pred_rec p (PForall ty e) \<longleftrightarrow> pure_exp_pred p e"
 
+\<comment> \<open>We tweak the simp rules for pure_exp_pred such that it is only unfolded for concrete arguments.\<close>
+declare pure_exp_pred.simps[simp del]
+lemmas pure_exp_pred_simps[simp] =
+  pure_exp_pred.simps[where ?e="Var _"]
+  pure_exp_pred.simps[where ?e="ELit _"]
+  pure_exp_pred.simps[where ?e="Unop _ _"]
+  pure_exp_pred.simps[where ?e="Binop _ _ _"]
+  pure_exp_pred.simps[where ?e="CondExp _ _ _"]
+  pure_exp_pred.simps[where ?e="FieldAcc _ _"]
+  pure_exp_pred.simps[where ?e="Old _ _"]
+  pure_exp_pred.simps[where ?e="Perm _ _"]
+  pure_exp_pred.simps[where ?e="PermPred _ _"]
+  pure_exp_pred.simps[where ?e="FunApp _ _"]
+  pure_exp_pred.simps[where ?e="Result"]
+  pure_exp_pred.simps[where ?e="Unfolding _ _ _"]
+  pure_exp_pred.simps[where ?e="Let _ _"]
+  pure_exp_pred.simps[where ?e="PExists _ _"]
+  pure_exp_pred.simps[where ?e="PForall _ _"]
+
 fun
   atomic_assert_pred :: "(pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool" and
   atomic_assert_pred_rec :: "(pure_exp \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert) \<Rightarrow> bool"
@@ -57,6 +76,12 @@ fun
 | "atomic_assert_pred_rec p_e (Acc e1 f (PureExp e2)) \<longleftrightarrow> pure_exp_pred p_e e1 \<and> pure_exp_pred p_e e2"
 | "atomic_assert_pred_rec p_e (AccPredicate pname es Wildcard) \<longleftrightarrow> list_all (pure_exp_pred p_e) es"
 | "atomic_assert_pred_rec p_e (AccPredicate pname es (PureExp e2)) \<longleftrightarrow> (list_all (pure_exp_pred p_e) es) \<and> pure_exp_pred p_e e2"
+
+declare atomic_assert_pred.simps[simp del]
+lemmas atomic_assert_pred_simps[simp] =
+  atomic_assert_pred.simps[where ?A_atm="Pure _"]
+  atomic_assert_pred.simps[where ?A_atm="Acc _ _ _"]
+  atomic_assert_pred.simps[where ?A_atm="AccPredicate _ _ _"]
 
 fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow> bool" and
     assert_pred_rec :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomic_assert \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> assertion \<Rightarrow>  bool"
@@ -71,6 +96,18 @@ fun assert_pred :: "(assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp atomi
 | "assert_pred_rec p_assert p_atm p_e (ForAll _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
 | "assert_pred_rec p_assert p_atm p_e (Exists _ A) \<longleftrightarrow> assert_pred p_assert p_atm p_e A"
 | "assert_pred_rec p_assert p_atm p_e (Wand A B) \<longleftrightarrow> assert_pred p_assert p_atm p_e A \<and> assert_pred p_assert p_atm p_e B"
+
+declare assert_pred.simps[simp del]
+lemmas assert_pred_simps[simp] =
+  assert_pred.simps[where ?A="Atomic _"]
+  assert_pred.simps[where ?A="Imp _ _"]
+  assert_pred.simps[where ?A="CondAssert _ _ _"]
+  assert_pred.simps[where ?A="Star _ _"]
+  assert_pred.simps[where ?A="ImpureAnd _ _"]
+  assert_pred.simps[where ?A="ImpureOr _ _"]
+  assert_pred.simps[where ?A="ForAll _ _"]
+  assert_pred.simps[where ?A="Exists _ _"]
+  assert_pred.simps[where ?A="Wand _ _"]
 
 fun stmt_pred :: "(stmt \<Rightarrow> bool) \<Rightarrow> (assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> stmt \<Rightarrow> bool" and
     stmt_pred_rec :: "(stmt \<Rightarrow> bool) \<Rightarrow> (assertion \<Rightarrow> bool) \<Rightarrow> (pure_exp \<Rightarrow> bool) \<Rightarrow> stmt \<Rightarrow> bool"
@@ -94,6 +131,27 @@ fun stmt_pred :: "(stmt \<Rightarrow> bool) \<Rightarrow> (assertion \<Rightarro
 | "stmt_pred_rec p_stmt p_assert p_e (Label lbl) \<longleftrightarrow> True"
 | "stmt_pred_rec p_stmt p_assert p_e (Scope vty s) \<longleftrightarrow> stmt_pred p_stmt p_assert p_e s"
 | "stmt_pred_rec p_stmt p_assert p_e Skip \<longleftrightarrow> True"
+
+declare stmt_pred.simps[simp del]
+lemmas stmt_pred_simps[simp] =
+  stmt_pred.simps[where ?s="stmt.Inhale _"]
+  stmt_pred.simps[where ?s="stmt.Exhale _"]
+  stmt_pred.simps[where ?s="stmt.Assert _"]
+  stmt_pred.simps[where ?s="stmt.Assume _"]
+  stmt_pred.simps[where ?s="stmt.LocalAssign _ _"]
+  stmt_pred.simps[where ?s="stmt.FieldAssign _ _ _"]
+  stmt_pred.simps[where ?s="stmt.Havoc _"]
+  stmt_pred.simps[where ?s="stmt.If _ _ _"]
+  stmt_pred.simps[where ?s="stmt.Seq _ _"]
+  stmt_pred.simps[where ?s="stmt.MethodCall _ _ _"]
+  stmt_pred.simps[where ?s="stmt.While _ _ _"]
+  stmt_pred.simps[where ?s="stmt.Unfold _ _ _"]
+  stmt_pred.simps[where ?s="stmt.Fold _ _ _"]
+  stmt_pred.simps[where ?s="stmt.Package _ _"]
+  stmt_pred.simps[where ?s="stmt.Apply _ _"]
+  stmt_pred.simps[where ?s="stmt.Label _"]
+  stmt_pred.simps[where ?s="stmt.Scope _ _"]
+  stmt_pred.simps[where ?s="stmt.Skip"]
 
 subsubsection \<open>Common instantiations\<close>
 
@@ -156,7 +214,7 @@ fun supported_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> bool"
   | "supported_atomic_assert _ = True"
 
 abbreviation supported_assertion
-  where "supported_assertion \<equiv> assert_pred (\<lambda>_. True) supported_atomic_assert supported_pure_exp"
+  where "supported_assertion \<equiv> assert_pred (\<lambda>_. True) supported_atomic_assert not_supported_exp_no_rec"
 
 lemma supported_pure_exp_no_unfolding:
   assumes "supported_pure_exp e"
@@ -172,9 +230,8 @@ lemma supported_assertion_no_unfolding:
   shows "no_unfolding_assertion A"
   using assms
   apply (induction A)
-         apply (simp_all add: supported_pure_exp_no_unfolding)
-   apply (metis atomic_assert_pred_rec.simps(1) atomic_assert_pred_rec.simps(3) pure_exp_pred.elims(2) supported_atomic_assert.elims(2) supported_pure_exp_no_unfolding)
-  using supported_pure_exp_no_unfolding by auto
+          apply (simp_all add: supported_pure_exp_no_unfolding)
+  by (metis atomic_assert_pred.elims(2) atomic_assert_pred.elims(3) atomic_assert_pred_rec.elims(3) atomic_assert_pred_rec.simps(1) atomic_assert_pred_rec.simps(3) supported_atomic_assert.simps(1) supported_atomic_assert.simps(2) supported_pure_exp_no_unfolding)
 
 subsection \<open>Free variables\<close>
 

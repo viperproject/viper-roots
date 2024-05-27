@@ -421,6 +421,12 @@ lemma greater_set_refl:
 
 lemmas larger_set_refl = greater_set_refl
 
+subsubsection \<open>emp_core\<close>
+
+lemma core_in_emp_core :
+  "|x| \<in> emp_core"
+  by (simp add:emp_core_def max_projection_prop_pure_core mpp_prop)
+
 subsubsection \<open>up_close_core\<close>
 
 lemma up_close_core_sum : 
@@ -576,7 +582,13 @@ lemma bool_to_assertion_false [simp]:
   assumes "\<not> P"
   shows "\<llangle>P\<rrangle> = {}"
   using assms by (simp split:bool_to_assertion_splits)
-  
+
+lemma bool_to_assertion_intro :
+  assumes "P"
+  assumes "\<omega> \<in> A"
+  shows "\<omega> \<in> \<llangle>P\<rrangle> \<otimes> A"
+  using assms by (simp)
+
 subsubsection \<open>Stabilize\<close>
 
 lemma in_Stabilize[simp] :

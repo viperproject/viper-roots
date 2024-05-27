@@ -160,18 +160,19 @@ end
 
 
 
-abbreviation pwrite :: preal where "pwrite \<equiv> 1"
+abbreviation (input) pwrite :: preal where "pwrite \<equiv> 1"
 abbreviation half :: preal where "half \<equiv> 1 / (Abs_preal 2)"
-abbreviation pnone :: preal where "pnone \<equiv> 0"
+abbreviation (input) pnone :: preal where "pnone \<equiv> 0"
 
 abbreviation pmin :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pmin \<equiv> inf"
 abbreviation pmax :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pmax \<equiv> sup"
 
-abbreviation padd :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "padd \<equiv> (+)"
-abbreviation pmult :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pmult \<equiv> (*)"
+abbreviation (input) padd :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "padd \<equiv> (+)"
+abbreviation (input) pmult :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pmult \<equiv> (*)"
 abbreviation pinv :: "preal \<Rightarrow> preal" where "pinv \<equiv> inverse"
-abbreviation pdiv :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pdiv \<equiv> (/)"
+abbreviation (input) pdiv :: "preal \<Rightarrow> preal \<Rightarrow> preal" where "pdiv \<equiv> (/)"
 
+(* TODO: make the following abbreviations? *)
 lift_definition pgte :: "preal \<Rightarrow> preal \<Rightarrow> bool" is "(\<ge>)" done
 lift_definition pgt :: "preal \<Rightarrow> preal \<Rightarrow> bool" is "(>)" done
 lift_definition ppos :: "preal \<Rightarrow> bool" is "\<lambda>p. p > 0" done
@@ -226,6 +227,15 @@ lemmas preal_to_real =
   Rep_preal_inject[symmetric]
   Rep_preal_inverse
   Abs_preal_inverse
+
+lemma preal_sub_ppos :
+  assumes "ppos (p1 - p2)"
+  shows "ppos p1"
+  using assms
+  apply (simp add:norm_preal preal_to_real)
+  apply (transfer)
+  apply (clarsimp)
+  by argo
 
 lemma preal_pgt_pnone: "pgt p1 pnone \<Longrightarrow> p1 \<noteq> pnone"
   by (transfer) simp
