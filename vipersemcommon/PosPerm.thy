@@ -35,9 +35,10 @@ class pos_perm = zero_neq_one + comm_semiring + comm_monoid_mult + inverse
       and padd_cancellative: "a = x + b \<Longrightarrow> a = y + b \<Longrightarrow> x = y"
 begin
 
-abbreviation pwrite where "pwrite \<equiv> 1"
+(* Why to we have these abbreviations twice? *)
+abbreviation (input) pwrite where "pwrite \<equiv> 1"
 abbreviation half where "half \<equiv> 1 / (1+1)"
-abbreviation pnone where "pnone \<equiv> 0"
+abbreviation (input) pnone where "pnone \<equiv> 0"
 
 abbreviation pmin :: "'a \<Rightarrow> 'a \<Rightarrow> 'a" where "pmin \<equiv> inf"
 abbreviation pmax :: "'a \<Rightarrow> 'a \<Rightarrow> 'a" where "pmax \<equiv> sup"

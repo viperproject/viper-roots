@@ -25,6 +25,17 @@ definition set_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonu
 definition set_state :: "('v, 'a) abs_state \<Rightarrow> 'a \<Rightarrow> ('v, 'a) abs_state" where
   "set_state \<omega> s = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)), s)"
 
+lemma full_state_ext:
+  assumes "get_store a = get_store b"
+      and "get_state a = get_state b"
+      and "get_trace a = get_trace b"
+    shows "a = b"
+  by (metis agreement.exhaust_sel assms get_state_def get_store_def get_trace_def prod_eqI)
+
+lemma abs_state_ext_iff :
+  "\<omega>1 = \<omega>2 \<longleftrightarrow> get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2 \<and> get_state \<omega>1 = get_state \<omega>2"
+  using full_state_ext by blast
+
 lemma get_store_set_store [simp] :
   "get_store (set_store \<omega> st) = st"
   by (simp add:get_store_def set_store_def)
@@ -77,6 +88,59 @@ lemma set_trace_make_abs_state[simp] :
 lemma set_state_make_abs_state[simp] :
   "set_state (make_abs_state s t st) st' = make_abs_state s t st'"
   by (simp add:make_abs_state_def set_trace_def set_state_def set_store_def get_trace_def get_store_def get_state_def)
+
+
+lemma get_state_stabilize [simp] :
+  "get_state (stabilize \<omega>) = stabilize (get_state \<omega>)"
+  by (simp add: get_state_def stabilize_prod_def)
+
+lemma get_trace_stabilize [simp] :
+  "get_trace (stabilize \<omega>) = get_trace \<omega>"
+  by (simp add: get_trace_def stabilize_prod_def stabilize_agreement_def)
+
+lemma get_store_stabilize [simp] :
+  "get_store (stabilize \<omega>) = get_store \<omega>"
+  by (simp add: get_store_def stabilize_prod_def stabilize_agreement_def)
+
+lemma set_state_stabilize_r [simp] :
+  "set_state \<omega> (stabilize st) = stabilize (set_state \<omega> st)"
+  by (simp add: set_state_def stabilize_prod_def get_store_def get_trace_def stabilize_agreement_def)
+
+lemma set_state_stabilize_l [simp] :
+  "set_state (stabilize \<omega>) st = set_state \<omega> st"
+  by (simp add: set_state_def stabilize_prod_def get_store_def get_trace_def stabilize_agreement_def)
+
+lemma set_state_set_state [simp] :
+  "set_state (set_state \<omega> st1) st2 = set_state \<omega> st2"
+  by (simp add: full_state_ext)
+
+lemma set_state_get_state [simp] :
+  "set_state \<omega> (get_state \<omega>) = \<omega>"
+  by (simp add: full_state_ext)
+
+subsection \<open>abs_state_record\<close>
+
+(* The automation likes to destruct tuples. abs_state_record is a crude hack to prevent the automation from doing this. *)
+(* TODO: Define abs_state via typedef like integer to get rid of this hack? *)
+
+record ('v, 'a) abs_state_record =
+  get_store_record :: "(var \<rightharpoonup> 'v)"
+  get_trace_record :: "(label \<rightharpoonup> 'a)"
+  get_state_record :: "'a"
+
+definition abs_state_from_record :: "('v, 'a) abs_state_record \<Rightarrow> ('v, 'a) abs_state" ("\<down>_" [80] 80) where
+"\<down> \<omega> = ((Ag (get_store_record \<omega>), Ag (get_trace_record \<omega>)), get_state_record \<omega>)"
+
+definition abs_state_to_record :: "('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state_record" ("\<up>_" [80] 80) where
+"\<up> \<omega> = \<lparr>get_store_record = get_store \<omega>, get_trace_record = get_trace \<omega>, get_state_record = get_state \<omega> \<rparr>"
+
+lemma abs_state_from_to_record [simp] :
+  "\<up>\<down> \<omega> = \<omega>"
+  by (simp add: abs_state_from_record_def abs_state_to_record_def get_state_def get_store_def get_trace_def)
+
+lemma abs_state_to_from_record [simp] :
+  "\<down>\<up> \<omega> = \<omega>"
+  by (simp add: abs_state_from_record_def abs_state_to_record_def get_state_def get_store_def get_trace_def)
 
 (*
 lemma pcm_agreement_compatible:
@@ -235,13 +299,6 @@ lemma sum_traces_asso:
   sum_traces (sum_traces a b) c = sum_traces a (sum_traces b c)"
   sorry
 *)
-
-lemma full_state_ext:
-  assumes "get_store a = get_store b"
-      and "get_state a = get_state b"
-      and "get_trace a = get_trace b"
-    shows "a = b"
-  by (metis agreement.exhaust_sel assms get_state_def get_store_def get_trace_def prod_eqI)
 
 
 (*

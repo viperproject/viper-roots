@@ -140,6 +140,10 @@ begin
 definition plus_preal :: "preal \<Rightarrow> preal \<Rightarrow> preal option" where
   "plus_preal a b = Some (a + b)"
 
+lemma preal_plus_iff :
+  "Some (z :: preal) = x \<oplus> y \<longleftrightarrow> z = x + y"
+  using SepAlgebra.plus_preal_def by auto
+
 instance proof
   fix a b c ab bc :: preal
   show "a \<oplus> b = b \<oplus> a"
@@ -220,6 +224,10 @@ lemma plus_funE:
   assumes "Some x = a \<oplus> b"
   shows "Some (x l) = a l \<oplus> b l"
   by (metis (no_types, lifting) assms compatible_funE option.discI option.exhaust_sel option.sel plus_fun_def)
+
+lemma fun_plus_iff :
+  "Some z = x \<oplus> y \<longleftrightarrow> (\<forall> l. Some (z l) = x l \<oplus> y l)"
+  by (meson plus_funE plus_funI)
 
 instance proof
 
@@ -308,6 +316,10 @@ lemma greaterE:
   shows "a l \<succeq> b l"
   by (meson SepAlgebra.plus_funE assms greater_def)
 
+lemma fun_greater_iff :
+  "f \<succeq> g \<longleftrightarrow> (\<forall> x. f x \<succeq> g x)"
+  using SepAlgebra.greaterI greaterE by metis
+
 end
 
 subsection \<open>Option\<close>
@@ -339,7 +351,10 @@ lemma plus_optionE:
     shows "Some xx = aa \<oplus> bb"
   using plus_option.simps(3)[of aa bb]
   by (metis (mono_tags, lifting) assms(1) assms(2) assms(3) assms(4) option.discI option.inject)
-  
+
+lemma option_plus_None_r [simp] :
+  "Some z = x \<oplus> None \<longleftrightarrow> z = x"
+  by (cases "x"; simp)
 
 instance proof
   fix a b c ab bc :: "('a :: pcm) option"
