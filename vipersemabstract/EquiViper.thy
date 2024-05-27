@@ -1,5 +1,5 @@
 theory EquiViper
-  imports Main  ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.LiftSepAlgebra ViperCommon.Binop ViperCommon.DeBruijn
+  imports Main  ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.LiftSepAlgebra ViperCommon.Binop ViperCommon.DeBruijn ViperCommon.SepLogic
 begin
 
 subsection \<open>Pre-virtual equi_states\<close>
@@ -292,9 +292,9 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 | RedLet: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; shift_and_add_equi_state \<omega> v1\<rangle> [\<Down>] r \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Let e1 e2; \<omega>\<rangle> [\<Down>] r"
 
 
-
-| RedExistsTrue: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty ; \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool True) ;
-  \<And>v'. \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v'\<rangle> [\<Down>] Val (VBool b) \<rbrakk>
+| RedExistsTrue: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty ;
+  \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool True) ;
+  \<And>v'. v' \<in> set_from_type (domains \<Delta>) ty \<Longrightarrow> \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v'\<rangle> [\<Down>] Val (VBool b) \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>] Val (VBool True)"
 
 
@@ -302,7 +302,9 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>] Val (VBool False)"
 | RedForallTrue: "\<lbrakk> \<And>v. v \<in> set_from_type (domains \<Delta>) ty \<longrightarrow> \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool True) \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>] Val (VBool True)"
-| RedForallFalse: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty ; \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool False) \<rbrakk>
+| RedForallFalse: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty ;
+    \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool False);
+    \<And>v'. v' \<in> set_from_type (domains \<Delta>) ty \<Longrightarrow> \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v'\<rangle> [\<Down>] Val (VBool b) \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>] Val (VBool False)"
 | RedCondExpTrue: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val (VBool True) ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] r \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>] r"
@@ -320,9 +322,9 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 | RedBinopFailure: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val v1 ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v2 ; eval_binop v1 bop v2 = BinopOpFailure ; eval_binop_lazy v1 bop = None \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Binop e1 bop e2; \<omega>\<rangle> [\<Down>] VFailure" (* Division by 0 *)
 | RedOldFailure: "\<lbrakk> get_trace \<omega> l = None \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> \<langle>Old l e ; \<omega>\<rangle> [\<Down>] VFailure"
-| RedExistsFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty \<longrightarrow> \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
+| RedExistsFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty; \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PExists ty e; \<omega>\<rangle> [\<Down>] VFailure"
-| RedForallFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty \<longrightarrow> \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
+| RedForallFailure: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty; \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] VFailure \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>] VFailure"
 | RedPropagateFailure: "\<lbrakk> e \<in> sub_pure_exp e' ; \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] VFailure \<rbrakk> \<Longrightarrow>  \<Delta> \<turnstile> \<langle>e'; \<omega>\<rangle> [\<Down>] VFailure"
 
@@ -350,6 +352,40 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>Unfolding P exps e; \<omega>\<rangle> [\<Down>] VFailure"
 *)
 *)
+
+inductive_cases red_pure_elim:
+  "\<Delta> \<turnstile> \<langle>ELit x;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Var x;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Unop op e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Binop e1 op e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>CondExp e1 e2 e3;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Old l e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Perm e f;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PermPred p es;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>FunApp f es;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Result;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Unfolding p es e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Let e1 e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PExists ty e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PForall ty e2;\<omega>\<rangle> [\<Down>] v"
+
+inductive_simps red_pure_simps:
+  "\<Delta> \<turnstile> \<langle>ELit x;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Var x;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Unop op e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Binop e1 op e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>CondExp e1 e2 e3;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>FieldAcc e f;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Old l e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Perm e f;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PermPred p es;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>FunApp f es;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Result;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Unfolding p es e;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>Let e1 e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PExists ty e2;\<omega>\<rangle> [\<Down>] v"
+  "\<Delta> \<turnstile> \<langle>PForall ty e2;\<omega>\<rangle> [\<Down>] v"
 
 text \<open>The following lemma proves that the meaning of pure expressions is independent from the interpretation of predicates.\<close>
 
@@ -406,7 +442,7 @@ next
 next
   case (RedForallFalse v \<Delta> ty e \<omega>)
   then show ?case
-    by (simp add: red_pure_red_pure_exps.RedForallFalse)
+    by (metis red_pure_red_pure_exps.RedForallFalse)
 next
   case (RedCondExpTrue \<Delta> e1 \<omega> e2 r e3)
   then show ?case
