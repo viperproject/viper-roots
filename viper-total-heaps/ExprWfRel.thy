@@ -1023,11 +1023,9 @@ proof -
           unfolding wf_mask_simple_def
         proof (intro allI)
           fix hl
-          (* This may not be provable, because state_rel0 doesn't say anything about the trace being well-formed *)
           show "get_mh_total_full ?\<omega>def_old  hl \<le> PosReal.pwrite"
             by (metis RInst \<open>get_trace_total \<omega> lbl = _\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) get_mh_total_full.elims label_hm_rel_def option.sel state_rel_label_hm_rel wf_mask_simple_def)
         qed
-        (* This may not be provable either *)
         show "valid_heap_mask (get_mh_total_full (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>))"
           using \<open>valid_heap_mask (get_mh_total_full (\<omega>def \<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>))\<close>
           by force
@@ -1067,41 +1065,65 @@ proof -
           (* This **should** be provable *)
           show ?thesis sorry
         qed
-        show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old"
-          using RInst state_rel_eval_welldef_eq by fastforce
-        show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old"
-          using RInst state_rel_eval_welldef_eq by fastforce
+        show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
+        show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
         show "get_h_total_full ?\<omega>def_old = get_h_total_full ?\<omega>_old" by simp
-        (* Figure out why this one is true \<longrightarrow> what do we actually know about \<phi>? *)
         show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full ?\<omega>_old) ns"
         proof -
-          let ?FieldTr = "field_translation Tr"
-          let ?LabelMap = "label_hm_translation Tr"
-          let ?HeapPred = "\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>)"
-          have "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap (get_trace_total \<omega>) ns"
-            using RInst state_rel_label_hm_rel by blast
-          hence "label_rel ?HeapPred (fst ?LabelMap) (get_trace_total \<omega>) ns"
-            unfolding label_hm_rel_def
-            by simp
-          hence "\<forall> lbl h. (fst ?LabelMap) lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega>) lbl = Some \<phi> \<and> ?HeapPred h \<phi> ns)"
-            unfolding label_rel_def
-            by simp
-          hence "(fst ?LabelMap) lbl = Some (heap_var Tr')" 
-            using OldH \<open>lbls = _\<close> \<open>Tr' = _\<close> by fastforce
-          have "(get_trace_total \<omega>) lbl = Some \<phi>"
-            by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
-          have "?HeapPred (heap_var Tr') \<phi> ns"
-            using \<open>\<forall>lbl h. fst (label_hm_translation Tr) lbl = Some h \<longrightarrow> (\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>) ns)\<close> \<open>fst (label_hm_translation Tr) lbl = Some (heap_var Tr')\<close> \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>
-            by fastforce
-          show ?thesis
-            using \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) (heap_var Tr') (get_hh_total \<phi>) ns\<close> assms(7) by force
+          have "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (heap_var Tr') (get_hh_total \<phi>) ns"
+          proof (rule label_tracked_implies_heap_rel)
+            show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+              using RInst state_rel_label_hm_rel by blast
+            show "get_trace_total \<omega> lbl = Some \<phi>"
+              by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
+            show "fst (label_hm_translation Tr) lbl = Some (heap_var Tr')"
+              using OldH assms(2) assms(7) by force
+          qed
+          thus ?thesis using \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(7) by fastforce
+        qed
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full ?\<omega>_old) ns"
+        proof -
+          have "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (mask_var Tr') (get_mh_total \<phi>) ns"
+          proof (rule label_tracked_implies_mask_rel)
+            show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+              using RInst state_rel_label_hm_rel by blast
+            show "get_trace_total \<omega> lbl = Some \<phi>"
+              by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
+            show "snd (label_hm_translation Tr) lbl = Some (mask_var Tr')"
+              using OldM assms(2) assms(7) by fastforce
+          qed
+          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(7))
+        qed
+        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full ?\<omega>def_old) ns"
+        proof -
+          have "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (heap_var_def Tr') (get_hh_total \<phi>) ns"
+          proof (rule label_tracked_implies_heap_rel)
+            show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+              using RInst state_rel_label_hm_rel by blast
+            show "get_trace_total \<omega> lbl = Some \<phi>"
+              by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
+            show "fst (label_hm_translation Tr) lbl = Some (heap_var_def Tr')"
+              using OldH assms(2) assms(7) by force
+          qed
+          thus ?thesis
+            by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(7))
+        qed
+        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full ?\<omega>def_old) ns"
+        proof - 
+          have "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (mask_var_def Tr') (get_mh_total \<phi>) ns"
+          proof (rule label_tracked_implies_mask_rel)
+            show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+              using RInst state_rel_label_hm_rel by blast
+            show "get_trace_total \<omega> lbl = Some \<phi>"
+              by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
+            show "snd (label_hm_translation Tr) lbl = Some (mask_var_def Tr')"
+              using OldM assms(2) assms(7) by fastforce
+          qed
+          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(7))
         qed
         show "field_rel Pr ?\<Lambda> (field_translation Tr') ns"
           using RInst \<open>Tr' = _\<close> state_rel_field_rel
           by force
-        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full ?\<omega>_old) ns" sorry
-        show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full ?\<omega>def_old) ns" sorry
-        show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full ?\<omega>def_old) ns" sorry
         show "boogie_const_rel (const_repr Tr') ?\<Lambda> ns"
           using RInst state_rel_boogie_const_rel \<open>Tr' = _\<close>
           by fastforce
@@ -1111,7 +1133,8 @@ proof -
         show "aux_vars_pred_sat  ?\<Lambda> AuxPred ns"
           using RInst state_rel_aux_vars_pred_sat
           by fast    
-        show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns" sorry
+        show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns"
+          using \<open>state_rel Pr StateCons TyRep (Tr\<lparr>label_hm_translation := lbls'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns\<close> assms(7) state_rel_label_hm_rel by force
       qed
     
       \<comment>\<open>Step 3: capture original heap and mask variables in auxiliary variables\<close>

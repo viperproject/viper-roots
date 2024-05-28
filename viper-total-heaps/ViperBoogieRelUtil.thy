@@ -512,6 +512,30 @@ proof -
     by fast
 qed
 
+(* if tracked then heap_rel holds for all labels *)
+lemma label_tracked_implies_heap_rel:
+  (* If the label_hm_rel relation holds for a given translation record and viper state *)
+  assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+  (* And the total state is defined at some label *)
+      and "get_trace_total \<omega> lbl = Some \<phi>"
+  (* And the heap variable is hvar *)
+      and "(fst (label_hm_translation Tr)) lbl = Some hvar"
+  (* Then heap_var_rel holds between Tr and hvar *)
+    shows "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar (get_hh_total \<phi>) ns"
+  using assms label_hm_rel_def label_rel_def
+  by (metis (mono_tags, lifting) option.sel)
+
+lemma label_tracked_implies_mask_rel:
+  assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+  (* And the total state is defined at some label *)
+      and "get_trace_total \<omega> lbl = Some \<phi>"
+  (* And the heap variable is mvar *)
+      and "(snd (label_hm_translation Tr)) lbl = Some mvar"
+  (* Then heap_var_rel holds between Tr and mvar *)
+    shows "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar (get_mh_total \<phi>) ns"
+  using assms label_hm_rel_def label_rel_def
+  by (metis (mono_tags, lifting) option.sel)
+
 lemma store_vpr_exp_to_temporary_var:
   assumes  
   StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega>def \<omega> ns") and
