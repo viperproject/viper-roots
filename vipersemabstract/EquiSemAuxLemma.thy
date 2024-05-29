@@ -201,8 +201,7 @@ lemma real_mult_permexpr_case_split:
 
 lemma shift_and_add_keep_vstate:
   shows "\<And>\<omega> v. get_state (shift_and_add_equi_state \<omega> v) = get_state \<omega>"
-  using shift_and_add_equi_state_def
-  by (metis get_state_def snd_conv)
+  unfolding shift_and_add_equi_state_def by (simp)
 
 
 lemma read_field_mono:
@@ -265,13 +264,23 @@ proof -
   moreover have "?w = (?wm, ?wh)"
     by simp
   ultimately have "?wh hl \<noteq> None"
-    by (metis wf_pre_virtual_state.simps)
+    by (metis wf_pre_virtual_state_def)
   moreover have "get_vh \<omega> = ?wh"
     by (simp add: get_vh_def)
   ultimately show "get_vh \<omega> hl \<noteq> None"
     by simp
 qed
 
+lemma vstate_wf_ppos:
+  assumes "ppos (get_vm st hl)"
+  shows "get_vh st hl \<noteq> None"
+  using assms
+  by (simp add: domIff norm_preal vstate_wf_imp)
+
+lemma vstate_wf_Some :
+  assumes "ppos (get_vm st hl)"
+  shows "\<exists> v. get_vh st hl = Some v"
+  using assms vstate_wf_ppos by blast
 
 section \<open>Equi Red Rules\<close>
 
@@ -320,6 +329,67 @@ inductive_cases RedAccPredWild_case: "red_atomic_assert I (AccPredicate P xs Wil
 
 subsection \<open>red_pure and field Acc reduction are unique\<close>
 
+lemma red_pure_det_ind :
+  (* TODO: weaken this *)
+  assumes "\<And> f vals st. interp.funs \<Delta> f vals st = None"
+  shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v1 \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r2 \<Longrightarrow> Val v1 = r2"
+    and "red_pure_exps \<Delta> \<omega> es vs1 \<Longrightarrow> red_pure_exps \<Delta> \<omega> es vs2 \<Longrightarrow> vs1 = vs2"
+  using assms
+proof (induction _ e \<omega> "Val v1" and _ \<omega> _ _ arbitrary: v1 r2 and vs2 rule: red_pure_red_pure_exps.inducts)
+  case (RedPureExps \<Delta> \<omega> exps vals)
+  then have "list_all2 (\<lambda>e v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) exps vs2"
+    using red_pure_exps.cases by blast
+  moreover have "list_all2 (\<lambda>e v. \<forall>r. (\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r) \<longrightarrow> r = Val v) exps vals"
+    using RedPureExps.hyps RedPureExps.prems(2) list_all2_mono by fastforce
+  ultimately show ?case
+    by (smt (verit, del_insts) extended_val.inject list_all2_mono list_all2_unique)
+next
+  case (RedBinopLazy \<Delta> e1 \<omega> v1 bop v e2)
+  then show ?case
+    apply (simp add:red_pure_simps)
+    using eval_binop_implies_eval_normal by fastforce
+next
+  case (RedBinop \<Delta> e1 \<omega> v1 e2 v2 bop v)
+  then show ?case
+    apply (simp add:red_pure_simps)
+    using eval_binop_implies_eval_normal by fastforce
+next
+  case (RedExistsTrue v \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp (no_asm_use) add:red_pure_simps) by blast
+next case (RedCondExpTrue \<Delta> e1 \<omega> e2 r e3) then show ?case
+    apply (unfold red_pure_simps) by fast
+next case (RedCondExpFalse \<Delta> e1 \<omega> e3 r e2) then show ?case
+    apply (unfold red_pure_simps)
+    by fast
+next
+  case (RedUnop \<Delta> e \<omega> v unop v')
+  then show ?case apply (simp (no_asm_use) add:red_pure_simps) by fastforce
+next
+  case (RedLet \<Delta> e1 \<omega> v1 e2)
+  then show ?case apply (simp (no_asm_use) add:red_pure_simps) by blast
+next
+  case (RedForallFalse v \<Delta> ty e \<omega>)
+  then show ?case apply (simp (no_asm_use) add:red_pure_simps) by blast
+next
+  case (RedPermNull \<Delta> e \<omega> f)
+  then show ?case apply (simp (no_asm_use) add:red_pure_simps) by blast
+next
+  case (RedField \<Delta> e \<omega> a f v)
+  then show ?case apply (simp (no_asm_use) add:red_pure_simps) by fastforce
+next
+  case (RedFunApp \<Delta> \<omega> exps vals f v)
+  from RedFunApp.hyps(3) RedFunApp.prems(2) show ?case by (simp)
+qed (simp (no_asm_use) add:red_pure_simps; simp; fastforce)+
+
+lemma red_pure_det:
+  assumes "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r1"
+  assumes "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r2"
+  assumes "\<And> f vals st. interp.funs \<Delta> f vals st = None"
+  shows "r1 = r2"
+  apply (cases r1; cases r2) using red_pure_det_ind assms by blast+
+
+(* TODO: get rid of this in favor of red_pure_det? *)
 lemma red_pure_val_unique:
   shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v1 \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v2 \<Longrightarrow> v1 = v2"
     and "red_pure_exps \<Delta> \<omega> es vs1 \<Longrightarrow> red_pure_exps \<Delta> \<omega> es vs2 \<Longrightarrow> vs1 = vs2"
@@ -487,6 +557,10 @@ proof -
     by (simp add: \<open>w = x \<oplus> y\<close> defined_def)
 qed
 
+(* TODO: Where to put this? *)
+lemma shift_and_add_core :
+  "shift_and_add_equi_state ( |\<omega>| ) v = |shift_and_add_equi_state \<omega> v|" 
+  by (simp add:shift_and_add_equi_state_def core_charact full_state_ext)
 
 subsection \<open>Properties about Addition on EquiViper states\<close>
 
@@ -919,8 +993,6 @@ lemma greater_cover_store:
     shows "get_store \<omega>1 l = Some v"
   by (metis assms(1) assms(2) greater_state_has_greater_parts(1))
 
-
-
 section \<open>red_pure for real_to_expr and binary operations on pure expressions\<close>
 
 lemma red_real_to_expr:
@@ -1031,7 +1103,7 @@ next
       by auto
     next
       case Int
-      from this obtain v' where "v2 = VInt v'" 
+      from this obtain v' where "v2 = VInt v'"
         by auto
       then have "p * v' = p * v"
         using \<open>v1 = VPerm p\<close> eval_res by auto
@@ -1046,14 +1118,14 @@ qed
 
 subsection \<open>Multiply p and its Inverse on State and Expressions\<close>
 
-\<comment>\<open>TODO: recheck whether this lemma holds and whether it is useful for clients 
+\<comment>\<open>TODO: recheck whether this lemma holds and whether it is useful for clients
          (earlier permission multiplication was feasible only with permission operands,
           but now integer operands are possible, which led to an experimental change for the lemma)\<close>
 lemma mult_inv_on_state_and_expr:
   assumes "p > 0"
       and "q * p = 1"
     shows "Abs_preal q \<odot> (Abs_preal p \<odot> \<omega>) = \<omega>"
-      and "I \<turnstile> \<langle>Binop (real_to_expr q) Mult (Binop (real_to_expr p) Mult e); \<omega>\<rangle> [\<Down>] Val (VPerm v) \<Longrightarrow> 
+      and "I \<turnstile> \<langle>Binop (real_to_expr q) Mult (Binop (real_to_expr p) Mult e); \<omega>\<rangle> [\<Down>] Val (VPerm v) \<Longrightarrow>
             (I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VPerm v)) \<or> (\<exists>v_int. v = real_of_int v_int \<and> I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VInt v_int))" (is "?MULT \<Longrightarrow> ?ORIGIN")
 proof -
   have "q > 0"
@@ -1068,11 +1140,11 @@ proof -
     by simp
   then have "v = q * v'" typ real
     by (simp add: assms(2))
-  then have "(I \<turnstile> \<langle>Binop (real_to_expr p) Mult e; \<omega>\<rangle> [\<Down>] Val (VPerm v')) \<or> 
+  then have "(I \<turnstile> \<langle>Binop (real_to_expr p) Mult e; \<omega>\<rangle> [\<Down>] Val (VPerm v')) \<or>
              (\<exists>v_int. real_of_int v_int = v' \<and> I \<turnstile> \<langle>Binop (real_to_expr p) Mult e; \<omega>\<rangle> [\<Down>] Val (VInt v_int))"
     using \<open>0 < q\<close> \<open>?MULT\<close> red_mult by blast
   then show ?ORIGIN
-    using \<open>v' = p * v\<close> assms(1) red_mult 
+    using \<open>v' = p * v\<close> assms(1) red_mult
     sorry
 qed
 
@@ -1158,9 +1230,12 @@ proof -
     have "\<pi> hl = 0"
       by (metis (mono_tags, opaque_lifting) \<open>\<phi>p = |\<phi>|\<close> calculation core_def core_fun core_preal_def fstI)
     then have "\<not>ppos (\<pi> hl)"
-      by (metis empty_heap_def wf_pre_virtual_state.simps wf_uuu zero_mask_def)
+      using gr_0_is_ppos by auto
     then show "ppos (\<pi> hl) \<Longrightarrow> h hl \<noteq> None"
       by simp
+  next
+    show "wf_mask_simple \<pi>"
+      by (metis all_pos calculation(1) calculation(2) core_def core_fun core_preal_def prod.sel(1) wf_mask_simpleI)
   qed
   ultimately show "\<exists>\<phi>. |prod| = \<phi> \<and> wf_pre_virtual_state \<phi>"
     by (simp add: \<open>\<phi> = prod\<close>)
@@ -1194,7 +1269,7 @@ lemma core_structure:
     and "get_vh |x| = get_vh x"
 proof -
   obtain xm xh where "(xm, xh) = Rep_virtual_state x"
-    by (metis wf_pre_virtual_state.cases)
+    using prod.collapse by blast
   moreover have "|(xm, xh)| = ( |xm|, |xh| )"
     by (simp add: core_def)
   ultimately have "Rep_virtual_state |x| = ( |xm|, |xh| )"
@@ -1273,7 +1348,7 @@ proof -
     moreover have "x = (?xm, ?xh)"
       by simp
     ultimately obtain v where "?xh hl = Some v"
-      by (metis assms(1) not_None_eq wf_pre_virtual_state.simps)
+      by (metis assms(1) not_None_eq wf_pre_virtual_state_def)
     then have "?ch hl = Some v"
       by (metis (mono_tags, lifting) core_def core_fun core_is_smaller core_option.simps(2) option.discI plus_val_def snd_eqD)
     moreover have "?yh hl \<succeq> ?ch hl"
@@ -1282,6 +1357,17 @@ proof -
       by (metis \<open>?xh hl = Some v\<close> assms(2) greaterE greater_prod_eq succ_antisym)
     then show "?yh hl \<noteq> None"
       by simp
+  next
+    show "wf_mask_simple (fst y)"
+    proof (rule wf_mask_simpleI)
+      fix hl
+      have "pwrite \<ge> fst x hl"
+        using assms(1) wf_mask_simple_def wf_pre_virtual_state_def by blast
+      moreover obtain r where "Some (fst x hl) = fst y hl \<oplus> r"
+        by (metis (no_types, lifting) assms(2) greater_def plus_funE plus_prodE)
+      ultimately show "pwrite \<ge> fst y hl"
+        by (metis SepAlgebra.plus_preal_def leD leI option.sel order_less_le_trans pos_perm_class.sum_larger)
+    qed
   qed
   then show ?thesis
     by simp
@@ -1345,21 +1431,23 @@ proof -
     then have "get_vh x hl \<noteq> None"
     proof -
       obtain \<pi>x hx where "Rep_virtual_state x = (\<pi>x, hx)"
-        using wf_pre_virtual_state.cases by blast
+        by fastforce
       then have "\<pi>x = \<pi>"
         by (simp add: calculation(2) get_vm_def)
       then have "hx hl \<noteq> None"
-        by (metis Rep_virtual_state \<open>Rep_virtual_state x = (\<pi>x, hx)\<close> \<open>ppos (\<pi> hl)\<close> mem_Collect_eq wf_pre_virtual_state.simps)
+        by (metis \<open>PosReal.ppos (\<pi> hl)\<close> \<open>Rep_virtual_state x = (\<pi>x, hx)\<close> calculation(2) get_vh_def gr_0_is_ppos prod.sel(2) vstate_wf_imp)
       moreover have "get_vh x = hx" using \<open>Rep_virtual_state x = (\<pi>x, hx)\<close>
         by (simp add:get_vh_def)
       ultimately show ?thesis
         by simp
     qed
     moreover have "ppos (get_vm x hl)"
-      sledgehammer
       using \<open>PosReal.ppos (\<pi> hl)\<close> \<open>\<pi> = get_vm x\<close> by blast
     ultimately show "h hl \<noteq> None"
       by (simp add: \<open>h = get_vh x |` {hl. ppos (get_vm x hl)}\<close> restrict_map_def)
+  next
+    show "wf_mask_simple \<pi>"
+      by (simp add:\<open>\<pi> = get_vm x\<close>)
   qed
   ultimately show ?thesis
     by simp
@@ -1375,7 +1463,7 @@ proof -
     by (simp add: Abs_virtual_state_inverse stabilize_wf)
   ultimately show "get_vm (stabilize x) = get_vm x"
     by (simp add: get_vm_def stabilize2pre_def stabilize_virtual_state_def)
-  show "get_vh (stabilize x) = get_vh x |` {hl. ppos (get_vm x hl)}" 
+  show "get_vh (stabilize x) = get_vh x |` {hl. ppos (get_vm x hl)}"
     using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre x)) = stabilize2pre x\<close>
     by (simp add: get_vh_def stabilize2pre_def stabilize_virtual_state_def)
 qed
@@ -1393,9 +1481,9 @@ instance proof
   show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
     apply (rule virtual_state_ext)
      apply (simp_all add: EquiSemAuxLemma.vstate_stabilize_structure stable_virtual_state_def)
-    apply (rule ext) 
+    apply (rule ext)
     by (metis core_option.cases eq_snd_iff mem_Collect_eq restrict_in restrict_out)
-  
+
   show "Some x = stabilize x \<oplus> |x|"
     sorry
   show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
@@ -1428,6 +1516,162 @@ lemma stable_rel_virtual_stateE:
 (* This does not hold! But it also should not hold. If there is a contradiction between a and x, all locations become stable. *)
   oops
   (* by (metis assms option.discI stable_rel_virtual_state_def) *)
+
+subsection \<open>determinism and monotonicity properties of red_pure\<close>
+
+lemma set_state_core :
+  "set_state ( |\<omega>| ) st = set_state \<omega> st"
+  by (rule full_state_ext; simp add: core_charact)
+
+lemma set_state_greater :
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "set_state \<omega> st = set_state \<omega>' st"
+  apply (rule full_state_ext)
+  using assms by (simp_all add:greater_state_has_greater_parts)
+
+lemma get_vh_Some_greater :
+  assumes "get_vh (get_state \<omega>) hl = Some v"
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "get_vh (get_state \<omega>') hl = Some v"
+  using assms
+  by (metis greater_charact read_field.elims read_field_mono)
+
+lemma red_pure_core_ind :
+  assumes "\<And> f vals st. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals |st|"
+  shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; |\<omega>|\<rangle> [\<Down>] r"
+    and "red_pure_exps \<Delta> (\<omega>) es vs \<Longrightarrow> red_pure_exps \<Delta> ( |\<omega>| ) es vs"
+  using assms
+proof (induction _ _ "\<omega>" "r" and _ "\<omega>" _ _ arbitrary: rule: red_pure_red_pure_exps.inducts)
+  case (RedPureExps c exps vals)
+  then show ?case by (simp add: list_all2_mono red_pure_red_pure_exps.RedPureExps)
+next
+  case (RedPropagateFailure e e' \<Delta>)
+  then show ?case by (cases e'; auto simp add:red_pure_simps core_charact)
+(* metis? makes this faster *)
+qed (clarsimp simp add:red_pure_simps core_charact set_state_core core_structure shift_and_add_core; metis?; fastforce)+
+
+lemma red_pure_core :
+  assumes "\<And> f vals st. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals |st|"
+  shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; |\<omega>|\<rangle> [\<Down>] r"
+  using red_pure_core_ind assms by blast
+
+
+subsubsection \<open>red_pure is monotonic wrt. greater\<close>
+
+lemma red_pure_greater_ind :
+  assumes "\<omega>' \<succeq> \<omega>"
+  (* TODO: weaken this *)
+  assumes "\<And> f vals st st'. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals st'"
+  shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] r"
+    and "red_pure_exps \<Delta> \<omega> es vs \<Longrightarrow> red_pure_exps \<Delta> (\<omega>') es vs"
+  using assms
+proof (induction _ _ "\<omega>" "r" and _ "\<omega>" _ _ arbitrary: \<omega>' and \<omega>' rule: red_pure_red_pure_exps.inducts)
+  case (RedLet \<Delta> e1 \<omega> v1 e2 r)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedExistsTrue v \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedExistsFalse \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedForallTrue \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedForallFalse v \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedExistsFailure v \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedForallFailure v \<Delta> ty e \<omega>)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis shift_and_add_equi_state_preserve_greater)
+next
+  case (RedFunApp \<Delta> \<omega> exps vals f v)
+  then show ?case by (clarsimp simp add:red_pure_simps greater_state_has_greater_parts set_state_greater; metis)
+next
+  case (RedFunAppFailure \<Delta> \<omega> exps vals f)
+  then show ?case apply (simp add:red_pure_simps greater_state_has_greater_parts set_state_greater del:Product_Type.split_paired_All)
+    by (metis)
+next
+  case (RedField \<Delta> e \<omega> a f v)
+  then show ?case
+    apply (simp add:red_pure_simps greater_state_has_greater_parts del:Product_Type.split_paired_All)
+    using get_vh_Some_greater by blast
+next
+  case (RedPureExps c exps vals)
+  then show ?case by (simp add: list_all2_mono red_pure_red_pure_exps.RedPureExps del:Product_Type.split_paired_All)
+next
+  case (RedPropagateFailure e e' \<Delta>)
+  then show ?case by (cases e'; simp add:red_pure_simps del:Product_Type.split_paired_All; metis)
+qed (clarsimp simp add:red_pure_simps greater_state_has_greater_parts set_state_greater; metis?; fastforce)+
+
+lemma red_pure_greater :
+  assumes "\<omega>' \<succeq> \<omega>"
+  assumes "\<And> f vals st st'. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals st'"
+  shows "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r \<Longrightarrow> \<Delta> \<turnstile> \<langle>e; \<omega>'\<rangle> [\<Down>] r"
+  using assms red_pure_greater_ind(1) by (metis)
+
+lemma red_pure_det_defined :
+  assumes "\<omega>1 ## \<omega>2"
+  assumes "\<And> f vals st. interp.funs \<Delta> f vals st = None"
+  assumes "\<Delta> \<turnstile> \<langle>e; \<omega>1\<rangle> [\<Down>] r1" "\<Delta> \<turnstile> \<langle>e; \<omega>2\<rangle> [\<Down>] r2"
+  shows "r1 = r2"
+proof -
+  obtain \<omega> where "\<omega> \<succeq> \<omega>1" "\<omega> \<succeq> \<omega>2"
+    using assms(1) defined_def greater_def commutative by (metis (no_types, opaque_lifting) not_Some_eq)
+  then show ?thesis
+    by (metis assms(2) assms(3) assms(4) red_pure_det red_pure_greater)
+qed
+
+subsection \<open>add_perm and del_perm\<close>
+
+lift_definition add_perm :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> preal \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" is
+  "\<lambda> st hl p v. ((get_vm st)(hl := pmin 1 (get_vm st hl + p)), (get_vh st)(hl \<mapsto> v))"
+  apply (simp add:wf_pre_virtual_state_def wf_mask_simple_def get_vm_bound)
+  using vstate_wf_Some by fastforce
+
+lemma add_perm_get_vh [simp] :
+  "get_vh (add_perm st hl p v) = (get_vh st)(hl \<mapsto> v)"
+  by (simp add:get_vh_def add_perm.rep_eq)
+
+lemma add_perm_get_vm [simp] :
+  "get_vm (add_perm st hl p v) = (get_vm st)(hl := pmin 1 (get_vm st hl + p))"
+  by (simp add:get_vm_def add_perm.rep_eq)
+
+lift_definition del_perm :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> preal \<Rightarrow> 'a virtual_state" is
+  "\<lambda> st hl p. ((get_vm st)(hl := get_vm st hl - p), get_vh st)"
+  apply (simp add:wf_pre_virtual_state_def wf_mask_simple_def get_vm_bound vstate_wf_Some norm_preal preal_to_real)
+  using preal_sub_ppos get_vm_bound
+  by (smt (verit, best) PosReal.ppos.rep_eq Rep_preal less_eq_preal.rep_eq mem_Collect_eq one_preal.rep_eq vstate_wf_Some)
+
+lemma del_perm_get_vh [simp] :
+  "get_vh (del_perm st hl p) = get_vh st"
+  by (simp add:del_perm.rep_eq get_vh_def)
+
+lemma del_perm_get_vm [simp] :
+  "get_vm (del_perm st hl p) = (get_vm st)(hl := get_vm st hl - p)"
+  by (simp add:del_perm.rep_eq get_vm_def)
+
+lemma del_perm_0 [simp] :
+  "del_perm st hl (Abs_preal 0) = st"
+  apply (rule virtual_state_ext; simp)
+  apply (rule ext; simp add:preal_to_real)
+  by (metis all_pos less_eq_preal.rep_eq zero_preal.rep_eq)
 
 (*
 datatype 'v ag_option = None_ag | Some_ag 'v
