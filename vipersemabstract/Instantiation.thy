@@ -79,30 +79,6 @@ lemma red_pure_assert_elim :
   using red_pure_det_defined defined_def
   by (metis option.discI)
 
-
-lift_definition acc_virt :: "heap_loc \<Rightarrow> preal \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" is
-"\<lambda> hl p v. ((\<lambda> hl'. if hl = hl' then (pmin 1 p) else 0), [hl \<mapsto> v])"
-  apply (simp add:sup_preal.rep_eq wf_pre_virtual_state_def wf_mask_simple_def)
-  using all_pos gr_0_is_ppos by blast
-
-lemma acc_virt_get_vm [simp]:
-  shows "get_vm (acc_virt hl p v) hl' = (if hl = hl' then pmin 1 p else 0)"
-  by (simp add:get_vm_def acc_virt.rep_eq)
-
-lemma acc_virt_get_vm' :
-  shows "get_vm (acc_virt hl p v) = (\<lambda> hl'. (if hl = hl' then pmin 1 p else 0))"
-  by (rule ext, rule acc_virt_get_vm)
-
-lemma acc_virt_get_vh [simp]:
-  "get_vh (acc_virt hl p v) = Map.empty(hl \<mapsto> v)"
-  by (simp add:acc_virt.rep_eq get_vh_def)
-
-lemma stabilize_acc_virt :
-  assumes "ppos p"
-  shows "stabilize (acc_virt hl p v) = acc_virt hl p v"
-  apply (rule virtual_state_ext; simp add:vstate_stabilize_structure)
-  using assms by (simp add:norm_preal preal_to_real)
-
 definition acc_heap_loc :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> heap_loc \<Rightarrow> real \<Rightarrow> 'a equi_state set" where
 "acc_heap_loc \<Delta> ty hl p = {\<omega> | v \<omega>. get_state \<omega> = acc_virt hl (Abs_preal p) v \<and> 0 < p \<and> p \<le> 1 \<and> has_type (domains \<Delta>) ty v }"
 
@@ -155,14 +131,7 @@ lemma acc_heap_loc_starI :
     apply (rule, safe; assumption?) apply (rule)
      apply (insert get_vm_bound[of "get_state \<omega>'" hl])
      apply (solves \<open>simp add:preal_to_real\<close>)
-  using assms apply (simp add:vstate_add_iff acc_virt_get_vm')
-  apply (safe)
-  subgoal
-    by (simp add:fun_plus_iff plus_val_id)
-  subgoal
-    apply (subgoal_tac "Abs_preal p \<le> 1") defer 1 using get_vm_bound order_trans apply blast
-    by (clarsimp simp add:fun_plus_iff preal_plus_iff norm_preal preal_to_real)
-  done
+  using assms by (simp add:acc_virt_plus add_perm_del_perm compatible_partial_functions_singleton defined_val preal_to_real)
 
 lemma abs_state_star_singletonE :
   assumes "\<omega>' \<in> {\<omega>} \<otimes> A"
@@ -186,27 +155,7 @@ lemma acc_heap_loc_starE :
   apply (insert assms)
   apply (erule abs_state_star_singletonE) subgoal for \<omega>''
     apply (clarsimp simp add:acc_heap_loc_def) subgoal for v
-      apply (rule exI[of _ v], safe)
-      subgoal
-      apply (clarsimp simp add: abs_state_ext_iff vstate_add_iff acc_virt_get_vm')
-      apply (rule virtual_state_ext; simp)
-        apply (rule ext)
-        subgoal for hl'
-          apply (drule plus_funE[where l=hl'])
-          apply (drule plus_funE[where l=hl'])
-          apply (simp add:preal_plus_iff preal_to_real split:if_splits)
-          by (smt (verit, best) get_vm_bound less_eq_preal.rep_eq one_preal.rep_eq)
-      apply (rule ext) subgoal for x
-          apply (drule plus_funE[of _ _ _ x]; simp split:if_splits)
-          by (metis commutative option.distinct(1) option.sel plus_option.simps(1) val_option_sum)
-        done
-      subgoal
-        apply (clarsimp simp add: vstate_add_iff acc_virt_get_vm')
-        apply (drule plus_funE[where l=hl and x="get_vm _"])
-        apply (simp add:preal_plus_iff)
-        apply (insert get_vm_bound[of "get_state \<omega>'" "hl"])
-        by (simp add:norm_preal preal_to_real)
-    apply (simp add:vstate_add_iff defined_def) by metis
+      by (auto simp add:acc_virt_plus abs_state_ext_iff preal_to_real)
     done
   done
 

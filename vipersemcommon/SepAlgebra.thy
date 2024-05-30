@@ -466,6 +466,10 @@ next
   qed
 qed
 
+lemma compatible_partial_functions_singleton :
+ "f ## [x \<mapsto> v] \<longleftrightarrow> (\<forall> v'. f x = Some v' \<longrightarrow> v' ## v)"
+  by (simp add: compatible_partial_functions)
+
 lemma result_sum_partial_functions:
   assumes "Some x = a \<oplus> b"
   shows "a l = None \<Longrightarrow> x l = b l"
