@@ -1190,7 +1190,7 @@ proof -
               by (metis (no_types, lifting) RInst aux_vars_pred_sat_def fun_upd_other premise state_rel_aux_vars_pred_sat)
           next
             assume "\<not>(x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h)"
-            (*from this consider (MDef) "x = mdef" | (M) "x = m" | (HDef) "x = hdef" | (H) "x = h"
+            from this consider (MDef) "x = mdef" | (M) "x = m" | (HDef) "x = hdef" | (H) "x = h"
               by blast 
             thm impI
             thus ?thesis
@@ -1207,22 +1207,6 @@ proof -
             next
               case H
               then show ?thesis sorry
-            qed*)
-
-            hence "x = mdef \<or> x = m \<or> x = hdef \<or> x = h" by simp
-            thus ?thesis
-            proof (elim disjE)
-              show "x = mdef \<Longrightarrow> ?thesis"
-              proof -
-                assume "x = mdef"
-                thus ?thesis
-                  by (smt (verit, del_insts) RInst has_Some_iff map_upd_Some_unfold mask_var_rel_def mh pred_eq_mask_def premise state_rel_mask_var_def_rel state_rel_mask_var_disjoint state_rel_obtain_mask)
-              qed
-              show "x = h \<Longrightarrow> ?thesis"
-              proof -
-                assume "x = h"
-                show ?thesis sorry
-              qed
             qed
           qed
         qed
