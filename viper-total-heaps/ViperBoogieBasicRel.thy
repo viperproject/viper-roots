@@ -593,9 +593,6 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
              label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst LabelMap) t ns
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
           \<and>  (\<forall> lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
-            (*(\<exists>\<phi>. t lbl = Some \<phi> \<and>                  
-                 heap_var_rel Pr \<Lambda> TyRep FieldTr (fst hm) (get_hh_total \<phi>) ns \<and>
-                 mask_var_rel Pr \<Lambda> TyRep FieldTr (snd hm) (get_mh_total \<phi>) ns))"*)
 
 lemma label_hm_rel_empty: "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
   by (simp add: label_hm_rel_def label_rel_def)
