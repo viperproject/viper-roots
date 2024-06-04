@@ -141,9 +141,9 @@ subsection \<open>Rule of consequence\<close>
 lemma rel_general_conseq:
 assumes Rel: "rel_general R0' R1' Success' Fail' P ctxt \<gamma> \<gamma>'" and
         Input: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> R0' \<omega> ns" and
-        Output: "\<And> \<omega> \<omega>' ns. (\<exists>ns0. R0 \<omega> ns0) \<Longrightarrow> R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns" and
-        Success: "\<And> \<omega> \<omega>'. Success \<omega> \<omega>' \<Longrightarrow> Success' \<omega> \<omega>'" and
-        Fail: "\<And> \<omega>. Fail \<omega>  \<Longrightarrow> Fail' \<omega>"
+        Output: "\<And> \<omega> \<omega>' ns0 ns. R0 \<omega> ns0 \<Longrightarrow> R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns" and
+        Success: "\<And> \<omega> \<omega>' ns0. R0 \<omega> ns0 \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> Success' \<omega> \<omega>'" and
+        Fail: "\<And> \<omega> ns0. R0 \<omega> ns0 \<Longrightarrow> Fail \<omega>  \<Longrightarrow> Fail' \<omega>"
       shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
   apply (rule rel_intro)
   using Input Output Success Fail rel_success_elim[OF Rel] rel_failure_elim[OF Rel]
@@ -158,7 +158,7 @@ assumes Rel: "rel_general R0' R1 Success Fail P ctxt \<gamma> \<gamma>'" and
 
 lemma rel_general_conseq_output:
 assumes Rel: "rel_general R0 R1' Success Fail P ctxt \<gamma> \<gamma>'" and
-        Output: "\<And> \<omega> \<omega>' ns. (\<exists>ns0. R0 \<omega> ns0) \<Longrightarrow> R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns"
+        Output: "\<And> \<omega> \<omega>' ns0 ns. R0 \<omega> ns0 \<Longrightarrow> R1' \<omega>' ns \<Longrightarrow> Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega>' ns"
       shows "rel_general R0 R1 Success Fail P ctxt \<gamma> \<gamma>'"
   by (rule rel_general_conseq[OF Rel _ Output])
 
