@@ -193,8 +193,25 @@ proof -
             thus "get_trace_total \<omega> l = Some \<phi>"
               using traceDefined by simp
             show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>) ?ns'"
-              (* TODO lift this *)
-              by (smt (verit, ccfv_SIG) True \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(8) assms(9) fst_conv fun_upd_same get_hh_total_full.elims heapVarValue heap_var_rel_def oldMType option.sel premise tr_vpr_bpl.select_convs(1) tr_vpr_bpl.select_convs(9) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_apply)
+              unfolding heap_var_rel_def
+            proof (intro conjI)
+              show "\<exists>hb. lookup_var ?\<Lambda> ?ns' h = Some (AbsV (AHeap hb)) \<and>
+                         lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep)) \<and>
+                         vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
+                         heap_rel Pr (field_translation Tr') (get_hh_total \<phi>) hb"
+              proof (intro exI, intro conjI)
+                show "lookup_var ?\<Lambda> ?ns' h = Some (AbsV (AHeap heapValue))"
+                  using True assms(8) assms(9) premise by auto
+                show "lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep))"
+                  using True assms(8) assms(9) oldMType premise by fastforce
+                show "vbpl_absval_ty_opt TyRep (AHeap heapValue) = Some (THeapId TyRep, [])"
+                  by (metis Semantics.val.inject(2) StateRel heapVarValue heap_var_rel_def option.sel state_rel0_def state_rel_def)
+                show "heap_rel Pr (field_translation Tr') (get_hh_total \<phi>) heapValue"
+                  by (smt (verit, best) Semantics.val.inject(2) \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(9) get_hh_total_full.elims heapVarValue heap_var_rel_def option.sel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_other update_var_same vbpl_absval.inject(4))
+              qed
+              show "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total \<phi>)"
+                by (metis StateRel get_hh_total_full.elims heap_var_rel_def state_rel_heap_var_rel traceDefined)
+            qed
           next
             case False
             from this obtain \<phi> where
