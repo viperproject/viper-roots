@@ -55,6 +55,7 @@ proof -
   let ?FieldTr = "field_translation Tr"
   let ?FieldTr' = "field_translation Tr'"
   let ?heapVar = "heap_var Tr"
+  let ?maskVar = "mask_var Tr"
   let ?\<omega>_trace_total = "get_trace_total \<omega>"
   let ?Tr_heap_labels = "fst (label_hm_translation Tr)"
   let ?Tr_mask_labels = "snd (label_hm_translation Tr)"
@@ -65,6 +66,11 @@ proof -
     heapVarValue: "lookup_var ?\<Lambda> ns ?heapVar = Some (AbsV (AHeap heapValue))" and
     heapVarType: "lookup_var_ty ?\<Lambda> ?heapVar = Some (TConSingle (THeapId TyRep))"
     unfolding state_rel_def state_rel0_def heap_var_rel_def
+    by fast
+ from StateRel obtain maskValue where
+    maskVarValue: "lookup_var ?\<Lambda> ns ?maskVar = Some (AbsV (AMask maskValue))" and
+    maskVarType: "lookup_var_ty ?\<Lambda> ?maskVar = Some (TConSingle (TMaskId TyRep))"
+    unfolding state_rel_def state_rel0_def mask_var_rel_def
     by fast
 
   (* The new state is the existing state, with oldHeap set to the heap value *)
@@ -200,29 +206,15 @@ proof -
           unfolding label_rel_def
         proof (intro allI, intro impI)
           fix l h
-          assume "snd (label_hm_translation Tr') l = Some h"
-          show " \<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
+          assume premise: "snd (label_hm_translation Tr') l = Some h"
+          have "snd (label_hm_translation Tr') = snd (label_hm_translation Tr)"
+            by (simp add: \<open>f = _\<close> \<open>Tr' = _\<close>)
+          hence "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
+                     mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) h (get_mh_total \<phi>) ns"
+            by (metis (mono_tags, lifting) StateRel  label_hm_rel_def label_rel_def premise state_rel_label_hm_rel)
+          thus "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
                      mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
-          proof (cases "l = lbl", intro exI, intro conjI)
-            case True
-            thus "get_trace_total \<omega> l = Some \<phi>"
-              using traceDefined by simp
-            show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
-              sorry
-          next
-            case False
-            from this obtain \<phi> where
-              "get_trace_total \<omega> l = Some \<phi>"
-              by (metis (no_types, lifting) StateRel \<open>snd (label_hm_translation Tr') l = Some h\<close> assms(8) assms(9) label_hm_rel_def label_rel_def prod.sel(2) state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
-            show "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
-                      mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
-            proof (intro exI, intro conjI)
-              show "get_trace_total \<omega> l = Some \<phi>"
-                by (simp add: \<open>get_trace_total \<omega> l = Some \<phi>\<close>)
-              show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
-                sorry
-            qed
-          qed
+            by (metis (no_types, lifting) DisjAux Sup_insert UnI1 Un_commute assms(8) assms(9) list.simps(15) mask_var_rel_def premise prod.sel(2) ranI tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other vars_label_hm_tr_def)
         qed
         show " \<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
           by (meson label_hm_rel_def label_hm_rel_empty)
