@@ -171,8 +171,13 @@ proof -
       show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ?ns'"
         by (metis StateRel \<open>\<And>thesis. (\<And>heapValue. \<lbrakk>lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap heapValue)); lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep))\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> heapVarValue oldMType option.sel state_rel_state_well_typed state_well_typed_lookup state_well_typed_upd_2)
       show "aux_vars_pred_sat ?\<Lambda> AuxPred ?ns'"
-        (* TODO lift smt *)
-        by (smt (verit, best) DisjAux StateRel \<open>state_well_typed (type_interp ctxt) (var_context ctxt) [] (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> \<open>type_interp ctxt = vbpl_absval_ty TyRep\<close> instantiate_nil oldMType option.sel state_rel_aux_vars_pred_sat state_rel_independent_var state_well_typed_lookup update_var_same)
+        unfolding aux_vars_pred_sat_def
+      proof (intro allI, intro impI)
+        fix x P
+        assume "AuxPred x = Some P"
+        thus "has_Some P (lookup_var ?\<Lambda> (update_var ?\<Lambda> ns oldH (AbsV (AHeap heapValue))) x)"
+          using DisjAux StateRel state_rel_aux_pred_sat_lookup by fastforce
+      qed
       show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>) ?ns'"
         unfolding label_hm_rel_def
       proof (intro conjI)
