@@ -912,7 +912,7 @@ next
       using \<open>p \<ge> 0\<close> Abs_preal_inverse EnoughPerm
       by (simp add: pgte.rep_eq)
     thus "pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p))"
-      using PermAtMostOne psub_smaller PermAtMostOne pgte_transitive PosReal.pgte.rep_eq less_eq_preal.rep_eq
+      using PermAtMostOne psub_smaller pgte_transitive PosReal.pgte.rep_eq less_eq_preal.rep_eq
       by fastforce
   qed
 
