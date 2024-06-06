@@ -44,8 +44,9 @@ lemma setup_oldh:
       and oldMType: "lookup_var_ty (var_context ctxt) oldH = Some (TConSingle (THeapId TyRep))"
       and "f = ((fst (label_hm_translation Tr))(lbl \<mapsto> oldH), (snd (label_hm_translation Tr)))"
       and "Tr' = Tr \<lparr> label_hm_translation := f \<rparr>"
+      and "h = heap_var Tr"
     shows "\<exists> ns'. red_ast_bpl P ctxt
-                  (((BigBlock name ((Lang.Assign oldH (Var (heap_var Tr))) # cs) s tr), cont), Normal ns)
+                  (((BigBlock name ((Lang.Assign oldH (Var h)) # cs) s tr), cont), Normal ns)
                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
                     (state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def \<omega> ns')"
 proof -
@@ -78,13 +79,13 @@ proof -
 
   show ?thesis
   proof (intro exI, intro conjI)
-    show "red_ast_bpl P ctxt ((BigBlock name (Assign oldH (expr.Var (heap_var Tr)) # cs) s tr, cont), Normal ns)
+    show "red_ast_bpl P ctxt ((BigBlock name (Assign oldH (expr.Var h) # cs) s tr, cont), Normal ns)
        ((BigBlock name cs s tr, cont), Normal ?ns')"
     proof (rule red_ast_bpl_one_assign)
       show "lookup_var_ty (var_context ctxt) oldH = Some (TConSingle (THeapId TyRep))"
         by (simp add: oldMType)
-      show "red_expr_bpl ctxt (expr.Var ?heapVar) ns (AbsV (AHeap heapValue))"
-        by (simp add: heapVarValue red_expr_red_exprs.RedVar)
+      show "red_expr_bpl ctxt (expr.Var h) ns (AbsV (AHeap heapValue))"
+        by (simp add: \<open>h = _\<close> heapVarValue red_expr_red_exprs.RedVar)
       show "type_of_val (type_interp ctxt) (AbsV (AHeap heapValue)) = instantiate (rtype_interp ctxt) (TConSingle (THeapId TyRep))"
         by (metis EmptyRType StateRel heapVarType heapVarValue option.sel state_rel_state_well_typed state_well_typed_lookup)
     qed
@@ -188,41 +189,7 @@ proof -
           assume premise: "fst (label_hm_translation Tr') l = Some h"
           show "\<exists> \<phi>'. get_trace_total \<omega> l = Some \<phi>' \<and>
                 heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>') ?ns'"
-          proof (cases "l = lbl", intro exI, intro conjI)
-            case True
-            thus "get_trace_total \<omega> l = Some \<phi>"
-              using traceDefined by simp
-            show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>) ?ns'"
-              unfolding heap_var_rel_def
-            proof (intro conjI)
-              show "\<exists>hb. lookup_var ?\<Lambda> ?ns' h = Some (AbsV (AHeap hb)) \<and>
-                         lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep)) \<and>
-                         vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
-                         heap_rel Pr (field_translation Tr') (get_hh_total \<phi>) hb"
-              proof (intro exI, intro conjI)
-                show "lookup_var ?\<Lambda> ?ns' h = Some (AbsV (AHeap heapValue))"
-                  using True assms(8) assms(9) premise by auto
-                show "lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep))"
-                  using True assms(8) assms(9) oldMType premise by fastforce
-                show "vbpl_absval_ty_opt TyRep (AHeap heapValue) = Some (THeapId TyRep, [])"
-                  by (metis Semantics.val.inject(2) StateRel heapVarValue heap_var_rel_def option.sel state_rel0_def state_rel_def)
-                show "heap_rel Pr (field_translation Tr') (get_hh_total \<phi>) heapValue"
-                  by (smt (verit, best) Semantics.val.inject(2) \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(9) get_hh_total_full.elims heapVarValue heap_var_rel_def option.sel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_other update_var_same vbpl_absval.inject(4))
-              qed
-              show "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total \<phi>)"
-                by (metis StateRel get_hh_total_full.elims heap_var_rel_def state_rel_heap_var_rel traceDefined)
-            qed
-          next
-            case False
-            from this obtain \<phi> where
-              "get_trace_total \<omega> l = Some \<phi>"
-              (* TODO lift this *)
-              by (smt (verit) StateRel assms(8) assms(9) fun_upd_apply label_hm_rel_def label_rel_def premise prod.sel(1) state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
-            show "\<exists>\<phi>'. get_trace_total \<omega> l = Some \<phi>' \<and>
-                       heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>') ?ns'"
-              (* TODO lift this *)
-              by (smt (verit) DisjAux StateRel Sup_insert UnI1 Un_commute \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(8) assms(9) fst_conv fun_upd_apply get_hh_total_full.elims heapVarValue heap_var_rel_def label_hm_rel_def label_rel_def list.simps(15) oldMType option.simps(1) premise ranI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_apply vars_label_hm_tr_def)
-          qed
+            by (smt (verit) DisjAux StateRel Sup_insert UnI1 Un_commute \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(8) assms(9) fst_conv fun_upd_apply get_hh_total_full.elims heapVarValue heap_var_rel_def label_hm_rel_def label_rel_def list.simps(15) oldMType option.simps(1) premise ranI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_apply vars_label_hm_tr_def)
         qed
         show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') m (get_mh_total \<phi>)) (snd (label_hm_translation Tr')) (get_trace_total \<omega>) ?ns'"
           unfolding label_rel_def
@@ -257,9 +224,10 @@ lemma setup_oldm:
           old_m_type: "lookup_var_ty (var_context ctxt) old_m = Some (TConSingle (TMaskId TyRep))" and
           (* This includes only the mask update in the label_hm_translation, should the heap be included as well? *)
           f: "f = (fst (label_hm_translation Tr), (snd (label_hm_translation Tr)) (lbl \<mapsto> old_m))" and
-          Tr': "Tr' = Tr \<lparr> label_hm_translation := f \<rparr>"
+          Tr': "Tr' = Tr \<lparr> label_hm_translation := f \<rparr>" and
+          "m = mask_var Tr"
   shows "\<exists> ns'. red_ast_bpl P ctxt
-                (((BigBlock name ((Lang.Assign old_m (Var (mask_var Tr))) # cs) s tr), cont), Normal ns)
+                (((BigBlock name ((Lang.Assign old_m (Var m)) # cs) s tr), cont), Normal ns)
                 ((BigBlock name cs s tr, cont), Normal ns') \<and>
                   (state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def \<omega> ns')"
 proof -
@@ -719,8 +687,8 @@ proof -
       by blast
   qed
   show ?thesis
-    using normal_execution new_state_rel
-    by fast
+    using normal_execution new_state_rel \<open>m = _\<close>
+    by blast
 qed
 
 (* if tracked then heap_rel holds for all labels *)
@@ -746,6 +714,70 @@ lemma label_tracked_implies_mask_rel:
     shows "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar (get_mh_total \<phi>) ns"
   using assms label_hm_rel_def label_rel_def
   by (metis (mono_tags, lifting) option.sel)
+
+
+lemma state_rel_can_add_trace:
+  assumes StateRel: "state_rel_def_same Pr (\<lambda>_. True) TyRep Tr AuxPred ctxt \<omega> ns"
+      and labelHMTranslationEmpty: "label_hm_translation Tr = (Map.empty, Map.empty)"
+      and "\<omega>' = update_trace_total \<omega> [lbl \<mapsto> get_total_full \<omega>]"
+      and labelNotInHMTranslation: "lbl \<notin> dom (fst (label_hm_translation Tr)) \<and> lbl \<notin> dom (snd (label_hm_translation Tr))"
+    shows "state_rel_def_same Pr (\<lambda>_. True) TyRep Tr AuxPred ctxt \<omega>' ns \<and>
+           get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>']"
+proof (intro conjI)
+  show "state_rel_def_same Pr (\<lambda>_. True) TyRep Tr AuxPred ctxt \<omega>' ns"
+    unfolding state_rel_def state_rel0_def
+  proof (intro conjI, simp_all, tactic distinct_subgoals_tac)
+    let ?\<Lambda> = "var_context ctxt"
+    let ?FieldTr = "field_translation Tr"
+    show "valid_heap_mask (get_mh_total (get_total_full \<omega>'))"
+      using label_hm_rel_def label_hm_rel_empty by blast
+    show "type_interp ctxt = vbpl_absval_ty TyRep"
+      using StateRel state_rel_type_interp by blast
+    show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr) (get_store_total \<omega>') ns"
+      by (metis StateRel \<open>\<omega>' = _\<close> state_rel_store_rel update_trace_total_store_same)
+    show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      using StateRel state_rel_disjoint
+      by fast
+    show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr (heap_var Tr) (get_hh_total (get_total_full \<omega>')) ns"
+      using StateRel \<open>\<omega>' = _\<close> state_rel_heap_var_rel
+      by force
+    show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr (mask_var Tr) (get_mh_total (get_total_full \<omega>')) ns"
+      using StateRel \<open>\<omega>' = _\<close> state_rel_mask_var_rel
+      by force
+    show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr (heap_var_def Tr) (get_hh_total (get_total_full \<omega>'))
+     ns"
+      using StateRel \<open>\<omega>' = _\<close> state_rel_heap_var_def_rel
+      by fastforce
+    show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr (mask_var_def Tr) (get_mh_total (get_total_full \<omega>'))
+     ns"
+      using StateRel \<open>\<omega>' = _\<close> state_rel_mask_var_def_rel
+      by fastforce
+    show "field_rel Pr ?\<Lambda> ?FieldTr ns"
+      using StateRel state_rel_field_rel
+      by blast
+    show "boogie_const_rel (const_repr Tr) ?\<Lambda> ns"
+      using StateRel state_rel_boogie_const_rel
+      by fast
+    show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ns"
+      using StateRel state_rel_state_well_typed
+      by fast
+    show "aux_vars_pred_sat ?\<Lambda> AuxPred ns"
+      using StateRel state_rel_aux_vars_pred_sat
+      by fast
+    show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr (label_hm_translation Tr) (get_trace_total \<omega>') ns"
+      unfolding label_hm_rel_def
+    proof (intro conjI)
+      show "label_rel (\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>)) (fst (label_hm_translation Tr)) (get_trace_total \<omega>') ns"
+        by (simp add: labelHMTranslationEmpty label_rel_def)
+      show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)) (snd (label_hm_translation Tr)) (get_trace_total \<omega>') ns"
+        by (simp add: labelHMTranslationEmpty label_rel_def)
+      show "\<forall>lbl \<phi>. get_trace_total \<omega>' lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+        by (meson label_hm_rel_def label_hm_rel_empty)
+    qed
+  qed
+  show "get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>']"
+    using \<open>\<omega>' = _\<close> by simp
+qed
 
 lemma element_not_in_any_set_implies_not_in_disj_vars:
   assumes "e \<notin> {heap_var Tr, heap_var_def Tr}"

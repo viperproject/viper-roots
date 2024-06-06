@@ -229,6 +229,15 @@ lemma red_ast_bpl_rel_transitive_3:
   using assms red_ast_bpl_rel_transitive
   by blast
 
+lemma red_ast_bpl_rel_transitive_4:
+   assumes "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Q \<omega>"
+       and "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
+       and "red_ast_bpl_rel (\<lambda>\<omega> ns. R1 \<omega> ns \<and> Q \<omega>) R2 P ctxt \<gamma>1 \<gamma>2"
+     shows "red_ast_bpl_rel R0 R2 P ctxt \<gamma>0 \<gamma>2"
+   using assms red_ast_bpl_transitive
+   unfolding red_ast_bpl_rel_def
+   by blast
+
 lemma red_ast_bpl_rel_transitive_with_inv:
   assumes Rel1: "red_ast_bpl_rel R0 R1 P ctxt \<gamma>0 \<gamma>1"
       and Inv: "\<And> \<omega> ns. R0 \<omega> ns \<Longrightarrow> Q \<omega>"
