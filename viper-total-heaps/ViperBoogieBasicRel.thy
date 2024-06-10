@@ -594,8 +594,11 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
           \<and>  (\<forall> lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
 
-lemma label_hm_rel_empty: "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
-  by (simp add: label_hm_rel_def label_rel_def)
+lemma label_hm_rel_empty:
+  \<comment>\<open>We need to assume that all members of the trace are well-formed\<close>
+  assumes "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    shows "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
+  by (simp add: assms label_hm_rel_def label_rel_def)
   
 definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
   where "vars_label_hm_tr LabelMap \<equiv> (ran (fst LabelMap)) \<union> (ran (snd LabelMap))"
@@ -2935,10 +2938,33 @@ next
   
   show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (fst label_tr, snd label_tr(lbl \<mapsto> m))
                         (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) ns"
-    unfolding label_hm_rel_def label_rel_def
-    using StateRelLabel HeapLabelStable MaskVarRel
-    unfolding \<open>label_tr = _\<close>
-    by fastforce      
+    unfolding label_hm_rel_def
+  proof (intro conjI)
+    show "label_rel (\<lambda>h \<phi>. heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>))
+     (fst (fst label_tr, snd label_tr(lbl \<mapsto> m))) (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) ns"
+      unfolding label_rel_def
+    proof (intro allI, intro impI)
+      fix lbla h
+      assume "fst (fst label_tr, snd label_tr(lbl \<mapsto> m)) lbla = Some h"
+      thus "\<exists>\<phi>. (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) lbla = Some \<phi> \<and>
+            heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
+        using HeapLabelStable StateRelLabel \<open>label_tr = _\<close>
+        by fastforce
+    qed
+    show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>))
+     (snd (fst label_tr, snd label_tr(lbl \<mapsto> m))) (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) ns"
+      unfolding label_rel_def
+    proof (intro allI, intro impI)
+      fix lbla h
+      assume "snd (fst label_tr, snd label_tr(lbl \<mapsto> m)) lbla = Some h"
+      thus "\<exists>\<phi>. (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) lbla = Some \<phi> \<and>
+            mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_mh_total \<phi>) ns"
+        using MaskVarRel StateRelLabel \<open>label_tr = _\<close>
+        by fastforce
+    qed
+    show "\<forall>lbla \<phi>. (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) lbla = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+      by (metis StateRel StateRelLabel get_mh_total_full.simps map_upd_Some_unfold state_rel_wf_mask_def_simple)
+  qed    
 qed(insert StateRel[simplified state_rel_def state_rel0_def], auto)              
 
 
