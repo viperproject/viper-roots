@@ -1475,6 +1475,7 @@ lemma init_state_in_state_relation:
                   local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
                   binder_state = Map.empty \<rparr>" and
           InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
+          WfTrace: "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)" and
 
           ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
           ClosedLocals: "list_all (closed \<circ> (fst \<circ> snd)) (snd (var_context ctxt))" and
@@ -1667,8 +1668,20 @@ proof -
       by (simp add: aux_vars_pred_sat_def)  
   next
     show "label_hm_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
-      using label_hm_rel_empty NoTrackedLabeledStates
-      by metis
+      unfolding label_hm_rel_def
+    proof (intro conjI)
+      show "label_rel
+     (\<lambda>h \<phi>. heap_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) h (get_hh_total \<phi>))
+     (fst (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
+        by (simp add: NoTrackedLabeledStates label_rel_def)
+      show "label_rel
+     (\<lambda>m \<phi>. mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) m (get_mh_total \<phi>))
+     (snd (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
+        by (simp add: NoTrackedLabeledStates label_rel_def)
+      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+        using WfTrace
+        by simp
+    qed
   qed (insert assms Disj, auto)
 qed
 

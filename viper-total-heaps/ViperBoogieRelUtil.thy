@@ -1232,6 +1232,7 @@ proof -
 
   have LabelRel: 
     "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
+    (* TODO prove this *)
     sorry
 
   show ?thesis
