@@ -98,11 +98,11 @@ proof -
       show "valid_heap_mask (get_mh_total_full \<omega>)"
         using StateRel state_rel_wf_mask_simple by blast
       show "consistent_state_rel_opt (state_rel_opt Tr') \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
-        by (metis StateRel assms(9) state_rel_consistent tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
+        by (metis StateRel \<open>Tr' = _\<close> state_rel_consistent tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
       show "type_interp ctxt = vbpl_absval_ty TyRep"
         using StateRel state_rel_type_interp by blast
       show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr') (get_store_total \<omega>) ?ns'"
-        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI assms(9) list.simps(15) state_rel_store_rel store_rel_stable tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI \<open>Tr' = _\<close> list.simps(15) state_rel_store_rel store_rel_stable tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
       proof -
         have disjoint_list_Tr: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
@@ -153,21 +153,21 @@ proof -
       show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
         using StateRel state_rel_eval_welldef_eq by blast
       show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) ?ns'"
-        by (metis (no_types, lifting) StateRel assms(9) heapVarValue heap_var_rel_stable state_rel_heap_var_rel tr_vpr_bpl.select_convs(1) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other update_var_same)
+        by (metis (no_types, lifting) StateRel \<open>Tr' = _\<close> heapVarValue heap_var_rel_stable state_rel_heap_var_rel tr_vpr_bpl.select_convs(1) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other update_var_same)
       show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full \<omega>) ?ns'"
-        by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnCI assms(9) insertCI list.simps(15) mask_var_rel_stable state_rel_mask_var_rel tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+        by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnCI \<open>Tr' = _\<close> insertCI list.simps(15) mask_var_rel_stable state_rel_mask_var_rel tr_vpr_bpl.select_convs(2) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full \<omega>def) ?ns'"
-        by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnI1 assms(9) heap_var_rel_stable insertCI list.simps(15) state_rel_heap_var_def_rel tr_vpr_bpl.select_convs(3) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+        by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnI1 \<open>Tr' = _\<close> heap_var_rel_stable insertCI list.simps(15) state_rel_heap_var_def_rel tr_vpr_bpl.select_convs(3) tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full \<omega>def) ?ns'"
-        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI assms(9) insertCI list.simps(15) mask_var_rel_stable state_rel_mask_var_def_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI \<open>Tr' = _\<close> insertCI list.simps(15) mask_var_rel_stable state_rel_mask_var_def_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       show "field_rel Pr ?\<Lambda> (field_translation Tr') ?ns'"
-        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI assms(9) field_rel_stable list.simps(15) state_rel_field_rel tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+        by (metis (no_types, lifting) DisjAux StateRel Sup_insert UnCI \<open>Tr' = _\<close> field_rel_stable list.simps(15) state_rel_field_rel tr_vpr_bpl.select_convs(5) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       show "boogie_const_rel (const_repr Tr') ?\<Lambda> ?ns'"
         unfolding boogie_const_rel_def
       proof (intro allI)
         fix const
         show "lookup_var (var_context ctxt) ?ns' (const_repr Tr' const) = Some (boogie_const_val const)"
-          by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnCI assms(9) boogie_const_rel_lookup list.simps(15) range_eqI state_rel_boogie_const_rel tr_vpr_bpl.select_convs(8) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
+          by (metis (mono_tags, lifting) DisjAux StateRel Sup_insert UnCI \<open>Tr' = _\<close> boogie_const_rel_lookup list.simps(15) range_eqI state_rel_boogie_const_rel tr_vpr_bpl.select_convs(8) tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other)
       qed
       show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ?ns'"
         by (metis StateRel \<open>\<And>thesis. (\<And>heapValue. \<lbrakk>lookup_var (var_context ctxt) ns (heap_var Tr) = Some (AbsV (AHeap heapValue)); lookup_var_ty (var_context ctxt) (heap_var Tr) = Some (TConSingle (THeapId TyRep))\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> heapVarValue oldMType option.sel state_rel_state_well_typed state_well_typed_lookup state_well_typed_upd_2)
@@ -189,7 +189,7 @@ proof -
           assume premise: "fst (label_hm_translation Tr') l = Some h"
           show "\<exists> \<phi>'. get_trace_total \<omega> l = Some \<phi>' \<and>
                 heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>') ?ns'"
-            by (smt (verit) DisjAux StateRel Sup_insert UnI1 Un_commute \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> assms(8) assms(9) fst_conv fun_upd_apply get_hh_total_full.elims heapVarValue heap_var_rel_def label_hm_rel_def label_rel_def list.simps(15) oldMType option.simps(1) premise ranI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_apply vars_label_hm_tr_def)
+            by (smt (verit) DisjAux StateRel Sup_insert UnI1 Un_commute \<open>heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>) (update_var (var_context ctxt) ns oldH (AbsV (AHeap heapValue)))\<close> \<open>f = _\<close> \<open>Tr' = _\<close> fst_conv fun_upd_apply get_hh_total_full.elims heapVarValue heap_var_rel_def label_hm_rel_def label_rel_def list.simps(15) oldMType option.simps(1) premise ranI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined update_var_apply vars_label_hm_tr_def)
         qed
         show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') m (get_mh_total \<phi>)) (snd (label_hm_translation Tr')) (get_trace_total \<omega>) ?ns'"
           unfolding label_rel_def
@@ -203,10 +203,11 @@ proof -
             by (metis (mono_tags, lifting) StateRel  label_hm_rel_def label_rel_def premise state_rel_label_hm_rel)
           thus "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
                      mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
-            by (metis (no_types, lifting) DisjAux Sup_insert UnI1 Un_commute assms(8) assms(9) list.simps(15) mask_var_rel_def premise prod.sel(2) ranI tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other vars_label_hm_tr_def)
+            by (metis (no_types, lifting) DisjAux Sup_insert UnI1 Un_commute \<open>f = _\<close> \<open>Tr' = _\<close> list.simps(15) mask_var_rel_def premise prod.sel(2) ranI tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other vars_label_hm_tr_def)
         qed
         show " \<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-          by (meson label_hm_rel_def label_hm_rel_empty)
+          using StateRel state_rel_label_hm_rel label_hm_rel_def
+          by blast
       qed
     qed
   qed
@@ -730,7 +731,7 @@ proof (intro conjI)
     let ?\<Lambda> = "var_context ctxt"
     let ?FieldTr = "field_translation Tr"
     show "valid_heap_mask (get_mh_total (get_total_full \<omega>'))"
-      using label_hm_rel_def label_hm_rel_empty by blast
+      using StateRel \<open>\<omega>' = _\<close> state_rel_wf_mask_def_simple by fastforce
     show "type_interp ctxt = vbpl_absval_ty TyRep"
       using StateRel state_rel_type_interp by blast
     show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr) (get_store_total \<omega>') ns"
@@ -771,8 +772,26 @@ proof (intro conjI)
         by (simp add: labelHMTranslationEmpty label_rel_def)
       show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)) (snd (label_hm_translation Tr)) (get_trace_total \<omega>') ns"
         by (simp add: labelHMTranslationEmpty label_rel_def)
-      show "\<forall>lbl \<phi>. get_trace_total \<omega>' lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-        by (meson label_hm_rel_def label_hm_rel_empty)
+      show "\<forall>l \<phi>. get_trace_total \<omega>' l = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+      proof (intro allI, intro impI)
+        fix l \<phi>
+        assume premise: "get_trace_total \<omega>' l = Some \<phi>"
+        have "get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>]"
+          using \<open>\<omega>' = _\<close>
+          by simp
+        hence "l = lbl"
+          by (metis fun_upd_apply option.discI premise)
+        hence "\<phi> = get_total_full \<omega>"
+          using \<open>get_trace_total \<omega>' = _\<close> premise
+          by simp   
+        hence "get_mh_total \<phi> = get_mh_total_full \<omega>"
+          by simp
+        from StateRel state_rel_wf_mask_simple have "wf_mask_simple (get_mh_total_full \<omega>)"
+          by blast
+        thus "valid_heap_mask (get_mh_total \<phi>)" 
+          using \<open>get_mh_total \<phi> = _\<close>
+          by simp
+      qed
     qed
   qed
   show "get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>']"
@@ -1213,9 +1232,7 @@ proof -
 
   have LabelRel: 
     "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
-    using ActiveLabels state_rel_label_hm_rel[OF StateRel]
-    unfolding label_hm_rel_def active_labels_hm_tr_def label_rel_def
-    by force
+    sorry
 
   show ?thesis
     unfolding state_rel_def state_rel0_def
