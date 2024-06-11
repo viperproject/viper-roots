@@ -1549,7 +1549,7 @@ lemma method_call_stmt_rel_general:
             vals_well_typed (absval_interp_total ctxt_vpr) v_args (method_decl.args mdecl) \<Longrightarrow>
             vals_well_typed (absval_interp_total ctxt_vpr) v_rets (method_decl.rets mdecl) \<Longrightarrow>
             list_all2 (\<lambda>y t. y = Some t) (map \<Lambda>_vpr ys) (rets mdecl) \<Longrightarrow>
-            rel_general (\<lambda> \<omega> ns. (\<omega>,ns) = (\<omega>0,ns0) \<and> R (\<omega> :: 'a full_total_state) ns) (RExhIn (g_exh \<omega>0 ns0)) 
+            rel_general (\<lambda> \<omega> ns. (\<omega>,ns) = (\<omega>0,ns0)) (RExhIn (g_exh \<omega>0 ns0)) 
                         (\<lambda>\<omega> \<omega>'. \<omega>' = state_during_exhale_pre_call \<omega> v_args) (\<lambda>_.False)
                         P ctxt \<gamma>1 \<gamma>_exh_in \<and>
            \<comment>\<open> (RExhIn (g_exh \<omega>0 ns0)) (state_during_exhale_pre_call \<omega>0 v_args) ns0 \<and>\<close>
@@ -1602,7 +1602,7 @@ proof (rule stmt_rel_intro_2)
       by blast
 
     from RelPremises[OF RArgs] RedMethodCall \<open>mdecl = _\<close> have 
-          InitStateRel: "rel_general (\<lambda> \<omega> ns. (\<omega>,ns) = (\<omega>0,ns0) \<and> R (\<omega> :: 'a full_total_state) ns) (RExhIn (g_exh \<omega>0 ns0)) 
+          InitStateRel: "rel_general (\<lambda> \<omega> ns. (\<omega>,ns) = (\<omega>0,ns0)) (RExhIn (g_exh \<omega>0 ns0)) 
                         (\<lambda>\<omega> \<omega>'. \<omega>' = state_during_exhale_pre_call \<omega> v_args) (\<lambda>_.False)
                         P ctxt \<gamma>1 \<gamma>_exh_in"
       and ExhalePreRel: "stmt_rel (RExhIn (g_exh \<omega>0 ns0)) (RExhOut (g_exh \<omega>0 ns0)) ctxt_vpr StateCons \<Lambda>_vpr P ctxt (Exhale (method_decl.pre mdecl)) \<gamma>_exh_in \<gamma>_exh_out"
@@ -2211,15 +2211,12 @@ proof (rule method_call_stmt_rel_general[OF MdeclSome _,
          auto simp add: map_upd_set_lookup_2)
   qed
   
-  show "rel_general (\<lambda>\<omega>1 ns1. (\<omega>1, ns1) = (\<omega>, ns) \<and> R \<omega>1 ns1) (\<lambda>\<omega> ns. ?RCall \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> \<omega>)
+  show "rel_general (\<lambda>\<omega>1 ns1. (\<omega>1, ns1) = (\<omega>, ns)) (\<lambda>\<omega> ns. ?RCall \<omega> ns \<and> framing_exh ctxt_vpr StateCons (method_decl.pre mdecl) \<omega> \<omega>)
         (\<lambda>\<omega> \<omega>'. \<omega>' = state_during_exhale_pre_call \<omega> v_args) (\<lambda>_. False) P ctxt \<gamma> \<gamma>"
   proof (rule rel_general_success_refl_2, simp)
     fix \<omega>_init ns_init \<omega>0
-    assume RInit: "(\<omega>_init, ns_init) = (\<omega>, ns) \<and> R \<omega>_init ns_init"
+    assume RInit: "(\<omega>_init, ns_init) = (\<omega>, ns)"
        and "\<omega>0 = state_during_exhale_pre_call \<omega>_init v_args"
-
-    hence R0: "R \<omega> ns"
-      by blast
 
     \<comment>\<open>Prove various properties before showing the goal\<close> 
 
