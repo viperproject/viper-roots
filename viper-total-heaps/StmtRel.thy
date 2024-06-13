@@ -1737,52 +1737,6 @@ abbreviation method_before_state_pred
            R \<omega>0 ns0 \<and>
             red_pure_exps_total ctxt_vpr StateCons (Some \<omega>0) es \<omega>0 (Some v_args)"
 
-lemma method_call_stmt_rel_general_2:
-  assumes MdeclSome:  "program.methods (program_total ctxt_vpr) m = Some mdecl"
-      and ArgsAreVars: "list_all (\<lambda>x. \<exists>a. x = ViperLang.Var a) es" \<comment>\<open>simplifying assumption: only variables as arguments\<close>
-      and "list_all2 (\<lambda>y t. y = Some t) (map \<Lambda>_vpr ys) (rets mdecl)"
-      and RelPremises:
-          "\<And> (\<omega>0 :: 'a full_total_state) ns0 v_args v_rets.  
-           \<comment>\<open> R \<omega>0 ns0 \<Longrightarrow>
-            red_pure_exps_total ctxt_vpr StateCons (Some \<omega>0) es \<omega>0 (Some v_args) \<Longrightarrow>      
-            vals_well_typed (absval_interp_total ctxt_vpr) v_args (method_decl.args mdecl) \<Longrightarrow>
-            vals_well_typed (absval_interp_total ctxt_vpr) v_rets (method_decl.rets mdecl) \<Longrightarrow>
-            list_all2 (\<lambda>y t. y = Some t) (map \<Lambda>_vpr ys) (rets mdecl) \<Longrightarrow>
-            \<close>
-            vals_well_typed (absval_interp_total ctxt_vpr) v_args (method_decl.args mdecl) \<Longrightarrow>
-            rel_general (\<lambda> \<omega> ns. (\<omega>,ns) = (\<omega>0,ns0) \<and> method_before_state_pred ctxt_vpr StateCons mdecl R es v_args v_rets \<omega>0 ns0) 
-                        (RExhIn (g_exh \<omega>0 ns0)) 
-                        (\<lambda>\<omega> \<omega>'. \<omega>' = state_during_exhale_pre_call \<omega> v_args) (\<lambda>_.False)
-                        P ctxt \<gamma> \<gamma>_exh_in"
-       and "\<And> (\<omega>0 :: 'a full_total_state) ns0.
-                          (stmt_rel (RExhIn (g_exh \<omega>0 ns0)) (RExhOut (g_exh \<omega>0 ns0)) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                          (Exhale (method_decl.pre mdecl)) \<gamma>_exh_in \<gamma>_exh_out)"
-       and "\<And> (\<omega>0 :: 'a full_total_state) ns0 v_args v_rets.
-                        vals_well_typed (absval_interp_total ctxt_vpr) v_args (method_decl.args mdecl) \<Longrightarrow>
-                        vals_well_typed (absval_interp_total ctxt_vpr) v_rets (method_decl.rets mdecl) \<Longrightarrow>
-                        rel_general (RExhOut (g_exh \<omega>0 ns0)) (RInhIn (g_inh \<omega>0 ns0))
-                        (\<lambda>\<omega> \<omega>'. red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr 
-                                                (Exhale (method_decl.pre mdecl)) 
-                                                (state_during_exhale_pre_call \<omega>0 v_args)
-                                                (RNormal \<omega>) \<and>
-                               \<omega>' = state_during_inhale_post_call \<omega>0 \<omega> v_args v_rets) 
-                        (\<lambda>_. False) P ctxt \<gamma>_exh_out \<gamma>_inh_in"
-       and "\<And> (\<omega>0 :: 'a full_total_state) ns0. 
-                      stmt_rel (RInhIn (g_inh \<omega>0 ns0)) (RInhOut (g_inh \<omega>0 ns0)) ctxt_vpr StateCons \<Lambda>_vpr P ctxt 
-                        (Inhale (method_decl.post mdecl)) \<gamma>_inh_in \<gamma>_inh_out"
-       and "\<And> (\<omega>0 :: 'a full_total_state) ns0 v_args v_rets.
-                  vals_well_typed (absval_interp_total ctxt_vpr) v_rets (method_decl.rets mdecl) \<Longrightarrow>
-                  rel_general (RInhOut (g_inh \<omega>0 ns0)) R'
-                                            \<comment>\<open>type annotation must match the one given above, otherwise will not match the other states\<close>
-                         (\<lambda>\<omega> \<omega>'. (\<exists>\<omega>pre :: 'a full_total_state. red_stmt_total ctxt_vpr StateCons \<Lambda>_vpr 
-                                          (Inhale (method_decl.post mdecl))
-                                          (state_during_inhale_post_call \<omega>0 \<omega>pre v_args v_rets)
-                                          (RNormal \<omega>)) \<and>
-                                  \<omega>' = reset_state_after_call ys v_rets \<omega>0 \<omega>) (\<lambda>_. False)
-                         P ctxt \<gamma>_inh_out \<gamma>'"
-        shows "stmt_rel R R' ctxt_vpr StateCons \<Lambda>_vpr P ctxt (MethodCall ys m es) \<gamma> \<gamma>'"
-  oops
-
 subsubsection \<open>Instantiated lemma\<close>
 
 lemma method_call_stmt_rel_inst:
