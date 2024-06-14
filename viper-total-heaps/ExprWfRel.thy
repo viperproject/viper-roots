@@ -711,10 +711,10 @@ proof (intro conjI, simp_all add: \<open>Tr' = _\<close>)
 qed (insert StateRel[simplified state_rel_def state_rel0_def], (simp | argo)+)
 \<comment>\<open>"insert StateRel[simplified state_rel_def state_rel0_def]" adds the state relation assumption in unfolded
 form to all subgoals and (simp | argo)+ applies simp or argo until neither works\<close>
-                   
 
 lemma old_expr_wf_rel_staterel:
-  assumes "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
+  assumes "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
@@ -1043,6 +1043,7 @@ proof -
             hence a: "StateCons \<omega>def \<and> StateCons \<omega>"
               using RInst state_rel_consistent by blast
             (* sorry these for now, until we figure out how to incorporate StateCons into the trace *)
+            (* use last conjunct of wf_total_consistency *)
             show "StateCons ?\<omega>def_old" sorry
             show "StateCons ?\<omega>_old" sorry
           qed
