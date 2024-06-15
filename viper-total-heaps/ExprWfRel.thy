@@ -713,7 +713,7 @@ qed (insert StateRel[simplified state_rel_def state_rel0_def], (simp | argo)+)
 form to all subgoals and (simp | argo)+ applies simp or argo until neither works\<close>
 
 lemma old_expr_wf_rel_staterel:
-  assumes "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+  assumes WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
@@ -795,14 +795,32 @@ proof -
       assume "mdef = m" 
       show "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb =
             mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb"
-        sorry \<comment>\<open>this one might be nontrivial\<close>
+      proof -
+        have ltr: "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb \<Longrightarrow>
+                   mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb"
+        proof -
+          assume "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb"
+          thus "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb"
+            by (smt (verit) RPrevInst Semantics.val.inject(2) \<open>mdef = m\<close> mask_rel_def mask_var_rel_def mh option.sel state_rel_mask_var_def_rel state_rel_obtain_mask tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) vbpl_absval.inject(5))
+        qed
+        have rtl: "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb \<Longrightarrow>
+                   mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb"
+        proof -
+          assume "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb"
+          show "mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>) mb"
+            by (smt (verit) RPrevInst Semantics.val.inject(2) \<open>mask_rel Pr (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) (get_mh_total_full \<omega>def) mb\<close> \<open>mdef = m\<close> mask_rel_def mask_var_rel_def mh option.sel state_rel_mask_var_def_rel state_rel_obtain_mask tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) vbpl_absval.inject(5))
+        qed
+        show ?thesis
+          using ltr rtl
+          by auto
+      qed
     next
       fix hb :: "'a bpl_heap_ty"
       show "pred_eq_heap_aux Pr TyRep (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<omega> hb =
           pred_eq_heap_aux Pr TyRep (field_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<omega>def hb \<and>
           total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>) =
           total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def)"
-        sorry \<comment>\<open>this one should be easier than the previous one, but potentially still nontrivial\<close>
+        by (metis RPrevInst fst_conv get_h_total_full.simps pred_eq_heap_aux_def state_rel_eval_welldef_eq)
     qed (simp add: \<open>Tr' = _\<close> mh)
 
     \<comment>\<open>In a second step, let's revert the labels\<close>
@@ -863,7 +881,7 @@ proof -
       note RInst = R[simplified \<open>R = _\<close>]
         
       obtain \<phi> where "get_trace_total \<omega> lbl = Some \<phi>"
-        by (metis (mono_tags, lifting) OldM RInst assms(3) label_hm_rel_def label_rel_def state_rel_label_hm_rel)
+        by (metis (mono_tags, lifting) OldM RInst \<open>lbls = _\<close> label_hm_rel_def label_rel_def state_rel_label_hm_rel)
 
       let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
       
@@ -929,11 +947,11 @@ proof -
               show "?M' \<subseteq> ?M"
               proof -
                 have heap_subset: "ran (fst lbls') \<subseteq> ran (fst lbls)"
-                  by (metis (mono_tags, lifting) OldH assms(7) fst_conv fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd subset_insertI2)
+                  by (metis (mono_tags, lifting) OldH \<open>lbls' = _\<close> fst_conv fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd subset_insertI2)
                 have map_subset: "ran (snd lbls') \<subseteq> ran (snd lbls)"
-                  by (metis (mono_tags, lifting) OldM assms(7) fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd snd_conv subset_insertI2)
+                  by (metis (mono_tags, lifting) OldM \<open>lbls' = _\<close> fun_upd_same fun_upd_triv fun_upd_upd order_refl ran_map_upd snd_conv subset_insertI2)
                 show "?M' \<subseteq> ?M" 
-                  using assms(3) heap_subset map_subset vars_label_hm_tr_def
+                  using \<open>lbls = _\<close> heap_subset map_subset vars_label_hm_tr_def
                   by auto
               qed
             qed
@@ -984,7 +1002,7 @@ proof -
             assume "fst (label_hm_translation ?Tr2) lbl = Some h"
             then obtain \<phi> where
               trace_defined: "get_trace_total \<omega> lbl = Some \<phi>"
-              by (smt (verit, best) RInst assms(3) assms(7) fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
+              by (smt (verit, best) RInst \<open>lbls = _\<close> \<open>lbls' = _\<close> fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
             show "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
             proof (rule exI)
               show "get_trace_total \<omega> lbl = Some \<phi> \<and> heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
@@ -993,7 +1011,7 @@ proof -
                   using trace_defined
                   by simp
                 show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) h (get_hh_total \<phi>) ns"
-                  by (smt (verit, ccfv_SIG) RInst \<open>fst (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> assms(3) assms(7) fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI option.sel state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) trace_defined)
+                  by (smt (verit, ccfv_SIG) RInst \<open>fst (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> \<open>lbls = _\<close> \<open>lbls' = _\<close> fst_conv fun_upd_apply label_hm_rel_def label_rel_def option.discI option.sel state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) trace_defined)
               qed
             qed
           qed
@@ -1005,9 +1023,9 @@ proof -
             assume "snd (label_hm_translation ?Tr2) lbl = Some h"
             then obtain \<phi> where
               trace_defined: "get_trace_total \<omega> lbl = Some \<phi>"
-              by (smt (verit, ccfv_threshold) RInst assms(3) assms(7) domI label_hm_rel_def label_rel_def map_le_def snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) upd_None_map_le)
+              by (smt (verit, ccfv_threshold) RInst \<open>lbls = _\<close> \<open>lbls' = _\<close> domI label_hm_rel_def label_rel_def map_le_def snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) upd_None_map_le)
             show "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> mask_var_rel Pr (var_context ctxt) TyRep (field_translation  ?Tr2) h (get_mh_total \<phi>) ns"
-              by (smt (verit, ccfv_SIG) RInst \<open>snd (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> assms(3) assms(7) fun_upd_apply label_hm_rel_def label_rel_def option.discI snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
+              by (smt (verit, ccfv_SIG) RInst \<open>snd (label_hm_translation (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) lbl = Some h\<close> \<open>lbls = _\<close> \<open>lbls' = _\<close> fun_upd_apply label_hm_rel_def label_rel_def option.discI snd_conv state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9))
           qed
           show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
             by (meson RInst label_hm_rel_def state_rel_label_hm_rel)
@@ -1034,18 +1052,10 @@ proof -
           assume premise: "consistent_state_rel_opt (state_rel_opt Tr')"
           show "StateCons ?\<omega>def_old \<and> StateCons ?\<omega>_old"
           proof (intro conjI)
-            have "state_rel_opt Tr' = state_rel_opt Tr"
-              using \<open>Tr' = _\<close>
-              by (simp)
-            hence "consistent_state_rel_opt (state_rel_opt Tr)"
-              using premise
-              by simp
-            hence a: "StateCons \<omega>def \<and> StateCons \<omega>"
-              using RInst state_rel_consistent by blast
-            (* sorry these for now, until we figure out how to incorporate StateCons into the trace *)
-            (* use last conjunct of wf_total_consistency *)
-            show "StateCons ?\<omega>def_old" sorry
-            show "StateCons ?\<omega>_old" sorry
+            show "StateCons ?\<omega>def_old"
+              by (metis WfTotalConsistency get_trace_empty_full_total_state is_empty_empty_full_total_state wf_total_consistency_def)
+            thus "StateCons ?\<omega>_old"
+              using RInst WfTotalConsistency state_rel_eval_welldef_eq total_consistency_store_update by fastforce
           qed
         qed
         show "type_interp ctxt = vbpl_absval_ty TyRep"
@@ -1078,9 +1088,9 @@ proof -
             show "get_trace_total \<omega> lbl = Some \<phi>"
               by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
             show "fst (label_hm_translation Tr) lbl = Some (heap_var Tr')"
-              using OldH assms(3) assms(8) by force
+              using OldH \<open>lbls = _\<close> \<open>Tr' = _\<close> by force
           qed
-          thus ?thesis using \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(8) by fastforce
+          thus ?thesis using \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>Tr' = _\<close> by fastforce
         qed
         show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full ?\<omega>_old) ns"
         proof -
@@ -1091,9 +1101,9 @@ proof -
             show "get_trace_total \<omega> lbl = Some \<phi>"
               by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
             show "snd (label_hm_translation Tr) lbl = Some (mask_var Tr')"
-              using OldM assms(3) assms(8) by fastforce
+              using OldM \<open>lbls = _\<close> \<open>Tr' = _\<close> by fastforce
           qed
-          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(8))
+          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = _\<close> \<open>Tr' = _\<close>)
         qed
         show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full ?\<omega>def_old) ns"
         proof -
@@ -1104,10 +1114,10 @@ proof -
             show "get_trace_total \<omega> lbl = Some \<phi>"
               by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
             show "fst (label_hm_translation Tr) lbl = Some (heap_var_def Tr')"
-              using OldH assms(3) assms(8) by force
+              using OldH \<open>lbls = _\<close> \<open>Tr' = _\<close> by force
           qed
           thus ?thesis
-            by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(8))
+            by (simp add: \<open>get_trace_total \<omega> lbl = _\<close> \<open>Tr' = _\<close>)
         qed
         show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full ?\<omega>def_old) ns"
         proof - 
@@ -1118,9 +1128,9 @@ proof -
             show "get_trace_total \<omega> lbl = Some \<phi>"
               by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close>)
             show "snd (label_hm_translation Tr) lbl = Some (mask_var_def Tr')"
-              using OldM assms(3) assms(8) by fastforce
+              using OldM \<open>lbls = _\<close> \<open>Tr' = _\<close> by fastforce
           qed
-          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> assms(8))
+          thus ?thesis by (simp add: \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>Tr' = _\<close>)
         qed
         show "field_rel Pr ?\<Lambda> (field_translation Tr') ns"
           using RInst \<open>Tr' = _\<close> state_rel_field_rel
@@ -1135,7 +1145,7 @@ proof -
           using RInst state_rel_aux_vars_pred_sat
           by fast    
         show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns"
-          using \<open>state_rel Pr StateCons TyRep (Tr\<lparr>label_hm_translation := lbls'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns\<close> assms(8) state_rel_label_hm_rel by force
+          using \<open>state_rel Pr StateCons TyRep (Tr\<lparr>label_hm_translation := lbls'\<rparr>) AuxPred ctxt \<omega>def \<omega> ns\<close> \<open>Tr' = _\<close> state_rel_label_hm_rel by force
       qed
     
       \<comment>\<open>Step 3: capture original heap and mask variables in auxiliary variables\<close>
@@ -1343,7 +1353,7 @@ next
     case RedSubFailure
     hence "ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t VFailure"
       by (fastforce elim: red_pure_exps_total_singleton)
-    then show ?thesis using assms wf_rel_failure_elim
+    then show ?thesis using assms(1) wf_rel_failure_elim
       using \<open>R \<omega>def \<omega> ns\<close> by blast
   qed
 qed

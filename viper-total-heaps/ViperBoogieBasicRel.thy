@@ -1423,7 +1423,7 @@ lemma state_rel0_label_hm_rel:
   by (simp add: state_rel0_def)
 
 lemmas state_rel_label_hm_rel = state_rel0_label_hm_rel[OF state_rel_state_rel0]
-
+                                   
 lemma state_rel0_label_hm_disjoint:
   assumes "state_rel0 Pr StateCons A \<Lambda> TyRep Tr AuxPred \<omega>def \<omega> ns"
   shows "vars_label_hm_tr (label_hm_translation Tr) \<inter> ( {heap_var Tr, heap_var_def Tr} \<union>
