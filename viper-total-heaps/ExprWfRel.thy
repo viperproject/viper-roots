@@ -760,6 +760,8 @@ proof -
         sorry \<comment>\<open>There should be an auxiliary lemma in ViperBoogieBasicRel that shows this 
               (this lemma can then also be used for the final goal of this theorem)\<close>
 
+      (* Should add a lemma that says this, could be obtains or shows *)
+
 \<comment>\<open>In a first step, let's revert the heap and mask, while leaving the labels.\<close>
 
       let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
@@ -1205,7 +1207,7 @@ proof -
             thus ?thesis
             proof cases
               case MDef
-                (* this holds because it held initially state_rel omegadef omega *)
+                (* these are statements about the "current" state and they hold because RPrev says them inside the state_rel0 definition *)
               then show ?thesis sorry
             next
               case M
