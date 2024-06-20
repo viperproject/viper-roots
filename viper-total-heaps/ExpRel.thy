@@ -344,6 +344,7 @@ lemma exp_rel_oldexp_inst:
       and "snd (label_hm_translation Tr) lbl = Some OldM"
       and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH \<rparr>"
       and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and DisjAux: "OldM \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldH \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldM \<noteq> OldH"
       and InnerExpRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep TrOld AuxPred ctxt) ctxt_vpr ctxt e e_bpl"
                    (is "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl")
                  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
@@ -423,8 +424,28 @@ proof (rule exp_rel_oldexp)
         by force
     next
       show "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
-        (* TODO *)
-        sorry
+      proof -
+        let ?TrOldHeap = "Tr \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
+        have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
+        proof (rule disjoint_list_change_heap)
+          show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+            using StateRel state_rel_disjoint
+            by blast
+          show "OldH \<notin> state_rel0_disj_vars Tr AuxPred"
+            using DisjAux
+            by fast
+        qed (simp)
+
+        thus "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
+        proof (rule disjoint_list_change_mask)
+          show "OldM \<notin> state_rel0_disj_vars ?TrOldHeap AuxPred"
+            using DisjAux
+            by simp
+          show "TrOld = ?TrOldHeap \<lparr> mask_var := OldM, mask_var_def := OldM \<rparr>"
+            using \<open>TrOld = _\<close>
+            by simp
+        qed
+      qed
     next
       show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old"
         using StateRel state_rel_eval_welldef_eq
