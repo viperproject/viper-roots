@@ -83,45 +83,6 @@ lemma typed_intersection:
   by (meson assms inf.cobounded1 typed_subset)
 
 
-lemma self_framing_star_alt:
-  assumes "self_framing_typed \<Delta> A"
-      and "framed_by_alt A P"
-      and "wf_assertion \<Delta> A"
-    shows "self_framing_typed \<Delta> (A \<otimes> P)"
-proof (rule self_framing_typedI)
-  fix \<omega> assume asm0: "typed \<Delta> \<omega>"
-  show "(\<omega> \<in> A \<otimes> P) = (stabilize \<omega> \<in> A \<otimes> P)"
-  proof
-    assume "\<omega> \<in> A \<otimes> P"
-    then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
-      by (meson x_elem_set_product)
-    then obtain \<omega>' where "Some \<omega>' = stabilize a \<oplus> p"
-      by (metis asso3 commutative decompose_stabilize_pure option.exhaust_sel)
-    then have "rel_stable_assertion_alt (stabilize a) P"
-      using \<open>a \<in> A\<close> assms(1) assms(2) framed_by_alt_def
-      by (metis (no_types, lifting) assms(3) self_framing_typed_def stabilize_is_stable typed_assertionE wf_assertion_def)
-    then have "stabilize \<omega>' \<in> {stabilize a} \<otimes> P"
-      by (meson Stable_def \<open>Some \<omega>' = stabilize a \<oplus> p\<close> \<open>p \<in> P\<close> in_Stabilize is_in_set_sum rel_stable_assertion_alt_def subsetD)
-    moreover have "stabilize \<omega>' = stabilize \<omega>"
-      by (metis (no_types, lifting) \<open>Some \<omega> = a \<oplus> p\<close> \<open>Some \<omega>' = stabilize a \<oplus> p\<close> already_stable option.inject stabilize_is_stable stabilize_sum)
-    ultimately show "stabilize \<omega> \<in> A \<otimes> P"
-      by (metis \<open>a \<in> A\<close> assms(1) assms(3) star_to_singletonI typed_assertionE typed_state.self_framing_typed_def typed_state.wf_assertion_def typed_state_axioms)
-  next
-    assume "stabilize \<omega> \<in> A \<otimes> P"
-    then obtain a p where "a \<in> A" "p \<in> P" "Some (stabilize \<omega>) = a \<oplus> p"
-      by (meson x_elem_set_product)
-    then obtain a' where "Some a' = a \<oplus> |\<omega>|"
-      by (metis (mono_tags, opaque_lifting) asso2 commutative decompose_stabilize_pure option.exhaust_sel)
-    then have "Some \<omega> = a' \<oplus> p"
-      by (metis (no_types, lifting) \<open>Some (stabilize \<omega>) = a \<oplus> p\<close> asso1 commutative decompose_stabilize_pure)
-    then have "a' \<in> A" using wf_assertionE[OF assms(3), of a' a]
-      by (metis \<open>Some a' = a \<oplus> |\<omega>|\<close> \<open>a \<in> A\<close> asm0 assms(1) assms(3) plus_pure_stabilize_eq typed_state.self_framing_typedE typed_state.self_framing_typed_altE typed_state.typed_assertionE typed_state.typed_core typed_state.typed_sum typed_state_axioms wf_assertion_def)
-    then show "\<omega> \<in> A \<otimes> P"
-      using \<open>Some \<omega> = a' \<oplus> p\<close> \<open>p \<in> P\<close> x_elem_set_product by blast
-  qed
-qed
-
-
 lemma self_framing_typed_star:
   assumes "self_framing_typed \<Delta> A"
       and "framed_by A P" (* TODO: should this be changed as well? *)
@@ -129,36 +90,23 @@ lemma self_framing_typed_star:
 proof (rule self_framing_typedI)
   fix \<omega>
   assume asm0: "typed \<Delta> \<omega>"
-  show "\<omega> \<in> A \<otimes> P \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> P" (is "?A \<longleftrightarrow> ?B")
+  show "(\<omega> \<in> A \<otimes> P) = (stabilize \<omega> \<in> A \<otimes> P)"
   proof
-    assume ?A
+    assume "\<omega> \<in> A \<otimes> P"
     then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
-      by (meson x_elem_set_product)
-    then have "stabilize a \<in> A"
-      using asm0 assms(1) greater_def self_framing_typedE typed_smaller by blast
-    moreover have "Some (stabilize \<omega>) = stabilize a \<oplus> stabilize p"
-      by (simp add: \<open>Some \<omega> = a \<oplus> p\<close> stabilize_sum)
-    then have "|stabilize a| ## stabilize p"
-      by (meson core_stabilize_mono(1) defined_comm greater_def greater_equiv smaller_compatible smaller_compatible_core)
-    then obtain pp where "Some pp = |stabilize a| \<oplus> stabilize p"
-      by (metis defined_def not_Some_eq)
-    then have "Some (stabilize \<omega>) = stabilize a \<oplus> pp"
-      by (metis (no_types, lifting) \<open>Some (stabilize \<omega>) = stabilize a \<oplus> stabilize p\<close> asso1 core_is_smaller)
-    moreover have "(p \<in> P) = (pp \<in> P)"
-    proof (rule rel_stable_assertionE[of "stabilize a" P p pp])
-      show "rel_stable_assertion (stabilize a) P"
-        using assms(2) framed_by_def stabilize_is_stable \<open>stabilize a \<in> A\<close> by blast
-      show "stabilize a ## p"
-        by (metis \<open>Some \<omega> = a \<oplus> p\<close> asso2 commutative decompose_stabilize_pure defined_def not_None_eq)
-      show "pure_larger pp (stabilize p)"
-        by (metis \<open>Some pp = |stabilize a| \<oplus> stabilize p\<close> commutative core_is_pure pure_def pure_larger_def)
-      show "pp \<succeq> |stabilize a|"
-        using \<open>Some pp = |stabilize a| \<oplus> stabilize p\<close> greater_def by auto
-    qed
-    ultimately show ?B
-      using \<open>p \<in> P\<close> x_elem_set_product by blast
+      using x_elem_set_product by blast
+    then obtain \<omega>' where "Some \<omega>' = stabilize a \<oplus> p"
+      by (metis asso3 commutative decompose_stabilize_pure option.exhaust_sel)
+    then have "rel_stable_assertion (stabilize a) P"
+      by (meson \<open>Some \<omega> = a \<oplus> p\<close> \<open>a \<in> A\<close> asm0 assms(1) assms(2) framed_by_def greater_def stabilize_is_stable typed_state.self_framing_typedE typed_state.typed_smaller typed_state_axioms)
+    then have "stabilize \<omega>' \<in> {stabilize a} \<otimes> P"
+      by (meson Stable_def \<open>Some \<omega>' = stabilize a \<oplus> p\<close> \<open>p \<in> P\<close> in_Stabilize is_in_set_sum rel_stable_assertion_def subsetD)
+    moreover have "stabilize \<omega>' = stabilize \<omega>"
+      by (metis (no_types, lifting) \<open>Some \<omega> = a \<oplus> p\<close> \<open>Some \<omega>' = stabilize a \<oplus> p\<close> already_stable option.inject stabilize_is_stable stabilize_sum)
+    ultimately show "stabilize \<omega> \<in> A \<otimes> P"
+      by (metis \<open>Some \<omega> = a \<oplus> p\<close> \<open>a \<in> A\<close> asm0 assms(1) greater_def star_to_singletonI typed_smaller typed_state.self_framing_typedE typed_state_axioms)
   next
-    assume ?B
+    assume "stabilize \<omega> \<in> A \<otimes> P"
     then obtain a p where "a \<in> A" "p \<in> P" "Some (stabilize \<omega>) = a \<oplus> p"
       by (meson x_elem_set_product)
     moreover obtain aa where "Some aa = a \<oplus> |\<omega>|"
@@ -166,11 +114,12 @@ proof (rule self_framing_typedI)
     then have "Some \<omega> = aa \<oplus> p"
       by (metis (no_types, lifting) asso1 calculation(3) commutative decompose_stabilize_pure)
     moreover have "aa \<in> A"
-      by (metis (no_types, lifting) \<open>Some aa = a \<oplus> |\<omega>|\<close> asm0 assms(1) calculation(1) calculation(4) greater_def plus_pure_stabilize_eq self_framing_typedE self_framing_typed_altE typed_smaller)
-    ultimately show ?A
+      by (metis (no_types, lifting) \<open>Some aa = a \<oplus> |\<omega>|\<close> asm0 assms(1) calculation(1) calculation(4) in_set_sum plus_pure_stabilize_eq self_framing_typed_def singletonD singletonI sum_then_singleton typed_smaller)
+    ultimately show "\<omega> \<in> A \<otimes> P"
       using x_elem_set_product by blast
   qed
 qed
+
 
 
 lemma typed_store_update:
@@ -1667,8 +1616,6 @@ next
   then show ?case using red_wf_complete[OF \<open>SL_Custom \<Delta> A C B\<close>]
     by (meson RedCustom RuleCustom.hyps(1) RuleCustom.prems(1) RuleCustom.prems(2) RuleCustom.prems(3) typed_assertion_def typed_def wf_abs_stmt.simps(10))
 qed
-
-
 
 
 

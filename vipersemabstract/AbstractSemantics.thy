@@ -276,7 +276,7 @@ proof (rule self_framing_typedI)
   fix \<omega>
   assume asm0: "typed \<Delta> \<omega>"
   then show "(\<omega> \<in> Stabilize_typed \<Delta> A) = (stabilize \<omega> \<in> Stabilize_typed \<Delta> A)"
-    by (simp add: Stabilize_typed_def already_stable stabilize_is_stable typed_then_stabilize_typed)
+    by (simp add: Stabilize_typed_def already_stable typed_then_stabilize_typed)
 qed
 
 lemma typed_state_then_stabilize_typed:
