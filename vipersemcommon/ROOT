@@ -16,4 +16,3 @@ session ViperCommon = "HOL" +
         PosReal
         PartialMap
         SepAlgebra
-        LiftSepAlgebra
