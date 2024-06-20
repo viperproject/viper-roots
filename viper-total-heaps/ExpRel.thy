@@ -339,20 +339,23 @@ proof (rule exp_rel_vpr_bpl_intro)
 qed
 
 lemma exp_rel_oldexp_inst:
-  assumes "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+  assumes RImpliesStateRel: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and "fst (label_hm_translation Tr) lbl = Some OldH"
       and "snd (label_hm_translation Tr) lbl = Some OldM"
       and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH \<rparr>"
+      and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       and InnerExpRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep TrOld AuxPred ctxt) ctxt_vpr ctxt e e_bpl"
                    (is "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl")
                  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
-  sorry (* prove this *)
-(*proof (rule exp_rel_oldexp)
+proof (rule exp_rel_oldexp)
 
   show "\<forall> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<longrightarrow> ?ROld (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns"
   proof (intro allI, intro impI)
     fix \<omega>def \<omega> ns
     assume R: "R \<omega>def \<omega> ns"
+    hence StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      using RImpliesStateRel
+      by simp
     (* Define some common abbreviations *)
     let ?\<Lambda> = "var_context ctxt"
     let ?FieldTr = "field_translation Tr"
@@ -365,12 +368,12 @@ lemma exp_rel_oldexp_inst:
     let ?\<omega>_old =    "\<omega>    \<lparr>get_total_full := the (?\<omega>_trace lbl)\<rparr>"
 
     show "?ROld ?\<omega>def_old ?\<omega>_old ns"
-    proof (subst \<open>ROld = _\<close>, subst state_rel_def, subst state_rel0_def, intro conjI)
+    proof (subst state_rel_def, subst state_rel0_def, intro conjI)
       show "valid_heap_mask (get_mh_total_full ?\<omega>def_old)"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
-          by fast
+          by blast
         then obtain \<phi> where "?\<omega>_trace lbl = Some \<phi>"
           using \<open>fst (label_hm_translation Tr) lbl = _\<close> label_hm_rel_def label_rel_def
           by meson
@@ -384,7 +387,7 @@ lemma exp_rel_oldexp_inst:
     next
       show "valid_heap_mask (get_mh_total_full ?\<omega>_old)"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
           by fast
         then obtain \<phi> where "?\<omega>_trace lbl = Some \<phi>"
@@ -412,31 +415,32 @@ lemma exp_rel_oldexp_inst:
       qed
     next
       show "type_interp ctxt = vbpl_absval_ty TyRep"
-        using R \<open>R = _\<close> state_rel_type_interp
+        using StateRel state_rel_type_interp
         by blast
     next
       show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation TrOld) (get_store_total ?\<omega>_old) ns"
-        using R \<open>R = _\<close> state_rel_store_rel \<open>TrOld = _\<close>
+        using StateRel state_rel_store_rel \<open>TrOld = _\<close>
         by force
     next
       show "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
+        (* TODO *)
         sorry
     next
       show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old"
-        using R \<open>R = _\<close> state_rel_eval_welldef_eq
+        using StateRel state_rel_eval_welldef_eq
         by fastforce
     next
       show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old"
-        using R \<open>R = _\<close> state_rel_eval_welldef_eq
+        using StateRel state_rel_eval_welldef_eq
         by fastforce
     next
       show "get_h_total_full ?\<omega>def_old = get_h_total_full ?\<omega>_old"
-        using R \<open>R = _\<close> state_rel_eval_welldef_eq
+        using StateRel state_rel_eval_welldef_eq
         by fastforce
     next
       show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld (heap_var TrOld) (get_hh_total_full ?\<omega>_old) ns"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
           by fast
         hence "label_rel (\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>)) (fst ?LabelMap) ?\<omega>_trace ns"
@@ -454,7 +458,7 @@ lemma exp_rel_oldexp_inst:
     next
       show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld (mask_var TrOld) (get_mh_total_full ?\<omega>_old) ns"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
           by fast
         hence "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)) (snd ?LabelMap) ?\<omega>_trace ns"
@@ -472,7 +476,7 @@ lemma exp_rel_oldexp_inst:
     next
       show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld (heap_var_def TrOld) (get_hh_total_full ?\<omega>def_old) ns"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
           by fast
         hence "label_rel (\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>)) (fst ?LabelMap) ?\<omega>_trace ns"
@@ -490,7 +494,7 @@ lemma exp_rel_oldexp_inst:
     next
       show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld (mask_var_def TrOld) (get_mh_total_full ?\<omega>def_old) ns"
       proof -
-        from R \<open>R = _\<close> have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
+        from StateRel have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr ?LabelMap ?\<omega>_trace ns"
           using state_rel_label_hm_rel
           by fast
         hence "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)) (snd ?LabelMap) ?\<omega>_trace ns"
@@ -507,34 +511,30 @@ lemma exp_rel_oldexp_inst:
       qed
     next
       show "field_rel Pr ?\<Lambda> ?FieldTrOld ns"
-        using R \<open>R = _\<close> state_rel_field_rel \<open>TrOld = _\<close>
+        using StateRel state_rel_field_rel \<open>TrOld = _\<close>
         by fastforce
     next
       show "boogie_const_rel (const_repr TrOld) ?\<Lambda> ns"
-        using R \<open>R = _\<close> state_rel_boogie_const_rel \<open>TrOld = _\<close>
+        using StateRel state_rel_boogie_const_rel \<open>TrOld = _\<close>
         by fastforce
     next
       show "state_well_typed (type_interp ctxt) ?\<Lambda> [] ns"
-        using R \<open>R = _\<close> state_rel_state_well_typed
+        using StateRel state_rel_state_well_typed
         by fast
     next
       show "aux_vars_pred_sat ?\<Lambda> AuxPred ns"
-        using R \<open>R = _\<close> state_rel_aux_vars_pred_sat
+        using StateRel state_rel_aux_vars_pred_sat
         by fast
     next
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
-        using R \<open>R = _\<close> state_rel_label_hm_rel \<open>TrOld = _\<close>
+        using StateRel state_rel_label_hm_rel \<open>TrOld = _\<close>
         by fastforce
-    next
-      show "Q ?\<omega>def_old ?\<omega>_old"
-        using R \<open>R = _\<close> QimpliesQOld
-        by simp
     qed
   qed
 
-  show "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
+  show "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl"
     by (simp add: InnerExpRel)
-qed*)
+qed
 
 
 subsubsection \<open>Binary Operations\<close>
