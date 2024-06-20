@@ -752,6 +752,71 @@ proof (cases v)
     using type_interp_rel_wf_def type_interp_rel_wf_vbpl by blast
 qed (insert assms, auto)
 
+subsection \<open>Disjointness\<close>
+
+lemma disjoint_list_change_heap:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and hPrimeNew: "h' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := h' \<rparr>"
+    shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+proof -
+  let ?xs = "[]"
+  let ?M = "{heap_var Tr, heap_var_def Tr}"
+  let ?ys = "[{mask_var Tr, mask_var_def Tr},
+              (ran (var_translation Tr)), 
+              (ran (field_translation Tr)),
+              (range (const_repr Tr)),
+              dom AuxPred,
+              vars_label_hm_tr (label_hm_translation Tr)]"
+
+  have "disjoint_list ((?xs @ {} # ?ys))"
+  proof (rule disjoint_list_one_subset)
+    show "disjoint_list (?xs @ (?M # ?ys))"
+      using disjointList by simp
+  qed (simp)
+
+  hence "disjoint_list (?xs @ ({} \<union> {h'}) # ?ys)"
+  proof (rule disjoint_list_add)
+    show "\<forall>A\<in>set (?xs @ ?ys). h' \<notin> A"
+      using hPrimeNew by simp
+  qed
+
+  thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+    using \<open>Tr' = _\<close>
+    by simp
+qed
+
+lemma disjoint_list_change_mask:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and mPrimeNew: "m' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := m' \<rparr>"
+    shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+proof -
+  let ?xs = "[{heap_var Tr, heap_var_def Tr}]"
+  let ?M = "{mask_var Tr, mask_var_def Tr}"
+  let ?ys = "[(ran (var_translation Tr)), 
+              (ran (field_translation Tr)),
+              (range (const_repr Tr)),
+              dom AuxPred,
+              vars_label_hm_tr (label_hm_translation Tr)]"
+
+  have "disjoint_list ((?xs @ {} # ?ys))"
+  proof (rule disjoint_list_one_subset)
+    show "disjoint_list (?xs @ (?M # ?ys))"
+      using disjointList by simp
+  qed (simp)
+
+  hence "disjoint_list (?xs @ ({} \<union> {m'}) # ?ys)"
+  proof (rule disjoint_list_add)
+    show "\<forall>A\<in>set (?xs @ ?ys). m' \<notin> A"
+      using mPrimeNew by simp
+  qed
+
+  thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+    using \<open>Tr' = _\<close>
+    by simp
+qed
+
 subsection \<open>Tactics\<close>
 
 text \<open>This tactic enumerates all options for the integer quantifier in the generated premise from 0 
