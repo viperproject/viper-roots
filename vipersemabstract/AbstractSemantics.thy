@@ -386,8 +386,17 @@ definition at_least_two_elems:
 subsection \<open>wf_assertion\<close>
 
 definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+  "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> (\<forall>x' x. pure_larger x' x \<and> typed \<Delta> x' \<and> x \<in> A \<longrightarrow> x' \<in> A)"
 
+lemma wf_assertionE:
+  assumes "wf_assertion \<Delta> A"
+      and "pure_larger x' x"
+      and "typed \<Delta> x'"
+      and "x \<in> A"
+    shows "x' \<in> A"
+  using assms(1) assms(2) assms(3) assms(4) typed_state.wf_assertion_def typed_state_axioms by blast
+
+(*
 lemma self_framing_wfI:
   assumes "wf_assertion \<Delta> A"
       and "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> stabilize \<omega> \<in> A"
@@ -404,7 +413,7 @@ proof -
   qed
   then show "\<forall>\<omega>. (\<omega> \<in> A) = (stabilize \<omega> \<in> A)" using assms(2) by blast
 qed
-
+*)
 
 definition exists_assert :: "('v, 'c) abs_type_context \<Rightarrow> var \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
   "exists_assert \<Delta> x A =

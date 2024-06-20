@@ -783,6 +783,13 @@ lemma and_entails_star:
 end
 *)
 
+definition rel_stable_assertion_alt where
+(*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>\<omega>'. \<omega> ## \<omega>' \<longrightarrow> (A \<omega>' \<longleftrightarrow> A (stabilize_rel \<omega> \<omega>')))" *)
+  "rel_stable_assertion_alt \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> A)"
+(*
+
+(\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (a \<in> A \<longleftrightarrow> x \<in> A))"
+*)
 
 text \<open>The truth of A in a only depends on parts of a (for a ## \<omega>) that:
 1) are stable, or
@@ -862,6 +869,9 @@ qed
 definition framed_by where
   "framed_by A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion \<omega> B)"
 
+definition framed_by_alt where
+  "framed_by_alt A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion_alt \<omega> B)"
+
 definition framed_by_exp where
   "framed_by_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> \<noteq> None)"
 
@@ -927,10 +937,15 @@ lemma rel_stable_assertionE:
     shows "a \<in> A \<longleftrightarrow> x \<in> A"
   using assms(1) assms(2) assms(3) assms(4) rel_stable_assertion_def by blast
 
+thm rel_stable_assertion_alt_def
 
+(*
+  "Stable A \<longleftrightarrow> (A \<subseteq> Stabilize A)"
 
-definition rel_stable_assertion_alt where
-  "rel_stable_assertion_alt \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> A)"
+lemma rel_stable_assertion_alt:
+  "rel_stable_assertion_alt \<omega> A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longrightarrow> stabilize \<omega> \<in> A)"
+  unfolding rel_stable_assertion_alt_def Stable_def Stabilize_def
+*)
 
 definition framed_by_alt where
   "framed_by_alt A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion_alt \<omega> B)"
