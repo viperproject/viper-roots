@@ -339,17 +339,17 @@ proof (rule exp_rel_vpr_bpl_intro)
 qed
 
 lemma exp_rel_oldexp_inst:
-  assumes "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
+  assumes "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and "fst (label_hm_translation Tr) lbl = Some OldH"
       and "snd (label_hm_translation Tr) lbl = Some OldM"
       and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH \<rparr>"
-      and "ROld = state_rel Pr StateCons TyRep TrOld AuxPred ctxt"
-      and InnerExpRel: "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
-      and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
-proof (rule exp_rel_oldexp)
+      and InnerExpRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep TrOld AuxPred ctxt) ctxt_vpr ctxt e e_bpl"
+                   (is "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl")
+                 shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
+  sorry (* prove this *)
+(*proof (rule exp_rel_oldexp)
 
-  show "\<forall> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<longrightarrow> ROld (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns"
+  show "\<forall> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<longrightarrow> ?ROld (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns"
   proof (intro allI, intro impI)
     fix \<omega>def \<omega> ns
     assume R: "R \<omega>def \<omega> ns"
@@ -364,7 +364,7 @@ proof (rule exp_rel_oldexp)
     let ?\<omega>def_old = "\<omega>def \<lparr>get_total_full := the (?\<omega>_trace lbl)\<rparr>"
     let ?\<omega>_old =    "\<omega>    \<lparr>get_total_full := the (?\<omega>_trace lbl)\<rparr>"
 
-    show "ROld ?\<omega>def_old ?\<omega>_old ns"
+    show "?ROld ?\<omega>def_old ?\<omega>_old ns"
     proof (subst \<open>ROld = _\<close>, subst state_rel_def, subst state_rel0_def, intro conjI)
       show "valid_heap_mask (get_mh_total_full ?\<omega>def_old)"
       proof -
@@ -525,12 +525,16 @@ proof (rule exp_rel_oldexp)
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
         using R \<open>R = _\<close> state_rel_label_hm_rel \<open>TrOld = _\<close>
         by fastforce
+    next
+      show "Q ?\<omega>def_old ?\<omega>_old"
+        using R \<open>R = _\<close> QimpliesQOld
+        by simp
     qed
   qed
 
   show "exp_rel_vpr_bpl ROld ctxt_vpr ctxt e e_bpl"
     by (simp add: InnerExpRel)
-qed
+qed*)
 
 
 subsubsection \<open>Binary Operations\<close>
