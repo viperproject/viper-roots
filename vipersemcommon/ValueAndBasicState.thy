@@ -23,7 +23,7 @@ datatype ref = is_address: Address (the_address: address) | Null
 subsection \<open>Viper (extended) values\<close>
 
 text \<open>The abstract type parameter in the values is the carrier type for domain values\<close>
-datatype (discs_sels) 'a val = VInt int | VBool bool | VPerm real | VRef ref | VAbs 'a
+datatype (discs_sels) 'a val = VInt (the_int: int) | VBool bool | VPerm real | VRef (the_ref: ref) | VAbs 'a
 
 type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 
