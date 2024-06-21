@@ -712,7 +712,11 @@ lemma old_expr_wf_rel_inst:
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
-      and DisjAux: "OldH \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldM \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldH \<noteq> OldM"
+      (* How to frame this assumption ?
+      and DisjAux: "OldH \<notin> (state_rel0_disj_vars Tr AuxPred - vars_label_hm_tr (label_hm_translation Tr)) \<and>
+                    OldM \<notin> (state_rel0_disj_vars Tr AuxPred - vars_label_hm_tr (label_hm_translation Tr)) \<and>
+                    OldH \<noteq> OldM"
+      *)
       and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
       and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
@@ -1072,35 +1076,36 @@ proof -
         qed
         show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
         proof -
-          (* First, change the heap *)
-          let ?TrOldHeap = "Tr \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
-          have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
-          proof (rule disjoint_list_change_heap)
+          (* First, remove the labels *)
+          let ?TrNoLabels = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+          have "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
+          proof (rule disjoint_list_remove_label)
             show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
               using RInst state_rel_disjoint by blast
-            show "OldH \<notin>  \<Union> (set (ViperBoogieRelUtil.state_rel0_disj_list Tr AuxPred))"
-              using DisjAux by simp
+          next
+            show "lbls' = ((fst (label_hm_translation Tr))(lbl := None),
+                          (snd (label_hm_translation Tr))(lbl := None))"
+              using \<open>Tr' = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close> by simp
+          qed (simp add: \<open>Tr' = _\<close>)
+
+          (* Next, change the heap *)
+          let ?TrOldHeap = "?TrNoLabels \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
+          have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
+          proof (rule disjoint_list_change_heap)
+            show "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
+              using \<open>disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)\<close>
+              by simp
+            show "OldH \<notin> \<Union> (set (state_rel0_disj_list ?TrNoLabels AuxPred))"
+              sorry
           qed (simp)
 
-          (* Next, change the mask *)
-          let ?TrOld = "?TrOldHeap \<lparr> mask_var := OldM, mask_var_def := OldM \<rparr>"
-          have "disjoint_list (state_rel0_disj_list ?TrOld AuxPred)"
+          (* Finally, change the mask *)
+          show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
           proof (rule disjoint_list_change_mask)
             show "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
               using \<open>disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)\<close> by simp
-            show "OldM \<notin>  \<Union> (set (ViperBoogieRelUtil.state_rel0_disj_list ?TrOldHeap AuxPred))"
-              using DisjAux by simp
-          qed (simp)
-
-          (* Finally, remove lbl from labels *)
-          show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
-          proof (rule disjoint_list_remove_label)
-            show "disjoint_list (ViperBoogieRelUtil.state_rel0_disj_list ?TrOld AuxPred)"
-              using \<open>disjoint_list (state_rel0_disj_list ?TrOld AuxPred)\<close> by simp
-          next
-            show "label_hm_translation Tr' = ((fst (label_hm_translation ?TrOld))(lbl := None),
-                                              (snd (label_hm_translation ?TrOld))(lbl := None))"
-              using \<open>Tr' = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close> by simp
+            show "OldM \<notin>  \<Union> (set (state_rel0_disj_list ?TrOldHeap AuxPred))"
+              sorry
           qed (simp add: \<open>Tr' = _\<close>)
         qed
         show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
@@ -1214,7 +1219,64 @@ proof -
         show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total ?\<omega>_old) ns "
           using state_rel_\<omega>_old state_rel_label_hm_rel by blast
         show "disjoint_list (state_rel0_disj_list Tr' (?AuxPredFun \<omega>def \<omega>))"
-          sorry
+        proof -
+          let ?xs = "[{heap_var Tr', heap_var_def Tr'},
+                      {mask_var Tr', mask_var_def Tr'},
+                      (ran (var_translation Tr')), 
+                      (ran (field_translation Tr')),
+                      (range (const_repr Tr'))]"
+          let ?M = "dom AuxPred"
+          let ?M' = "{ mdef, m, hdef, h }"
+          let ?ys = "[vars_label_hm_tr (label_hm_translation Tr')]"
+          have "dom (?AuxPredFun \<omega>def \<omega>) = ?M \<union> ?M'" by fastforce
+          have "disjoint_list (?xs@((?M \<union> ?M')#?ys))"
+          proof (rule disjoint_list_add_set)
+            show "disjoint_list (?xs @ (dom AuxPred # ?ys))"
+              using state_rel_\<omega>_old state_rel_disjoint by fastforce
+            show "\<forall>A\<in>set (?xs @ ?ys). disjnt ?M' A"
+            proof (intro ballI)
+              fix A
+              assume "A \<in> set (?xs @ ?ys)"
+              hence "A = {heap_var Tr', heap_var_def Tr'} \<or>
+                     A = {mask_var Tr', mask_var_def Tr'} \<or>
+                     A = ran (var_translation Tr') \<or>
+                     A = ran (field_translation Tr') \<or>
+                     A = range (const_repr Tr') \<or>
+                     A = vars_label_hm_tr (label_hm_translation Tr')"
+                by simp
+              then consider (HeapVars)      "A = {heap_var Tr', heap_var_def Tr'}"
+                          | (MaskVars)      "A = {mask_var Tr', mask_var_def Tr'}"
+                          | (VarTrans)      "A = ran (var_translation Tr')"
+                          | (FieldTrans)    "A = ran (field_translation Tr')"
+                          | (ConstRepr)     "A = range (const_repr Tr')"
+                          | (HMTranslation) "A = vars_label_hm_tr (label_hm_translation Tr')"
+                by fast
+              thus "disjnt ?M' A"
+              proof (cases)
+                case HeapVars
+                show ?thesis sorry
+              next
+                case MaskVars
+                show ?thesis sorry
+              next
+                case VarTrans
+                show ?thesis sorry
+              next
+                case FieldTrans
+                show ?thesis sorry
+              next
+                case ConstRepr
+                show ?thesis sorry
+              next
+                case HMTranslation
+                show ?thesis sorry
+              qed
+            qed
+          qed
+          thus ?thesis
+            using \<open>Tr' = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close>  \<open>dom (?AuxPredFun \<omega>def \<omega>) = ?M \<union> ?M'\<close>
+            by simp
+        qed
         show "aux_vars_pred_sat ?\<Lambda> (?AuxPredFun \<omega>def \<omega>) ns"
           unfolding aux_vars_pred_sat_def
         proof(intro allI, rule impI)
