@@ -1152,6 +1152,27 @@ lemma a2t2a_state[simp] :
   by (rule a2t_stateI; simp add:assms a2t_states_in_stable)
 
 
+subsection \<open>well_typedly\<close>
+
+lemma in_well_typedly :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  shows "\<omega> \<in> well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A
+     \<longleftrightarrow> \<omega> \<in> A"
+  apply (rule)
+  subgoal using well_typedly_incl by blast
+  subgoal
+    apply (simp add:well_typedly_def well_typed_def)
+    sorry
+  done
+
+lemma well_typedly_singleton :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  shows "well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) {\<omega>} = {\<omega>}"
+  apply (rule)
+   apply (clarsimp simp add:well_typedly_def)
+  using assms by (clarsimp simp add: in_well_typedly)
+
+
 subsection \<open>preservation of a2t_state_wf\<close>
 
 lemma red_stmt_a2t_state_wf :
@@ -2333,6 +2354,14 @@ next
   then show ?case by (simp)
 qed
 
+lemma rel_stable_assertion_make_semantic_assertionI :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  assumes "Stable ({\<omega>} \<otimes> \<langle>(ctxt_to_interp ctxt), declared_fields (program_total ctxt)\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+  shows "rel_stable_assertion \<omega> (make_semantic_assertion (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A)"
+  using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_def)
+  apply (subst well_typedly_singleton[symmetric]) apply (assumption)
+  by (simp add:well_typedly_add_set Stable_well_typedly)
+
 lemma red_inhale_is_stable :
   assumes "stable \<omega>"
   assumes "\<Delta> = ctxt_to_interp ctxt"
@@ -2343,8 +2372,8 @@ lemma red_inhale_is_stable :
   shows "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>) \<Longrightarrow>
          rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A)"
   using assms
-  unfolding rel_stable_assertion_make_semantic_assertionI
-  using red_inhale_refines sorry (* TODO *)
+  using rel_stable_assertion_make_semantic_assertionI red_inhale_refines
+  by blast
 
 lemma inhale_refines :
   assumes "assertion_typing (program_total ctxt) \<Lambda> A"
@@ -2359,11 +2388,11 @@ lemma inhale_refines :
   assumes "valid_a2t_assert A"
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
+  apply (subgoal_tac "\<omega>' \<in> {\<omega>} \<otimes> \<langle>\<Delta>, (declared_fields (program_total ctxt))\<rangle> \<Turnstile> \<langle>A\<rangle>")
+  prefer 2 using make_semantic_assertion_in_unfold add_set_mono apply (metis (no_types, opaque_lifting) subset_eq)
   using red_inhale_refines
-  sorry
-(* TODO:
   by (smt (verit, best) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subset_eq)
-*)
+
 
 subsection \<open>refinement of Exhale\<close>
 
@@ -2729,19 +2758,17 @@ next
     apply (cut_tac red_exhale_refines[where ?\<omega>=\<omega> and ?\<Delta>=\<Delta>]; (simp add:assms(2))?)
     apply (clarsimp)
     subgoal for \<omega>'
-      apply (rule concrete_post_Exhale)
-      apply (assumption)
-      sorry
-(*
-TODO:
-       apply (solves \<open>simp add:make_semantic_assertion_def\<close>)
+      apply (rule concrete_post_Exhale[where ?\<omega>'="\<down>\<omega>'"])
+        apply (assumption)
+      subgoal
+        apply (clarsimp simp add:make_semantic_assertion_def)
+        using well_typedly_add_set_l in_well_typedly by blast
       apply (simp add:red_stmt_total_set_ExhaleI)
       apply (insert havoc_locs_state_a2t[of ctxt \<Lambda> "\<down>\<omega>'"])
       apply (drule red_exhale_set_preserves_typing_a2t; assumption?; (simp add:get_trace_in_star)?)
       apply (insert stable_dom_get_vh_eq_get_vm[of "get_state \<omega>"])
        apply (clarsimp simp add:stable_get_state eq_pnone_not_ppos)
       by force
-*)
     done
 next case (Assert x)
   from this assms(1) show ?case

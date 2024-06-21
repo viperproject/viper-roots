@@ -1145,14 +1145,62 @@ proof
 
 qed
 
+definition well_typedly :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set" where
+"well_typedly \<Delta> F A = A \<inter> {\<omega> |\<omega>. well_typed ((map_option (make_semantic_vtyp \<Delta>)) \<circ> F) (get_abs_state \<omega>)}"
+
+lemma well_typedly_incl :
+  shows "well_typedly \<Delta> F A \<subseteq> A"
+  by (simp add:well_typedly_def)
+
+lemma well_typedly_add_set1 :
+  shows "well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2 \<subseteq> well_typedly \<Delta> F (A1 \<otimes> A2)"
+  unfolding well_typedly_def add_set_def
+  apply (auto)
+   apply blast
+  by (meson full_add_charact(2) well_typed_sum)
+
+lemma well_typedly_plus1 :
+  assumes "Some \<phi> = a \<oplus> b"
+  assumes "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state \<phi>)"
+  shows "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state a)"
+  sorry
+
+lemma well_typedly_plus :
+  assumes "Some \<phi> = a \<oplus> b"
+  assumes "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state \<phi>)"
+  shows "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state a)"
+        "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state b)"
+  using assms(1) assms(2) well_typedly_plus1 apply blast
+  by (metis assms(1) assms(2) commutative well_typedly_plus1)
+
+lemma well_typedly_add_set2 :
+  shows "well_typedly \<Delta> F (A1 \<otimes> A2) \<subseteq> well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2"
+  unfolding well_typedly_def add_set_def
+  using well_typedly_plus by blast
+
+lemma well_typedly_add_set :
+  shows "well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2 = well_typedly \<Delta> F (A1 \<otimes> A2)"
+  using well_typedly_add_set1 well_typedly_add_set2 by blast
+
+lemma well_typedly_add_set_l :
+  shows "well_typedly \<Delta> F (A1 \<otimes> A2) \<subseteq> A1 \<otimes> well_typedly \<Delta> F A2"
+  unfolding well_typedly_def add_set_def
+  using well_typedly_plus by blast
+
+lemma Stable_well_typedly :
+  assumes "Stable A"
+  shows "Stable (well_typedly \<Delta> F A)"
+  using assms
+  apply (simp add:Stable_def Stabilize_def well_typedly_def)
+  (* apply (auto) *)
+  sorry
 
 definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion \<Delta> F A = {\<omega> |\<omega>. \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle> \<and> well_typed ((map_option (make_semantic_vtyp \<Delta>)) \<circ> F) (snd \<omega>)}"
+  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 
-
-lemma rel_stable_assertion_make_semantic_assertionI :
- "rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> F A) = Stable ({\<omega>} \<otimes> make_semantic_assertion \<Delta> F A)"
-  by (simp add:rel_stable_assertion_def)
+lemma make_semantic_assertion_in_unfold :
+  shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>"
+  by (simp add:make_semantic_assertion_def well_typedly_incl)
 
 fun compile :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt"
   where
