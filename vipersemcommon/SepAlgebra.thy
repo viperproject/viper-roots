@@ -105,6 +105,29 @@ next
   then show ?A
     using greater_def by auto
 qed
+lemma comp_prod:
+  "a ## b \<longleftrightarrow> (fst a ## fst b \<and> snd a ## snd b)" (is "?A \<longleftrightarrow> ?B")
+proof
+  assume ?A
+  then obtain x where "Some x = a \<oplus> b"
+    by (metis defined_def not_Some_eq)
+  then have "Some (fst x) = fst a \<oplus> fst b \<and> Some (snd x) = snd a \<oplus> snd b"
+    by (metis SepAlgebra.plus_prodE)
+  then show ?B
+    by (metis defined_def option.discI)
+next
+  assume ?B
+  then obtain r1 r2 where "Some r1 = fst a \<oplus> fst b \<and> Some r2 = snd a \<oplus> snd b"
+    by (metis defined_def option.exhaust_sel)
+  then show ?A
+    using defined_def SepAlgebra.plus_prodIAlt by fastforce
+qed    
+
+lemma compatible_prodI:
+  assumes "fst a ## fst b"
+      and "snd a ## snd b"
+    shows "a ## b"
+  using assms(1) assms(2) comp_prod by blast
 
 end
 
@@ -112,11 +135,19 @@ subsection \<open>Function\<close>
 
 datatype 'v agreement = Ag (the_ag: 'v)
 
+
 instantiation "agreement" :: (type) pcm
 begin
 
 definition plus_agreement :: "'a agreement \<Rightarrow> 'a agreement \<Rightarrow> 'a agreement option" where
   "plus_agreement a b = (if a = b then Some a else None)"
+
+lemma plus_AgI:
+  fixes \<omega> :: "'v agreement"
+  assumes "\<omega> = a"
+      and "\<omega> = b"
+    shows "Some \<omega> = a \<oplus> b"
+  by (metis SepAlgebra.plus_agreement_def assms(1) assms(2))
 
 instance proof
   fix a b c ab bc :: "'a agreement"
@@ -129,6 +160,11 @@ instance proof
   show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a "
     by (metis plus_agreement_def)
 qed
+
+lemma greater_Ag:
+  fixes a b :: "'a agreement"
+  shows "a \<succeq> b \<longleftrightarrow> a = b"
+  by (simp add: SepAlgebra.plus_agreement_def greater_def)
 
 
 end
@@ -441,6 +477,7 @@ lemma result_sum_partial_functions:
   using assms option.discI option.inject plus_funE[of x a b] plus_option.simps(3)[of va vb]
   by (metis (full_types))
 
+(*
 subsection \<open>Sum\<close>
 
 instantiation sum :: (pcm, pcm) pcm
@@ -462,14 +499,18 @@ instance proof
      apply (simp_all add: commutative)
     done
 
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc" sorry
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
+    apply (cases ab; cases bc)
+    
+       apply (cases bc)
+    
 
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" sorry
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a" sorry
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" 
+  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
 qed
 
 end
-
+*)
 
 
 
@@ -708,6 +749,8 @@ qed
 
 end
 
+
+(*
 subsection \<open>Sum\<close>
 
 instantiation sum :: (pcm_with_core, pcm_with_core) pcm_with_core
@@ -749,15 +792,30 @@ instance proof
   qed
 
   show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
-    sorry
+    
 
-  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|" sorry
+  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
 
   show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-    sorry
+   
 qed
 
 end
+
+
+instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
+begin
+
+fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
+  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
+| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
+
+(* TODO *)
+instance
+
+end
+
+*)
 
 
 lemma padd_pnone:
@@ -958,18 +1016,6 @@ qed
 end
 
 
-
-instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
-begin
-
-fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
-  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
-| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
-
-(* TODO *)
-instance sorry
-
-end
 
 instantiation agreement :: (type) pcm_mult
 begin

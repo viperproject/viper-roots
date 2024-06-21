@@ -854,7 +854,7 @@ class sep_algebra = pcm_with_core +
   fixes stabilize :: "'a \<Rightarrow> 'a"
 
   assumes already_stable: "stable x \<Longrightarrow> stabilize x = x"
-    and stabilize_is_stable: "stable (stabilize x)"
+    and stabilize_is_stable[simp]: "stable (stabilize x)"
     and stabilize_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
     and decompose_stabilize_pure: "Some x = stabilize x \<oplus> |x|"
     and stabilize_core_emp : "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
@@ -881,13 +881,18 @@ begin
 definition stable_rel :: "'a \<Rightarrow> 'a \<Rightarrow> bool" where
   "stable_rel a b = (\<forall>c. a \<oplus> b = Some c \<longrightarrow> stable c)"
 
+lemma stable_relI:
+  assumes "\<And>c. a \<oplus> b = Some c \<Longrightarrow> stable c"
+  shows "stable_rel a b"
+  by (simp add: assms stable_rel_def)
+
 lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> stabilize a"
   using local.greater_equiv local.stabilize_sum by blast
 
 (*
 lemma stabilize_rel:
   assumes "Some x = a \<oplus> b"
-  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def sorry
+  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def
 
 
 lemma stabilize_rel_order:
@@ -943,7 +948,6 @@ proof (rule cancellative)
   show "Some x = r \<oplus> b"
     by (simp add: assms(4) local.commutative)
   show "|a| = |b|"
-    sorry
 
 (*      and cancellative: "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
 *)
@@ -1036,8 +1040,6 @@ proof -
   moreover have "Some x = stabilize_rel \<omega> x \<oplus> |x|"
     by (simp add: local.stabilize_rel_sum_pure)
   ultimately have "Some (stabilize_rel \<omega>' x) = stabilize_rel \<omega> x \<oplus> |stabilize_rel \<omega>' x|"
-    sorry
-  show ?thesis sorry
 qed
 *)
 
@@ -1090,6 +1092,54 @@ lemma pure_large_stable_same:
 lemma stabilize_core_right_id :
   "Some a = a \<oplus> stabilize |a|"
   by (metis local.asso1 local.commutative local.core_is_smaller local.decompose_stabilize_pure)
+
+subsection \<open>Expressions\<close>
+
+definition wf_exp where
+  "wf_exp e \<longleftrightarrow> (\<forall>a b v. a \<succeq> b \<and> e b = Some v \<longrightarrow> e a = Some v) \<and> (\<forall>a. e a = e |a| )"
+
+lemma wf_expI:
+  assumes "\<And>a. e a = e |a|"
+      and "\<And>a b v. a \<succeq> b \<and> e b = Some v \<Longrightarrow> e a = Some v"
+    shows "wf_exp e"
+  using assms(1) assms(2) wf_exp_def by blast
+
+lemma wf_expE:
+  assumes "wf_exp e"
+      and "a \<succeq> b"
+      and "e b = Some v"
+    shows "e a = Some v"
+  by (meson assms(1) assms(2) assms(3) wf_exp_def)
+
+lemma wf_exp_coreE:
+  assumes "wf_exp e"
+  shows "e a = e |a|"
+  by (meson assms wf_exp_def)
+
+definition negate where
+  "negate b \<omega> = (if b \<omega> = None then None else Some (\<not> (the (b \<omega>))))"
+
+lemma wf_exp_negate:
+  assumes "wf_exp b"
+  shows "wf_exp (negate b)"
+  by (smt (verit, del_insts) assms negate_def option.collapse wf_exp_def)
+
+lemma wf_exp_stabilize:
+  assumes "e (stabilize \<omega>) = Some v"
+      and "wf_exp e"
+    shows "e \<omega> = Some v"
+  by (meson assms(1) assms(2) decompose_stabilize_pure greater_def wf_exp_def)
+
+lemma pure_larger_stabilize:
+  "pure_larger \<omega> (stabilize \<omega>)"
+  by (metis decompose_stabilize_pure max_projection_prop_def max_projection_prop_pure_core pure_larger_def)
+
+lemma wf_exp_combinedE:
+  assumes "wf_exp e"
+      and "e \<omega> = Some v"
+      and "|\<omega>'| \<succeq> |\<omega>|"
+    shows "e \<omega>' = Some v"
+  using assms(1) assms(2) assms(3) wf_expE wf_exp_coreE by fastforce
 
 end
 

@@ -1,5 +1,6 @@
 theory EquiViper
-  imports Main  ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.LiftSepAlgebra ViperCommon.Binop ViperCommon.DeBruijn ViperCommon.SepLogic
+  imports Main ViperCommon.PosPerm ViperCommon.ValueAndBasicState ViperCommon.PartialMap ViperCommon.Binop ViperCommon.DeBruijn
+  ViperCommon.PosReal ViperCommon.SepAlgebra AbstractSemantics
 begin
 
 subsection \<open>Pre-virtual equi_states\<close>
@@ -29,7 +30,6 @@ end
 lemma plus_val_id :
   "(v :: 'a val) \<oplus> v = Some v"
   by (simp add: plus_val_def)
-
 
 instantiation val :: (type) pcm_mult
 begin
@@ -65,8 +65,10 @@ type_synonym 'a partial_heap = "heap_loc \<rightharpoonup> 'a val"
 - mask (x, f) \<le> 1
 - If mask (x, f) > 0 \<Longrightarrow> heap (x, f) != None
 *)
+
 definition wf_pre_virtual_state :: "'a pre_virtual_state \<Rightarrow> bool" where
-"wf_pre_virtual_state st \<longleftrightarrow> (\<forall>hl. ppos (fst st hl) \<longrightarrow> snd st hl \<noteq> None) \<and> wf_mask_simple (fst st)"
+  "wf_pre_virtual_state st \<longleftrightarrow> (\<forall>hl. ppos (fst st hl) \<longrightarrow> snd st hl \<noteq> None) \<and> wf_mask_simple (fst st)"
+
 
 (*
 States are *unbounded*
@@ -78,7 +80,6 @@ lemma wf_pre_virtual_stateI:
   assumes "wf_mask_simple \<pi>"
     shows "wf_pre_virtual_state (\<pi>, h)"
   using assms by (simp add:wf_pre_virtual_state_def)
-
 
 
 subsection \<open>Additions\<close>
@@ -147,6 +148,20 @@ setup_lifting type_definition_virtual_state
 definition get_vh :: "'a virtual_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = snd (Rep_virtual_state \<phi>)"
 definition get_vm :: "'a virtual_state \<Rightarrow> preal mask" where "get_vm \<phi> = fst (Rep_virtual_state \<phi>)"
 
+lemma virtual_state_ext:
+  assumes "get_vh a = get_vh b"
+      and "get_vm a = get_vm b"
+    shows "a = b"
+  by (metis Rep_virtual_state_inject assms(1) assms(2) get_vh_def get_vm_def prod.expand)
+
+
+(*
+definition set_vh where
+  "set_vh \<phi> h = Abs_virtual_state (get_vm \<phi>, h)"
+definition set_vm where
+  "set_vm \<phi> m = Abs_virtual_state (m, get_vh \<phi>)"
+*)
+
 definition uu :: "'a virtual_state" where "uu = Abs_virtual_state uuu"
 
 
@@ -155,7 +170,7 @@ lemma sum_wf_is_wf:
       and "wf_pre_virtual_state b"
       and "Some x = a \<oplus> b"
     shows "wf_pre_virtual_state x"
-  oops
+  sorry
 
 fun read_field :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
   where "read_field \<phi> loc = get_vh \<phi> loc"
@@ -251,7 +266,6 @@ instance proof
 
   show "Some x = a \<oplus> b \<Longrightarrow> Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
     sorry
-    (*by (smt (verit) compatible_virtual_state_implies_pre_virtual_state compatible_virtual_state_implies_pre_virtual_state_rev distrib_state_mult mult_virtual_state.rep_eq) *)
 qed
 
 end
@@ -259,6 +273,8 @@ end
 
 
 subsection \<open>Normal equi_states\<close>
+
+type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement"
 
 (* Normal equi_state *)
 
@@ -268,7 +284,7 @@ type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 (*
 type_synonym 'a trace = "label \<rightharpoonup> 'a virtual_state"
 *)
-type_synonym 'a equi_state = "('a val, 'a virtual_state) abs_state"
+type_synonym 'a equi_state = "('a val, ('a ag_trace \<times> 'a virtual_state)) abs_state"
                                     
 (*
 = 'a val ag_store \<times> ('a virtual_state \<times> 'a trace)"
@@ -277,16 +293,57 @@ type_synonym 'a equi_state = "('a val, 'a virtual_state) abs_state"
 
 (*
 fun get_store :: "'a equi_state \<Rightarrow> (var \<rightharpoonup> 'a val)" where "get_store \<omega> = get_store \<omega>"
-fun get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
 fun get_t :: "'a equi_state \<Rightarrow> 'a trace" where "get_t \<omega> = fst (snd \<omega>)"
 *)
+(*
+definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
 
-fun get_h :: "'a equi_state \<Rightarrow> 'a partial_heap" where "get_h \<omega> = get_vh (get_state \<omega>)"
-fun get_m :: "'a equi_state \<Rightarrow> preal mask" where "get_m \<omega> = get_vm (get_state \<omega>)"
+*)
+definition get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
+definition get_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state)" where "get_trace \<omega> = the_ag (fst (snd \<omega>))"
+definition set_state :: "'a equi_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
+  "set_state \<omega> \<phi> = (Ag (get_store \<omega>), (Ag (get_trace \<omega>), \<phi>))"
+definition set_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state) \<Rightarrow> 'a equi_state" where
+  "set_trace \<omega> \<tau> = (Ag (get_store \<omega>), (Ag \<tau>, get_state \<omega>))"
+
+lemma get_store_set_trace [simp] :
+  "get_store (set_trace \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_trace_def)
+lemma get_store_set_state [simp] :
+  "get_store (set_state \<omega> st) = get_store \<omega>"
+  by (simp add:get_store_def set_state_def)
+
+lemma get_trace_set_store [simp] :
+  "get_trace (set_store \<omega> st) = get_trace \<omega>"
+  by (simp add: get_abs_state_def get_trace_def set_store_def)
+lemma get_trace_set_trace [simp] :
+  "get_trace (set_trace \<omega> t) = t"
+  by (simp add:get_trace_def set_trace_def)
+lemma get_trace_set_state [simp] :
+  "get_trace (set_state \<omega> st) = get_trace \<omega>"
+  by (simp add:get_trace_def set_state_def)
+
+lemma get_state_set_store [simp] :
+  "get_state (set_store \<omega> st) = get_state \<omega>"
+  by (metis get_abs_state_def get_abs_state_set_store get_state_def)
+lemma get_state_set_trace [simp] :
+  "get_state (set_trace \<omega> st) = get_state \<omega>"
+  by (simp add:get_state_def set_trace_def)
+lemma get_state_set_state [simp] :
+  "get_state (set_state \<omega> st) = st"
+  by (simp add:get_state_def set_state_def)
+
+(*
+(* TODO vipersemabstract/EquiSemAuxLemma.thy *)
+
+
+*)
+
+abbreviation get_h where "get_h \<omega> \<equiv> get_vh (get_state \<omega>)"
+abbreviation get_m where "get_m \<omega> \<equiv> get_vm (get_state \<omega>)"
+
+
 fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_virtual_state" where "get_pv \<omega> = Rep_virtual_state (get_state \<omega>)"
-
-
-definition u :: "'a equi_state" where "u = ((Ag Map.empty, Ag Map.empty), uu)"
 
 definition shift_and_add_equi_state where
   "shift_and_add_equi_state \<omega> x = set_store \<omega> (shift_and_add (get_store \<omega>) x)"
@@ -329,6 +386,7 @@ inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<
 | RedForallFalse: "\<lbrakk> v \<in> set_from_type (domains \<Delta>) ty ;
     \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v\<rangle> [\<Down>] Val (VBool False);
     \<And>v'. v' \<in> set_from_type (domains \<Delta>) ty \<Longrightarrow> \<exists>b. \<Delta> \<turnstile> \<langle>e; shift_and_add_equi_state \<omega> v'\<rangle> [\<Down>] Val (VBool b) \<rbrakk>
+
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>PForall ty e; \<omega>\<rangle> [\<Down>] Val (VBool False)"
 | RedCondExpTrue: "\<lbrakk> \<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val (VBool True) ; \<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] r \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> \<langle>CondExp e1 e2 e3; \<omega>\<rangle> [\<Down>] r"
@@ -410,6 +468,7 @@ inductive_simps red_pure_simps:
   "\<Delta> \<turnstile> \<langle>Let e1 e2;\<omega>\<rangle> [\<Down>] v"
   "\<Delta> \<turnstile> \<langle>PExists ty e2;\<omega>\<rangle> [\<Down>] v"
   "\<Delta> \<turnstile> \<langle>PForall ty e2;\<omega>\<rangle> [\<Down>] v"
+
 
 text \<open>The following lemma proves that the meaning of pure expressions is independent from the interpretation of predicates.\<close>
 
@@ -572,7 +631,6 @@ lemma no_old_indep_trace:
   and       "fst x = fst x'" and
         "get_state x = get_state x'"
   shows "e x = Some v \<longleftrightarrow> e x' = Some v"
-
   sorry
 
 (*
@@ -606,9 +664,10 @@ section \<open>Restrictions\<close>
 
 fun all_predicate_have_bodies where
   "all_predicate_have_bodies Pr \<longleftrightarrow> (\<forall>P decl. program.predicates Pr P = Some decl \<longrightarrow> predicate_decl.body decl \<noteq> None)"
-
+(*
 fun wf_exp where
   "wf_exp _ = undefined"
+*)
 
 fun wf_assert where
   "wf_assert Pr (AccPredicate P arg p) \<longleftrightarrow> (program.predicates Pr P \<noteq> None)"
@@ -629,6 +688,74 @@ lemma predicate_body_good_case:
     shows "predicate_body Pr p = A"
   using assms predicate_body_def
   by simp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* DUMP OF a part of LiftSepAlgebra *)
+
+subsection \<open>Normal states\<close>
+
+(* TODO: rename get_ into abs_? *)
+(* TODO: Should state be renamed to heap? get_state on abs_state sounds like the identity *)
+(* TODO: define this via record instead of getter and setter functions? This would require proving the
+class instances for the record (via isomorphism?), but one would get nice getters and setters automatically *)
+
+lemma full_state_ext:
+  assumes "get_store a = get_store b"
+      and "get_state a = get_state b"
+      and "get_trace a = get_trace b"
+    shows "a = b"
+  by (metis agreement.exhaust_sel assms get_state_def get_store_def get_trace_def prod_eqI)
+
+lemma abs_state_ext_iff :
+  "\<omega>1 = \<omega>2 \<longleftrightarrow> get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2 \<and> get_state \<omega>1 = get_state \<omega>2"
+  using full_state_ext by blast
+
+
+definition make_equi_state :: "(var \<rightharpoonup> 'a val) \<Rightarrow> (label \<rightharpoonup> 'a virtual_state) \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
+  "make_equi_state s t st = set_store (set_trace (set_state undefined st) t) s"
+
+lemma get_store_make_equi_state[simp] :
+  "get_store (make_equi_state s t st) = s"
+  by (simp add:make_equi_state_def)
+lemma get_trace_make_equi_state[simp] :
+  "get_trace (make_equi_state s t st) = t"
+  by (simp add:make_equi_state_def)
+lemma get_state_make_equi_state[simp] :
+  "get_state (make_equi_state s t st) = st"
+  by (simp add:make_equi_state_def)
+lemma set_store_make_equi_state[simp] :
+  "set_store (make_equi_state s t st) s' = make_equi_state s' t st"
+  by (simp add: EquiViper.full_state_ext)
+lemma set_trace_make_equi_state[simp] :
+  "set_trace (make_equi_state s t st) t' = make_equi_state s t' st"
+  by (simp add: EquiViper.full_state_ext)
+lemma set_state_make_equi_state[simp] :
+  "set_state (make_equi_state s t st) st' = make_equi_state s t st'"
+  by (simp add: EquiViper.full_state_ext)
+
+
+(* END OF partial DUMP *)
+
+
+
+
+
 
 
 

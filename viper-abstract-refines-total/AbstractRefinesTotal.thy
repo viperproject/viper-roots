@@ -68,26 +68,26 @@ section \<open>Separation logic basics\<close>
 
 subsection \<open>partial_heap_typing\<close>
 
-abbreviation "partial_heap_typing ctxt h \<equiv> well_typed_heap (program_total ctxt) (absval_interp_total ctxt) h"
+abbreviation "partial_heap_typing ctxt h \<equiv> ValueAndBasicState.well_typed_heap (program_total ctxt) (absval_interp_total ctxt) h"
 
 lemma partial_heap_typing_stabilize :
   assumes "partial_heap_typing ctxt (get_vh st)"
   shows "partial_heap_typing ctxt (get_vh (stabilize st))"
-  using assms by (simp add:well_typed_heap_def vstate_stabilize_structure(2) restrict_map_eq_Some)
+  using assms by (simp add:ValueAndBasicState.well_typed_heap_def vstate_stabilize_structure(2) restrict_map_eq_Some)
 
 lemma partial_heap_typing_elim :
   assumes "partial_heap_typing ctxt h"
   assumes "h a = Some v"
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
   shows "has_type (absval_interp_total ctxt) ty v"
-  using assms apply (simp add: well_typed_heap_def) by (metis option.sel prod.collapse)
+  using assms apply (simp add: ValueAndBasicState.well_typed_heap_def) by (metis option.sel prod.collapse)
 
 lemma partial_heap_typing_insert :
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
   assumes "partial_heap_typing ctxt h"
   assumes "has_type (absval_interp_total ctxt) ty v"
   shows "partial_heap_typing ctxt (h (a\<mapsto>v))"
-  using assms unfolding well_typed_heap_def by (auto)
+  using assms unfolding ValueAndBasicState.well_typed_heap_def by (auto)
 
 subsection \<open>PosReal\<close>
 
@@ -352,7 +352,7 @@ lemma store_typing_insert :
 
 subsection \<open>heap typing for THSem\<close>
 
-(* TODO: combine with total_heap_well_typed or well_typed_heap? *)
+(* TODO: combine with total_heap_well_typed or ValueAndBasicState.well_typed_heap? *)
 definition heap_typing :: "'a total_context \<Rightarrow> 'a total_heap \<Rightarrow> bool" where
 "heap_typing ctxt hh \<longleftrightarrow> (\<forall> a ty. declared_fields (program_total ctxt) (snd a) = Some ty \<longrightarrow>
    has_type (absval_interp_total ctxt) ty (hh a))"
@@ -383,7 +383,7 @@ definition partial_trace_typing :: "'a total_context \<Rightarrow> (string \<rig
 definition trace_typing :: "'a total_context \<Rightarrow> (string \<rightharpoonup> 'a total_state) \<Rightarrow> bool" where
 "trace_typing ctxt t = (\<forall> l st. t l = Some st \<longrightarrow> heap_typing ctxt (get_hh_total st))"
 
-definition abs_state_typing :: "'a total_context \<Rightarrow> type_env \<Rightarrow> ('a val, 'a virtual_state) abs_state \<Rightarrow> bool" where
+definition abs_state_typing :: "'a total_context \<Rightarrow> type_env \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
 "abs_state_typing ctxt \<Lambda> \<omega> \<longleftrightarrow> (store_typing ctxt \<Lambda> (get_store \<omega>) \<and>
    partial_heap_typing ctxt (get_vh (get_state \<omega>)) \<and>
    partial_trace_typing ctxt (get_trace \<omega>))"
@@ -805,7 +805,7 @@ subsection \<open>restricting abs state \<close>
 definition restrict_virtual_state :: "'a virtual_state \<Rightarrow> heap_loc set \<Rightarrow> 'a virtual_state"  (infixl "|`\<^sub>v"  110) where
   "st |`\<^sub>v A = Abs_virtual_state (get_vm st, get_vh st |` (A \<union> {hl. ppos (get_vm st hl)}))"
 
-definition restrict_abs_state :: "('a val, 'a virtual_state) abs_state \<Rightarrow> heap_loc set \<Rightarrow> ('a val, 'a virtual_state) abs_state"  (infixl "|`\<^sub>a"  110) where
+definition restrict_abs_state :: "'a equi_state \<Rightarrow> heap_loc set \<Rightarrow> 'a equi_state"  (infixl "|`\<^sub>a"  110) where
   "\<omega> |`\<^sub>a A = set_state \<omega> (get_state \<omega> |`\<^sub>v A)"
 
 lemma stabilize_vstate_restrict :
@@ -831,11 +831,11 @@ lemma restrict_abs_state_struct [simp] :
 
 subsection \<open>translation of ctxt and state\<close>
 
-definition t2a_ctxt :: "'a total_context \<Rightarrow> type_context \<Rightarrow> ('a val, address \<times> field_ident) abs_type_context" where
+definition t2a_ctxt :: "'a total_context \<Rightarrow> type_context \<Rightarrow> ('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context" where
 "t2a_ctxt ctxt \<Lambda> = \<lparr>
    variables = \<lambda> v. map_option (\<lambda> ty. {v. has_type (absval_interp_total ctxt) ty v}) (\<Lambda> v),
-   heap_locs = \<lambda> f. map_option (\<lambda> ty. {v. has_type (absval_interp_total ctxt) ty v})
-     (declared_fields (program_total ctxt) (snd f)) \<rparr>"
+   custom_context = \<lambda> f. map_option (\<lambda> ty. {v. has_type (absval_interp_total ctxt) ty v})
+     (declared_fields (program_total ctxt) f) \<rparr>"
 
 lemma t2a_ctxt_variables [simp] :
   assumes "\<Lambda> x = Some ty"
@@ -843,9 +843,9 @@ lemma t2a_ctxt_variables [simp] :
   using assms
   by (simp add:t2a_ctxt_def)
 
-lemma t2a_ctxt_heap_locs [simp] :
-  assumes "declared_fields (program_total ctxt) (snd x) = Some ty"
-  shows "heap_locs (t2a_ctxt ctxt \<Lambda>) x = Some {v. has_type (absval_interp_total ctxt) ty v}"
+lemma t2a_ctxt_custom_context [simp] :
+  assumes "declared_fields (program_total ctxt) x = Some ty"
+  shows "custom_context (t2a_ctxt ctxt \<Lambda>) x = Some {v. has_type (absval_interp_total ctxt) ty v}"
   using assms
   by (simp add:t2a_ctxt_def)
 
@@ -853,8 +853,8 @@ lift_definition t2a_virtual_state :: "'a total_state \<Rightarrow> 'a virtual_st
 "\<lambda> st. (pmin 1 \<circ> get_mh_total st, (Some \<circ> get_hh_total st))"
   by (simp add:wf_pre_virtual_state_def wf_mask_simple_def)
 
-definition t2a_state :: "'a full_total_state \<Rightarrow> ('a val, 'a virtual_state) abs_state" where
-"t2a_state \<omega> = make_abs_state
+definition t2a_state :: "'a full_total_state \<Rightarrow> 'a equi_state" where
+"t2a_state \<omega> = make_equi_state
    (get_store_total \<omega>)
    ((\<lambda> x. Some (stabilize (t2a_virtual_state x))) \<circ>\<^sub>m (get_trace_total \<omega>))
    (t2a_virtual_state (get_total_full \<omega>))"
@@ -934,10 +934,10 @@ definition a2t_extend_heap :: "'a total_context \<Rightarrow> 'a partial_heap \<
 definition a2t_extend_state :: "'a total_context \<Rightarrow> 'a virtual_state \<Rightarrow> 'a total_state" where
 "a2t_extend_state ctxt st = total_state.make (a2t_extend_heap ctxt (get_vh st)) undefined (get_vm st) undefined"
 
-definition a2t_extend :: "'a total_context \<Rightarrow> ('a val, 'a virtual_state) abs_state \<Rightarrow> 'a full_total_state" where
+definition a2t_extend :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state" where
 "a2t_extend ctxt \<omega> = full_total_state.make (get_store \<omega>) ((\<lambda> x. Some (a2t_extend_state ctxt x)) \<circ>\<^sub>m get_trace \<omega>) (a2t_extend_state ctxt (get_state \<omega>))"
 
-definition a2t_extend_ok :: "'a total_context \<Rightarrow> ('a val, 'a virtual_state) abs_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool" where
+definition a2t_extend_ok :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state \<Rightarrow> bool" where
 "a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t =
   ((partial_heap_typing ctxt (get_vh (get_state \<omega>)) \<longleftrightarrow> heap_typing ctxt (get_hh_total (get_total_full \<omega>\<^sub>t))) \<and>
   (partial_trace_typing ctxt (get_trace \<omega>) \<longleftrightarrow> trace_typing ctxt (get_trace_total \<omega>\<^sub>t)))"
@@ -946,7 +946,7 @@ definition a2t_extend_ok :: "'a total_context \<Rightarrow> ('a val, 'a virtual_
 lemma a2t_extend_heap_typed :
   assumes "abs_type_wf (absval_interp_total ctxt)"
   shows "heap_typing ctxt (a2t_extend_heap ctxt h) = partial_heap_typing ctxt h"
-  apply (simp add:a2t_extend_heap_def heap_typing_def well_typed_heap_def split:option.splits)
+  apply (simp add:a2t_extend_heap_def heap_typing_def ValueAndBasicState.well_typed_heap_def split:option.splits)
   using well_typed_val_typed assms by fastforce
 
 lemma a2t_extend_typed :
@@ -958,12 +958,12 @@ lemma a2t_extend_typed :
 
 
 
-definition a2t_states :: "'a total_context \<Rightarrow> ('a val, 'a virtual_state) abs_state \<Rightarrow> 'a full_total_state set" where
+definition a2t_states :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state set" where
 "a2t_states ctxt \<omega> = {\<omega>\<^sub>t. \<omega> = t2a_state \<omega>\<^sub>t |`\<^sub>a dom (get_vh (get_state \<omega>)) \<and>
   a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t \<and>
   wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t))}"
 
-definition a2t_state :: "'a total_context \<Rightarrow> ('a val, 'a virtual_state) abs_state \<Rightarrow> 'a full_total_state" where
+definition a2t_state :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state" where
 "a2t_state ctxt \<omega> = (SOME \<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega>)"
 
 lemma a2t_states_in_stable :
@@ -1152,48 +1152,73 @@ lemma a2t2a_state[simp] :
   by (rule a2t_stateI; simp add:assms a2t_states_in_stable)
 
 
+subsection \<open>well_typedly\<close>
+
+lemma in_well_typedly :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  shows "\<omega> \<in> well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A
+     \<longleftrightarrow> \<omega> \<in> A"
+  apply (rule)
+  subgoal using well_typedly_incl by blast
+  subgoal
+    apply (simp add:well_typedly_def well_typed_def)
+    sorry
+  done
+
+lemma well_typedly_singleton :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  shows "well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) {\<omega>} = {\<omega>}"
+  apply (rule)
+   apply (clarsimp simp add:well_typedly_def)
+  using assms by (clarsimp simp add: in_well_typedly)
+
+
 subsection \<open>preservation of a2t_state_wf\<close>
 
-context semantics
-begin
-
 lemma red_stmt_a2t_state_wf :
-  assumes "red_stmt \<Delta> C \<omega> S"
+  assumes "ConcreteSemantics.red_stmt \<Delta> C \<omega> S"
   assumes "stable \<omega> \<and> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "\<omega>' \<in> S"
   shows "stable \<omega>' \<and> a2t_state_wf ctxt (get_trace \<omega>')"
   using assms
-proof (induct rule: red_stmt_induct_simple)
+proof (induct rule: ConcreteSemantics.red_stmt_induct_simple)
   case (Inhale A \<omega>' \<omega> \<Delta>)
-  then show ?case by (metis greater_state_has_greater_parts(2) in_set_sum singleton_iff)
+  then show ?case
+    by (metis get_trace_in_star is_in_set_sum)
 next
   case (Exhale a A \<omega> \<omega>' \<Delta>)
   then show ?case apply (simp)
     by (metis greater_def greater_state_has_greater_parts(2))
 next
-  case (FieldAssign \<Delta> r \<omega> hl e v)
-  then show ?case apply (simp)
-    (* TODO: fix assumptions about set value *)
-    sorry
+  case (Custom \<Delta> C \<omega> S)
+  then show ?case proof (cases C)
+    case (FieldAssign r g e)
+    from Custom this show ?thesis
+      apply (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
+      by (metis Custom.hyps(2) Custom.hyps(3) get_state_set_state red_custom_stable stable_get_state)
+  next
+    case (Label l)
+    from Custom this show ?thesis
+      by (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
+  qed
 next
   case (Havoc \<Delta> x ty \<omega> v)
-  then show ?case by (simp add:stable_get_state[symmetric])
+  then show ?case    
+    by (metis ConcreteSemantics.stable_assign_var_state TypedEqui.assign_var_state_def get_trace_set_store)
 next
   case (LocalAssign \<Delta> e \<omega> v x)
-  then show ?case by (simp add:stable_get_state[symmetric])
-next
-  case (Label \<Delta> l \<omega>)
-  then show ?case by (simp add:stable_get_state[symmetric] a2t_state_wf_def)
+  then show ?case
+    by (metis ConcreteSemantics.stable_assign_var_state TypedEqui.assign_var_state_def get_trace_set_store)
+
 qed
 
-end
 
 lemma concrete_red_stmt_post_stable_wf :
   assumes "stable \<omega>"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "concrete_red_stmt_post \<Delta> C \<omega> {\<omega>'. stable \<omega>' \<longrightarrow> a2t_state_wf ctxt (get_trace \<omega>') \<longrightarrow> \<omega>' \<in> S}"
   shows "concrete_red_stmt_post \<Delta> C \<omega> S"
-  using assms unfolding concrete_red_stmt_post_def using ConcreteSemantics.red_stmt_a2t_state_wf by blast
+  using assms unfolding concrete_red_stmt_post_def using red_stmt_a2t_state_wf by blast
 
 
 subsection \<open>refinement of pure expressions\<close>
@@ -1216,6 +1241,10 @@ next
   case (Old x1a e)
   then show ?case
     by (auto simp add: red_pure_exp_simps red_pure_simps Map.map_comp_Some_iff)
+next
+  case (ELit x)
+  then show ?case
+    by (metis extended_val.discI red_pure_elim(1) red_pure_exp_simps(1) red_pure_red_pure_exps.RedLit)
 qed (simp add: red_pure_exp_simps red_pure_simps)+
 
 lemma ppos_get_mh_total_total_state_mask[simp] :
@@ -1291,6 +1320,10 @@ next
     apply (subst red_pure_exp_cong_mh_eq; simp?)
     apply (subst red_pure_refines_red_pure_total[where ?\<Delta>=\<Delta>])
     by (auto)
+next
+  case (ELit x)
+  then show ?case
+    by (metis RedLit2Val_case red_pure_exp_simps(1) red_pure_red_pure_exps.RedLit)
 qed (simp add: red_pure_exp_simps red_pure_simps)+
 
 lemma red_exhale_a2t_mask :
@@ -1436,8 +1469,8 @@ lemma red_inhale_set_AccPureI :
   using assms
   apply (auto simp add:red_inhale_set_def red_inhale_simps th_result_rel.simps
       red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"] a2t_states_in_stable dest:red_pure_det) (* Long *)
-     apply (auto)
-  by (metis a2t_states_in_stable red_pure_val_unique(1) val.inject(3) val.inject(4))+
+      apply (auto)
+  by (metis a2t_statesI_direct_stable assms(3) red_pure_val_unique(1) val.inject(3) val.inject(4))+
 
 
 lemma red_inhale_ok_AccWildcardE :
@@ -2321,6 +2354,14 @@ next
   then show ?case by (simp)
 qed
 
+lemma rel_stable_assertion_make_semantic_assertionI :
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  assumes "Stable ({\<omega>} \<otimes> \<langle>(ctxt_to_interp ctxt), declared_fields (program_total ctxt)\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+  shows "rel_stable_assertion \<omega> (make_semantic_assertion (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A)"
+  using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_def)
+  apply (subst well_typedly_singleton[symmetric]) apply (assumption)
+  by (simp add:well_typedly_add_set Stable_well_typedly)
+
 lemma red_inhale_is_stable :
   assumes "stable \<omega>"
   assumes "\<Delta> = ctxt_to_interp ctxt"
@@ -2329,10 +2370,10 @@ lemma red_inhale_is_stable :
   assumes "valid_a2t_assert A"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   shows "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>) \<Longrightarrow>
-         ConcreteSemantics.rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A)"
+         rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A)"
   using assms
-  unfolding rel_stable_assertion_make_semantic_assertionI
-  using red_inhale_refines by blast
+  using rel_stable_assertion_make_semantic_assertionI red_inhale_refines
+  by blast
 
 lemma inhale_refines :
   assumes "assertion_typing (program_total ctxt) \<Lambda> A"
@@ -2341,15 +2382,17 @@ lemma inhale_refines :
   assumes "\<Delta> = ctxt_to_interp ctxt"
   assumes "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>)"
   assumes "stable \<omega>'"
-  assumes "\<omega>' \<in> {\<omega>} \<otimes> \<langle>make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A\<rangle>"
+  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A"
   assumes "\<omega>\<^sub>t' \<in> a2t_states ctxt \<omega>'"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_assert A"
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
-  unfolding make_semantic_assertion_inh
+  apply (subgoal_tac "\<omega>' \<in> {\<omega>} \<otimes> \<langle>\<Delta>, (declared_fields (program_total ctxt))\<rangle> \<Turnstile> \<langle>A\<rangle>")
+  prefer 2 using make_semantic_assertion_in_unfold add_set_mono apply (metis (no_types, opaque_lifting) subset_eq)
   using red_inhale_refines
   by (smt (verit, best) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subset_eq)
+
 
 subsection \<open>refinement of Exhale\<close>
 
@@ -2657,7 +2700,7 @@ proof (rule subsetI)
   have "\<omega>\<^sub>t\<lparr>get_total_full := get_total_full \<omega>\<^sub>t\<lparr>get_hh_total :=
       (\<lambda> hl. (case get_vh (get_state \<omega>) hl of Some x \<Rightarrow> x | _ \<Rightarrow> get_hh_total (get_total_full \<omega>\<^sub>t) hl)) \<rparr>\<rparr> \<in> a2t_states ctxt \<omega>"
     apply (rule a2t_statesI[OF assms(1)])
-    subgoal using assms Hty apply (clarsimp simp add:heap_typing_def abs_state_typing_def well_typed_heap_def)
+    subgoal using assms Hty apply (clarsimp simp add:heap_typing_def abs_state_typing_def ValueAndBasicState.well_typed_heap_def)
       apply (case_tac "get_vh (get_state \<omega>) (a, b)"; simp)
       by fastforce
     subgoal using assms H\<omega>\<^sub>t by (simp add:abs_state_typing_def)
@@ -2715,14 +2758,16 @@ next
     apply (cut_tac red_exhale_refines[where ?\<omega>=\<omega> and ?\<Delta>=\<Delta>]; (simp add:assms(2))?)
     apply (clarsimp)
     subgoal for \<omega>'
-      apply (rule concrete_post_Exhale)
+      apply (rule concrete_post_Exhale[where ?\<omega>'="\<down>\<omega>'"])
         apply (assumption)
-       apply (solves \<open>simp add:make_semantic_assertion_inh\<close>)
+      subgoal
+        apply (clarsimp simp add:make_semantic_assertion_def)
+        using well_typedly_add_set_l in_well_typedly by blast
       apply (simp add:red_stmt_total_set_ExhaleI)
       apply (insert havoc_locs_state_a2t[of ctxt \<Lambda> "\<down>\<omega>'"])
       apply (drule red_exhale_set_preserves_typing_a2t; assumption?; (simp add:get_trace_in_star)?)
       apply (insert stable_dom_get_vh_eq_get_vm[of "get_state \<omega>"])
-      apply (clarsimp simp add:stable_get_state eq_pnone_not_ppos)
+       apply (clarsimp simp add:stable_get_state eq_pnone_not_ppos)
       by force
     done
 next case (Assert x)
@@ -2826,12 +2871,8 @@ next
     apply (rule concrete_post_FieldAssign; clarsimp?)
          apply (blast)
         apply (assumption)
-    subgoal
-      apply (simp add:ConcreteSemantics.has_write_perm_def has_write_perm_only_def)
-      apply (rule exI, safe)
-       apply (rule succ_refl)
-      by (assumption)
-      apply (clarsimp; rule)
+       apply (simp add:has_write_perm_only_def)
+      apply (auto)[1]
      apply (clarsimp)
     apply (clarsimp simp add:red_stmt_total_set_FieldAssignI[where \<Delta>="\<Delta>"] assms(2))
     apply (drule a2t_states_set_value)
