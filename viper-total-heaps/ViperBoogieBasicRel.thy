@@ -817,6 +817,45 @@ proof -
     by simp
 qed
 
+(* Disjointness is preserved when removing one label from the label_hm_translation *)
+lemma disjoint_list_remove_label:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and "lbls' = (((fst (label_hm_translation Tr))(lbl := None)), ((snd (label_hm_translation Tr))(lbl := None)))"
+      (is "lbls' = (((fst ?lbls)(lbl := None)), ((snd ?lbls)(lbl := None)))")
+      and "Tr' = Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+    shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+proof -
+  let ?xs = "[{heap_var Tr, heap_var_def Tr},
+              {mask_var Tr, mask_var_def Tr},
+              (ran (var_translation Tr)), 
+              (ran (field_translation Tr)),
+              (range (const_repr Tr)),
+              dom AuxPred]"
+  let ?M  = "vars_label_hm_tr (label_hm_translation Tr)"
+  let ?M' = "vars_label_hm_tr (label_hm_translation Tr')"
+  let ?ys = "[]"
+  have "disjoint_list (?xs @ (?M' # ?ys))"
+  proof (rule disjoint_list_one_subset)
+    show "disjoint_list (?xs @ (?M # ?ys))"
+      using disjointList by simp
+    show "vars_label_hm_tr (label_hm_translation Tr') \<subseteq> vars_label_hm_tr (label_hm_translation Tr) "
+    proof -
+      have HeapSubset: "ran (fst lbls') \<subseteq> ran (fst ?lbls)"
+        by (metis (mono_tags, lifting) \<open>lbls' = _\<close> fst_conv ranI ran_restrictD restrict_complement_singleton_eq subsetI)
+      have MaskSubset:"ran (snd lbls') \<subseteq> ran (snd ?lbls)"
+        by (metis (full_types) \<open>lbls' = _\<close> ranI ran_restrictD restrict_complement_singleton_eq snd_conv subsetI)
+      have "vars_label_hm_tr lbls' \<subseteq> vars_label_hm_tr ?lbls"
+        unfolding vars_label_hm_tr_def
+        using HeapSubset MaskSubset
+        by fast
+      thus ?thesis
+        using \<open>Tr' = _\<close> by simp
+    qed
+  qed
+  thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+    using \<open>Tr' = _\<close> by simp
+qed
+
 subsection \<open>Tactics\<close>
 
 text \<open>This tactic enumerates all options for the integer quantifier in the generated premise from 0 
