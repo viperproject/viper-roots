@@ -712,6 +712,7 @@ lemma old_expr_wf_rel_inst:
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
+      and DisjAux: "OldH \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldM \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldH \<noteq> OldM"
       and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
       and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
@@ -1071,10 +1072,36 @@ proof -
         qed
         show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
         proof -
-          have "disjoint_list (state_rel0_disj_list Tr AuxPred)"
-            using RInst state_rel_disjoint by blast
-              (* This **should** be provable *)
-          show ?thesis sorry
+          (* First, change the heap *)
+          let ?TrOldHeap = "Tr \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
+          have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
+          proof (rule disjoint_list_change_heap)
+            show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+              using RInst state_rel_disjoint by blast
+            show "OldH \<notin>  \<Union> (set (ViperBoogieRelUtil.state_rel0_disj_list Tr AuxPred))"
+              using DisjAux by simp
+          qed (simp)
+
+          (* Next, change the mask *)
+          let ?TrOld = "?TrOldHeap \<lparr> mask_var := OldM, mask_var_def := OldM \<rparr>"
+          have "disjoint_list (state_rel0_disj_list ?TrOld AuxPred)"
+          proof (rule disjoint_list_change_mask)
+            show "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
+              using \<open>disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)\<close> by simp
+            show "OldM \<notin>  \<Union> (set (ViperBoogieRelUtil.state_rel0_disj_list ?TrOldHeap AuxPred))"
+              using DisjAux by simp
+          qed (simp)
+
+          (* Finally, remove lbl from labels *)
+          show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+          proof (rule disjoint_list_remove_label)
+            show "disjoint_list (ViperBoogieRelUtil.state_rel0_disj_list ?TrOld AuxPred)"
+              using \<open>disjoint_list (state_rel0_disj_list ?TrOld AuxPred)\<close> by simp
+          next
+            show "label_hm_translation Tr' = ((fst (label_hm_translation ?TrOld))(lbl := None),
+                                              (snd (label_hm_translation ?TrOld))(lbl := None))"
+              using \<open>Tr' = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close> by simp
+          qed (simp add: \<open>Tr' = _\<close>)
         qed
         show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
         show "get_trace_total ?\<omega>def_old = get_trace_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
