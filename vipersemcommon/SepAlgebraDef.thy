@@ -887,7 +887,7 @@ lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> sta
 (*
 lemma stabilize_rel:
   assumes "Some x = a \<oplus> b"
-  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def sorry
+  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def
 
 
 lemma stabilize_rel_order:
@@ -943,7 +943,6 @@ proof (rule cancellative)
   show "Some x = r \<oplus> b"
     by (simp add: assms(4) local.commutative)
   show "|a| = |b|"
-    sorry
 
 (*      and cancellative: "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
 *)
@@ -1036,8 +1035,6 @@ proof -
   moreover have "Some x = stabilize_rel \<omega> x \<oplus> |x|"
     by (simp add: local.stabilize_rel_sum_pure)
   ultimately have "Some (stabilize_rel \<omega>' x) = stabilize_rel \<omega> x \<oplus> |stabilize_rel \<omega>' x|"
-    sorry
-  show ?thesis sorry
 qed
 *)
 

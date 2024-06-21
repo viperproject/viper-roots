@@ -237,8 +237,7 @@ fun sat_set :: "('a, 'a virtual_state) ValueAndBasicState.interp \<Rightarrow> (
 | "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Imp b A\<rangle> = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes> (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>CondAssert b A B\<rangle>) = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes>
      (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp) \<otimes> 
-     (if v = VBool False then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>) else emp)
-                                    )"
+     (if v = VBool False then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>) else emp) )"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A && B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) \<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A --* B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) --\<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 (* | "\<Delta> \<Turnstile> \<langle>ForAll ty A\<rangle> \<longleftrightarrow> (\<forall>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v\<rangle>)" *)
@@ -539,7 +538,6 @@ lemma well_typedI[intro]:
     shows "well_typed \<Gamma> \<omega>"
   by (simp add: assms(1) assms(2) well_typed_def)
 
-thm well_typedI[elim_format]
 
 lemma well_typedE:
   assumes "well_typed \<Gamma> \<omega>"
@@ -547,8 +545,6 @@ lemma well_typedE:
     and "the_ag (fst \<omega>) l = Some \<phi> \<Longrightarrow> well_typed_heap \<Gamma> \<phi>"
   using assms well_typed_def apply blast
   by (meson assms well_typed_def)
-
-thm well_typedE(1)[elim_format]
 
 
 lemma well_typed_sum:
@@ -606,30 +602,15 @@ proof
 qed
 
 
-
-
-
-
-
 fun wf_custom_stmt where
   "wf_custom_stmt \<Delta> (FieldAssign r f e) \<longleftrightarrow> sep_algebra_class.wf_exp r \<and> sep_algebra_class.wf_exp e
   \<and> (\<exists>ty. custom_context \<Delta> f = Some ty \<and> TypedEqui.typed_exp ty e)"
 | "wf_custom_stmt _ (Label _) \<longleftrightarrow> True"
 
-
-
-
-
-
-
-
 definition update_value where
   "update_value \<Delta> A r f e =
   { \<omega>' |\<omega>' \<omega> l v ty. custom_context \<Delta> f = Some ty \<and> v \<in> ty \<and>
  \<omega> \<in> A \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)}"
-
-
-
 
 lemma in_update_value:
   assumes "\<omega> \<in> A"
@@ -721,8 +702,6 @@ lemma get_vm_stabilize[simp]:
 lemma get_m_stabilize[simp]:
   "get_m (stabilize \<omega>) = get_m \<omega>"
   by (simp add: get_state_def stabilize_prod_def)
-
-
 
 
 lemma virtual_state_ext_stable:
@@ -899,11 +878,6 @@ qed
 
 
 
-
-
-
-
-
 inductive red_custom_stmt :: "('a val, field_ident \<rightharpoonup> 'a val set) abs_type_context \<Rightarrow> 'a custom \<Rightarrow> 'a equi_state \<Rightarrow> 'a equi_state set \<Rightarrow> bool"
   where
   RedFieldAssign: "\<lbrakk> r \<omega> = Some hl ; e \<omega> = Some v ; get_vm (get_state \<omega>) (hl, f) = 1; custom_context \<Delta> f = Some ty; v \<in> ty \<rbrakk>
@@ -1018,14 +992,6 @@ proof -
 qed
 
 
-
-
-(*
-  assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> (FieldAssign r g e) (snd \<omega>) (f \<omega>)"
-      and "wf_custom_stmt \<Delta> (FieldAssign r g e)"
-      and "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> stable (snd \<alpha>)"
-    shows "SL_Custom \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) (FieldAssign r g e) (TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA)))"
-*)
 
 
 lemma SL_proof_aux_custom:

@@ -1530,7 +1530,18 @@ next
 next
   case (RuleAssume \<Delta> A P)
   moreover have asm0: "stable_on \<omega> P"
-    unfolding stable_on_def sorry
+  proof (rule stable_onI)
+    fix x assume asm1: "pure_larger x \<omega>"
+    thm self_framing_on_def[of A P]
+
+    then have "(\<omega> \<in> P) = (x \<in> P)"
+
+(*
+self_framing_on A P
+*)
+    unfolding stable_on_def
+  proof -
+
 (*
   proof
     sorry

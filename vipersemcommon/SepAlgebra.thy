@@ -477,6 +477,7 @@ lemma result_sum_partial_functions:
   using assms option.discI option.inject plus_funE[of x a b] plus_option.simps(3)[of va vb]
   by (metis (full_types))
 
+(*
 subsection \<open>Sum\<close>
 
 instantiation sum :: (pcm, pcm) pcm
@@ -498,14 +499,18 @@ instance proof
      apply (simp_all add: commutative)
     done
 
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc" sorry
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
+    apply (cases ab; cases bc)
+    
+       apply (cases bc)
+    
 
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" sorry
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a" sorry
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" 
+  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
 qed
 
 end
-
+*)
 
 
 
@@ -744,6 +749,8 @@ qed
 
 end
 
+
+(*
 subsection \<open>Sum\<close>
 
 instantiation sum :: (pcm_with_core, pcm_with_core) pcm_with_core
@@ -785,15 +792,30 @@ instance proof
   qed
 
   show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
-    sorry
+    
 
-  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|" sorry
+  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
 
   show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-    sorry
+   
 qed
 
 end
+
+
+instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
+begin
+
+fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
+  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
+| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
+
+(* TODO *)
+instance
+
+end
+
+*)
 
 
 lemma padd_pnone:
@@ -994,18 +1016,6 @@ qed
 end
 
 
-
-instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
-begin
-
-fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
-  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
-| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
-
-(* TODO *)
-instance sorry
-
-end
 
 instantiation agreement :: (type) pcm_mult
 begin

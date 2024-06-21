@@ -863,6 +863,11 @@ proof (clarify)
 definition stable_on where
   "stable_on \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
 
+lemma stable_onI:
+  assumes "\<And>x. pure_larger x \<omega> \<Longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A)"
+  shows "stable_on \<omega> A"
+  using assms stable_on_def by force
+
 definition self_framing where
   "self_framing A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"
 

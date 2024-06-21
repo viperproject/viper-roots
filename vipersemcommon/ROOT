@@ -12,7 +12,6 @@ session ViperCommon = "HOL" +
         ViperTyping
         ViperUtil
         WellFormedness
-	theories [quick_and_dirty] (* these should be fixed *)
         PosReal
         PartialMap
         SepAlgebra
