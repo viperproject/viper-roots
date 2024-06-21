@@ -342,6 +342,15 @@ lemma get_state_set_state [simp] :
   "get_state (set_state \<omega> st) = st"
   by (simp add:get_state_def set_state_def)
 
+
+lemma snd_get_abs_state :
+  "snd (get_abs_state \<omega>) = get_state \<omega>"
+  by (simp add: get_abs_state_def get_state_def)
+
+lemma fst_get_abs_state :
+  "the_ag (fst (get_abs_state \<omega>)) = get_trace \<omega>"
+  by (simp add: get_abs_state_def get_trace_def)
+
 (*
 (* TODO vipersemabstract/EquiSemAuxLemma.thy *)
 

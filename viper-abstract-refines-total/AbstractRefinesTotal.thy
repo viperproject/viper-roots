@@ -1141,6 +1141,15 @@ lemma a2t2a_state[simp] :
 
 subsection \<open>well_typedly\<close>
 
+lemma well_typed_heap_partial_heap_typing :
+ "Instantiation.well_typed_heap
+     (map_option (make_semantic_vtyp (ctxt_to_interp ctxt)) \<circ>
+      declared_fields (program_total ctxt))
+     st \<longleftrightarrow>
+   partial_heap_typing ctxt (get_vh st)"
+  apply (auto simp add:well_typed_heap_def ValueAndBasicState.well_typed_heap_def)
+  sorry
+
 lemma in_well_typedly :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
   shows "\<omega> \<in> well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A
@@ -1148,8 +1157,8 @@ lemma in_well_typedly :
   apply (rule)
   subgoal using well_typedly_incl by blast
   subgoal
-    apply (simp add:well_typedly_def well_typed_def)
-    sorry
+    apply (simp add:well_typedly_def well_typed_def snd_get_abs_state fst_get_abs_state)
+    using assms by (clarsimp simp add:abs_state_typing_def partial_trace_typing_def well_typed_heap_partial_heap_typing)
   done
 
 lemma well_typedly_singleton :
