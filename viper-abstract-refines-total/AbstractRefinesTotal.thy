@@ -1153,14 +1153,6 @@ lemma a2t2a_state[simp] :
 
 
 subsection \<open>preservation of a2t_state_wf\<close>
-(*
-context semantics
-begin
-
-(*
-red_stmt \<Delta> C \<omega> (f \<omega>))
-*)
-*)
 
 lemma red_stmt_a2t_state_wf :
   assumes "ConcreteSemantics.red_stmt \<Delta> C \<omega> S"
@@ -1177,14 +1169,17 @@ next
   then show ?case apply (simp)
     by (metis greater_def greater_state_has_greater_parts(2))
 next
-  case (Custom C')
-  then show ?case sorry
-(*
-  case (FieldAssign \<Delta> r \<omega> hl e v)
-  then show ?case apply (simp)
-    (* TODO: fix assumptions about set value *)
-    sorry
-*)
+  case (Custom \<Delta> C \<omega> S)
+  then show ?case proof (cases C)
+    case (FieldAssign r g e)
+    from Custom this show ?thesis
+      apply (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
+      by (metis Custom.hyps(2) Custom.hyps(3) get_state_set_state red_custom_stable stable_get_state)
+  next
+    case (Label l)
+    from Custom this show ?thesis
+      by (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
+  qed
 next
   case (Havoc \<Delta> x ty \<omega> v)
   then show ?case    
@@ -1193,11 +1188,7 @@ next
   case (LocalAssign \<Delta> e \<omega> v x)
   then show ?case
     by (metis ConcreteSemantics.stable_assign_var_state TypedEqui.assign_var_state_def get_trace_set_store)
-(*
-next
-  case (Label \<Delta> l \<omega>)
-  then show ?case by (simp add:stable_get_state[symmetric] a2t_state_wf_def)
-*)
+
 qed
 
 
@@ -2853,20 +2844,12 @@ next
     apply (rule concrete_post_FieldAssign; clarsimp?)
          apply (blast)
         apply (assumption)
-    sorry
-(*
-TODO:
-    subgoal
-      apply (simp add:ConcreteSemantics.has_write_perm_def has_write_perm_only_def)
-      apply (rule exI, safe)
-       apply (rule succ_refl)
-      by (assumption)
-      apply (clarsimp; rule)
+       apply (simp add:has_write_perm_only_def)
+      apply (auto)[1]
      apply (clarsimp)
     apply (clarsimp simp add:red_stmt_total_set_FieldAssignI[where \<Delta>="\<Delta>"] assms(2))
     apply (drule a2t_states_set_value)
     by (auto)
-*)
 next
   case (Havoc x)
   note calc = Havoc
