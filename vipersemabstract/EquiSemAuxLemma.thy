@@ -1516,13 +1516,14 @@ qed
 
 end
 
-
+(*
 lemma stable_rel_virtual_stateI:
   assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
   shows "stable_rel a x"
-  using assms
-  apply (clarsimp simp add: stable_rel_def stable_virtual_state_def)
-  sorry
+proof (clarsimp simp add: stable_rel_def stable_virtual_state_def)
+*)
+
+
 
 lemma stable_rel_virtual_stateE:
   assumes "stable_rel a x"
@@ -1570,64 +1571,84 @@ next
   then show ?case by (cases e'; auto simp add:red_pure_simps core_charact)
 next
   case (RedLit \<Delta> l uu)
-  then show ?case sorry
+  then show ?case
+    by (simp add: red_pure_red_pure_exps.RedLit)
 next
   case (RedVar \<omega> n v \<Delta>)
-  then show ?case sorry
+  then show ?case
+    by (simp add: core_charact(1) red_pure_red_pure_exps.RedVar)
 next
   case (RedUnop \<Delta> e \<omega> v unop v')
-  then show ?case sorry
+  then show ?case
+    using red_pure_red_pure_exps.RedUnop by blast
 next
   case (RedBinopLazy \<Delta> e1 \<omega> v1 bop v e2)
-  then show ?case sorry
+  then show ?case
+    using red_pure_red_pure_exps.RedBinopLazy by blast
 next
   case (RedBinop \<Delta> e1 \<omega> v1 e2 v2 bop v)
-  then show ?case sorry
+  then show ?case
+    using red_pure_red_pure_exps.RedBinop by blast
 next
   case (RedOld \<omega> l \<phi> \<Delta> e v)
-  then show ?case sorry
+  then show ?case
+    by (metis get_trace_set_state red_pure_red_pure_exps.RedOld set_state_core)
 next
   case (RedLet \<Delta> e1 \<omega> v1 e2 r)
-  then show ?case sorry
+  then show ?case
+    by (simp add: red_pure_red_pure_exps.RedLet shift_and_add_core)
 next
   case (RedExistsTrue v \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedExistsTrue shift_and_add_core)
 next
   case (RedExistsFalse \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedExistsFalse shift_and_add_core)
 next
   case (RedForallTrue \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedForallTrue shift_and_add_core)
 next
   case (RedForallFalse v \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedForallFalse shift_and_add_core)
 next
   case (RedCondExpTrue \<Delta> e1 \<omega> e2 r e3)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedCondExpTrue)
 next
   case (RedCondExpFalse \<Delta> e1 \<omega> e3 r e2)
-  then show ?case sorry
+  then show ?case
+    by (metis (no_types, opaque_lifting) red_pure_red_pure_exps.RedCondExpFalse)
 next
   case (RedPermNull \<Delta> e \<omega> f)
-  then show ?case sorry
+  then show ?case
+    using red_pure_simps(8) by blast
 next
   case (RedResult \<omega> v \<Delta>)
-  then show ?case sorry
+  then show ?case
+    by (simp add: core_charact(1) red_pure_simps(11))
 next
   case (RedBinopRightFailure \<Delta> e1 \<omega> v1 e2 bop)
-  then show ?case sorry
+  then show ?case
+    using red_pure_simps(4) by blast
 next
   case (RedBinopFailure \<Delta> e1 \<omega> v1 e2 v2 bop)
-  then show ?case sorry
+  then show ?case
+    by (simp add: red_pure_red_pure_exps.RedBinopFailure)
 next
   case (RedOldFailure \<omega> l \<Delta> e)
-  then show ?case sorry
+  then show ?case
+    by (metis get_trace_set_state red_pure_red_pure_exps.RedOldFailure set_state_core)
 next
   case (RedExistsFailure v \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (simp add: red_pure_red_pure_exps.RedExistsFailure shift_and_add_core)
 next
   case (RedForallFailure v \<Delta> ty e \<omega>)
-  then show ?case sorry
+  then show ?case
+    by (simp add: red_pure_red_pure_exps.RedForallFailure shift_and_add_core)
 next
   case (RedField \<Delta> e \<omega> a f v)
   then show ?case sorry
@@ -1766,215 +1787,6 @@ lemma del_perm_0 [simp] :
   apply (rule ext; simp add:preal_to_real)
   by (metis all_pos less_eq_preal.rep_eq zero_preal.rep_eq)
 
-(*
-datatype 'v ag_option = None_ag | Some_ag 'v
-
-type_synonym 'v ag_store = "nat \<Rightarrow> 'v val ag_option"
-type_synonym 'v ag_trace = "label \<Rightarrow> 'v virtual_state ag_option"
-=======
-(*
-lemma vstate_stabilize_structure:
-  shows "get_vm (stabilize_rel a x) = get_vm x"
-    and "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)"
-proof -
-  have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: get_vm_def)
-  moreover have "Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x"
-    by (simp add: Abs_virtual_state_inverse stabilize_wf)
-  ultimately show "get_vm (stabilize_rel a x) = get_vm x"
-    by (simp add: get_vm_def stabilize2pre_def stabilize_rel_virtual_state_def)
-  show "get_vh (stabilize_rel a x) = (\<lambda>hl. if get_vm a hl = 0 \<and> get_vm x hl = 0 then None else get_vh x hl)" using \<open>Rep_virtual_state (Abs_virtual_state (stabilize2pre a x)) = stabilize2pre a x\<close>
-    by (simp add: get_vh_def stabilize2pre_def stabilize_rel_virtual_state_def)
-qed
-*)
-(*
-lemma vstate_u_structure:
-  shows "get_vm sep_algebra_class.u = zero_mask"
-    and "get_vh sep_algebra_class.u = empty_heap"
-proof -
-  have "Rep_virtual_state (Abs_virtual_state uuu) = uuu" using wf_uuu
-    using Abs_virtual_state_inverse uuu_def by blast
-  moreover have "\<And>\<omega>. get_vm \<omega> = fst (Rep_virtual_state \<omega>)"
-    by (simp add: get_vm_def)
-  ultimately show "get_vm sep_algebra_class.u = zero_mask"
-    by (smt (verit) fst_conv u_virtual_state_def uuu_def)
-  have "\<And>\<omega>. get_vh \<omega> = snd (Rep_virtual_state \<omega>)"
-    by (simp add: get_vh_def)
-  then show "get_vh sep_algebra_class.u = empty_heap" using \<open>Rep_virtual_state (Abs_virtual_state uuu) = uuu\<close>
-    by (smt (verit) snd_conv u_virtual_state_def uuu_def)
-qed
-*)
-
-instance proof
-  fix x a b c :: "'v virtual_state"
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    sorry
-  show "sep_algebra_class.stable (stabilize x)"
-    by (smt (verit, del_insts) Abs_virtual_state_inverse get_vh_def get_vm_def mem_Collect_eq not_gr_0 prod.sel(1) prod.sel(2) stabilize2pre_def stabilize_virtual_state_def stabilize_wf stable_virtual_state_def)
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    sorry
-  show "Some x = stabilize x \<oplus> |x|"
-    sorry
-  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
-    sorry
-qed
-
-lemma get_trace_stabilize[simp]:
-  "get_trace (stabilize \<omega>) = get_trace \<omega>"
-  by (metis agreement.collapse fst_conv get_trace_def snd_conv stabilize_ag stabilize_prod_def)
-lemma set_trace_stabilize[simp]:
-  "set_trace (stabilize \<omega>) t = stabilize (set_trace \<omega> t)"
-  by (metis (no_types, lifting) fst_conv get_state_def get_store_stabilize set_trace_def snd_conv stabilize_ag stabilize_prod_def)
-
-end
-
-
-datatype 'v ag_option = None_ag | Some_ag (ag_the: 'v)
-
-type_synonym 'v ag_store = "nat \<Rightarrow> 'v val ag_option"
-type_synonym 'v ag_trace = "(label \<rightharpoonup> 'v virtual_state) agreement"
->>>>>>> abssem_proof
-type_synonym 'v ag_state = "'v ag_store \<times> 'v ag_trace \<times> 'v virtual_state"
-
-instantiation ag_option :: (type) pcm
-begin
-
-fun plus_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option \<Rightarrow> 'v ag_option option" where
-  "plus_ag_option None_ag x = Some x"
-| "plus_ag_option x None_ag = Some x"
-| "plus_ag_option (Some_ag x) (Some_ag y) = (if x = y then Some (Some_ag x) else None)"
-
-instance proof
-  fix a b ab c bc :: "'v ag_option"
-  show "a \<oplus> b = b \<oplus> a"
-    by (metis(mono_tags) ag_option.exhaust plus_ag_option.simps(1) plus_ag_option.simps(2) plus_ag_option.simps(3))
-  assume "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc"
-  then show "ab \<oplus> c = a \<oplus> bc"
-    by (smt (verit) option.discI option.sel plus_ag_option.elims)
-next
-  fix a b ab c :: "'v ag_option"
-  assume "a \<oplus> b = Some ab \<and> b \<oplus> c = None"
-  then show "ab \<oplus> c = None"
-    by (metis(mono_tags) ag_option.exhaust option.distinct(1) option.inject plus_ag_option.simps(1) plus_ag_option.simps(3))
-next
-  fix a b c :: "'v ag_option"
-  assume "a \<oplus> b = Some c" "Some c = c \<oplus> c"
-  then show "Some a = a \<oplus> a"
-    by (metis(mono_tags) ag_option.exhaust plus_ag_option.simps(1) plus_ag_option.simps(3))
-qed
-
-end
-
-
-instantiation ag_option :: (type) pcm_with_core
-begin
-
-definition core_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option" where
-  "core_ag_option = id"
-
-instance proof
-  fix x c :: "'v ag_option"
-  have "Some x = x \<oplus> x"
-    by (metis ag_option.exhaust plus_ag_option.simps(1) plus_ag_option.simps(3))
-  then show "Some x = x \<oplus> |x|" using core_ag_option_def
-    by (metis id_apply)
-  then show "Some |x| = |x| \<oplus> |x|" using core_ag_option_def
-    by (metis id_apply)
-  assume "Some x = x \<oplus> c"
-  then have "Some |x| = c \<oplus> x" using core_ag_option_def
-    by (metis commutative id_apply)
-  then show "\<exists>r. Some |x| = c \<oplus> r"
-    by auto
-next
-  fix c a b :: "'v ag_option"
-  assume "Some c = a \<oplus> b"
-  then show "Some |c| = |a| \<oplus> |b|" using core_ag_option_def
-    by (metis id_apply)
-next
-  fix x y :: "'v ag_option"
-  assume "|x| = |y|"
-  then show "x = y" using core_ag_option_def
-    by (metis id_apply)
-qed
-
-end
-
-instantiation ag_option :: (type) sep_algebra
-begin
-
-<<<<<<< HEAD
-=======
-(*
->>>>>>> abssem_proof
-definition u_ag_option :: "'v ag_option" where
-  "u_ag_option = None_ag"
-
-definition stable_rel_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option \<Rightarrow> bool" where
-  "stable_rel_ag_option _ _ \<longleftrightarrow> True"
-
-definition stabilize_rel_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option \<Rightarrow> 'v ag_option" where
-  "stabilize_rel_ag_option _ x = x"
-<<<<<<< HEAD
-
-instance proof
-  fix x a b y :: "'v ag_option"
-=======
-*)
-
-definition stable_ag_option :: "'v ag_option \<Rightarrow> bool" where
-  "stable_ag_option _ \<longleftrightarrow> True"
-
-definition stabilize_ag_option :: "'v ag_option \<Rightarrow> 'v ag_option" where
-  "stabilize_ag_option x = x"
-
-instance proof
-  fix x a b c :: "'v ag_option"
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    by (simp add: stabilize_ag_option_def)
-  show "sep_algebra_class.stable (stabilize x)"
-    by (simp add: stable_ag_option_def)
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    by (simp add: stabilize_ag_option_def)
-  show "Some x = stabilize x \<oplus> |x|"
-    by (simp add: core_is_smaller stabilize_ag_option_def)
-  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
-    oops
-(*
-
-
-
->>>>>>> abssem_proof
-  show "stabilize_rel a x = x"
-    by (simp add: stabilize_rel_ag_option_def)
-  then show "Some x = stabilize_rel a x \<oplus> |x|"
-    by (simp add: core_is_smaller)
-  show "stable_rel a (stabilize_rel a x)"
-    by (simp add: stable_rel_ag_option_def)
-  show "Some x = x \<oplus> sep_algebra_class.u"
-    by (simp add: commutative u_ag_option_def)
-  show "stabilize_rel a x \<succeq> stabilize_rel b x"
-    by (simp add: stabilize_rel_ag_option_def succ_refl)
-  assume "Some x = a \<oplus> b"
-  then show "Some (stabilize_rel sep_algebra_class.u x) = stabilize_rel sep_algebra_class.u a \<oplus> stabilize_rel a b"
-    by (simp add: stabilize_rel_ag_option_def)
-  show "Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-    by (simp add: \<open>Some x = a \<oplus> b\<close> stabilize_rel_ag_option_def)
-<<<<<<< HEAD
-qed
-
-end
-*)
-*)
-
-
-
-
-
-
-
-
-
-(* REMAINING DUMP OF LiftSepAlgebra *)
 
 
 lemma get_state_stabilize [simp] :
@@ -2056,288 +1868,5 @@ next
     using defined_def plus_prodIAlt by fastforce
 qed
 
-
-
-(* TODO:
-
-lemma plus_state_def:
-  "\<omega>1 \<oplus> \<omega>2 = (let r = (get_state \<omega>1 \<oplus> get_state \<omega>2) in
-  (if get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2 \<and> r \<noteq> None then Some ((Ag (get_store \<omega>1), Ag (get_trace \<omega>1)), the r)
-  else None))" (is "?A = ?B")
-proof (cases "\<omega>1 \<oplus> \<omega>2")
-  case None
-  then have "get_state \<omega>1 \<oplus> get_state \<omega>2 = None \<or> get_store \<omega>1 \<noteq> get_store \<omega>2 \<or> get_trace \<omega>1 \<noteq> get_trace \<omega>2"
-    by (metis comp_prod defined_def get_state_def get_store_trace_comp)
-  then show ?thesis
-    using None by auto
-next
-  case (Some x)
-  then have asm0: "get_store \<omega>1 = get_store \<omega>2 \<and> get_state \<omega>1 \<oplus> get_state \<omega>2 \<noteq> None \<and> get_trace \<omega>1 = get_trace \<omega>2"
-    by (metis comp_prod defined_def get_store_trace_comp get_state_def option.simps(3))
-  then obtain r where "Some r = get_state \<omega>1 \<oplus> get_state \<omega>2"
-    by force
-  moreover have "fst \<omega>1 \<oplus> fst \<omega>2 = Some (Ag (get_store \<omega>1), Ag (get_trace \<omega>1))"
-    by (metis (no_types, opaque_lifting) agreement.exhaust_sel asm0 core_is_smaller fst_conv get_store_def get_store_trace_comp get_trace_def greater_def smaller_compatible_core surjective_pairing)
-  ultimately show ?thesis
-    by (smt (z3) asm0 get_state_def option.sel plus_prodIAlt)
-qed
-
-
-(*
-fun mult_state :: "'b \<Rightarrow> 'a equi_state \<Rightarrow> 'a equi_state option" (infixl "\<odot>" 70) where
-  "\<alpha> \<odot> \<omega> = (let r = (\<alpha> \<odot> get_state \<omega>) in if r = None then None else Some (get_store \<omega>, get_t \<omega>, the r))"
-*)
-(*
-definition core_trace :: "'a trace \<Rightarrow> 'a trace" where
-  "core_trace \<tau> l = (if \<tau> l = None then None else Some (core (the (\<tau> l))))"
-*)
-
-lemma full_core_def:
-  "|\<omega>| = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)),  |get_state \<omega>| )"
-  by (smt (verit) agreement.exhaust_sel core_def core_is_smaller fst_conv get_state_def get_store_def get_trace_def option.discI plus_state_def snd_conv)
-
-(*
-lemma full_stable_def:
-  "stable \<omega> \<longleftrightarrow> stable (get_state \<omega>)" (is "?A \<longleftrightarrow> ?B")
-  sorry
-
-fun full_stabilize :: "'a equi_state \<Rightarrow> 'a equi_state" where
-  "full_stabilize \<omega> = (get_store \<omega>, stabilize (get_state \<omega>))"
-*)
-
-lemma full_add_defined:
-  "\<omega>1 \<oplus> \<omega>2 \<noteq> None \<longleftrightarrow> ((get_state \<omega>1) \<oplus> (get_state \<omega>2) \<noteq> None \<and> get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2)"
-  using plus_state_def[of \<omega>1 \<omega>2] option.discI
-  by (smt (verit, del_insts))
-
-lemma full_add_charact:
-  assumes "Some x = a \<oplus> b"
-  shows "get_store x = get_store a"
-      and "Some (get_state x) = (get_state a) \<oplus> (get_state b)"
-proof -
-  show "get_store x = get_store a"
-    by (smt (verit) agreement.exhaust_sel assms fst_conv get_store_def option.discI option.sel plus_state_def)
-  show "Some (get_state x) = (get_state a) \<oplus> (get_state b)" 
-    by (smt assms get_state_def option.exhaust_sel option.sel option.simps(3) plus_state_def snd_conv)
-qed
-
-(*
-lemma compatible_traces_commutative:
-  "compatible_traces a b \<longleftrightarrow> compatible_traces b a"
-  sorry
-
-lemma sum_traces_commutative:
-  "compatible_traces a b \<Longrightarrow> sum_traces a b = sum_traces b a"
-  sorry
-
-lemma compatible_traces_asso:
-  "compatible_traces a b \<and> compatible_traces (sum_traces a b) c
-  \<longleftrightarrow> compatible_traces b c \<and> compatible_traces a (sum_traces b c)"
-  sorry
-
-lemma sum_traces_asso:
-  "compatible_traces a b \<and> compatible_traces (sum_traces a b) c \<Longrightarrow>
-  sum_traces (sum_traces a b) c = sum_traces a (sum_traces b c)"
-  sorry
-*)
-
-
-(*
-lemma sum_trace_core:
-  "compatible_traces \<tau> (core_trace \<tau>)"
-  "sum_traces \<tau> (core_trace \<tau>) = \<tau>"
-  sorry
-*)
-
-
-(*
-lemma core_trace_sum:
-  "sum_traces (core_trace \<tau>) (core_trace \<tau>) = core_trace \<tau>"
-  sorry
-
-lemma core_trace_invo:
-  "core_trace (core_trace \<tau>) = core_trace \<tau>"
-  sorry
-*)
-
-(*
-lemma add_ag_stores:
-  fixes c :: "('v :: pcm_agreement) ag_store"
-  shows "Some c = c \<oplus> c"
-proof -
-  have "compatible_fun c c"
-  proof (rule compatible_funI)
-    fix l show "c l \<oplus> c l \<noteq> None"
-      apply (cases "c l")
-       apply simp
-      by (smt (verit, del_insts) option.distinct(1) pcm_agreement_class.plus_agreement plus_option.simps(3))
-  qed
-  then obtain cc where "Some cc = c \<oplus> c"
-    by (simp add: plus_fun_def)
-  moreover have "cc = c"
-    using calculation map_invo pcm_agreement_sum by blast
-  ultimately show ?thesis by simp
-qed
-
-*)
-
-lemma add_defined_lift:
-  fixes s :: "'v ag_store"
-  assumes "Some c = a \<oplus> b"
-  shows "Some (s, c) = (s, a) \<oplus> (s, b)"
-proof -
-  have "Some s = s \<oplus> s"
-    by (simp add: plus_agreement_def)
-  then show ?thesis using plus_prodIAlt assms 
-    by fastforce
-qed
-
-(*
-lemma full_stabilize_is_smaller:
-  "\<exists>r. Some x = full_stabilize x \<oplus> r"
-proof -
-  obtain \<sigma> xx where "x = (\<sigma>, xx)" by (metis surj_pair)
-  then obtain rr where "Some xx = stabilize xx \<oplus> rr"
-    using stabilize_is_smaller by blast
-  then have "Some x = full_stabilize x \<oplus> (\<sigma>, rr)"
-    by (simp add: \<open>x = (\<sigma>, xx)\<close> add_defined_lift get_store_def get_state_def)
-  then show ?thesis
-    by blast
-qed
-
-
-lemma full_stabilize_is_stable:
-  "full_stable (full_stabilize x)"
-  by (simp add: get_state_def stabilize_is_stable)
-
-lemma full_stabilize_max:
-  assumes "Some x = a \<oplus> b"
-      and "full_stable a"
-    shows "\<exists>r. Some (full_stabilize x) = a \<oplus> r"
-proof -
-  obtain \<sigma>x \<sigma>a \<sigma>b xx aa bb where "x = (\<sigma>x, xx)" "a = (\<sigma>a, aa)" "b = (\<sigma>b, bb)"
-    by (meson surj_pair)
-  then have "Some xx = aa \<oplus> bb"
-    by (metis assms(1) full_add_charact(2) get_state_def snd_conv)
-  then obtain rr where "Some (stabilize xx) = aa \<oplus> rr" 
-    by (metis \<open>a = (\<sigma>a, aa)\<close> assms(2) full_stable.elims(2) get_state_def stabilize_max snd_conv)
-  then have "Some (full_stabilize x) = a \<oplus> (\<sigma>x, rr)"
-    using \<open>a = (\<sigma>a, aa)\<close> \<open>x = (\<sigma>x, xx)\<close> add_defined_lift assms(1) fst_conv full_add_charact
-      full_sa_axioms full_stabilize.elims option.distinct(1) option.sel plus_state_def snd_conv
-    using fst_conv full_stabilize.simps get_store_def get_state_def option.distinct(1) option.sel plus_state_def snd_conv
-    \<open>a = (\<sigma>a, aa)\<close> \<open>b = (\<sigma>b, bb)\<close> \<open>x = (\<sigma>x, xx)\<close> assms(1) fst_conv full_sa.plus_state_def full_sa_axioms
-    full_stabilize.elims get_store_def get_state_def option.distinct(1) option.sel snd_conv map_add_assoc
-    by (smt (verit) compatible_maps_asso compatible_maps_refl map_invo)
-  then show ?thesis
-    by blast
-qed
-*)
-
-(*
-lemma full_stabilize_sum:
-  assumes "Some c = a \<oplus> b"
-  shows "Some (full_stabilize c) = full_stabilize a \<oplus> full_stabilize b"
-  by (smt add_defined_lift assms full_add_charact(1) full_add_charact(5) full_add_charact(5) full_add_defined full_stabilize.simps stabilize_sum)
-*)
-
-(*
-definition full_add_set (infixl "\<otimes>" 60) where "full_add_set = SA.add_set"
-definition full_defined (infixl "##" 60) where "full_defined = SA.defined"
-definition full_greater (infixl "\<succeq>" 50) where "full_greater = SA.greater"
-definition full_greater_set (infixl "\<ggreater>" 50) where "full_greater_set = SA.greater_set"
-definition full_minus (infixl "\<ominus>" 63) where "full_minus = SA.minus"
-definition full_mono where "full_mono = SA.mono_prop"
-*)
-
-(*
-definition larger_trace :: "'a trace \<Rightarrow> 'a trace \<Rightarrow> bool" where
-  "larger_trace a b \<longleftrightarrow> (\<forall>l \<phi>. b l = Some \<phi> \<longrightarrow> (\<exists>\<phi>'. a l = Some \<phi>' \<and> \<phi>' \<succeq> \<phi>))"
-
-lemma larger_traceI:
-  assumes "\<And>l \<phi>. b l = Some \<phi> \<Longrightarrow> (\<exists>\<phi>'. a l = Some \<phi>' \<and> \<phi>' \<succeq> \<phi>)"
-  shows "larger_trace a b"
-  by (simp add: assms larger_trace_def)
-
-lemma larger_trace_equiv:
-  "larger_trace a b \<longleftrightarrow> (\<exists>c. compatible_traces b c \<and> a = sum_traces b c)"
-  sorry
-*)
-
-lemma ag_store_greater:
-  fixes s :: "'v ag_store"
-  shows "s' \<succeq> s \<longleftrightarrow> s = s'"
-  by (metis ag_comp smaller_compatible_core succ_refl)
-
-lemma ag_trace_greater:
-  fixes s :: "'v ag_trace"
-  shows "s' \<succeq> s \<longleftrightarrow> s = s'"
-  by (metis ag_comp smaller_compatible_core succ_refl)
-
-lemma greater_charact:
-  "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_state \<omega>' \<succeq> get_state \<omega> \<and> get_trace \<omega> = get_trace \<omega>'" (is "?A \<longleftrightarrow> ?B")
-proof
-  show "?A \<Longrightarrow> ?B"
-    by (metis (no_types, opaque_lifting) get_state_def get_store_trace_comp greater_prod_eq smaller_compatible)
-  assume ?B
-  then have "Ag (get_store \<omega>') \<succeq> Ag (get_store \<omega>) \<and> get_state \<omega>' \<succeq> get_state \<omega> \<and> Ag (get_trace \<omega>') \<succeq> Ag (get_trace \<omega>)"
-    by (simp add: succ_refl)
-  then show ?A
-    by (simp add: get_state_def get_store_def get_trace_def greater_prod_eq)
-qed
-
-lemma core_charact:
-  shows "get_store |\<omega>| = get_store \<omega>"
-    and "get_trace |\<omega>| = get_trace \<omega>"
-    and "get_state |\<omega>| = |get_state \<omega>|"
-  by (simp_all add: full_core_def get_store_def get_state_def get_trace_def)
-
-(*
-lemma mult_charact:
-  assumes "Some \<omega>' = \<alpha> \<odot> \<omega>"
-    shows "Some (get_state \<omega>') = \<alpha> \<odot> (get_state \<omega>)"
-      and "get_t \<omega>' = get_t \<omega>"
-      and "get_store \<omega>' = get_store \<omega>"
-  apply (smt assms get_state_def mult_state.elims option.exhaust_sel option.sel option.simps(3) snd_conv) 
-  apply (smt assms fst_conv get_t_def mult_state.elims option.sel option.simps(3) snd_conv) 
-proof -
-  have "\<forall>b p. if b \<odot> get_state p = None then b \<odot> p = None else b \<odot> p = Some (get_store p, get_t p, the (b \<odot> get_state p))"
-    by fastforce
-  then show "get_store \<omega>' = get_store \<omega>"
-    by (metis (no_types) assms fst_conv get_store_def option.distinct(1) option.inject)
-qed
-*)
-
-
-(*
-lemma dom_union:
-  assumes "Some x = a \<oplus> b"
-  shows "dom x = dom a \<union> dom b"
-(is "?A = ?B")
-proof
-  show "?A \<subseteq> ?B"
-    using assms result_sum_partial_functions(1) by fastforce
-  show "?B \<subseteq> ?A"
-    by (smt (verit, ccfv_threshold) Un_iff assms compatible_fun_def domIff option.distinct(1) option.sel plus_fun_def plus_option.elims subsetI)
-qed
-
-lemma ag_stores_compatible:
-  fixes a :: "('v :: pcm_agreement) ag_store"
-  assumes "a ## b"
-      and "a l = Some va"
-      and "b l = Some vb"
-    shows "va = vb"
-  by (metis assms(1) assms(2) assms(3) compatible_maps_def compatible_options.simps(1) pcm_agreement_compatible)
-*)
-
-
-
-
-*)
-
-
-
-
-
-(* END OF REMAINING DUMP *)
 
 end

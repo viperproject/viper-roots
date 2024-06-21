@@ -881,6 +881,11 @@ begin
 definition stable_rel :: "'a \<Rightarrow> 'a \<Rightarrow> bool" where
   "stable_rel a b = (\<forall>c. a \<oplus> b = Some c \<longrightarrow> stable c)"
 
+lemma stable_relI:
+  assumes "\<And>c. a \<oplus> b = Some c \<Longrightarrow> stable c"
+  shows "stable_rel a b"
+  by (simp add: assms stable_rel_def)
+
 lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> stabilize a"
   using local.greater_equiv local.stabilize_sum by blast
 
