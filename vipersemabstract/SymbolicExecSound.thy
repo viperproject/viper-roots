@@ -258,7 +258,10 @@ lemma s2a_in_well_typedly :
   apply (rule)
   subgoal using well_typedly_incl by blast
   subgoal
-    apply (simp add:well_typedly_def well_typed_def)
+    apply (simp add:well_typedly_def well_typed_def snd_get_abs_state fst_get_abs_state)
+    using assms apply (clarsimp simp add:greater_charact_equi s2a_state_wf_def s2a_heap_wf_def
+       well_typed_heap_def make_semantic_vtyp_def s2a_heap_typed_def vstate_greater_charact)
+    (* TODO: For this we need that \omega is well-typed, not just the concrete symbolic part *)
     sorry
   done
 

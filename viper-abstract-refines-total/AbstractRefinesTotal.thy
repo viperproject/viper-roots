@@ -1142,12 +1142,13 @@ lemma a2t2a_state[simp] :
 subsection \<open>well_typedly\<close>
 
 lemma well_typed_heap_partial_heap_typing :
- "Instantiation.well_typed_heap
+ "partial_heap_typing ctxt (get_vh st) \<Longrightarrow> Instantiation.well_typed_heap
      (map_option (make_semantic_vtyp (ctxt_to_interp ctxt)) \<circ>
       declared_fields (program_total ctxt))
-     st \<longleftrightarrow>
-   partial_heap_typing ctxt (get_vh st)"
-  apply (auto simp add:well_typed_heap_def ValueAndBasicState.well_typed_heap_def)
+     st"
+  apply (auto simp add:well_typed_heap_def ValueAndBasicState.well_typed_heap_def make_semantic_vtyp_def)
+  (* This requires weakening Instantiation.well_typed_heap such that it does not enforce anymore
+    that all locations must have a type. *)
   sorry
 
 lemma in_well_typedly :

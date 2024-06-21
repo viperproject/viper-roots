@@ -207,13 +207,9 @@ definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarro
   "make_semantic_assertion \<Delta> A = { \<omega> |\<omega>. \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle> }"
 *)
 
-fun make_semantic_vtyp :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> 'a val abs_vtyp" where
-  "make_semantic_vtyp _ TInt = { VInt n |n. True }"
-| "make_semantic_vtyp _ TBool = { VBool b |b. True }"
-| "make_semantic_vtyp _ TPerm = { VPerm p |p. True }"
-| "make_semantic_vtyp _ TRef = { VRef r |r. True }"
+definition make_semantic_vtyp :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> 'a val abs_vtyp" where
+"make_semantic_vtyp \<Delta> ty = { v. has_type (domains \<Delta>) ty v}"
 
-| "make_semantic_vtyp \<Delta> (TAbs ty) = undefined" (* { VAbs x |x. True }" *)
 (*
 TODO: Ignoring domains so far...
 record ('v, 'a) interp =
