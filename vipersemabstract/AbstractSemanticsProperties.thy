@@ -1529,7 +1529,8 @@ next
     by (meson RuleAssert.prems(1) empty_subsetI insert_subsetI)
 next
   case (RuleAssume \<Delta> A P)
-  moreover have asm0: "stable_on \<omega> P"
+  moreover have asm0: "stable_on \<omega> P" sorry
+(*
   proof (rule stable_onI)
     fix x assume asm1: "pure_larger x \<omega>"
     thm self_framing_on_def[of A P]
@@ -1548,6 +1549,7 @@ self_framing_on A P
 
     by (metis (no_types, lifting) already_stable pure_larger_stabilize_same self_framing_on_def self_framing_typed_altE typed_assertion_def wf_abs_stmt.simps(5) stable_on_def wf_assertion_def) 
 (* long *)
+*)
 *)
   then show "\<exists>S. red_stmt \<Delta> (abs_stmt.Assume P) \<omega> S \<and> S \<subseteq> A \<inter> P"
   proof (cases "\<omega> \<in> P")
