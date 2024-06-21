@@ -31,6 +31,11 @@ lemma plus_val_id :
   "(v :: 'a val) \<oplus> v = Some v"
   by (simp add: plus_val_def)
 
+lemma defined_val :
+  "(v :: 'a val) ## v' \<longleftrightarrow> v = v'"
+  by (simp add: defined_def plus_val_def)
+
+
 instantiation val :: (type) pcm_mult
 begin
 
@@ -162,8 +167,12 @@ definition set_vm where
   "set_vm \<phi> m = Abs_virtual_state (m, get_vh \<phi>)"
 *)
 
-definition uu :: "'a virtual_state" where "uu = Abs_virtual_state uuu"
+lift_definition uu :: "'a virtual_state" is "uuu"
+  using wf_uuu by (simp add: uuu_def)
 
+lemma uu_get :
+  shows "get_vm uu = zero_mask" "get_vh uu = empty_heap"
+  by (simp_all add:get_vm_def get_vh_def uu.rep_eq uuu_def)
 
 lemma sum_wf_is_wf:
   assumes "wf_pre_virtual_state a"

@@ -1788,6 +1788,68 @@ lemma del_perm_0 [simp] :
   by (metis all_pos less_eq_preal.rep_eq zero_preal.rep_eq)
 
 
+lemma add_perm_del_perm :
+  assumes "get_vh st hl = Some v"
+  assumes "p \<le> get_vm st hl"
+  shows "add_perm (del_perm st hl p) hl p v = st"
+  apply (rule virtual_state_ext; rule ext; simp add:assms)
+  using assms apply (simp add:preal_to_real)
+  using get_vm_bound preal_to_real by (metis min.absorb2)
+
+lemma add_perm_del_perm_le :
+  assumes "get_vh st hl = Some v"
+  assumes "p \<le> get_vm st hl"
+  assumes "q \<le> p"
+  shows "add_perm (del_perm st hl p) hl q v = del_perm st hl (p - q)"
+  apply (rule virtual_state_ext; rule ext; simp add:assms)
+  using assms apply (simp add:preal_to_real)
+  using get_vm_bound preal_to_real by (smt (verit, ccfv_SIG) not_gr_0)
+
+subsection \<open>acc_virt\<close>
+
+lift_definition acc_virt :: "heap_loc \<Rightarrow> preal \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" is
+"\<lambda> hl p v. ((\<lambda> hl'. if hl = hl' then (pmin 1 p) else 0), [hl \<mapsto> v])"
+  apply (simp add:sup_preal.rep_eq wf_pre_virtual_state_def wf_mask_simple_def)
+  using all_pos gr_0_is_ppos by blast
+
+lemma acc_virt_get_vm [simp]:
+  shows "get_vm (acc_virt hl p v) hl' = (if hl = hl' then pmin 1 p else 0)"
+  by (simp add:get_vm_def acc_virt.rep_eq)
+
+lemma acc_virt_get_vm' :
+  shows "get_vm (acc_virt hl p v) = (\<lambda> hl'. (if hl = hl' then pmin 1 p else 0))"
+  by (rule ext, rule acc_virt_get_vm)
+
+lemma acc_virt_get_vh [simp]:
+  "get_vh (acc_virt hl p v) = Map.empty(hl \<mapsto> v)"
+  by (simp add:acc_virt.rep_eq get_vh_def)
+
+lemma stabilize_acc_virt :
+  assumes "ppos p"
+  shows "stabilize (acc_virt hl p v) = acc_virt hl p v"
+  apply (rule virtual_state_ext; simp add:vstate_stabilize_structure)
+  using assms by (simp add:norm_preal preal_to_real)
+
+lemma acc_virt_plus :
+  shows "Some st2 = st1 \<oplus> acc_virt hl p v \<longleftrightarrow> 
+    st2 = add_perm st1 hl p v \<and> get_vh st1 ## [hl \<mapsto> v] \<and> get_vm st1 hl + pmin 1 p \<le> 1"
+  apply (auto simp add:vstate_add_iff)
+  subgoal
+    apply (rule virtual_state_ext; simp; rule ext)
+    subgoal for hl2
+      apply (drule plus_funE[where l=hl2 and x="get_vm _"]; auto simp add:plus_preal_def)
+      by (metis PosReal.pmin_sum add.commute get_vm_bound inf.absorb4 inf.orderE inf_absorb2 leI padd_pgte)
+    subgoal for hl2
+      apply (drule plus_funE[where l=hl2 and x="get_vh _"]; simp split:if_splits)
+      by (cases "get_vh st1 hl"; simp add:plus_val_def split:if_splits)
+    done
+  subgoal by (metis defined_def option.discI)
+  subgoal by (metis EquiViper.add_masks_def acc_virt_get_vm get_vm_bound)
+  subgoal by (cases "get_vh st1 hl"; simp add:fun_plus_iff plus_val_id compatible_partial_functions_singleton defined_val)
+  subgoal apply (simp add:fun_plus_iff plus_preal_def preal_to_real)
+    by (metis add.commute add_increasing2 all_pos less_eq_preal.rep_eq min.absorb2 min.orderE nle_le zero_preal.rep_eq)
+  done
+
 
 lemma get_state_stabilize [simp] :
   "get_state (stabilize \<omega>) = stabilize (get_state \<omega>)"
@@ -1816,6 +1878,10 @@ lemma set_state_set_state [simp] :
 lemma set_state_get_state [simp] :
   "set_state \<omega> (get_state \<omega>) = \<omega>"
   by (simp add: full_state_ext)
+
+lemma stable_get_state :
+  "stable (get_state \<omega>) \<longleftrightarrow> stable \<omega>"
+  by (simp add:get_state_def stable_prod_def stable_agreement_def)
 
 subsection \<open>equi_state_record\<close>
 

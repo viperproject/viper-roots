@@ -20,14 +20,6 @@ lemma RNormal_eq_ex_if_total[simp] :
 definition total_state_mask :: "heap_loc set \<Rightarrow> 'a full_total_state" where
 "total_state_mask hls = undefined\<lparr>get_total_full := undefined\<lparr>get_mh_total := (\<lambda> hl. if hl \<in> hls then 1 else 0) \<rparr> \<rparr>"
 
-lemma compatible_partial_functions_singleton :
- "f ## [x \<mapsto> v] \<longleftrightarrow> (\<forall> v'. f x = Some v' \<longrightarrow> v' ## v)"
-  by (simp add: compatible_partial_functions)
-
-lemma defined_val :
-  "(v :: 'a val) ## v' \<longleftrightarrow> v = v'"
-  by (simp add: defined_def plus_val_def)
-
 subsection \<open>abs_state properties\<close>
 
 (* TODO: Make both simp lemmas? *)
@@ -38,11 +30,6 @@ lemma stable_dom_get_vh_eq_get_vm :
   shows "dom (get_vh st) = {hl. ppos (get_vm st hl)}"
   using assms
   by (metis (mono_tags, lifting) Collect_cong dom_def stable_virtual_state_def vstate_wf_ppos)
-
-(* Should this be a simp lemma? *)
-lemma stable_get_state :
-  "stable (get_state \<omega>) \<longleftrightarrow> stable \<omega>"
-  by (simp add:get_state_def stable_prod_def stable_agreement_def)
 
 lemma get_trace_in_star :
   assumes "\<omega>' \<in> {\<omega>} \<otimes> A"
