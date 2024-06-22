@@ -1,0 +1,7 @@
+session SimpleViperFrontEnd = ViperAbstract +
+  theories
+	VHelper
+	ParImp
+	FrontEndTranslation
+  theories [quick_and_dirty]
+  	CSL_IDF
