@@ -478,17 +478,6 @@ qed
 definition atrue where
   "atrue \<Delta> = {\<omega>. typed \<Delta> \<omega>}"
 
-lemma fvaA_atrue_empty[simp]:
-  "free_vars \<Delta> (atrue \<Delta>) = {}"
-  sorry (* fvA \<Delta> *)
-
-lemma free_vars_agree:
-  assumes "typed_store \<Delta> \<sigma>1"
-      and "typed_store \<Delta> \<sigma>2"
-      and "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
-    shows "((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A)"
-  sorry (* TODO: free_vars *)
-
 end
 
 
