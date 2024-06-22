@@ -58,7 +58,7 @@ proof
   then have "Some \<omega> = |\<omega>| \<oplus> \<omega>"
     by (simp add: commutative core_is_smaller)
   moreover have "|\<omega>| \<in> atrue \<Delta>"
-    by (metis CollectI TypedEqui.typed_core TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> assms atrue_def typed_state.typed_assertionE)
+    by (metis CollectI TypedEqui.typed_core TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> assms TypedEqui.atrue_def typed_state.typed_assertionE)
   ultimately show "\<omega> \<in> atrue \<Delta> \<otimes> P"
     using \<open>\<omega> \<in> P\<close> x_elem_set_product by blast
 qed
@@ -81,8 +81,8 @@ fun wf_stmt where
 lemma atrue_self_framing_and_typed[simp]:
   "TypedEqui.typed_assertion \<Delta> (atrue \<Delta>)"
   "TypedEqui.self_framing_typed \<Delta> (atrue \<Delta>)"
-  using TypedEqui.typed_assertionI atrue_def apply blast
-  by (simp add: TypedEqui.self_framing_typedI TypedEqui.typed_state_then_stabilize_typed atrue_def)
+  using TypedEqui.typed_assertionI TypedEqui.atrue_def apply blast
+  by (simp add: TypedEqui.self_framing_typedI TypedEqui.typed_state_then_stabilize_typed TypedEqui.atrue_def)
 
 lemma convert_proof_alloc:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (Havoc r;; Inhale (full_ownership_with_val r e)) Q"
@@ -107,14 +107,14 @@ proof (rule RuleCons)
     show "disjoint (fvA \<Delta> (TypedEqui.exists_assert \<Delta> r P)) (wrC (Calloc r e))"
       by (metis (no_types, opaque_lifting) Diff_iff Diff_insert_absorb disjoint_minus disjoint_simps(1) ex_in_conv ConcreteSemantics.exists_assert_no_in_fv subset_Diff_insert wrC.simps(5))
     show "TypedEqui.self_framing_typed \<Delta> (atrue \<Delta>)"
-      using TypedEqui.self_framing_typed_def atrue_def
+      using TypedEqui.self_framing_typed_def TypedEqui.atrue_def
       using TypedEqui.typed_state_then_stabilize_typed by blast
     show "TypedEqui.self_framing_typed \<Delta> (TypedEqui.exists_assert \<Delta> r P)"
       using asm0 by fastforce
     show "TypedEqui.typed_assertion \<Delta> (TypedEqui.exists_assert \<Delta> r P)"
       using asm0 by fastforce
     show "TypedEqui.typed_assertion \<Delta> (atrue \<Delta>)"
-      using TypedEqui.typed_assertion_def atrue_def by blast
+      using TypedEqui.typed_assertion_def TypedEqui.atrue_def by blast
   qed
 
   moreover have "TypedEqui.typed_assertion \<Delta> P \<and> variables \<Delta> r \<noteq> None"
@@ -175,7 +175,7 @@ proof (rule ConcreteSemantics.SL_proof_Exhale_elim)
     show "P \<subseteq> TypedEqui.Stabilize_typed \<Delta> (full_ownership r) \<otimes> Q"
       by (simp add: assms helper_exhale_encoding)
     show "TypedEqui.Stabilize_typed \<Delta> (atrue \<Delta>) \<otimes> Q \<subseteq> Q \<otimes> atrue \<Delta>"
-      by (metis TypedEqui.typed_Stabilize_typed TypedEqui.typed_assertion_def add_set_commm add_set_mono atrue_def mem_Collect_eq subsetI)
+      by (metis TypedEqui.typed_Stabilize_typed TypedEqui.typed_assertion_def add_set_commm add_set_mono TypedEqui.atrue_def mem_Collect_eq subsetI)
   qed
 qed
 
@@ -220,7 +220,7 @@ proof -
   obtain r where "Some \<omega>' = \<omega> \<oplus> r"
     using assms(2) greater_def by blast
   then have "r \<in> atrue \<Delta>"
-    using TypedEqui.typed_smaller assms(1) atrue_def greater_equiv by blast
+    using TypedEqui.typed_smaller assms(1) TypedEqui.atrue_def greater_equiv by blast
   then show ?thesis
     using \<open>Some \<omega>' = \<omega> \<oplus> r\<close> assms(3) x_elem_set_product by blast
 qed
@@ -476,7 +476,7 @@ corollary invariant_translate_alloc:
 
 lemma atrue_twice_same:
   "atrue \<Delta> \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta>"
-  unfolding atrue_def add_set_def
+  unfolding TypedEqui.atrue_def add_set_def
   by (smt (z3) Collect_mono_iff TypedEqui.typed_sum mem_Collect_eq)
 
 lemma atrue_twice_equal:
@@ -488,7 +488,7 @@ proof
     then have "Some x = x \<oplus> |x|"
       using core_is_smaller by blast
     then have "|x| \<in> atrue \<Delta>"
-      using TypedEqui.typed_core \<open>x \<in> atrue \<Delta>\<close> atrue_def by blast
+      using TypedEqui.typed_core \<open>x \<in> atrue \<Delta>\<close> TypedEqui.atrue_def by blast
     then show "x \<in> atrue \<Delta> \<otimes> atrue \<Delta>"
       using \<open>Some x = x \<oplus> |x|\<close> \<open>x \<in> atrue \<Delta>\<close> x_elem_set_product by blast
   qed
@@ -581,7 +581,7 @@ qed
 lemma drop_conjunct_entails:
   assumes "TypedEqui.typed_assertion \<Delta> A"
   shows "A \<otimes> B \<otimes> atrue \<Delta> \<subseteq> B \<otimes> atrue \<Delta>"
-  by (smt (verit) TypedEqui.typed_assertion_def add_set_asso add_set_commm add_set_def assms atrue_def atrue_twice_equal mem_Collect_eq subsetI)
+  by (smt (verit) TypedEqui.typed_assertion_def add_set_asso add_set_commm add_set_def assms TypedEqui.atrue_def atrue_twice_equal mem_Collect_eq subsetI)
 
 
 (*

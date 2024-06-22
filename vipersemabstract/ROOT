@@ -6,9 +6,3 @@ session ViperAbstract = ViperCommon +
     EquiSemAuxLemma
     EquiViper
     Instantiation
-    (*
-    CombinabilityInSemMult
-	FixedPointEquiSem
-    SemSynMultEquiv
-    PredInterpCompleteLattice
-	*)

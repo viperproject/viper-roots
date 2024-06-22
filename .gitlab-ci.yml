@@ -20,3 +20,4 @@ setup_isabelle:
     - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps/paper-results
     - ./isabelle/bin/isabelle build -j4 -D vipersemabstract
     - ./isabelle/bin/isabelle build -j4 -D viper-abstract-refines-total
+    - ./isabelle/bin/isabelle build -j4 -D simple-frontend
