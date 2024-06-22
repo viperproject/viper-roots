@@ -144,13 +144,14 @@ proof (rule no_abortsI)
     by (metis asm0(2-4) aborts_agrees agrees_search(1) assms(1) assms(2) fst_conv no_aborts_def snd_conv)
 qed
 
-definition fvA where
-  "fvA Q = undefined Q"
+abbreviation fvA where
+  "fvA \<Delta> Q \<equiv> TypedEqui.free_vars \<Delta> Q"
 
 lemma fvA_agrees:
-  assumes "agrees (fvA Q) s s'"
+  assumes "agrees (fvA \<Delta> Q) s s'"
     shows "(Ag s, \<tau>, \<omega>) \<in> Q \<longleftrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
-  sorry (* TODO: free_vars... *)
+  sorry
+ (* TODO: free_vars... *)
 
 
 abbreviation well_typed_cmd where
@@ -158,7 +159,7 @@ abbreviation well_typed_cmd where
 
 lemma safe_agrees:
   assumes "safe \<Delta> n C s \<tau> \<omega> Q"
-      and "agrees (fvC C \<union> fvA Q) s s'"
+      and "agrees (fvC C \<union> fvA \<Delta> Q) s s'"
       and "TypedEqui.typed_store \<Delta> s"
       and "well_typed_cmd \<Delta> C"
     shows "safe \<Delta> n C s' \<tau> \<omega> Q"
@@ -179,7 +180,7 @@ proof (induct n arbitrary: C s s' \<omega>)
     fix \<omega>0' \<omega>f C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "\<langle>C, concretize s' \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
       "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>0')"
-    then obtain s'' h' where "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'"
+    then obtain s'' h' where "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'"
       using red_agrees[OF asm0(4)]
       by (metis Suc.prems(2) Un_upper1 agrees_search(1) fst_conv snd_conv)
     moreover have "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
@@ -192,17 +193,17 @@ proof (induct n arbitrary: C s s' \<omega>)
     proof (rule Suc.hyps)
       show "safe \<Delta> n C' (fst (s'', h')) \<tau> \<omega>1 Q"
         using r1 by blast
-      show "agrees (fvC C' \<union> fvA Q) (fst (s'', h')) (fst \<sigma>')"
-        by (metis \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> agreesC agrees_simps(4) fst_eqD red_properties sup.absorb_iff1)
+      show "agrees (fvC C' \<union> fvA \<Delta> Q) (fst (s'', h')) (fst \<sigma>')"
+        by (metis \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> agreesC agrees_simps(4) fst_eqD red_properties sup.absorb_iff1)
       show "TypedEqui.typed_store \<Delta> (fst (s'', h'))"
         using red_keeps_typed_store[OF asm0(4), of \<Delta>]
         asm0(5) TypedEqui.typed_def[of \<Delta> "(Ag s', \<tau>, \<omega>0')"]
-        by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(4) TypedEqui.typed_state_axioms \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')\<close> \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> fst_eqD red_keeps_typed_store typed_state.typed_def)
+        by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(4) TypedEqui.typed_state_axioms \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')\<close> \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> fst_eqD red_keeps_typed_store typed_state.typed_def)
       show "well_typed_cmd \<Delta> C'"
         using Suc.prems(4) asm0(4) well_typed_cmd_red by blast
     qed
     then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
-      using \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> r1 by auto
+      using \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> r1 by auto
   qed
 qed (simp)
 
@@ -247,7 +248,8 @@ lemma write_dom_mono:
   assumes "\<omega>' \<succeq> \<omega>"
   shows "write_dom \<omega> \<subseteq> write_dom \<omega>'"
 proof -
-  have "\<And>l. get_vm \<omega>' l \<le> 1" sorry (* TODO: assumption \<le> 1 *)
+  have "\<And>l. get_vm \<omega>' l \<le> 1"
+    by (simp add: get_vm_bound)
   moreover have "\<And>l. get_vm \<omega>' l \<ge> get_vm \<omega> l"
     by (metis EquiViper.add_masks_def assms get_vm_additive greater_def pos_perm_class.sum_larger)
   ultimately show ?thesis
@@ -320,7 +322,9 @@ proof -
   proof (rule full_state_ext)
     show "get_store x = get_store y"
       by (simp add: assms(1) calculation full_add_charact(1))
-    show "get_abs_state x = get_abs_state y"
+    show "get_trace x = get_trace y"
+      by (metis assms(3) assms(4) calculation greater_state_has_greater_parts(2) minus_bigger minus_default)
+    show "get_state x = get_state y"
       by (smt (verit) \<open>get_store x = get_store y\<close> assms(3) assms(5) calculation greater_def greater_state_has_greater_parts(2) option.sel state_add_iff)
   qed
   ultimately show ?thesis by simp
@@ -374,7 +378,7 @@ lemma mk_virtual_state_simps[simp]:
   "get_vh (mk_virtual_state h) = h"
 proof -
   have "wf_pre_virtual_state (\<lambda>l. if l \<in> dom h then 1 else 0, h)"
-    using gr_0_is_ppos by fastforce
+    by (smt (verit, best) EquiSemAuxLemma.gr_0_is_ppos domIff leD linorder_linear not_gr_0 wf_mask_simple_def wf_pre_virtual_stateI)
   then show "get_vm (mk_virtual_state h) = (\<lambda>l. if l \<in> dom h then 1 else 0)"
     unfolding mk_virtual_state_def using get_wf_easy
     by (metis fst_conv)
@@ -400,7 +404,7 @@ proof (rule virtual_state_ext)
   show "get_vm \<omega> = get_vm (mk_virtual_state (get_vh \<omega>))"
   proof
     fix l show "get_vm \<omega> l = get_vm (mk_virtual_state (get_vh \<omega>)) l"
-      by (metis assms(1) assms(2) binary_mask_def mk_virtual_state_charact(1) mk_virtual_state_simps(1) mk_virtual_state_simps(2) not_gr_0 stable_virtual_state_def vstate_wf_imp)
+      by (metis EquiSemAuxLemma.gr_0_is_ppos assms(1) assms(2) binary_mask_def mk_virtual_state_charact(1) mk_virtual_state_simps(1) mk_virtual_state_simps(2) norm_preal(4) stable_virtual_state_def vstate_wf_imp)
   qed
 qed (simp)
 
@@ -460,7 +464,7 @@ qed
 
 lemma frame_safe:
   assumes "safe \<Delta> n C s \<tau> \<omega> Q"
-      and "fvA R \<inter> wrC C = {}"
+      and "fvA \<Delta> R \<inter> wrC C = {}"
       and "Some \<omega>' = \<omega> \<oplus> \<omega>f"
       and "(Ag s, \<tau>, \<omega>f) \<in> R"
       and "sep_algebra_class.stable \<omega>f"
@@ -501,13 +505,13 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
     moreover have "safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (Q \<otimes> R)"
       using \<open>safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1'' Q\<close>
     proof (rule Suc(1)[of C' _ \<omega>1'' \<omega>1 \<omega>f])
-      show "fvA R \<inter> wrC C' = {}"
+      show "fvA \<Delta> R \<inter> wrC C' = {}"
         by (meson Suc.prems(2) asm0 disjoint_iff red_properties subset_iff)
       show "Some \<omega>1 = \<omega>1'' \<oplus> \<omega>f"
         using calculation by auto
       have "agrees (-(wrC C)) s (fst \<sigma>')"
         by (metis agrees_search(1) asm0(4) fst_conv red_properties)
-      then have "agrees (fvA R) s (fst \<sigma>')"
+      then have "agrees (fvA \<Delta> R) s (fst \<sigma>')"
         using Suc.prems(2) agrees_search(3) by auto
       then show "(Ag (fst \<sigma>'), \<tau>, \<omega>f) \<in> R"
         by (meson Suc.prems(4) fvA_agrees)
@@ -555,7 +559,7 @@ lemma stabilize_stable_simp[simp]:
 
 proposition frame_rule:
   assumes "CSL \<Delta> P C Q"
-      and "disjoint (fvA R) (wrC C)"
+      and "disjoint (fvA \<Delta> R) (wrC C)"
       and "TypedEqui.self_framing_typed \<Delta> P"
       and "TypedEqui.self_framing_typed \<Delta> R"
       and "TypedEqui.typed_assertion \<Delta> P"
@@ -576,7 +580,7 @@ proof (rule CSL_I)
       using \<open>sep_algebra_class.stable \<omega>\<close> stabilize_sum_of_stable r by blast
     show "safe \<Delta> (Suc n) C s \<tau> (stabilize \<omega>p) Q"
       by (metis CSL_E TypedEqui.typed_state_axioms \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>p) \<and> TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>r)\<close> assms(1) assms(3) r(2) stabilize_equi_state stabilize_is_stable typed_state.self_framing_typedE typed_state.typed_state_then_stabilize_typed)
-    show "fvA R \<inter> wrC C = {}"
+    show "fvA \<Delta> R \<inter> wrC C = {}"
       by (meson assms(2) disjoint_def)
     show "(Ag s, \<tau>, stabilize \<omega>r) \<in> R"
       by (metis TypedEqui.self_framing_typedE \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>p) \<and> TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>r)\<close> assms(4) r(3) stabilize_equi_state)
@@ -590,6 +594,16 @@ qed
 
 subsection \<open>Parallel rule\<close>
 
+lemma compatible_sum_less_one:
+  assumes "a ## b"
+  shows "get_vm a l + get_vm b l \<le> 1"
+proof -
+  obtain \<omega> where "Some \<omega> = a \<oplus> b"
+    by (metis assms defined_def not_Some_eq)
+  then show ?thesis
+    by (metis EquiViper.add_masks_def get_vm_additive get_vm_bound)
+qed
+
 lemma disj_conv:
   assumes "\<omega>1 ## \<omega>2"
   shows "disjoint (write_dom \<omega>1) (read_dom \<omega>2)"
@@ -601,7 +615,7 @@ proof
     then have "get_vm \<omega>1 (l, field_val) + get_vm \<omega>2 (l, field_val) > 1"
       by (smt (verit) CollectD IntD1 add.commute comm_monoid_add_class.add_0 inf.absorb_iff2 inf_commute leI not_gr_0 pos_perm_class.padd_cancellative pos_perm_class.sum_larger read_dom_def write_dom_def)
     then show "l \<in> {}"
-      sorry (* TODO: Need \<le> 1 assumption *)
+      by (simp add: assms compatible_sum_less_one leD)
   qed
 qed (simp)
 
@@ -634,8 +648,8 @@ lemma safe_par:
   assumes "safe \<Delta> n C1 s \<tau> \<omega>1 Q1"
       and "safe \<Delta> n C2 s \<tau> \<omega>2 Q2"
       and "Some \<omega> = \<omega>1 \<oplus> \<omega>2"
-      and "disjoint (fvC C1 \<union> fvA Q1) (wrC C2)"
-      and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
+      and "disjoint (fvC C1 \<union> fvA \<Delta> Q1) (wrC C2)"
+      and "disjoint (fvC C2 \<union> fvA \<Delta> Q2) (wrC C1)"
       and "sep_algebra_class.stable \<omega>1"
       and "sep_algebra_class.stable \<omega>2"
       and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
@@ -716,7 +730,7 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
           by (meson Suc.prems(2) Suc_n_not_le_n nat_le_linear safety_mono)
         have "agrees (-wrC C1) s (fst \<sigma>')"
           by (metis agrees_search(1) asm2(2) fst_conv red_properties)
-        then show "agrees (fvC C2 \<union> fvA Q2) s (fst \<sigma>')"
+        then show "agrees (fvC C2 \<union> fvA \<Delta> Q2) s (fst \<sigma>')"
           using Suc.prems(5) agrees_minusD disjoint_search(1) by blast
         show "TypedEqui.typed_store \<Delta> s"
           using TypedEqui.typed_def asm0(1) by force
@@ -730,9 +744,9 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
       moreover have "safe \<Delta> n {A1} C1' {B1} || {A2} C2 {B2} (fst \<sigma>') \<tau> \<omega>' (Q1 \<otimes> Q2)"
         using \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>2\<close>
       proof (rule Suc(1)[OF ra(2) \<open>safe \<Delta> n C2 (fst \<sigma>') \<tau> \<omega>2 Q2\<close>])
-        show "disjoint (fvC C1' \<union> fvA Q1) (wrC C2)"
+        show "disjoint (fvC C1' \<union> fvA \<Delta> Q1) (wrC C2)"
           by (metis Suc.prems(4) asm2(2) disjoint_search(2) disjoint_simps(3) red_properties)
-        show "disjoint (fvC C2 \<union> fvA Q2) (wrC C1')"
+        show "disjoint (fvC C2 \<union> fvA \<Delta> Q2) (wrC C1')"
           by (meson Suc.prems(5) asm2(2) disjoint_search(1) disjoint_search(2) red_properties)
         show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>')"
           using \<open>TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>a')\<close> calculation(6) commutative greater_equiv typed_smaller_state by fastforce
@@ -765,7 +779,7 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
           by (meson Suc.prems(1) Suc_n_not_le_n nat_le_linear safety_mono)
         have "agrees (-wrC C2) s (fst \<sigma>')"
           by (metis agrees_search(1) asm2(2) fst_conv red_properties)
-        then show "agrees (fvC C1 \<union> fvA Q1) s (fst \<sigma>')"
+        then show "agrees (fvC C1 \<union> fvA \<Delta> Q1) s (fst \<sigma>')"
           using Suc.prems(4) agrees_minusD disjoint_search(1) by blast
         show "TypedEqui.typed_store \<Delta> s"
           using TypedEqui.typed_def asm0(1) by force
@@ -780,9 +794,9 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
       proof (rule Suc(1)[OF  \<open>safe \<Delta> n C1 (fst \<sigma>') \<tau> \<omega>1 Q1\<close> ra(2)])
         show "Some \<omega>' = \<omega>1 \<oplus> \<omega>a"
           by (simp add: \<open>Some \<omega>' = \<omega>a \<oplus> \<omega>1\<close> commutative)
-        show "disjoint (fvC C2' \<union> fvA Q2) (wrC C1)"
+        show "disjoint (fvC C2' \<union> fvA \<Delta> Q2) (wrC C1)"
           by (metis Suc.prems(5) asm2(2) disjoint_search(2) disjoint_simps(3) red_properties)
-        show "disjoint (fvC C1 \<union> fvA Q1) (wrC C2')"
+        show "disjoint (fvC C1 \<union> fvA \<Delta> Q1) (wrC C2')"
           by (meson Suc.prems(4) asm2(2) disjoint_search(1) disjoint_search(2) red_properties)
         show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>')"
           using \<open>TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>a')\<close> calculation(6) commutative greater_equiv typed_smaller_state by fastforce
@@ -803,8 +817,8 @@ qed (simp)
 proposition rule_par:
   assumes "CSL \<Delta> P1 C1 Q1"
       and "CSL \<Delta> P2 C2 Q2"
-      and "disjoint (fvC C1 \<union> fvA Q1) (wrC C2)"
-      and "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
+      and "disjoint (fvC C1 \<union> fvA \<Delta> Q1) (wrC C2)"
+      and "disjoint (fvC C2 \<union> fvA \<Delta> Q2) (wrC C1)"
       and "TypedEqui.self_framing_typed \<Delta> P1"
       and "TypedEqui.self_framing_typed \<Delta> P2"
       and "TypedEqui.typed_assertion \<Delta> P1"
@@ -828,9 +842,9 @@ proof (rule CSL_I)
       using CSL_E \<open>(Ag s, \<tau>, stabilize p1) \<in> P1 \<and> (Ag s, \<tau>, stabilize p2) \<in> P2\<close> assms(1) calculation(2) stabilize_is_stable by blast
     show "safe \<Delta> (Suc n) C2 s \<tau> (stabilize p2) Q2"
       using CSL_E \<open>(Ag s, \<tau>, stabilize p1) \<in> P1 \<and> (Ag s, \<tau>, stabilize p2) \<in> P2\<close> assms(2) calculation(2) stabilize_is_stable by blast
-    show "disjoint (fvC C1 \<union> fvA Q1) (wrC C2)"      
+    show "disjoint (fvC C1 \<union> fvA \<Delta> Q1) (wrC C2)"      
       using assms(3) by auto
-    show "disjoint (fvC C2 \<union> fvA Q2) (wrC C1)"
+    show "disjoint (fvC C2 \<union> fvA \<Delta> Q2) (wrC C1)"
       using assms(4) by auto
     show "well_typed_cmd \<Delta> {A1} C1 {B1} || {A2} C2 {B2}"
       using assms(9) by auto
@@ -1095,42 +1109,56 @@ proof -
   have "get_vm \<omega>' l = get_vm \<omega> l + get_vm \<omega>f l"
     using EquiViper.add_masks_def assms(1) get_vm_additive by blast
   moreover have "get_vm \<omega>' l \<le> 1"
-    sorry (* TODO: Need assumption in def of virtual_state *)
+    using get_vm_bound by blast
   ultimately have "get_vm \<omega>f l = 0"
     by (metis PosReal.padd_cancellative add.commute add.right_neutral assms(3) nle_le pos_perm_class.sum_larger)
   moreover have "get_vh \<omega>f l = None"
-    using assms(2) calculation pperm_pgt_pnone stable_virtual_state_def by blast
+    using assms(2) calculation pperm_pgt_pnone stable_virtual_state_def
+    by (metis EquiSemAuxLemma.gr_0_is_ppos)
   show ?thesis
   proof (rule compatible_virtual_state_implies_pre_virtual_state_rev)
     show "Some (Rep_virtual_state (set_value \<omega>' l v)) = Rep_virtual_state (set_value \<omega> l v) \<oplus> Rep_virtual_state \<omega>f"
     proof (rule plus_prodI)
       show "Some (fst (Rep_virtual_state (set_value \<omega>' l v))) = fst (Rep_virtual_state (set_value \<omega> l v)) \<oplus> fst (Rep_virtual_state \<omega>f)"
-        by (metis assms(1) get_vm_additive get_vm_def set_value_charact(1))
+        by (metis assms(1) get_vh_vm_set_value(2) get_vm_additive get_vm_def)
       show "Some (snd (Rep_virtual_state (set_value \<omega>' l v))) = snd (Rep_virtual_state (set_value \<omega> l v)) \<oplus> snd (Rep_virtual_state \<omega>f)"
       proof (rule plus_funI)
         fix la show "Some (snd (Rep_virtual_state (set_value \<omega>' l v)) la) = snd (Rep_virtual_state (set_value \<omega> l v)) la \<oplus> snd (Rep_virtual_state \<omega>f) la"
         proof (cases "l = la")
           case True
           then have "snd (Rep_virtual_state (set_value \<omega>' l v)) la = Some v"
-            by (metis fun_upd_apply get_vh_def set_value_charact(2))
+            by (metis fun_upd_apply get_vh_def get_vh_vm_set_value(1))
           moreover have "snd (Rep_virtual_state (set_value \<omega> l v)) la = Some v"
-            by (metis True fun_upd_apply get_vh_def set_value_charact(2))
+            by (metis True fun_upd_apply get_vh_def get_vh_vm_set_value(1))
           ultimately show ?thesis
             by (metis True \<open>get_vh \<omega>f l = None\<close> get_vh_def plus_option.simps(2))
         next
           case False
           then show ?thesis
-            by (metis assms(1) fun_upd_apply get_vh_def plus_funE set_value_charact(2) vstate_add_iff)
+            by (metis assms(1) fun_upd_apply get_vh_def plus_funE get_vh_vm_set_value(1) vstate_add_iff)
         qed
       qed
     qed
   qed
 qed
+(*
+definition force_typing where
+  "force_typing \<Delta> A = Set.filter (TypedEqui.typed \<Delta>) A"
 
-
+lemma force_typing_is_typed[simp]:
+  "TypedEqui.typed_assertion \<Delta> (force_typing \<Delta> A)"
+  by (simp add: TypedEqui.typed_assertion_def force_typing_def)
+*)
 definition full_ownership :: "var \<Rightarrow> int equi_state set"
   where
   "full_ownership r = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1}"
+
+lemma in_full_ownership:
+  assumes "get_store \<omega> r = Some (VRef (Address l))"
+      and "get_m \<omega> (l, field_val) = 1"
+    shows "\<omega> \<in> full_ownership r"
+  using assms full_ownership_def by blast
+
 
 definition full_ownership_with_val where
   "full_ownership_with_val r e = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1
@@ -1165,7 +1193,7 @@ lemma stable_before_then_update_stable:
   assumes "sep_algebra_class.stable \<omega>"
       and "get_vh \<omega> l \<noteq> None"
   shows "sep_algebra_class.stable (set_value \<omega> l v)"
-  by (metis assms(1) assms(2) fun_upd_apply set_value_charact(1) set_value_charact(2) stable_virtual_state_def)
+  by (metis assms(1) assms(2) fun_upd_apply get_vh_vm_set_value(1) get_vh_vm_set_value(2) stable_virtual_state_def)
 
 
 proposition rule_write:
@@ -1205,14 +1233,14 @@ proof (rule CSL_I)
         using asm0 asm1 asm2 write_helper by blast
       moreover have "\<sigma>' = concretize s (set_value \<omega>0' (l, field_val) ?v) \<and> C' = Cskip"
         using red_write_cases[OF asm2(2)]
-        using \<open>s r = Some (VRef (Address l)) \<and> get_vm \<omega>0' (l, field_val) = PosReal.pwrite\<close> old.prod.inject option.inject ref.inject set_value_charact(2) val.inject(4) by fastforce
+        using \<open>s r = Some (VRef (Address l)) \<and> get_vm \<omega>0' (l, field_val) = PosReal.pwrite\<close> old.prod.inject option.inject ref.inject get_vh_vm_set_value(1) val.inject(4) by fastforce
       moreover have "safe \<Delta> m Cskip s \<tau> (set_value \<omega> (l, field_val) ?v) (full_ownership_with_val r e)"
       proof (rule safe_skip)
         show "(Ag s, \<tau>, set_value \<omega> (l, field_val) (VInt (edenot e s))) \<in> full_ownership_with_val r e"
           by (simp add: asm0 asm1 full_add_charact(1) full_ownership_with_val_def)
       qed
       ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> m C' (fst \<sigma>') \<tau> \<omega>1 (full_ownership_with_val r e)"
-        by (metis \<open>sep_algebra_class.stable \<omega>\<close> asm0 asm1(2) binary_mask_def fst_conv not_gr_0 one_neq_zero set_value_charact(1) snd_conv stable_before_then_update_stable vstate_wf_imp)
+        by (metis \<open>sep_algebra_class.stable \<omega>\<close> asm0 asm1(2) binary_mask_def fst_conv not_gr_0 one_neq_zero get_vh_vm_set_value(2) snd_conv stable_before_then_update_stable vstate_wf_imp)
     qed (simp)
     ultimately show ?thesis by blast
   qed (simp)
@@ -1258,11 +1286,13 @@ definition set_perm_and_value :: "'a virtual_state \<Rightarrow> (address \<time
 (* Not true, needs pre... *)
 lemma wf_set_perm:
   assumes "p > 0 \<Longrightarrow> v \<noteq> None"
-  shows "wf_pre_virtual_state ((get_vm \<phi>)(hl := p), (get_vh \<phi>)(hl := v))"
-  using assms gr_0_is_ppos vstate_wf_imp by fastforce
+      and "p \<le> 1"
+    shows "wf_pre_virtual_state ((get_vm \<phi>)(hl := p), (get_vh \<phi>)(hl := v))"
+  by (smt (verit) EquiSemAuxLemma.gr_0_is_ppos assms(1) assms(2) fun_upd_apply get_vm_bound vstate_wf_imp wf_mask_simpleI wf_pre_virtual_stateI)
 
 lemma update_perm_simps[simp]:
   assumes "p > 0 \<Longrightarrow> v \<noteq> None"
+      and "p \<le> 1"
     shows "get_vh (set_perm_and_value \<phi> hl p v) = (get_vh \<phi>)(hl := v)"
       and "get_vm (set_perm_and_value \<phi> hl p v) = (get_vm \<phi>)(hl := p)"
   unfolding set_perm_and_value_def
@@ -1272,10 +1302,11 @@ lemma update_perm_simps[simp]:
 lemma stable_set_perm_and_value:
   assumes "p > 0 \<longleftrightarrow> v \<noteq> None"
       and "stable \<omega>"
+      and "p \<le> 1"
     shows "stable (set_perm_and_value \<omega> hl p v)"
 proof (rule stable_virtual_stateI)
   show "\<And>hla. get_vh (set_perm_and_value \<omega> hl p v) hla \<noteq> None \<Longrightarrow> PosReal.pnone < get_vm (set_perm_and_value \<omega> hl p v) hla"
-    by (metis assms(1) assms(2) fun_upd_apply stable_virtual_state_def update_perm_simps(1) update_perm_simps(2))
+    by (metis EquiSemAuxLemma.gr_0_is_ppos assms(1) assms(2) assms(3) fun_upd_apply stable_virtual_state_def update_perm_simps(1) update_perm_simps(2))
 qed
 
 lemma plus_virtual_stateI:
@@ -1290,6 +1321,7 @@ lemma alloc_helper:
   assumes "Some \<omega>' = \<omega> \<oplus> \<omega>f"
       and "get_vh \<omega>f l = None"
       and "p > 0 \<Longrightarrow> v \<noteq> None"
+      and "p \<le> 1"
     shows "Some (set_perm_and_value \<omega>' l p v) = set_perm_and_value \<omega> l p v \<oplus> \<omega>f"
 proof (rule plus_virtual_stateI)
   show "Some (get_vh (set_perm_and_value \<omega>' l p v)) = get_vh (set_perm_and_value \<omega> l p v) \<oplus> get_vh \<omega>f"
@@ -1299,10 +1331,13 @@ proof (rule plus_virtual_stateI)
     by (smt (verit, ccfv_threshold) SepAlgebra.plus_preal_def add.right_neutral assms fun_upd_apply get_vm_additive not_gr_0 plus_funE update_perm_simps(2) vstate_wf_imp)
 qed
 
+definition atrue where
+  "atrue \<Delta> = {\<omega>. TypedEqui.typed \<Delta> \<omega>}"
+
 
 proposition rule_alloc:
   assumes "r \<notin> fvE e"
-  shows "CSL \<Delta> UNIV (Calloc r e) (full_ownership_with_val r e)"
+  shows "CSL \<Delta> (atrue \<Delta>) (Calloc r e) (full_ownership_with_val r e)"
 proof (rule CSL_I)
   fix n :: nat
   fix s :: stack
@@ -1324,7 +1359,7 @@ proof (rule CSL_I)
       then have r: "Some (set_perm_and_value \<omega>0' (l, field_val) 1 (Some (VInt (edenot e s))))
   = set_perm_and_value \<omega> (l, field_val) 1 (Some (VInt (edenot e s))) \<oplus> \<omega>f"
         using alloc_helper
-        by (smt (verit, ccfv_SIG) EquiViper.add_masks_def Pair_inject asm0(1) asm0(2) commutative dom_eqD option.discI padd_pos pperm_pnone_pgt stable_virtual_state_def vstate_add_iff vstate_wf_imp)
+        by (smt (verit, ccfv_threshold) EquiSemAuxLemma.gr_0_is_ppos EquiViper.add_masks_def Pair_inject \<open>sep_algebra_class.stable \<omega>\<close> asm0(1) asm0(2) asm0(3) binary_mask_and_stable_then_mk_virtual comm_monoid_add_class.add_0 leI mk_virtual_state_simps(1) option.discI order_less_imp_le padd_pos pperm_pgt_pnone stable_sum stable_virtual_state_def vstate_add_iff)
       let ?\<omega>1 = "set_perm_and_value \<omega> (l, field_val) 1 (Some (VInt (edenot e s)))"
       let ?\<omega>1' = "set_perm_and_value \<omega>0' (l, field_val) 1 (Some (VInt (edenot e s)))"
 
@@ -1334,7 +1369,7 @@ proof (rule CSL_I)
       proof (rule binary_maskI)
         fix la show "get_vm (set_perm_and_value \<omega>0' (l, field_val) PosReal.pwrite (Some (VInt (edenot e s)))) la = PosReal.pnone \<or>
           get_vm (set_perm_and_value \<omega>0' (l, field_val) PosReal.pwrite (Some (VInt (edenot e s)))) la = PosReal.pwrite"
-          by (metis asm0(3) binary_mask_def fun_upd_apply option.discI update_perm_simps(2))
+          by (metis asm0(3) binary_mask_def dual_order.refl fun_upd_def option.simps(3) update_perm_simps(2))
       qed
       moreover have "\<sigma>' = concretize (fst \<sigma>') ?\<omega>1'"
         using asm1(1) asm1(4) by auto
@@ -1369,9 +1404,9 @@ lemma erase_perm_and_value_simps[simp]:
   "get_vh (erase_perm_and_value \<phi> hl) = (get_vh \<phi>)(hl := None)"
 proof -
   show "get_vm (erase_perm_and_value \<phi> hl) = (get_vm \<phi>)(hl := PosReal.pnone)"
-    by (metis erase_perm_and_value_def pperm_pgt_pnone set_perm_and_value_def update_perm_simps(2))
+    by (metis all_pos erase_perm_and_value_def order_less_irrefl set_perm_and_value_def update_perm_simps(2))
   show "get_vh (erase_perm_and_value \<phi> hl) = (get_vh \<phi>)(hl := None)"
-    by (metis erase_perm_and_value_def pperm_pgt_pnone set_perm_and_value_def update_perm_simps(1))
+    by (metis all_pos erase_perm_and_value_def pperm_pgt_pnone set_perm_and_value_def update_perm_simps(1))
 qed
 
 
@@ -1382,26 +1417,26 @@ lemma free_helper:
     shows "Some (erase_perm_and_value \<omega>' hl) = erase_perm_and_value \<omega> hl \<oplus> \<omega>f"
 proof -
   have asm: "get_vm \<omega>' hl \<le> 1"
-    sorry (* TODO: Need assumption in def of virtual_state *)
+    using get_vm_bound by blast
   then have "get_vm \<omega>' hl = 1"
     by (simp add: EquiViper.add_masks_def antisym assms(1) assms(3) get_vm_additive pos_perm_class.sum_larger)
   then have "get_vm \<omega>f hl = 0"
     by (smt (verit, ccfv_threshold) EquiViper.add_masks_def PosReal.ppos.rep_eq assms(1) assms(3) get_vm_additive gr_0_is_ppos not_gr_0 plus_preal.rep_eq)
   then have "get_vh \<omega>f hl = None"
-    using assms(2) pperm_pgt_pnone stable_virtual_state_def by blast
+    using EquiSemAuxLemma.gr_0_is_ppos assms(2) pperm_pgt_pnone stable_virtual_state_def by blast
   show ?thesis
   proof (rule plus_virtual_stateI)
     show "Some (get_vh (erase_perm_and_value \<omega>' hl)) = get_vh (erase_perm_and_value \<omega> hl) \<oplus> get_vh \<omega>f"
-      by (metis \<open>get_vh \<omega>f hl = None\<close> alloc_helper assms(1) erase_perm_and_value_def pperm_pgt_pnone set_perm_and_value_def vstate_add_iff)
+      by (smt (verit, ccfv_SIG) \<open>get_vh \<omega>f hl = None\<close> assms(1) erase_perm_and_value_simps(2) fun_upd_apply partial_heap_same_sum plus_funE plus_funI vstate_add_iff)
     show "Some (get_vm (erase_perm_and_value \<omega>' hl)) = get_vm (erase_perm_and_value \<omega> hl) \<oplus> get_vm \<omega>f"
-      by (metis \<open>get_vh \<omega>f hl = None\<close> alloc_helper assms(1) erase_perm_and_value_def pperm_pgt_pnone set_perm_and_value_def vstate_add_iff)
+      by (smt (verit, ccfv_threshold) \<open>get_vm \<omega>f hl = 0\<close> assms(1) erase_perm_and_value_simps(1) fun_plus_iff fun_upd_apply get_vm_additive zero_mask_def zero_mask_identity)
   qed
 qed
 
 lemma stable_erase_perm_value:
   assumes "sep_algebra_class.stable \<omega>"
   shows "sep_algebra_class.stable (erase_perm_and_value \<omega> hl)"
-  by (metis assms erase_perm_and_value_def order_less_irrefl set_perm_and_value_def stable_set_perm_and_value)
+  by (metis all_pos assms erase_perm_and_value_def linorder_not_le set_perm_and_value_def stable_set_perm_and_value)
 
 lemma binary_mask_erase_perm_value:
   assumes "binary_mask \<omega>"
@@ -1410,13 +1445,13 @@ lemma binary_mask_erase_perm_value:
 
 
 proposition rule_free:
-  "CSL \<Delta> (full_ownership r) (Cfree r) UNIV"
+  "CSL \<Delta> (full_ownership r) (Cfree r) (atrue \<Delta>)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> full_ownership r" "sep_algebra_class.stable \<omega>"
   then obtain l where r: "s r = Some (VRef (Address l)) \<and> get_vm \<omega> (l, field_val) = 1"
     using full_ownership_def by fastforce
-  show "safe \<Delta> (Suc n) (Cfree r) s \<tau> \<omega> UNIV"
+  show "safe \<Delta> (Suc n) (Cfree r) s \<tau> \<omega> (atrue \<Delta>)"
   proof (rule safeI_alt)
     show "accesses (Cfree r) s \<subseteq> read_dom \<omega>"
       by (simp add: in_read_dom_write_dom(1) r)
@@ -1443,21 +1478,23 @@ proof (rule CSL_I)
     qed
     fix C' \<sigma>'
     assume "\<langle>Cfree r, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 UNIV"
+    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (atrue \<Delta>)"
     proof (rule red_free_cases)
       fix sa h l'
       assume asm2: "concretize s \<omega>0' = (sa, h)" "C' = Cskip" "\<sigma>' = (sa, h((l', field_val) := None))"
         "sa r = Some (VRef (Address l'))"
       let ?\<omega>1 = "erase_perm_and_value \<omega> (l', field_val)"
       let ?\<omega>1' = "erase_perm_and_value \<omega>0' (l', field_val)"
-      have "snd \<sigma>' = get_vh ?\<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> ?\<omega>1 UNIV"
-        using asm2(1) asm2(2) asm2(3) by auto
+      have "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, ?\<omega>1)"
+        sorry (* TODO *)
+      then have "snd \<sigma>' = get_vh ?\<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> ?\<omega>1 (atrue \<Delta>)"
+        using asm2(1) asm2(2) asm2(3) atrue_def by auto
       moreover have "Some ?\<omega>1' = ?\<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable ?\<omega>1"
         using asm0(2) asm1(1) asm1(2) asm2(1) asm2(4) free_helper r stable_erase_perm_value by fastforce
       moreover have "binary_mask ?\<omega>1'"
         by (simp add: asm1(3) binary_mask_erase_perm_value)        
       ultimately show
-        "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 UNIV"
+        "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (atrue \<Delta>)"
         by blast
     qed
   qed (simp_all)
@@ -1473,23 +1510,103 @@ lemma read_helper:
   by (metis assms(1) assms(2) commutative greater_equiv read_field.elims read_field_mono)
 
 
+(*
+ConcreteSemantics.post_substitute_var_assert x (semantify_heap_loc r) P"
+*)
+thm ConcreteSemantics.post_substitute_var_assert_def
+thm ConcreteSemantics.substitute_var_state_def
 
-definition read_result where
-  "read_result x r = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val) }"
+definition read_result :: "int equi_state set \<Rightarrow> var \<Rightarrow> var \<Rightarrow> int equi_state set" where
+  "read_result A x r = { TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega> |\<omega> l.
+  \<omega> \<in> A \<and> get_store \<omega> r = Some (VRef (Address l)) }"
+
+definition simple_read_result where
+  "simple_read_result x r = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val) }"
 
 definition read_perm where
   "read_perm r = { \<omega> |\<omega> l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0 \<and> get_h \<omega> (l, field_val) = Some (VInt v)}"
 
+thm fvA_agrees
+
+lemma fvA_agrees_better:
+  assumes "agrees (fvA \<Delta> A) (get_store a) (get_store b)"
+      and "get_trace a = get_trace b"
+      and "get_state a = get_state b"
+      and "a \<in> A"
+    shows "b \<in> A"
+  by (metis assms fvA_agrees set_state_def set_state_get_state)
+
+
+lemma assign_var_state_refl:
+  "\<omega> = TypedEqui.assign_var_state x (get_store \<omega> x) \<omega>"
+  by (simp add: AbstractSemantics.full_state_ext TypedEqui.assign_var_state_def)
+
+lemma get_store_assign_var[simp]:
+  "get_store (TypedEqui.assign_var_state x v \<omega>) = (get_store \<omega>)(x := v)"
+  by (simp add: TypedEqui.assign_var_state_def)
+
+lemma fvA_assign_var_state:
+  assumes "x \<notin> fvA \<Delta> A"
+      and "\<omega> \<in> A"
+    shows "TypedEqui.assign_var_state x v \<omega> \<in> A"
+proof -
+  have "agrees (fvA \<Delta> A) (get_store \<omega>) ((get_store \<omega>)(x := v))"
+    using assms(1) by force
+  then have "((Ag (get_store \<omega>), fst (snd \<omega>), snd (snd \<omega>)) \<in> A) = ((Ag ((get_store \<omega>)(x := v)), fst (snd \<omega>), snd (snd \<omega>)) \<in> A)"
+    using fvA_agrees[of _ A "get_store \<omega>" "(get_store \<omega>)(x := v)" "fst (snd \<omega>)" "snd (snd \<omega>)"]
+    by blast
+  then show ?thesis
+    by (simp add: TypedEqui.assign_var_state_def assms(2) get_abs_state_def get_store_def set_store_def)
+qed
+
+
+lemma fvA_assign_var_state_reciprocal:
+  assumes "x \<notin> fvA \<Delta> A"
+      and "TypedEqui.assign_var_state x v \<omega> \<in> A"
+    shows "\<omega> \<in> A"
+  by (metis ConcreteSemantics.assign_var_state_inverse assms(1) assms(2) fvA_assign_var_state)
+
+lemma read_result_simple_same:
+  assumes "x \<notin> fvA \<Delta> A"
+      and "x \<noteq> r"
+  shows "read_result A x r = A \<inter> simple_read_result x r" (is "?A = ?B")
+proof
+  show "?A \<subseteq> ?B"
+  proof
+    fix \<omega>' assume asm0: "\<omega>' \<in> read_result A x r"
+    then obtain \<omega> l where "\<omega>' = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>"
+      "\<omega> \<in> A" "get_store \<omega> r = Some (VRef (Address l))"
+      using read_result_def by auto
+    then have "\<omega>' \<in> A"
+      using assms fvA_assign_var_state by blast
+    moreover have "\<omega>' \<in> simple_read_result x r"
+      unfolding simple_read_result_def
+      by (smt (verit, ccfv_threshold) CollectI TypedEqui.assign_var_state_def \<open>\<omega>' = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> assms(2) fun_upd_other fun_upd_same get_state_set_store get_store_assign_var)
+    ultimately show "\<omega>' \<in> ?B"
+      by blast
+  qed
+  show "?B \<subseteq> ?A"
+  proof
+    fix \<omega> assume "\<omega> \<in> A \<inter> simple_read_result x r"
+    then obtain l where "get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val)"
+      unfolding simple_read_result_def by blast
+    then have "\<omega> = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>"
+      by (metis assign_var_state_refl)
+    then show "\<omega> \<in> ?A"
+      by (smt (verit, del_insts) CollectI Int_iff \<open>\<omega> \<in> A \<inter> simple_read_result x r\<close> \<open>get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val)\<close> read_result_def)
+  qed
+qed
+
+
 proposition rule_read:
-  assumes "x \<notin> fvA A"
-      and "A \<subseteq> read_perm r"
-    shows "CSL \<Delta> A (Cread x r) (A \<inter> read_result x r)"
+  assumes "A \<subseteq> read_perm r"
+    shows "CSL \<Delta> A (Cread x r) (read_result A x r)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> A" "sep_algebra_class.stable \<omega>"
   then obtain l v where lv_def: "s r = Some (VRef (Address l))" "get_vm \<omega> (l, field_val) > 0" "get_vh \<omega> (l, field_val) = Some (VInt v)"
-    using assms(2) unfolding read_perm_def by force
-  show "safe \<Delta> (Suc n) (Cread x r) s \<tau> \<omega> (A \<inter> read_result x r)"
+    using assms(1) unfolding read_perm_def by force
+  show "safe \<Delta> (Suc n) (Cread x r) s \<tau> \<omega> (read_result A x r)"
   proof (rule safeI_alt)
     show "accesses (Cread x r) s \<subseteq> read_dom \<omega>"
       by (simp add: lv_def(1) lv_def(2) read_dom_def)
@@ -1499,26 +1616,81 @@ proof (rule CSL_I)
       using lv_def(3) read_helper by blast
     then show "aborts (Cread x r) (concretize s \<omega>0') \<Longrightarrow> False"
       using lv_def(1) by auto
-    have "(Ag (s(x := Some (VInt v))), \<tau>, \<omega>) \<in> A"
-      by (meson agrees_search(4) asm0(1) assms(1) fvA_agrees)
 
     fix C' \<sigma>'
     assume "\<langle>Cread x r, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (A \<inter> read_result x r)"
+    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (read_result A x r)"
     proof (rule red_read_cases)
       fix sa h l' v'
       assume asm2: "concretize s \<omega>0' = (sa, h)" "C' = Cskip" "\<sigma>' = (sa(x \<mapsto> VInt v'), h)" "sa r = Some (VRef (Address l'))"
       "h (l', field_val) = Some (VInt v')"
       then have "l = l' \<and> v = v'"
         using \<open>get_vh \<omega>0' (l, field_val) = Some (VInt v)\<close> lv_def(1) by auto
-      moreover have "(Ag (s(x := Some (VInt v))), \<tau>, \<omega>) \<in> read_result x r"
-        unfolding read_result_def
-        using \<open>(Ag (s(x \<mapsto> VInt v)), \<tau>, \<omega>) \<in> A\<close> assms(2) get_simps_unfolded(1) lv_def(1) lv_def(3) unfolding read_perm_def  by fastforce
-      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (A \<inter> read_result x r)"
-        using \<open>(Ag (s(x \<mapsto> VInt v)), \<tau>, \<omega>) \<in> A\<close> asm0(2) asm1(2) asm1(3) asm2(1) asm2(2) asm2(3) by auto
+      moreover have "(Ag (s(x := Some (VInt v))), \<tau>, \<omega>) \<in> read_result A x r"
+        unfolding read_result_def TypedEqui.assign_var_state_def
+        using asm0(1) lv_def(1) lv_def(3) by force
+      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'
+        \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (read_result A x r)"
+        using asm0(2) asm1(2) asm1(3) asm2(1) asm2(2) asm2(3) by auto
     qed
   qed (simp_all)
 qed
+
+
+subsection \<open>Force typing\<close>
+
+lemma can_convert_safe_to_stabilize_typed:
+  assumes "safe \<Delta> n C s \<tau> \<omega> A"
+      and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
+      and "stable (Ag s, \<tau>, \<omega>)"
+      and "well_typed_cmd \<Delta> C"
+  shows "safe \<Delta> n C s \<tau> \<omega> (TypedEqui.Stabilize_typed \<Delta> A)"
+  using assms
+proof (induct n arbitrary: C s \<omega>)
+  case (Suc n)
+  show ?case
+    apply (rule safeI)
+    using Suc.prems(1) assms(2)
+    apply (simp add: ConcreteSemantics.stabilize_typed_elem Suc.prems(2) Suc.prems(3) already_stable)
+        apply (meson Suc.prems(1) safeE(2))
+    apply (meson Suc.prems(1) safeE(3))
+    using Suc.prems(1) safeE(4) apply blast
+  proof -
+    fix \<omega>0' \<omega>f C' \<sigma>'
+    assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'"
+       "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')" "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    then obtain \<omega>1 \<omega>1' where
+       r: "Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'" "safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 A"
+      using Suc.prems(1) safeE(5) by blast
+    have "safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (TypedEqui.Stabilize_typed \<Delta> A)"
+      using r(2)
+    proof (rule Suc(1))
+      show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1)"
+        unfolding TypedEqui.typed_def
+      proof
+        show "TypedEqui.typed_store \<Delta> (get_store (Ag (fst \<sigma>'), \<tau>, \<omega>1))"
+          by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(4) TypedEqui.typed_def asm0(4) asm0(5) fst_conv red_keeps_typed_store)
+        show "well_typed (custom_context \<Delta>) (get_abs_state (Ag (fst \<sigma>'), \<tau>, \<omega>1))"
+          by (metis (no_types, lifting) Suc.prems(4) TypedEqui.typed_def asm0(1) asm0(4) asm0(5) greater_def r(1) stable_sum typed_equi_red typed_smaller_state)
+      qed
+      show "sep_algebra_class.stable (Ag (fst \<sigma>'), \<tau>, \<omega>1)"
+        using r(1) stable_get_state by fastforce
+      show "well_typed_cmd \<Delta> C'"
+        by (metis Suc.prems(4) asm0(5) well_typed_cmd_red)
+    qed
+    then show "\<exists>\<omega>1 \<omega>1'.
+          Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (TypedEqui.Stabilize_typed \<Delta> A)"
+      using r by blast
+  qed
+qed (simp)
+
+lemma can_convert_to_Stabilize_typed:
+  assumes "CSL \<Delta> A C B"
+      and "well_typed_cmd \<Delta> C"
+    shows "CSL \<Delta> (TypedEqui.Stabilize_typed \<Delta> A) C (TypedEqui.Stabilize_typed \<Delta> B)"
+  apply (rule CSL_I)
+  by (metis CSL_E ConcreteSemantics.stabilize_typed_elem already_stable assms(1) assms(2) can_convert_safe_to_stabilize_typed get_simps_unfolded(2) stable_get_state)
+
 
 section \<open>Actual logic\<close>
 
@@ -1526,10 +1698,10 @@ inductive CSL_syn :: "concrete_type_context \<Rightarrow> int equi_state set \<R
   ("_ \<turnstile>CSL [_] _ [_]" [51,0,0] 81)
   where
   RuleSkip: "\<Delta> \<turnstile>CSL [P] Cskip [P]"
-| RuleFrame: "\<lbrakk> \<Delta> \<turnstile>CSL [P] C [Q]; disjoint (fvA R) (wrC C); TypedEqui.self_framing_typed \<Delta> P; TypedEqui.self_framing_typed \<Delta> R;
+| RuleFrame: "\<lbrakk> \<Delta> \<turnstile>CSL [P] C [Q]; disjoint (fvA \<Delta> R) (wrC C); TypedEqui.self_framing_typed \<Delta> P; TypedEqui.self_framing_typed \<Delta> R;
   TypedEqui.typed_assertion \<Delta> P; TypedEqui.typed_assertion \<Delta> R\<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile>CSL [P \<otimes> R] C [Q \<otimes> R]"
-| RulePar: "\<lbrakk> disjoint (fvC C1 \<union> fvA Q1) (wrC C2); disjoint (fvC C2 \<union> fvA Q2) (wrC C1); TypedEqui.self_framing_typed \<Delta> P1;
+| RulePar: "\<lbrakk> disjoint (fvC C1 \<union> fvA \<Delta> Q1) (wrC C2); disjoint (fvC C2 \<union> fvA \<Delta> Q2) (wrC C1); TypedEqui.self_framing_typed \<Delta> P1;
   TypedEqui.self_framing_typed \<Delta> P2; TypedEqui.typed_assertion \<Delta> P1; TypedEqui.typed_assertion \<Delta> P2;
     \<Delta> \<turnstile>CSL [P1] C1 [Q1]; \<Delta> \<turnstile>CSL [P2] C2 [Q2] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P1 \<otimes> P2] {_} C1 {_} || {_} C2 {_} [Q1 \<otimes> Q2]"
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile>CSL [P] C1 [Q]; \<Delta> \<turnstile>CSL [Q] C2 [R] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P] Cseq C1 C2 [R]"
@@ -1538,9 +1710,11 @@ inductive CSL_syn :: "concrete_type_context \<Rightarrow> int equi_state set \<R
 | RuleWhile: "\<lbrakk> \<Delta> \<turnstile>CSL [I \<inter> (assertify_bexp b)] C [I] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [I] (Cwhile b C) [I \<inter> (assertify_bexp (Bnot b))]"
 | RuleWrite: "\<Delta> \<turnstile>CSL [full_ownership r] Cwrite r e [full_ownership_with_val r e]"
 | RuleAssign: "\<Delta> \<turnstile>CSL [sub_pre x e P] Cassign x e [P]"
-| RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<Delta> \<turnstile>CSL [UNIV] Calloc r e [full_ownership_with_val r e]"
-| RuleFree: "\<Delta> \<turnstile>CSL [full_ownership r] Cfree r [UNIV]"
-| RuleRead: "\<lbrakk> x \<notin> fvA A; A \<subseteq> read_perm r\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [A] Cread x r [A \<inter> read_result x r]"
+| RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<Delta> \<turnstile>CSL [atrue \<Delta>] Calloc r e [full_ownership_with_val r e]"
+| RuleFree: "\<Delta> \<turnstile>CSL [full_ownership r] Cfree r [atrue \<Delta>]"
+| RuleRead: "\<lbrakk> A \<subseteq> read_perm r\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [A] Cread x r [read_result A x r]"
+
+| RuleStabilizeTyped: "\<Delta> \<turnstile>CSL [P] C [Q] \<Longrightarrow> \<Delta> \<turnstile>CSL [TypedEqui.Stabilize_typed \<Delta> P] C [TypedEqui.Stabilize_typed \<Delta> Q]"
 
 theorem CSL_sound:
   assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
@@ -1548,7 +1722,7 @@ theorem CSL_sound:
     shows "CSL \<Delta> P C Q"
   using assms
   by (induct rule: CSL_syn.induct) (simp_all add: rule_skip rule_seq rule_conseq rule_if rule_while
-      rule_write rule_assign rule_alloc rule_free rule_read frame_rule rule_par)
+      rule_write rule_assign rule_alloc rule_free rule_read frame_rule rule_par can_convert_to_Stabilize_typed)
 
 
 subsection \<open>Adequacy\<close>

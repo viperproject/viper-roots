@@ -220,9 +220,6 @@ datatype 'a custom =
   FieldAssign "('a equi_state, address) exp" field_ident "('a equi_state, 'a val) exp"
   | Label label
 
-
-
-
 (*
 type_synonym 'a equi_state = "('a trace \<times> 'a virtual_state, 'a val) state"
 *)
@@ -279,16 +276,16 @@ lemma owns_onlyI[intro]:
   using assms(1) assms(2) owns_only_def by blast
 
 definition remove_only where
-  "remove_only \<omega> l = set_state \<omega> (Abs_virtual_state ((get_vm (get_state \<omega>))(l := 0), get_vh (get_state \<omega>)))"
+  "remove_only \<omega> l = set_state \<omega> (Abs_virtual_state ((get_vm (get_state \<omega>))(l := 0), (get_vh (get_state \<omega>))(l := None)))"
 
 lemma remove_only_charact:
-  "get_vh (get_state (remove_only \<omega> l)) = get_vh (get_state \<omega>)"
+  "get_vh (get_state (remove_only \<omega> l)) = (get_vh (get_state \<omega>))(l := None)"
   "get_vm (get_state (remove_only \<omega> l)) = (get_vm (get_state \<omega>))(l := 0)"
 proof -
-  have "wf_pre_virtual_state ((get_vm (get_state \<omega>))(l := 0), get_vh (get_state \<omega>))"
+  have r: "wf_pre_virtual_state ((get_vm (get_state \<omega>))(l := 0), (get_vh (get_state \<omega>))(l := None))"
   proof (rule wf_pre_virtual_stateI)
     fix hl assume asm0: "PosReal.ppos (((get_vm (get_state \<omega>))(l := PosReal.pnone)) hl)"
-    show "get_vh (get_state \<omega>) hl \<noteq> None"
+    show "((get_vh (get_state \<omega>))(l := None)) hl \<noteq> None"
     proof (cases "hl = l")
       case True
       then show ?thesis using ppos_def
@@ -298,18 +295,18 @@ proof -
       then have "PosReal.ppos (get_vm (get_state \<omega>) hl)"
         using asm0 by force
       then show ?thesis
-        by (simp add: gr_0_is_ppos vstate_wf_imp)
+        by (simp add: False vstate_wf_ppos)
     qed
   next
     show "wf_mask_simple ((get_m \<omega>)(l := 0))"
       by (simp add: all_pos get_vm_bound wf_mask_simpleI)
   qed
-  then show "get_vh (get_state (remove_only \<omega> l)) = get_vh (get_state \<omega>)"
+  then show "get_vh (get_state (remove_only \<omega> l)) = (get_vh (get_state \<omega>))(l := None)"
     by (simp add: Abs_virtual_state_inverse get_vh_def remove_only_def)
   show "get_vm (get_state (remove_only \<omega> l)) = (get_vm (get_state \<omega>))(l := PosReal.pnone)"
-    by (metis (mono_tags, lifting) Abs_virtual_state_inverse \<open>wf_pre_virtual_state ((get_vm (get_state \<omega>))(l := PosReal.pnone), get_vh (get_state \<omega>))\<close> get_state_set_state get_vm_def mem_Collect_eq prod.sel(1) remove_only_def)
+    by (metis (mono_tags, lifting) Abs_virtual_state_inverse r get_state_set_state get_vm_def mem_Collect_eq prod.sel(1) remove_only_def)
 qed
-
+(*
 lemma remove_only_core:
   "|remove_only \<omega> l| = |\<omega>|"
 proof (rule full_state_ext)
@@ -318,8 +315,40 @@ proof (rule full_state_ext)
   show "get_trace |remove_only \<omega> l| = get_trace |\<omega>|"
     by (metis get_trace_set_state remove_only_def set_state_core)
   show "get_state |remove_only \<omega> l| = get_state |\<omega>|"
+    sorry
+
     by (metis Rep_virtual_state_inverse agreement.exhaust_sel core_charact(2) core_def core_structure(1) core_structure(2) get_abs_state_def get_abs_state_set_abs_state get_state_def get_state_set_state get_state_set_trace get_vh_def get_vm_def prod.exhaust_sel remove_only_charact(1) set_abs_state_def set_trace_def)
 qed
+*)
+
+lemma remove_only_stabilize:
+  "stabilize (remove_only \<omega> l) = remove_only (stabilize \<omega>) l"
+proof (rule full_state_ext)
+  show "get_state (stabilize (remove_only \<omega> l)) = get_state (remove_only (stabilize \<omega>) l)"
+  proof (rule virtual_state_ext)
+    show "get_m (stabilize (remove_only \<omega> l)) = get_m (remove_only (stabilize \<omega>) l)"
+      by (simp add: remove_only_charact(2) vstate_stabilize_structure(1))
+    show "get_h (stabilize (remove_only \<omega> l)) = get_h (remove_only (stabilize \<omega>) l)"
+    proof
+      fix x show "get_h (stabilize (remove_only \<omega> l)) x = get_h (remove_only (stabilize \<omega>) l) x"
+        apply (cases "x = l")
+        apply (metis \<open>get_m (stabilize (remove_only \<omega> l)) = get_m (remove_only (stabilize \<omega>) l)\<close> fun_upd_same remove_only_charact(1) stabilize_is_stable stable_get_state stable_virtual_state_def vstate_wf_ppos)
+        apply (cases "get_h (stabilize (remove_only \<omega> l)) x")
+        apply (metis fun_upd_apply get_state_stabilize remove_only_charact(1) remove_only_charact(2) stabilize_is_stable stable_virtual_state_def vstate_stabilize_structure(1) vstate_wf_ppos)
+      proof -
+        fix a :: "'a val"
+        assume a1: "get_h (stabilize (remove_only \<omega> l)) x = Some a"
+        assume a2: "x \<noteq> l"
+        have "\<forall>p. (p::(nat \<Rightarrow> 'a val option) agreement \<times> (char list \<Rightarrow> 'a virtual_state option) agreement \<times> 'a virtual_state) \<succeq> stabilize p \<and> sep_algebra_class.stable (stabilize p) \<and> (\<forall>pa. \<not> sep_algebra_class.stable pa \<or> \<not> p \<succeq> pa \<or> stabilize p \<succeq> pa)"
+          by (metis (no_types) max_projection_prop_def max_projection_prop_stable_stabilize)
+        then show ?thesis
+          using a2 a1 by (smt (z3) \<open>get_m (stabilize (remove_only \<omega> l)) = get_m (remove_only (stabilize \<omega>) l)\<close> fun_upd_other get_vh_Some_greater remove_only_charact(1) stable_get_state stable_virtual_state_def vstate_wf_Some)
+      qed        
+    qed
+  qed
+qed (simp_all add: remove_only_def)
+
+
 
 
 definition points_to where
@@ -398,13 +427,11 @@ proof (rule full_state_ext)
 qed
 
 lemma split_remove_only_owns_only:
-  assumes "r \<omega> = Some l"
-      and "wf_exp r"
-      and "get_vm (get_state \<omega>) l = 1"
-  shows "\<exists>ptr. Some \<omega> = remove_only \<omega> l \<oplus> ptr \<and> ptr \<in> points_to r"
+  assumes "get_vm (get_state \<omega>) l = 1"
+  shows "Some \<omega> = remove_only \<omega> l \<oplus> (set_state \<omega> (Abs_virtual_state (\<lambda>l'. if l = l' then 1 else 0, get_vh (get_state \<omega>))))"
 proof -
   obtain v where "get_vh (get_state \<omega>) l = Some v"
-    by (metis assms(3) not_Some_eq not_gr_0 vstate_wf_imp zero_neq_one)
+    by (metis assms(1) not_Some_eq not_gr_0 vstate_wf_imp zero_neq_one)
   let ?m = "\<lambda>l'. if l = l' then 1 else 0"
   let ?h = "get_vh (get_state \<omega>)"
   define ptr where "ptr = set_state \<omega> (Abs_virtual_state (?m, ?h))"
@@ -421,11 +448,11 @@ proof -
   moreover have "Some \<omega> = remove_only \<omega> l \<oplus> ptr"
   proof (rule plus_prodI)
     show "Some (fst \<omega>) = fst (remove_only \<omega> l) \<oplus> fst ptr"
-      by (metis agreement.exhaust_sel core_charact(1) get_store_def get_store_set_state plus_AgI ptr_def remove_only_core)
+      by (simp add: get_store_def plus_agreement_def ptr_def remove_only_def set_state_def)
     show "Some (snd \<omega>) = snd (remove_only \<omega> l) \<oplus> snd ptr"
     proof (rule plus_prodI)
-      show "Some (fst (snd \<omega>)) = fst (snd (remove_only \<omega> l)) \<oplus> fst (snd ptr)"        
-        by (smt (verit) core_def core_is_smaller fst_conv option.distinct(1) plus_agreement_def ptr_def remove_only_core remove_only_def set_state_def snd_conv)
+      show "Some (fst (snd \<omega>)) = fst (snd (remove_only \<omega> l)) \<oplus> fst (snd ptr)"
+        by (metis plus_agreement_def prod.exhaust_sel prod.inject ptr_def remove_only_def set_state_def set_state_get_state)
       show "Some (snd (snd \<omega>)) = snd (snd (remove_only \<omega> l)) \<oplus> snd (snd ptr)"
       proof (rule compatible_virtual_state_implies_pre_virtual_state_rev)
         show "Some (Rep_virtual_state (snd (snd \<omega>))) = Rep_virtual_state (snd (snd (remove_only \<omega> l))) \<oplus> Rep_virtual_state (snd (snd ptr))"
@@ -434,29 +461,38 @@ proof -
           proof (rule plus_funI)
             fix la show "Some (fst (Rep_virtual_state (snd (snd \<omega>))) la) =
           fst (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la \<oplus> fst (Rep_virtual_state (snd (snd ptr))) la"
-            by (metis SepAlgebra.plus_preal_def \<open>get_vm (get_state ptr) = (\<lambda>l'. if l = l' then PosReal.pwrite else PosReal.pnone)\<close> add.right_neutral assms(3) commutative fun_upd_def get_state_def get_vm_def remove_only_charact(2))
+            by (metis SepAlgebra.plus_preal_def \<open>get_vm (get_state ptr) = (\<lambda>l'. if l = l' then PosReal.pwrite else PosReal.pnone)\<close> add.right_neutral assms(1) commutative fun_upd_def get_state_def get_vm_def remove_only_charact(2))
           qed
           show "Some (snd (Rep_virtual_state (snd (snd \<omega>)))) = snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) \<oplus> snd (Rep_virtual_state (snd (snd ptr)))"
+          proof (rule plus_funI)
+            fix la show "Some (snd (Rep_virtual_state (snd (snd \<omega>))) la) =
+          snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la \<oplus> snd (Rep_virtual_state (snd (snd ptr))) la"
+            proof (cases "la = l")
+              case True
+              then show ?thesis sorry
+            next
+              case False
+              then show ?thesis sorry
+            qed
+          qed
+(*
+            thm partial_heap_same_sum
+          
           proof (rule partial_heap_same_sum)
             show "snd (Rep_virtual_state (snd (snd \<omega>))) = snd (Rep_virtual_state (snd (snd (remove_only \<omega> l))))"
+              
+
               by (metis get_state_def get_vh_def remove_only_charact(1))
             show "snd (Rep_virtual_state (snd (snd \<omega>))) = snd (Rep_virtual_state (snd (snd ptr)))"
               by (metis Abs_virtual_state_inverse \<open>wf_pre_virtual_state (\<lambda>l'. if l = l' then PosReal.pwrite else PosReal.pnone, get_vh (get_state \<omega>))\<close> get_state_def get_state_set_state get_vh_def mem_Collect_eq ptr_def snd_eqD)
           qed
+*)
         qed
       qed
     qed
   qed
-  moreover have "r ptr = Some l"
-    using assms(2) assms(1)
-  proof (rule wf_exp_combinedE)
-    have "|ptr| = |\<omega>|"
-      by (metis Abs_virtual_state_inverse \<open>wf_pre_virtual_state (\<lambda>l'. if l = l' then PosReal.pwrite else PosReal.pnone, get_vh (get_state \<omega>))\<close> get_state_set_state get_store_set_state get_trace_set_state get_vh_def mem_Collect_eq ptr_def same_core snd_eqD)
-    then show "|ptr| \<succeq> |\<omega>|"
-      by (simp add: succ_refl)
-  qed
   ultimately show ?thesis
-    by (metis (mono_tags, lifting) CollectI points_to_def)
+    using ptr_def by blast
 qed
 
 definition pure_post_field_assign where

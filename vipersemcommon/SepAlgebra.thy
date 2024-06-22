@@ -105,6 +105,13 @@ next
   then show ?A
     using greater_def by auto
 qed
+
+lemma greater_prodI:
+  assumes "fst x \<succeq> fst y"
+      and "snd x \<succeq> snd y"
+    shows "x \<succeq> y"
+  by (simp add: assms(1) assms(2) greater_prod_eq)
+
 lemma comp_prod:
   "a ## b \<longleftrightarrow> (fst a ## fst b \<and> snd a ## snd b)" (is "?A \<longleftrightarrow> ?B")
 proof

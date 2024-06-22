@@ -898,6 +898,7 @@ inductive_cases SL_proof_Havoc_elim[elim!]: "\<Delta> \<turnstile> [A] Havoc x [
 inductive_cases SL_proof_Seq_elim[elim!]: "\<Delta> \<turnstile> [A] Seq C1 C2 [B]"
 inductive_cases SL_proof_If_elim[elim!]: "\<Delta> \<turnstile> [A] If b C1 C2 [B]"
 inductive_cases SL_proof_Custom_elim[elim!]: "\<Delta> \<turnstile> [A] Custom C [B]"
+inductive_cases SL_proof_LocalAssign_elim[elim!]: "\<Delta> \<turnstile> [A] LocalAssign x e [B]"
 
 (*
 inductive_cases SL_proof_FieldAssign_elim[elim!]: "\<Delta> \<turnstile> [A] FieldAssign r e [B]"

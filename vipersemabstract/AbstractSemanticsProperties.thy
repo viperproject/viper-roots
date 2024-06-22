@@ -1090,9 +1090,9 @@ next
   moreover have "?A = Stabilize_typed \<Delta> (\<Union> (f ` SA))" (is "?A = ?B")
   proof (rule self_framing_typed_ext)
     show "self_framing_typed \<Delta> (post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA)))"
-      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by blast
+      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by presburger
     show "typed_assertion \<Delta> (post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA)))"
-      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by blast
+      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by presburger
 
     fix \<omega> assume asm0: "stable \<omega>" "typed \<Delta> \<omega>" "\<omega> \<in> post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA))"
     then obtain \<omega>' where "\<omega>' \<in> Stabilize_typed \<Delta> (snd ` SA)" "\<omega> = assign_var_state x (e \<omega>') \<omega>'"
@@ -1630,6 +1630,58 @@ next
     by (meson RedCustom RuleCustom.hyps(1) RuleCustom.prems(1) RuleCustom.prems(2) RuleCustom.prems(3) typed_assertion_def typed_def wf_abs_stmt.simps(10))
 qed
 
+
+lemma proof_then_typed:
+  assumes "\<Delta> \<turnstile> [A] C [B]"
+  shows "typed_assertion \<Delta> A \<and> typed_assertion \<Delta> B"
+  using assms
+proof (induct rule: SL_proof.induct)
+  case (RuleInhale \<Delta> A P)
+(* might need that P, and thus the program, is well-typed *)
+  then show ?case sorry
+next
+  case (RuleAssume \<Delta> A P)
+  then show ?case
+    using typed_intersection by blast
+next
+  case (RuleHavoc \<Delta> A x)
+  then show ?case
+    using typed_assertion_exists_assert by blast
+next
+  case (RuleLocalAssign \<Delta> A e x)
+(* might need that e, and thus the program, is well-typed *)
+  then show ?case sorry
+next
+  case (RuleIf \<Delta> A b C1 B1 C2 B2)
+  then show ?case
+    using typed_union by blast
+qed (simp_all)
+
+lemma proof_then_self_framing:
+  assumes "\<Delta> \<turnstile> [A] C [B]"
+  shows "self_framing_typed \<Delta> A \<and> self_framing_typed \<Delta> B"
+  using assms
+proof (induct rule: SL_proof.induct)
+  case (RuleInhale \<Delta> A P)
+  then show ?case
+    using self_framing_typed_star by blast
+next
+  case (RuleAssume \<Delta> A P)
+  then show ?case
+    by (smt (verit) Int_iff self_framing_on_def self_framing_typed_def)
+next
+  case (RuleHavoc \<Delta> A x)
+  then show ?case
+    using self_framing_exists_assert by blast
+next
+  case (RuleLocalAssign \<Delta> A e x)
+(* might need that e, and thus the program, is well-typed *)
+  then show ?case sorry
+next
+  case (RuleIf \<Delta> A b C1 B1 C2 B2)
+  then show ?case
+    by (simp add: typed_state.self_framing_typed_def typed_state_axioms)
+qed (simp_all)
 
 
 end
