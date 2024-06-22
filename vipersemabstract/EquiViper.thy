@@ -174,12 +174,13 @@ lemma uu_get :
   shows "get_vm uu = zero_mask" "get_vh uu = empty_heap"
   by (simp_all add:get_vm_def get_vh_def uu.rep_eq uuu_def)
 
+(*
 lemma sum_wf_is_wf:
   assumes "wf_pre_virtual_state a"
       and "wf_pre_virtual_state b"
       and "Some x = a \<oplus> b"
     shows "wf_pre_virtual_state x"
-  sorry
+*)
 
 fun read_field :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
   where "read_field \<phi> loc = get_vh \<phi> loc"
