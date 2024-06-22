@@ -457,22 +457,25 @@ lemma invariant_translateI:
 
 lemma invariant_translate_simpler:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q \<Longrightarrow> \<Delta> \<turnstile>CSL [P] C [Q]"
-  shows "invariant_translate \<Delta> P C Q"
-  by (meson CSL_add_atrue ConcreteSemantics.semantics_axioms assms invariant_translateI semantics.proof_then_self_framing semantics.proof_then_typed)
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
+    shows "invariant_translate \<Delta> P C Q"
+  by (simp add: CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms(1) assms(2) invariant_translateI)
 
 corollary invariant_translate_skip:
   "invariant_translate \<Delta> P Cskip Q"
   using convert_proof_skip invariant_translate_simpler by fastforce
 
 corollary invariant_translate_assign:
-  "invariant_translate \<Delta> P (Cassign x e) Q"
-  using convert_proof_assign invariant_translate_simpler by fastforce
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cassign x e)))"
+  shows "invariant_translate \<Delta> P (Cassign x e) Q"
+  using convert_proof_assign invariant_translate_simpler assms by fastforce
 
 corollary invariant_translate_alloc:
   assumes "well_typed_cmd \<Delta> (Calloc r e)"
       and "wf_stmt \<Delta> (Calloc r e)"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Calloc r e)))"
     shows "invariant_translate \<Delta> P (Calloc r e) Q"
-  using assms(1) assms(2) cmd.distinct(37) convert_proof_alloc invariant_translate_simpler by fastforce
+  using assms cmd.distinct(37) convert_proof_alloc invariant_translate_simpler by fastforce
 
 lemma atrue_twice_same:
   "atrue \<Delta> \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta>"
@@ -496,30 +499,33 @@ qed (simp add: atrue_twice_same)
 
 
 corollary invariant_translate_free:
-  "invariant_translate \<Delta> P (Cfree r) Q"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cfree r)))"
+  shows "invariant_translate \<Delta> P (Cfree r) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cfree r))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cfree r [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
     using RuleFrame[OF convert_proof_free]
-    by (simp add: ConcreteSemantics.proof_then_self_framing ConcreteSemantics.proof_then_typed)
+    by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_free fst_eqD translate.simps(4))
   then show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cfree r [Q \<otimes> atrue \<Delta>]"
     by (simp add: add_set_asso atrue_twice_equal)
 qed
 
 corollary invariant_translate_write:
-  "invariant_translate \<Delta> P (Cwrite r e) Q"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cwrite r e)))"
+  shows "invariant_translate \<Delta> P (Cwrite r e) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cwrite r e))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwrite r e [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
     using RuleFrame[OF convert_proof_write]
-    by (simp add: ConcreteSemantics.proof_then_self_framing ConcreteSemantics.proof_then_typed)
+    by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_write fst_eqD translate.simps(5))
   then show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwrite r e [Q \<otimes> atrue \<Delta>]"
     by (simp add: add_set_asso atrue_twice_equal)
 qed
 
 corollary invariant_translate_read:
-  "invariant_translate \<Delta> P (Cread x r) Q"
-  using convert_proof_read invariant_translate_simpler by fastforce
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cread x r)))"
+  shows "invariant_translate \<Delta> P (Cread x r) Q"
+  using convert_proof_read invariant_translate_simpler assms by fastforce
 
 
 lemma invariant_translate_seq:
@@ -871,11 +877,11 @@ proof (rule invariant_translateI)
       show "TypedEqui.self_framing_typed \<Delta> (I \<otimes> atrue \<Delta>)"
         using assms(3) self_framing_typed_star_atrue by auto
       show "TypedEqui.self_framing_typed \<Delta> R1"
-        using ConcreteSemantics.proof_then_self_framing calculation(5) by blast
+        using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
       show "TypedEqui.typed_assertion \<Delta> (I \<otimes> atrue \<Delta>)"
         using assms(3) typed_assertion_star_atrue by auto
       show "TypedEqui.typed_assertion \<Delta> R1"
-        using ConcreteSemantics.proof_then_typed calculation(5) by blast
+        using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
     qed
     have "P \<subseteq> R1 \<otimes> I"
       by (meson \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C)\<close> add_set_mono calculation(3) entails_def equalityD1 subset_trans)
@@ -1024,7 +1030,7 @@ proof -
     show "P \<otimes> atrue \<Delta> \<subseteq> P \<otimes> atrue \<Delta> \<otimes> atrue \<Delta>"
       by (simp add: add_set_asso atrue_twice_equal)
     show "B' \<otimes> atrue \<Delta> \<subseteq> Q \<otimes> atrue \<Delta>"
-      by (meson ConcreteSemantics.proof_then_typed \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (abs_stmt.Inhale P ;; fst (translate C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono drop_conjunct_entails dual_order.trans entails_def order_refl)
+      by (smt (verit, ccfv_SIG) ConcreteSemantics.proofs_are_self_framing_and_typed ConcreteSemantics.semantics_axioms \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (abs_stmt.Inhale P ;; fst (translate C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono assms(3) assms(5) atrue_twice_equal drop_conjunct_entails entails_def order.trans semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) semantics.wf_abs_stmt.simps(7))
   qed
 qed
 

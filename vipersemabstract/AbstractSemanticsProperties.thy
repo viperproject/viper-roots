@@ -1541,7 +1541,7 @@ next
     by (meson RuleAssert.prems(1) empty_subsetI insert_subsetI)
 next
   case (RuleAssume \<Delta> A P)
-  moreover have asm0: "stable_on \<omega> P" sorry
+  moreover have asm0: "stable_on \<omega> P" sorry (* TODO: Assume *)
 (*
   proof (rule stable_onI)
     fix x assume asm1: "pure_larger x \<omega>"
@@ -1557,7 +1557,7 @@ self_framing_on A P
 
 (*
   proof
-    sorry
+    
 
     by (metis (no_types, lifting) already_stable pure_larger_stabilize_same self_framing_on_def self_framing_typed_altE typed_assertion_def wf_abs_stmt.simps(5) stable_on_def wf_assertion_def) 
 (* long *)
@@ -1641,60 +1641,6 @@ next
   then show ?case using red_wf_complete[OF \<open>SL_Custom \<Delta> A C B\<close>]
     by (meson RedCustom RuleCustom.hyps(1) RuleCustom.prems(1) RuleCustom.prems(2) RuleCustom.prems(3) typed_assertion_def typed_def wf_abs_stmt.simps(10))
 qed
-
-
-lemma proof_then_typed:
-  assumes "\<Delta> \<turnstile> [A] C [B]"
-  shows "typed_assertion \<Delta> A \<and> typed_assertion \<Delta> B"
-  using assms
-proof (induct rule: SL_proof.induct)
-  case (RuleInhale \<Delta> A P)
-(* might need that P, and thus the program, is well-typed *)
-  then show ?case sorry
-next
-  case (RuleAssume \<Delta> A P)
-  then show ?case
-    using typed_intersection by blast
-next
-  case (RuleHavoc \<Delta> A x)
-  then show ?case
-    using typed_assertion_exists_assert by blast
-next
-  case (RuleLocalAssign \<Delta> A e x)
-(* might need that e, and thus the program, is well-typed *)
-  then show ?case sorry
-next
-  case (RuleIf \<Delta> A b C1 B1 C2 B2)
-  then show ?case
-    using typed_union by blast
-qed (simp_all)
-
-lemma proof_then_self_framing:
-  assumes "\<Delta> \<turnstile> [A] C [B]"
-  shows "self_framing_typed \<Delta> A \<and> self_framing_typed \<Delta> B"
-  using assms
-proof (induct rule: SL_proof.induct)
-  case (RuleInhale \<Delta> A P)
-  then show ?case
-    using self_framing_typed_star by blast
-next
-  case (RuleAssume \<Delta> A P)
-  then show ?case
-    by (smt (verit) Int_iff self_framing_on_def self_framing_typed_def)
-next
-  case (RuleHavoc \<Delta> A x)
-  then show ?case
-    using self_framing_exists_assert by blast
-next
-  case (RuleLocalAssign \<Delta> A e x)
-(* might need that e, and thus the program, is well-typed *)
-  then show ?case sorry
-next
-  case (RuleIf \<Delta> A b C1 B1 C2 B2)
-  then show ?case
-    by (simp add: typed_state.self_framing_typed_def typed_state_axioms)
-qed (simp_all)
-
 
 end
 
