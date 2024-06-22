@@ -1,5 +1,5 @@
 theory ParImp
-  imports ViperCommon.SepAlgebra ViperCommon.SepLogic "../vipersemabstract/Instantiation" VHelper
+  imports ViperCommon.SepAlgebra ViperCommon.SepLogic ViperAbstract.Instantiation VHelper
 begin
 
 (* Maybe adapt state model to instantiation, just remove mask... *)

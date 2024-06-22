@@ -1,5 +1,5 @@
 theory CSL_IDF
-  imports ParImp ViperCommon.SepAlgebra ViperCommon.SepLogic "../vipersemabstract/Instantiation"
+  imports ParImp ViperCommon.SepAlgebra ViperCommon.SepLogic ViperAbstract.Instantiation
 begin
 
 subsection \<open>Safety\<close>
