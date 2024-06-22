@@ -46,7 +46,7 @@ datatype cmd =
 | Cseq cmd cmd
 | Cpar f_assertion cmd f_assertion f_assertion cmd f_assertion ("{_} _ {_} || {_} _ {_}")
 | Cif bexp cmd cmd
-| Cwhile bexp cmd
+| Cwhile bexp f_assertion cmd
 
 
 primrec edenot :: "exp \<Rightarrow> stack \<Rightarrow> int"
@@ -77,7 +77,7 @@ inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state 
 | red_Par1[elim]: "\<lbrakk> \<langle>C1, \<sigma>\<rangle> \<rightarrow> \<langle>C1', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>{A1} C1 {B1} || {A2} C2 {B2}, \<sigma>\<rangle> \<rightarrow> \<langle>{A1} C1' {B1} || {A2} C2 {B2}, \<sigma>'\<rangle>" 
 | red_Par2[elim]: "\<lbrakk> \<langle>C2, \<sigma>\<rangle> \<rightarrow> \<langle>C2', \<sigma>'\<rangle> \<rbrakk> \<Longrightarrow> \<langle>{A1} C1 {B1} || {A2} C2 {B2}, \<sigma>\<rangle> \<rightarrow> \<langle>{A1} C1 {B1} || {A2} C2' {B2}, \<sigma>'\<rangle>"
 | red_Par3[intro]: "\<langle>{_} Cskip {_} || {_} Cskip {_}, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>\<rangle>"
-| red_Loop[intro]: "\<langle>Cwhile b C, \<sigma>\<rangle> \<rightarrow> \<langle>Cif b (Cseq C (Cwhile b C)) Cskip, \<sigma>\<rangle>"
+| red_Loop[intro]: "\<langle>Cwhile b I C, \<sigma>\<rangle> \<rightarrow> \<langle>Cif b (Cseq C (Cwhile b I C)) Cskip, \<sigma>\<rangle>"
 | red_Assign[intro]:"\<lbrakk> \<sigma> = (s,h); \<sigma>' = (s(x \<mapsto> VInt (edenot e s)), h) \<rbrakk> \<Longrightarrow> \<langle>Cassign x e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
 
 | red_Alloc[intro]: "\<lbrakk> \<sigma> = (s,h); (l, field_val) \<notin> dom h; \<sigma>' = (s(x \<mapsto> VRef (Address l)), h((l, field_val) \<mapsto> VInt (edenot e s))) \<rbrakk> 
@@ -92,7 +92,7 @@ inductive_cases red_par_cases: "\<langle>{P1} C1 {Q1} || {P2} C2 {Q2}, \<sigma>\
 inductive_cases red_seq_cases: "\<langle>Cseq C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_write_cases: "\<langle>Cwrite r e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_if_cases: "\<langle>Cif b C1 C2, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-inductive_cases red_while_cases: "\<langle>Cwhile b C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+inductive_cases red_while_cases: "\<langle>Cwhile b I C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_alloc_cases: "\<langle>Calloc r e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_assign_cases: "\<langle>Cassign x e, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
 inductive_cases red_free_cases: "\<langle>Cfree r, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
@@ -120,7 +120,7 @@ where
   | "accesses (Cseq C1 C2)     s = accesses C1 s"
   | "accesses ({_} C1 {_} || {_} C2 {_})     s = accesses C1 s \<union> accesses C2 s"
   | "accesses (Cif B C1 C2)    s = {}"
-  | "accesses (Cwhile B C)     s = {}"
+  | "accesses (Cwhile B I C)     s = {}"
 
 primrec
   writes :: "cmd \<Rightarrow> stack \<Rightarrow> address set"
@@ -134,7 +134,7 @@ where
   | "writes (Cseq C1 C2)     s = writes C1 s"
   | "writes ({_} C1 {_} || {_} C2 {_})     s = writes C1 s \<union> writes C2 s"
   | "writes (Cif B C1 C2)    s = {}"
-  | "writes (Cwhile B C)     s = {}"
+  | "writes (Cwhile B I C)     s = {}"
 
 inductive
   aborts :: "cmd \<Rightarrow> state \<Rightarrow> bool"
@@ -158,7 +158,7 @@ where
 inductive_cases aborts_write_elim[elim]: "aborts (Cwrite r e) \<sigma>"
 inductive_cases aborts_par_elim[elim]: "aborts ({P1} C1 {Q1} || {P2} C2 {Q2}) \<sigma>"
 inductive_cases aborts_seq_elim[elim]: "aborts (Cseq C1 C2) \<sigma>"
-inductive_cases aborts_while_elim[elim]: "aborts (Cwhile b C) \<sigma>"
+inductive_cases aborts_while_elim[elim]: "aborts (Cwhile b I C) \<sigma>"
 inductive_cases aborts_if_elim[elim]: "aborts (Cif b C1 C2) \<sigma>"
 inductive_cases aborts_alloc_elim[elim]: "aborts (Calloc r e) \<sigma>"
 inductive_cases aborts_assign_elim[elim]: "aborts (Cassign x e) \<sigma>"
@@ -198,7 +198,7 @@ where
 | "fvC (Cseq C1 C2)     = (fvC C1 \<union> fvC C2)"
 | "fvC ({_} C1 {_} || {_} C2 {_})     = (fvC C1 \<union> fvC C2)"
 | "fvC (Cif B C1 C2)    = (fvB B \<union> fvC C1 \<union> fvC C2)"
-| "fvC (Cwhile B C)     = (fvB B \<union> fvC C)"
+| "fvC (Cwhile B I C)     = (fvB B \<union> fvC C)"
 
 
 text \<open>Below, we define the set of syntactically updated variables 
@@ -217,7 +217,7 @@ where
 | "wrC (Cseq C1 C2)    = (wrC C1 \<union> wrC C2)"
 | "wrC ({_} C1 {_} || {_} C2 {_})    = (wrC C1 \<union> wrC C2)"
 | "wrC (Cif B C1 C2)   = (wrC C1 \<union> wrC C2)"
-| "wrC (Cwhile B C)    = (wrC C)"
+| "wrC (Cwhile B I C)    = (wrC C)"
 
 primrec
   wrL :: "cmd \<Rightarrow> var list"
@@ -231,7 +231,7 @@ where
 | "wrL (Cseq C1 C2)    = (wrL C1 @ wrL C2)"
 | "wrL ({_} C1 {_} || {_} C2 {_})    = (wrL C1 @ wrL C2)"
 | "wrL (Cif B C1 C2)   = (wrL C1 @ wrL C2)"
-| "wrL (Cwhile B C)    = (wrL C)"
+| "wrL (Cwhile B I C)    = (wrL C)"
 
 lemma wrL_wrC_same:
   "set (wrL C) = wrC C"
@@ -436,7 +436,7 @@ fun well_typed_cmd_aux where
 | "well_typed_cmd_aux \<Delta> (Cfree r) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
 | "well_typed_cmd_aux \<Delta> (Cif _ C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
 | "well_typed_cmd_aux \<Delta> ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> (Cwhile _ C) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C"
+| "well_typed_cmd_aux \<Delta> (Cwhile _ _ C) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C"
 
 (*
 lemma update_store_typed:

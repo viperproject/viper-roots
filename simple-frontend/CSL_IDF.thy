@@ -150,8 +150,7 @@ abbreviation fvA where
 lemma fvA_agrees:
   assumes "agrees (fvA \<Delta> Q) s s'"
     shows "(Ag s, \<tau>, \<omega>) \<in> Q \<longleftrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
-  sorry
- (* TODO: free_vars... *)
+  sorry (* TODO: free_vars... *)
 
 
 abbreviation well_typed_cmd where
@@ -1024,22 +1023,22 @@ lemma safe_while:
       and "(Ag s, \<tau>, \<omega>) \<in> I"
       and "sep_algebra_class.stable \<omega>"
       and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
-      and "well_typed_cmd \<Delta> (Cwhile b C)"
-    shows "safe \<Delta> n (Cwhile b C) s \<tau> \<omega> (I \<inter> (assertify_bexp (Bnot b)))"
+      and "well_typed_cmd \<Delta> (Cwhile b I' C)"
+    shows "safe \<Delta> n (Cwhile b I' C) s \<tau> \<omega> (I \<inter> (assertify_bexp (Bnot b)))"
   using assms
 proof (induct n arbitrary: \<omega> s)
   case (Suc n)
   note SucOuter = Suc
-  show "safe \<Delta> (Suc n) (Cwhile b C) s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
+  show "safe \<Delta> (Suc n) (Cwhile b I' C) s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
   proof (rule safeI)
-    show "no_aborts \<Delta> (Cwhile b C) s \<tau> \<omega>"
+    show "no_aborts \<Delta> (Cwhile b I' C) s \<tau> \<omega>"
       using aborts_while_elim no_aborts_def by blast
     fix \<omega>0' \<omega>f C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
-    assume "\<langle>Cwhile b C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    assume "\<langle>Cwhile b I' C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
     then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (I \<inter> assertify_bexp (Bnot b))"
     proof (rule red_while_cases)
-      assume asm1: "C' = Cif b (Cseq C (Cwhile b C)) Cskip" "\<sigma>' = concretize s \<omega>0'"
+      assume asm1: "C' = Cif b (Cseq C (Cwhile b I' C)) Cskip" "\<sigma>' = concretize s \<omega>0'"
       have "safe \<Delta> n C' s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
       proof (cases n)
         case (Suc m)
@@ -1057,16 +1056,16 @@ proof (induct n arbitrary: \<omega> s)
             show "C'' = Cskip \<Longrightarrow> \<sigma>' = concretize s \<omega>0' \<Longrightarrow> \<not> bdenot b (fst (concretize s \<omega>0')) \<Longrightarrow>
     \<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> m C'' (fst \<sigma>') \<tau> \<omega>1 (I \<inter> assertify_bexp (Bnot b))"
               by (metis IntI SucOuter(3) SucOuter(4) asm2(2) asm2(3) bdenot.simps(3) fst_conv in_assertify_bexp_alt safe_skip snd_conv)
-            assume asm3: "C'' = Cseq C (Cwhile b C)" "\<sigma>' = concretize s \<omega>0'" "bdenot b (fst (concretize s \<omega>0'))"
+            assume asm3: "C'' = Cseq C (Cwhile b I' C)" "\<sigma>' = concretize s \<omega>0'" "bdenot b (fst (concretize s \<omega>0'))"
             have "safe \<Delta> m C'' s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
               unfolding asm3(1)
             proof (rule safe_seq)
               show "safe \<Delta> m C s \<tau> \<omega> I"
                 by (metis CSL_E IntI SucOuter(3) SucOuter(4) SucOuter(5) asm3(3) assms(1) fst_conv in_assertify_bexp_alt)
-              show "\<And>ma \<omega>' s'. ma \<le> m \<and> (Ag s', \<tau>, \<omega>') \<in> I \<and> sep_algebra_class.stable \<omega>' \<and> TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>') \<Longrightarrow> safe \<Delta> ma (Cwhile b C) s' \<tau> \<omega>' (I \<inter> assertify_bexp (Bnot b))"
+              show "\<And>ma \<omega>' s'. ma \<le> m \<and> (Ag s', \<tau>, \<omega>') \<in> I \<and> sep_algebra_class.stable \<omega>' \<and> TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>') \<Longrightarrow> safe \<Delta> ma (Cwhile b I' C) s' \<tau> \<omega>' (I \<inter> assertify_bexp (Bnot b))"
                 using Suc Suc.hyps[OF assms(1)] le_SucI safety_mono
                 by (meson assms(5))
-              show "well_typed_cmd \<Delta> (Cseq C (Cwhile b C))"
+              show "well_typed_cmd \<Delta> (Cseq C (Cwhile b I' C))"
                 using SucOuter(6) by auto
             qed (simp_all add: \<open>sep_algebra_class.stable \<omega>\<close> SucOuter(5))
             then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> m C'' (fst \<sigma>') \<tau> \<omega>1 (I \<inter> assertify_bexp (Bnot b))"
@@ -1083,12 +1082,12 @@ qed (simp)
 
 proposition rule_while:
   assumes "CSL \<Delta> (I \<inter> (assertify_bexp b)) C I"
-      and "well_typed_cmd \<Delta> (Cwhile b C)"
-    shows "CSL \<Delta> I (Cwhile b C) (I \<inter> (assertify_bexp (Bnot b)))"
+      and "well_typed_cmd \<Delta> (Cwhile b I' C)"
+    shows "CSL \<Delta> I (Cwhile b I' C) (I \<inter> (assertify_bexp (Bnot b)))"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume "(Ag s, \<tau>, \<omega>) \<in> I" "sep_algebra_class.stable \<omega>" "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
-  then show "safe \<Delta> (Suc n) (Cwhile b C) s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
+  then show "safe \<Delta> (Suc n) (Cwhile b I' C) s \<tau> \<omega> (I \<inter> assertify_bexp (Bnot b))"
     using assms(1) safe_while assms(2) by blast
 qed
 
@@ -1334,6 +1333,10 @@ qed
 definition atrue where
   "atrue \<Delta> = {\<omega>. TypedEqui.typed \<Delta> \<omega>}"
 
+lemma fvaA_atrue_empty[simp]:
+  "fvA \<Delta> (atrue \<Delta>) = {}"
+  sorry (* fvA \<Delta> *)
+
 
 proposition rule_alloc:
   assumes "r \<notin> fvE e"
@@ -1448,7 +1451,7 @@ proposition rule_free:
   "CSL \<Delta> (full_ownership r) (Cfree r) (atrue \<Delta>)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
-  assume asm0: "(Ag s, \<tau>, \<omega>) \<in> full_ownership r" "sep_algebra_class.stable \<omega>"
+  assume asm0: "(Ag s, \<tau>, \<omega>) \<in> full_ownership r" "sep_algebra_class.stable \<omega>" "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
   then obtain l where r: "s r = Some (VRef (Address l)) \<and> get_vm \<omega> (l, field_val) = 1"
     using full_ownership_def by fastforce
   show "safe \<Delta> (Suc n) (Cfree r) s \<tau> \<omega> (atrue \<Delta>)"
@@ -1486,7 +1489,19 @@ proof (rule CSL_I)
       let ?\<omega>1 = "erase_perm_and_value \<omega> (l', field_val)"
       let ?\<omega>1' = "erase_perm_and_value \<omega>0' (l', field_val)"
       have "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, ?\<omega>1)"
-        sorry (* TODO *)
+        unfolding TypedEqui.typed_def
+      proof
+        show "TypedEqui.typed_store \<Delta> (get_store (Ag (fst \<sigma>'), \<tau>, erase_perm_and_value \<omega> (l', field_val)))"
+          by (metis TypedEqui.typed_def asm0(3) asm2(1) asm2(3) fst_conv get_simps_unfolded(1))
+        show "well_typed (custom_context \<Delta>) (get_abs_state (Ag (fst \<sigma>'), \<tau>, erase_perm_and_value \<omega> (l', field_val)))"
+        proof (rule well_typedI)
+          show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state (Ag (fst \<sigma>'), \<tau>, erase_perm_and_value \<omega> (l', field_val))))"
+            by (smt (verit, ccfv_SIG) Instantiation.well_typed_heap_def TypedEqui.typed_def asm0(3) erase_perm_and_value_simps(2) fun_upd_apply get_abs_state_def option.simps(3) snd_conv well_typedE(1))
+          show "\<And>l \<phi>. the_ag (fst (get_abs_state (Ag (fst \<sigma>'), \<tau>, erase_perm_and_value \<omega> (l', field_val)))) l = Some \<phi> \<Longrightarrow>
+           Instantiation.well_typed_heap (custom_context \<Delta>) \<phi>"
+            by (metis TypedEqui.typed_def asm0(3) fst_conv get_abs_state_def snd_conv well_typedE(2))
+        qed
+      qed
       then have "snd \<sigma>' = get_vh ?\<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> ?\<omega>1 (atrue \<Delta>)"
         using asm2(1) asm2(2) asm2(3) atrue_def by auto
       moreover have "Some ?\<omega>1' = ?\<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable ?\<omega>1"
@@ -1707,7 +1722,7 @@ inductive CSL_syn :: "concrete_type_context \<Rightarrow> int equi_state set \<R
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile>CSL [P] C1 [Q]; \<Delta> \<turnstile>CSL [Q] C2 [R] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P] Cseq C1 C2 [R]"
 | RuleCons: "\<lbrakk>\<Delta> \<turnstile>CSL [P] C [Q]; P' \<subseteq> P; Q \<subseteq> Q'\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P'] C [Q']"
 | RuleIf: "\<lbrakk> \<Delta> \<turnstile>CSL [P \<inter> assertify_bexp b] C1 [Q]; \<Delta> \<turnstile>CSL [P \<inter> assertify_bexp (Bnot b)] C2 [Q]\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P] Cif b C1 C2 [Q]"
-| RuleWhile: "\<lbrakk> \<Delta> \<turnstile>CSL [I \<inter> (assertify_bexp b)] C [I] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [I] (Cwhile b C) [I \<inter> (assertify_bexp (Bnot b))]"
+| RuleWhile: "\<lbrakk> \<Delta> \<turnstile>CSL [I \<inter> assertify_bexp b] C [I] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [I] (Cwhile b I' C) [I \<inter> assertify_bexp (Bnot b)]"
 | RuleWrite: "\<Delta> \<turnstile>CSL [full_ownership r] Cwrite r e [full_ownership_with_val r e]"
 | RuleAssign: "\<Delta> \<turnstile>CSL [sub_pre x e P] Cassign x e [P]"
 | RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<Delta> \<turnstile>CSL [atrue \<Delta>] Calloc r e [full_ownership_with_val r e]"

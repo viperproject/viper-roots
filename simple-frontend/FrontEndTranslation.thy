@@ -74,15 +74,9 @@ fun wf_stmt where
   wf_stmt \<Delta> C1 \<and> wf_stmt \<Delta> C2"
 | "wf_stmt \<Delta> (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Delta> C1 \<and> wf_stmt \<Delta> C2"
 
+| "wf_stmt \<Delta> (Cwhile b I C) \<longleftrightarrow> TypedEqui.self_framing_typed \<Delta> I \<and> TypedEqui.typed_assertion \<Delta> I \<and> wf_stmt \<Delta> C"
+
 | "wf_stmt \<Delta> _ \<longleftrightarrow> True"
-
-lemma fvA_charact_exists:
-  "fvA \<Delta> (TypedEqui.exists_assert \<Delta> r P) \<subseteq> fvA \<Delta> P - {r}"
-  sorry (* fvA \<Delta> *)
-
-lemma fvaA_atrue_empty[simp]:
-  "fvA \<Delta> (atrue \<Delta>) = {}"
-  sorry (* fvA \<Delta> *)
 
 lemma atrue_self_framing_and_typed[simp]:
   "TypedEqui.typed_assertion \<Delta> (atrue \<Delta>)"
@@ -111,7 +105,7 @@ proof (rule RuleCons)
     then show "\<Delta> \<turnstile>CSL [atrue \<Delta>] Calloc r e [full_ownership_with_val r e]"
       using RuleAlloc[of r e] by simp
     show "disjoint (fvA \<Delta> (TypedEqui.exists_assert \<Delta> r P)) (wrC (Calloc r e))"
-      by (metis (no_types, opaque_lifting) Diff_iff Diff_insert_absorb disjoint_minus disjoint_simps(1) ex_in_conv fvA_charact_exists subset_Diff_insert wrC.simps(5))
+      by (metis (no_types, opaque_lifting) Diff_iff Diff_insert_absorb disjoint_minus disjoint_simps(1) ex_in_conv ConcreteSemantics.exists_assert_no_in_fv subset_Diff_insert wrC.simps(5))
     show "TypedEqui.self_framing_typed \<Delta> (atrue \<Delta>)"
       using TypedEqui.self_framing_typed_def atrue_def
       using TypedEqui.typed_state_then_stabilize_typed by blast
@@ -410,11 +404,13 @@ fun translate :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" where
 
 | "translate (Cif b C1 C2) = (If (semantify_bexp b) (fst (translate C1)) (fst (translate C2)), snd (translate C1) \<union> snd (translate C2))"
 
-
 | "translate ({P1} C1 {Q1} || {P2} C2 {Q2}) =
   ((Exhale (P1 \<otimes> P2);; ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);; Inhale (Q1 \<otimes> Q2)),
   let r1 = translate C1 in let r2 = translate C2 in
   { (Inhale P1;; fst r1;; Exhale Q1), (Inhale P2;; fst r2;; Exhale Q2) } \<union> snd r1 \<union> snd r2)"
+
+| "translate (Cwhile b I C) = (Exhale I;; ConcreteSemantics.havoc_list (wrL C);; Inhale (I \<inter> assertify_bexp (Bnot b)),
+  { Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I } \<union> snd (translate C))"
 
 lemma CSL_weaken_post_atrue:
   assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
@@ -820,6 +816,76 @@ proof (rule invariant_translateI)
   qed
 qed
 
+lemma intersect_and_star:
+  "(I \<otimes> R) \<inter> assertify_bexp b \<subseteq> (I \<inter> assertify_bexp b) \<otimes> R"
+proof
+  fix \<omega> assume "\<omega> \<in> (I \<otimes> R) \<inter> assertify_bexp b"
+  then obtain i r where "bdenot b (get_store \<omega>)" "Some \<omega> = i \<oplus> r" "i \<in> I" "r \<in> R"
+    by (metis (no_types, lifting) CollectD IntD1 IntD2 assertify_bexp_def x_elem_set_product)
+  then have "i \<in> I \<inter> assertify_bexp b"
+    by (simp add: full_add_charact(1) in_assertify_bexp)
+  then show "\<omega> \<in> (I \<inter> assertify_bexp b) \<otimes> R"
+    using \<open>Some \<omega> = i \<oplus> r\<close> \<open>r \<in> R\<close> x_elem_set_product by blast
+qed
+
+
+lemma invariant_translate_while:
+  assumes "\<And>P Q. invariant_translate \<Delta> P C Q"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C))"
+      and "wf_stmt \<Delta> (Cwhile b I C)"
+    shows "invariant_translate \<Delta> P (Cwhile b I C) Q"
+proof (rule invariant_translateI)
+  assume asm0: "proof_obligations_valid \<Delta> (snd (translate (Cwhile b I C)))"
+    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cwhile b I C))) Q"
+  then have r1: "proof_obligations_valid \<Delta> (snd (translate C))"
+    using proof_obligations_valid_union by fastforce
+  moreover obtain B where B_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I) B"
+    by (metis (no_types, lifting) asm0(1) insertCI proof_obligations_valid_def proof_obligations_valid_union snd_eqD translate.simps(10))
+  moreover obtain R0 R1 where R_defs: "entails P (R0 \<otimes> I)" "Q = R1 \<otimes> (I \<inter> assertify_bexp (Bnot b))"
+    "ConcreteSemantics.SL_proof \<Delta> R0 (ConcreteSemantics.havoc_list (wrL C)) R1"
+    using asm0(2) by auto
+  moreover have "entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - (set (wrL C))"
+    using ConcreteSemantics.SL_proof_Havoc_list_elim assms(2) calculation(5) by blast
+
+  (* R1 is the frame *)
+
+  show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwhile b I C [Q \<otimes> atrue \<Delta>]"
+  proof (rule RuleCons)
+    show "\<Delta> \<turnstile>CSL [(I \<otimes> atrue \<Delta>) \<otimes> R1] Cwhile b I C [((I \<otimes> atrue \<Delta>) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
+    proof (rule RuleFrame)
+      show "\<Delta> \<turnstile>CSL [I \<otimes> atrue \<Delta>] Cwhile b I C [(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b)]"
+      proof (rule RuleWhile)
+        show "\<Delta> \<turnstile>CSL [(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b] C [I \<otimes> atrue \<Delta>]"
+        proof (rule RuleCons)
+          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> I \<inter> assertify_bexp b \<otimes> atrue \<Delta>] C [B \<otimes> I \<otimes> atrue \<Delta>]"
+            using invariant_translate_inhale_exhale_get_proof[OF _ B_def]
+            using assms(1) r1 by blast
+          show "B \<otimes> I \<otimes> atrue \<Delta> \<subseteq> I \<otimes> atrue \<Delta>"
+            using B_def drop_conjunct_entails by blast
+          show "(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b \<subseteq> atrue \<Delta> \<otimes> (I \<inter> assertify_bexp b) \<otimes> atrue \<Delta>"
+            by (metis (no_types, lifting) add_set_asso add_set_commm atrue_twice_equal intersect_and_star)
+        qed
+      qed
+      show "disjoint (fvA \<Delta> R1) (wrC (Cwhile b I C))"
+        using \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C)\<close> disjoint_def wrL_wrC_same by fastforce
+      show "TypedEqui.self_framing_typed \<Delta> (I \<otimes> atrue \<Delta>)"
+        using assms(3) self_framing_typed_star_atrue by auto
+      show "TypedEqui.self_framing_typed \<Delta> R1"
+        using ConcreteSemantics.proof_then_self_framing calculation(5) by blast
+      show "TypedEqui.typed_assertion \<Delta> (I \<otimes> atrue \<Delta>)"
+        using assms(3) typed_assertion_star_atrue by auto
+      show "TypedEqui.typed_assertion \<Delta> R1"
+        using ConcreteSemantics.proof_then_typed calculation(5) by blast
+    qed
+    have "P \<subseteq> R1 \<otimes> I"
+      by (meson \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C)\<close> add_set_mono calculation(3) entails_def equalityD1 subset_trans)
+    then show "P \<otimes> atrue \<Delta> \<subseteq> I \<otimes> atrue \<Delta> \<otimes> R1"
+      by (metis (no_types, opaque_lifting) add_set_asso add_set_commm add_set_mono verit_comp_simplify1(2))
+    show "(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b) \<otimes> R1 \<subseteq> Q \<otimes> atrue \<Delta>"      
+      by (smt (verit, del_insts) add_set_asso add_set_commm add_set_mono calculation(4) intersect_and_star subsetI)
+  qed
+qed
+
 
 lemma invariant_translate_induct:
   assumes "wf_stmt \<Delta> C"
@@ -897,8 +963,26 @@ next
     qed
   qed
 next
-  case (Cwhile x1 C)
-  then show ?case sorry
+  case (Cwhile b I C)
+  show ?case
+  proof (rule invariant_translate_while)
+    show "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C))"
+      using Cwhile.prems(3) by force
+    show "wf_stmt \<Delta> (Cwhile b I C)"
+      using Cwhile.prems(1) by auto
+    fix P Q show "invariant_translate \<Delta> P C Q"
+    proof (rule Cwhile(1)[of P Q])
+      show "wf_stmt \<Delta> C"
+        using Cwhile.prems(1) by auto
+      show "well_typed_cmd \<Delta> C"
+        using Cwhile.prems(2) by auto
+      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I)"
+        using Cwhile.prems(4) by fastforce
+      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))" by force
+      show "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+        using Cwhile.prems(4) by auto
+    qed
+  qed
 qed (simp_all add: invariant_translate_skip invariant_translate_free invariant_translate_alloc invariant_translate_seq
       invariant_translate_write invariant_translate_read invariant_translate_assign)
 
@@ -943,28 +1027,6 @@ proof -
       by (meson ConcreteSemantics.proof_then_typed \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (abs_stmt.Inhale P ;; fst (translate C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono drop_conjunct_entails dual_order.trans entails_def order_refl)
   qed
 qed
-
-
-(* DONE:
-- Skip
-- Assign
-- Alloc
-- Free
-- Write
-- Read
-- Seq
-- Parallel rule
-
-Missing:
-Compositional stuff
-\<longrightarrow> While loop
-\<longrightarrow> If
-
-datatype cmd =
-| Cif bexp cmd cmd
-| Cwhile bexp cmd
-*)
-
 
 
 end
