@@ -192,7 +192,21 @@ begin
 lift_definition plus_virtual_state :: "'a virtual_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a virtual_state option"
   is "(\<lambda> st1 st2. Option.bind (st1 \<oplus> st2) (\<lambda> x. if wf_mask_simple (fst x) then Some x else None))"
   apply (simp add: bind_split wf_pre_virtual_state_def del:Product_Type.split_paired_All)
-  sorry
+proof clarify
+  fix a b aa ba ab bb ac bc
+  assume asm0: "\<forall>hl. PosReal.ppos (fst (a, b) hl) \<longrightarrow> (\<exists>y. snd (a, b) hl = Some y)"
+                "\<forall>hl. PosReal.ppos (fst (aa, ba) hl) \<longrightarrow> (\<exists>y. snd (aa, ba) hl = Some y)"
+                "(a, b) \<oplus> (aa, ba) = Some (ab, bb)" "PosReal.ppos (fst (ab, bb) (ac, bc))"
+  then have "a (ac, bc) > 0 \<or> aa (ac, bc) > 0"
+    using plus_prodE preal_plusE
+    by (metis (mono_tags, lifting) add.right_neutral fst_conv gr_0_is_ppos plus_funE pperm_pnone_pgt)
+  then have "\<exists>y. b (ac, bc) = Some y \<or> ba (ac, bc) = Some y"
+    by (metis asm0(1) asm0(2) fst_conv gr_0_is_ppos snd_conv)
+  then have "\<exists>y. b (ac, bc) \<oplus> ba (ac, bc) = Some y"
+    by (metis asm0(3) plus_funE plus_prodE snd_conv)
+  then show "\<exists>y. snd (ab, bb) (ac, bc) = Some y"
+    by (smt (verit) \<open>\<exists>y. b (ac, bc) = Some y \<or> ba (ac, bc) = Some y\<close> asm0(3) option.discI option.sel plus_funE plus_option.elims plus_prodE snd_conv)
+qed
 
 lemma compatible_virtual_state_implies_pre_virtual_state:
   assumes "Some x = a \<oplus> b"
@@ -224,7 +238,23 @@ instance proof
     apply (clarsimp simp add:virtual_state_plus_None)
     apply (safe)
      apply (metis EquiViper.compatible_virtual_state_implies_pre_virtual_state asso2 option.discI)
-    sorry
+  proof -
+    fix aa ba
+    assume asm0: "a \<oplus> b = Some ab" "wf_mask_simple (the (get_vm ab \<oplus> get_vm c))"
+       "Rep_virtual_state ab \<oplus> Rep_virtual_state c = Some (aa, ba)" "\<not> wf_mask_simple (the (get_vm b \<oplus> get_vm c))"
+    then obtain hl where "the (get_vm b \<oplus> get_vm c) hl > 1"
+      by (meson not_less wf_mask_simple_def)
+    then have "get_vm b hl + get_vm c hl > 1"
+      by (smt (verit, ccfv_SIG) SepAlgebra.plus_preal_def option.sel plus_funI plus_fun_def)
+    moreover have "the (get_vm ab \<oplus> get_vm c) hl \<ge> get_vm ab hl + get_vm c hl"
+      by (metis (no_types, lifting) EquiViper.add_masks_def asm0(3) get_vm_def nle_le option.sel plus_prodE)
+    moreover have "get_vm ab hl \<ge> get_vm b hl"
+      by (metis (no_types, lifting) EquiViper.add_masks_def EquiViper.compatible_virtual_state_implies_pre_virtual_state \<open>a \<oplus> b = b \<oplus> a\<close> asm0(1) get_vm_def plus_prodE pos_perm_class.sum_larger)      
+    moreover have "the (get_vm ab \<oplus> get_vm c) hl \<le> 1"
+      using asm0(2) wf_mask_simple_def by blast
+    ultimately show False
+      by (simp add: leD less_eq_preal.rep_eq plus_preal.rep_eq)
+  qed
   assume asm0: "a \<oplus> b = Some c" "Some c = c \<oplus> c"
   then have "Some ?c = ?a \<oplus> ?b \<and> Some ?c = ?c \<oplus> ?c"
     by (metis compatible_virtual_state_implies_pre_virtual_state)
@@ -238,7 +268,7 @@ end
 lemma mult_wf_is_wf:
   assumes "wf_pre_virtual_state x"
     shows "wf_pre_virtual_state (\<alpha> \<odot> x)"
-  sorry
+  sorry (* False *)
 
 
 instantiation virtual_state :: (type) pcm_mult
@@ -264,7 +294,7 @@ instance proof
     by (simp add: compatible_virtual_state_implies_pre_virtual_state_rev distrib_scala_mult mult_virtual_state.rep_eq)
 
   show "Some x = a \<oplus> b \<Longrightarrow> Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
-    sorry
+    sorry (* Should not be needed, because this instantiation is invalid *)
 qed
 
 end
@@ -634,12 +664,14 @@ inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pu
 \<Longrightarrow> red_atomic_assert \<Delta> (AccPredicate P exps Wildcard) \<omega> (Some False)"
 *)
 
+(*
 lemma no_old_indep_trace:
   assumes "no_old e"
   and       "fst x = fst x'" and
         "get_state x = get_state x'"
   shows "e x = Some v \<longleftrightarrow> e x' = Some v"
-  sorry
+  
+*)
 
 (*
 inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where

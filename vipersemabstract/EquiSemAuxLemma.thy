@@ -491,17 +491,15 @@ lemma red_accfield_unique:
 proof (induction _ "Acc x f e" \<omega> _ rule: red_atomic_assert.induct)
   case (RedAtomicAcc \<Delta> \<omega> r p v)
   then show ?case using red_pure_val_unique(1)[of \<Delta> x \<omega> "VRef r"] red_pure_val_unique(1)[of \<Delta> p \<omega> "VPerm v"]
-    sorry
+    by (smt (verit, best) RedAccFieldPerm_case val.inject(3) val.inject(4))
 next
   case (RedAtomicAccZero \<Delta> \<omega> uu p)
   then show ?case
     by (metis (no_types, lifting) RedAccFieldPerm_case less_numeral_extra(3) red_pure_val_unique(1) val.inject(3))
 next
   case (RedAtomicAccWildcard \<Delta> \<omega> a)
-  then show ?case sorry
-(*
+  then show ?case
     by (metis RedAccFieldWild_case red_pure_val_unique(1) ref.distinct(1) ref.sel val.inject(4))
-*)
 next
   case (RedAtomicAccWildcardNull \<Delta> \<omega>)
   then show ?case
@@ -513,7 +511,7 @@ next
 qed
 
 
-section \<open>Separealion Algebra and Properties of EquiViper states\<close>
+section \<open>Separation Algebra and Properties of EquiViper states\<close>
 
 
 subsection \<open>Properties of Abstract Separealion Algebra\<close>

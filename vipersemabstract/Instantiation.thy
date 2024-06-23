@@ -315,8 +315,6 @@ proof (rule full_state_ext)
   show "get_trace |remove_only \<omega> l| = get_trace |\<omega>|"
     by (metis get_trace_set_state remove_only_def set_state_core)
   show "get_state |remove_only \<omega> l| = get_state |\<omega>|"
-    sorry
-
     by (metis Rep_virtual_state_inverse agreement.exhaust_sel core_charact(2) core_def core_structure(1) core_structure(2) get_abs_state_def get_abs_state_set_abs_state get_state_def get_state_set_state get_state_set_trace get_vh_def get_vm_def prod.exhaust_sel remove_only_charact(1) set_abs_state_def set_trace_def)
 qed
 *)
@@ -469,10 +467,10 @@ proof -
           snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la \<oplus> snd (Rep_virtual_state (snd (snd ptr))) la"
             proof (cases "la = l")
               case True
-              then show ?thesis sorry
+              then show ?thesis sorry (* TD: TODO *)
             next
               case False
-              then show ?thesis sorry
+              then show ?thesis sorry (* TD: TODO *)
             qed
           qed
 (*
@@ -1110,7 +1108,16 @@ lemma well_typedly_plus1 :
   assumes "Some \<phi> = a \<oplus> b"
   assumes "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state \<phi>)"
   shows "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state a)"
-  sorry
+proof (rule well_typedI)
+  show "Instantiation.well_typed_heap (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (snd (get_abs_state a))"
+    by (metis (no_types, opaque_lifting) assms(1) assms(2) get_abs_state_def greater_def greater_prod_eq well_typed_def well_typed_heap_smaller)
+  have "fst (get_abs_state a) = fst (get_abs_state \<phi>)"
+    using plus_prodE[OF HOL.sym[OF assms(1)]] plus_prodE[of "snd a" "snd b" "snd \<phi>"]
+    by (metis get_abs_state_def option.discI option.inject plus_agreement_def)
+  then show "\<And>l \<phi>. the_ag (fst (get_abs_state a)) l = Some \<phi> \<Longrightarrow> Instantiation.well_typed_heap (map_option (make_semantic_vtyp \<Delta>) \<circ> F) \<phi>"
+    by (metis assms(2) well_typedE(2))
+qed
+
 
 lemma well_typedly_plus :
   assumes "Some \<phi> = a \<oplus> b"

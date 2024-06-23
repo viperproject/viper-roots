@@ -173,6 +173,11 @@ lemma greater_Ag:
   shows "a \<succeq> b \<longleftrightarrow> a = b"
   by (simp add: SepAlgebra.plus_agreement_def greater_def)
 
+lemma plus_AgE:
+  fixes \<omega> :: "'v agreement"
+  assumes "Some \<omega> = a \<oplus> b"
+  shows "the_ag \<omega> = the_ag a \<and> the_ag \<omega> = the_ag b"
+  by (metis SepAlgebra.plus_agreement_def assms option.discI option.sel)
 
 end
 
@@ -201,6 +206,11 @@ instance proof
   then show "Some a = a \<oplus> a"
     by (metis plus_preal_def \<open>a \<oplus> b = Some c\<close> add.commute add.right_neutral nle_le option.inject pos_perm_class.sum_larger)
 qed
+
+lemma preal_plusE:
+  assumes "Some (x :: preal) = a \<oplus> b"
+  shows "x = a + b"
+  using assms preal_plus_iff by auto
 
 end
 
