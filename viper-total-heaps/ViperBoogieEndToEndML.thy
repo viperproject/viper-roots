@@ -16,7 +16,7 @@ ML \<open>
             (simp_tac_with_thms @{thms ty_repr_basic_def} ctxt THEN'
              resolve_tac ctxt [lookup_mask_var_thm]) ctxt) THEN'
     (Rmsg' "Post Framing Init - Zero Mask" 
-            (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt) THEN'
+            (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info) ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Disjointntess" ((#aux_var_disj_tac basic_info) ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Heap and Mask Disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Propagate 1"
@@ -28,7 +28,7 @@ ML \<open>
          progress_red_bpl_rel_tac_2 (fn ctxt => simp_only_tac @{thms One_nat_def} ctxt) ctxt THEN'
          simplify_continuation ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Propagate 2" (resolve_tac ctxt @{thms stmt_rel_propagate_same_rel}) ctxt) THEN'
-    (Rmsg' "Post Framing Init - Assume Good State" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
+    (Rmsg' "Post Framing Init - Assume Good State" (progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thms basic_info)) ctxt)
 
 \<close>
 

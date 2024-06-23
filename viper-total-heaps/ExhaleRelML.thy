@@ -152,7 +152,7 @@ ML \<open>
   fun prove_perm_non_negative_exh_tac ctxt (info: basic_stmt_rel_info) lookup_aux_var_state_rel_thm =
       (Rmsg' "Exh Prove Perm Nonnegative 1" (resolve_tac ctxt @{thms rel_propagate_pre_assert_2}) ctxt) THEN'
       (Rmsg' "Exh Prove Perm Nonnegative - Introduce Facts" 
-              (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thm info),
+              (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thms info),
               intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_state_rel_thm]) ctxt) THEN'
       (Rmsg' "Exh Prove Perm Nonnegative - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
       (Rmsg' "Exh Prove Perm Nonnegative - Success Condition" 
@@ -162,7 +162,7 @@ ML \<open>
     (Rmsg' "Exh Prove Sufficient Perm 1" (resolve_tac ctxt @{thms rel_general_cond_2}) ctxt) THEN' 
       (* if condition *)
       (Rmsg' "Exh Prove Sufficient Perm - Introduce Facts Cond" 
-            (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thm info),
+            (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thms info),
             intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_state_rel_thm]) ctxt) THEN'
       (Rmsg' "Exh Prove Sufficient Perm - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
       (* then branch *)
@@ -207,13 +207,13 @@ ML \<open>
     (Rmsg' "UpdExhField Dom AuxPred" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField Wf TyRepr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
     (Rmsg' "UpdExhField Wf Total Consistency" (resolve_tac ctxt [#consistency_wf_thm info]) ctxt) THEN'
-    (Rmsg' "UpdExhField MaskDef Different" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+    (Rmsg' "UpdExhField MaskDef Different" (assm_full_simp_solved_with_thms_tac (#tr_def_thms info) ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField TyInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField MaskUpdateWf" (resolve_tac ctxt [@{thm mask_update_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
     (Rmsg' "UpdExhField MaskReadWf" (resolve_tac ctxt [@{thm mask_read_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
     (Rmsg' "UpdExhField MaskUpdateBpl" (assm_full_simp_solved_with_thms_tac @{thms update_mask_concrete_def ty_repr_basic_def} ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField MaskReadBpl" (assm_full_simp_solved_with_thms_tac @{thms read_mask_concrete_def ty_repr_basic_def} ctxt) ctxt) THEN'
-    (Rmsg' "UpdExhField MaskVar" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+    (Rmsg' "UpdExhField MaskVar" (assm_full_simp_solved_with_thms_tac (#tr_def_thms info) ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField FieldRel" ((#field_rel_single_tac info) ctxt) ctxt) THEN'
     (Rmsg' "UpdExhField RcvRel" (exp_rel_tac exp_rel_info ctxt) ctxt)
 

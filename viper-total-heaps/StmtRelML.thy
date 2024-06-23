@@ -116,7 +116,7 @@ and
         such as when inhaling the precondition).
        It might be better to control this via hints, because this tactic may reduce a good state
        assumption that should not be reduced at this point. *)
-     (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thm (#basic_stmt_rel_info info))) ORELSE' (progress_red_bpl_rel_tac ctxt)) ctxt)
+     (Rmsg' "Progress Good State" ((progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm (#basic_stmt_rel_info info)) (#tr_def_thms (#basic_stmt_rel_info info))) ORELSE' (progress_red_bpl_rel_tac ctxt)) ctxt)
 \<close>
 
 ML \<open>
@@ -182,10 +182,10 @@ ML \<open>
                                                   ]) ctxt) THEN'
      (Rmsg' "WfWriteableField MaskRead Wf" (resolve_tac ctxt [@{thm mask_read_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
      (Rmsg' "WfWriteableField2" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-     (Rmsg' "WfWriteableField3" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info, @{thm read_mask_concrete_def}] ctxt) ctxt) THEN'
-     (Rmsg' "WfWriteableField6" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+     (Rmsg' "WfWriteableField3" (assm_full_simp_solved_with_thms_tac (@{thm read_mask_concrete_def} :: (#tr_def_thms basic_stmt_rel_info)) ctxt) ctxt) THEN'
+     (Rmsg' "WfWriteableField6" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField7 (exp rel rcv)" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
-     (Rmsg' "WfWriteableField8" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+     (Rmsg' "WfWriteableField8" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField9 (single field rel)" ((#field_rel_single_tac basic_stmt_rel_info) ctxt) ctxt) THEN'
      (Rmsg' "WfWriteableField10" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt)     
 
@@ -194,7 +194,7 @@ ML \<open>
        FieldAssignHint (rcv_wf_rel_info, rhs_wf_rel_info, rcv_exp_rel_info, rhs_exp_rel_info) =>
        (Rmsg' "FieldAssign 1" (resolve_tac ctxt [@{thm field_assign_rel_inst} OF [@{thm wf_ty_repr_basic}, #consistency_wf_thm basic_stmt_rel_info]]) ctxt) THEN'
        (Rmsg' "FieldAssign RStateRel" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign HeapVarDefSame" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapVarDefSame" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign TypeInterp" (assm_full_simp_solved_with_thms_tac [] ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign HeapUpdWf" (resolve_tac ctxt [@{thm heap_update_wf_concrete} OF [#ctxt_wf_thm basic_stmt_rel_info, @{thm wf_ty_repr_basic}]])
@@ -203,8 +203,8 @@ ML \<open>
        (Rmsg' "FieldAssign7 (Wf Rcv)" (exp_wf_rel_non_trivial_tac rcv_wf_rel_info rcv_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign8 (Wf Rhs)" (exp_wf_rel_non_trivial_tac rhs_wf_rel_info rhs_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign9 (Wf Writeable Field)" (wf_writeable_field_rel_tac rcv_exp_rel_info basic_stmt_rel_info ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign HeapVar" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
-       (Rmsg' "FieldAssign HeapUpdateBpl" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info, @{thm update_heap_concrete_def}, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapVar" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
+       (Rmsg' "FieldAssign HeapUpdateBpl" (assm_full_simp_solved_with_thms_tac ([@{thm update_heap_concrete_def}, @{thm ty_repr_basic_def}] @ #tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign Exp Rel Rcv" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign FieldRel" ((#field_rel_single_tac basic_stmt_rel_info) ctxt) ctxt) THEN'
        (Rmsg' "FieldAssign Exp Rel Rhs" (exp_rel_tac rcv_exp_rel_info ctxt) ctxt)
@@ -217,23 +217,23 @@ ML \<open>
     resolve_tac ctxt @{thms state_rel_set_def_to_eval} THEN'
     assm_full_simp_solved_tac ctxt THEN'
     resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output} THEN'
-    assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt
+    assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info) ctxt
                                                                                    
   fun exhale_havoc_tac ctxt (basic_info: basic_stmt_rel_info) (lookup_decl_exhale_heap_thm: thm) =
-    let val tr_thm = #tr_def_thm basic_info in
+    let val tr_thms = #tr_def_thms basic_info in
       (Rmsg' "exhale havoc 1" (resolve_tac ctxt @{thms exhale_stmt_rel_finish}) ctxt) THEN'
-      (Rmsg' "exhale havoc StateRel"  (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc StateRel"  (assm_full_simp_solved_with_thms_tac tr_thms ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc CtxtWf"  (resolve_tac ctxt [#ctxt_wf_thm basic_info]) ctxt) THEN'
       (Rmsg' "exhale havoc WfTyRepr"  (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
       (Rmsg' "exhale havoc ProgramTotal" (resolve_tac ctxt [@{thm HOL.sym} OF [#vpr_program_ctxt_eq_thm basic_info]]) ctxt) THEN'
       (Rmsg' "exhale havoc DomainType" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
-      (Rmsg' "exhale havoc WellDefSame" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc WellDefSame" (assm_full_simp_solved_with_thms_tac tr_thms ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc IdOnKnownLocsName" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc TypeInterp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc StateCons" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc ElemExhaleState" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
-      (Rmsg' "exhale havoc HeapVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
-      (Rmsg' "exhale havoc MaskVar" (assm_full_simp_solved_with_thms_tac [tr_thm] ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc HeapVar" (assm_full_simp_solved_with_thms_tac tr_thms ctxt) ctxt) THEN'
+      (Rmsg' "exhale havoc MaskVar" (assm_full_simp_solved_with_thms_tac tr_thms ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc LookupDeclExhaleHeap" (assm_full_simp_solved_with_thms_tac [@{thm ty_repr_basic_def},  lookup_decl_exhale_heap_thm] ctxt) ctxt) THEN'
       (Rmsg' "exhale havoc ExhaleHeapFresh" (#aux_var_disj_tac basic_info ctxt) ctxt)
     end
@@ -308,7 +308,7 @@ ML \<open>
     (Rmsg' "assert rel reset tac field translation eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "assert rel reset tac aux pred disjointness" ((#aux_var_disj_tac basic_info) ctxt) ctxt) THEN'
     (Rmsg' "assert rel reset tac well def same" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-    (Rmsg' "assert rel translation records update" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt)
+    (Rmsg' "assert rel translation records update" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info) ctxt) ctxt)
 
   fun assert_rel_reset_state_tac_pure (basic_info: basic_stmt_rel_info) ctxt =
     (Rmsg' "assert pure rel reset state init" (resolve_tac ctxt @{thms rel_propagate_pre_2_only_state_rel}) ctxt) THEN'
@@ -316,7 +316,7 @@ ML \<open>
         (Rmsg' "assert pure rel reset state set def to eval" (resolve_tac ctxt @{thms state_rel_set_def_to_eval}) ctxt) THEN'
           (Rmsg' "assert pure rel reset state implication input rel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "assert pure rel reset state input implies output" (resolve_tac ctxt @{thms red_ast_bpl_rel_input_implies_output}) ctxt) THEN'
-          (Rmsg' "assert pure rel reset state input implies output 2" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info] ctxt) ctxt) THEN'
+          (Rmsg' "assert pure rel reset state input implies output 2" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info) ctxt) ctxt) THEN'
     (Rmsg' "assert pure rel reset state finish" (resolve_tac ctxt @{thms assert_reset_state_pure}) ctxt) THEN'
       (Rmsg' "assert pure rel reset state finish 2" (blast_tac ctxt) ctxt) THEN'
       (Rmsg' "assert pure rel reset state finish 3" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
@@ -349,7 +349,7 @@ ML \<open>
         let val callee_data = Symtab.lookup (#method_data_table basic_info) callee_name |> Option.valOf in
         (Rmsg' "MethodCall Start" (resolve_tac ctxt [@{thm method_call_stmt_rel_inst} OF [#consistency_wf_thm basic_info, #consistency_down_mono_thm basic_info]]) ctxt) THEN'
         (Rmsg' "MethodCall Program Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-        (Rmsg' "MethodCall ConsistencyEnabled" (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_info, @{thm default_state_rel_options_def}] ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall ConsistencyEnabled" (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info @ [@{thm default_state_rel_options_def}]) ctxt) ctxt) THEN'
         (Rmsg' "MethodCall MdeclSome" (assm_full_simp_solved_with_thms_tac [#method_lookup_thm callee_data] ctxt) ctxt) THEN'
         (Rmsg' "MethodCall MethodSpecsFramed" (EVERY' [eresolve_tac ctxt @{thms vpr_method_spec_correct_total_from_all}, 
                                                   resolve_tac ctxt [#method_lookup_thm callee_data]]) ctxt) THEN'

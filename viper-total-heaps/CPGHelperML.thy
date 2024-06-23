@@ -121,7 +121,7 @@ fun rewrite_rel_general_tac ctxt =
       ctxt_wf_thm: thm,
       consistency_wf_thm: thm,
       consistency_down_mono_thm: thm,
-      tr_def_thm: thm,
+      tr_def_thms: thm list,
       method_data_table: method_data Symtab.table,
       vpr_program_ctxt_eq_thm: thm,
       var_rel_tac: (Proof.context -> int -> tactic),
@@ -173,7 +173,7 @@ fun prove_red_expr_bpl_tac ctxt =
 fun upd_def_var_tac_aux (basic_stmt_rel_info : basic_stmt_rel_info) lookup_ty_new_var_thm errorMsgPrefix ctxt =
   (Rmsg' (errorMsgPrefix^"DefVar3") (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
   (Rmsg' (errorMsgPrefix^"DefVar4") (assm_full_simp_solved_with_thms_tac [lookup_ty_new_var_thm, @{thm ty_repr_basic_def}] ctxt) ctxt) THEN'
-  (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_with_thms_tac [#tr_def_thm basic_stmt_rel_info] ctxt) ctxt) THEN'
+  (Rmsg' (errorMsgPrefix^"DefVar5") (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_stmt_rel_info) ctxt) ctxt) THEN'
   (Rmsg' (errorMsgPrefix^"DefVar6") (assm_full_simp_solved_tac ctxt) ctxt) THEN' 
   (Rmsg' (errorMsgPrefix^"DefVarAuxVarDisj") ((#aux_var_disj_tac basic_stmt_rel_info) ctxt) ctxt)
 
@@ -254,15 +254,15 @@ ML \<open>
 
 (* tactics for introducing facts into goals *)
 
-fun intro_fact_lookup_no_perm_const_tac ctxt tr_def_thm = 
+fun intro_fact_lookup_no_perm_const_tac ctxt tr_def_thms = 
   revcut_tac @{thm lookup_no_perm_const[OF state_rel_boogie_const_rel_2]} THEN'
   fastforce_tac ctxt [] THEN'
-  assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
+  assm_full_simp_solved_with_thms_tac tr_def_thms ctxt
 
-fun intro_fact_lookup_null_const_tac ctxt tr_def_thm = 
+fun intro_fact_lookup_null_const_tac ctxt tr_def_thms = 
   revcut_tac @{thm lookup_null_const[OF state_rel_boogie_const_rel_2]} THEN'
   fastforce_tac ctxt [] THEN'
-  assm_full_simp_solved_with_thms_tac [tr_def_thm] ctxt
+  assm_full_simp_solved_with_thms_tac tr_def_thms ctxt
 
 (* lookup_aux_var_thm should already instantiate the auxiliary variable *)
 
@@ -288,7 +288,7 @@ fun intro_fact_mask_lookup_reduction ctxt (info: basic_stmt_rel_info) exp_rel_in
   (Rmsg' "intro mask lookup red 5" (blast_tac ctxt) ctxt) THEN'
   (Rmsg' "intro mask lookup red 6" (vpr_rcv_red_tac ctxt |> SOLVED') ctxt) THEN'
   (Rmsg' "intro mask lookup red 7" ((#field_rel_single_tac info) ctxt |> SOLVED') ctxt) THEN'
-  (Rmsg' "intro mask lookup red 8" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+  (Rmsg' "intro mask lookup red 8" (assm_full_simp_solved_with_thms_tac (#tr_def_thms info) ctxt) ctxt) THEN'
   (Rmsg' "intro mask lookup red 9" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
   (Rmsg' "intro mask lookup red 10" (exp_rel_tac exp_rel_info ctxt) ctxt) THEN'
   (Rmsg' "intro mask lookup red 11" (assm_full_simp_solved_with_thms_tac @{thms read_mask_concrete_def} ctxt) ctxt)

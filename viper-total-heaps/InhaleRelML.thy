@@ -101,7 +101,7 @@ ML \<open>
          (Rmsg' "InhaleRel Init" (resolve_tac ctxt @{thms inhale_propagate_post}) ctxt) THEN'
          inhale_rel_aux_tac ctxt info hint THEN'
          (Rmsg' "InhaleRel Good State" (rewrite_red_bpl_rel_tac ctxt THEN'
-                                        progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thm basic_info)) ctxt)
+                                        progress_assume_good_state_rel_tac ctxt (#ctxt_wf_thm basic_info) (#tr_def_thms basic_info)) ctxt)
         end)
     | TrivialInhHint => (Rmsg' "InhaleRel Trivial True Assertion" (resolve_tac ctxt @{thms inhale_rel_true}) ctxt)
     | AtomicInhHint atomicHint => (#atomic_inhale_rel_tac info) ctxt (#basic_info info) (#no_def_checks_tac_opt info) atomicHint
@@ -147,7 +147,7 @@ ML \<open>
   fun prove_perm_non_negative_inh_tac ctxt (info: basic_stmt_rel_info) lookup_aux_var_state_rel_thm =
       (Rmsg' "Inh Prove Perm Nonnegative - Init" (resolve_tac ctxt @{thms rel_propagate_pre_assert_2}) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Introduce Facts" 
-              (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thm info),
+              (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thms info),
               intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_state_rel_thm]) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Boogie Expression Reduction" (prove_red_expr_bpl_tac ctxt) ctxt) THEN'
       (Rmsg' "Inh Prove Perm Nonnegative - Success Condition" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
@@ -169,8 +169,8 @@ ML \<open>
    (Rmsg' "Inh Assume Rcv Non-Null - Init 1" (resolve_tac ctxt @{thms rel_propagate_pre_assume}) ctxt) THEN'
    (Rmsg' "Inh Assume Rcv Non-Null - Init 2" (resolve_tac ctxt @{thms conjI}) ctxt) THEN'
    (Rmsg' "Inh Assume Rcv Non-Null - Introduce Facts" 
-            (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thm info),
-                     intro_fact_lookup_null_const_tac ctxt (#tr_def_thm info),
+            (EVERY' [intro_fact_lookup_no_perm_const_tac ctxt (#tr_def_thms info),
+                     intro_fact_lookup_null_const_tac ctxt (#tr_def_thms info),
                      intro_fact_lookup_aux_var_tac ctxt lookup_aux_var_state_rel_thm,
                      intro_fact_rcv_lookup_reduction ctxt exp_rel_info @{thm exp_rel_ref_access} 
                                  (fn ctxt => resolve_tac ctxt @{thms inhale_field_acc_rel_assm_ref_eval} THEN' blast_tac ctxt)]) ctxt) THEN'
@@ -183,13 +183,13 @@ ML \<open>
     (Rmsg' "inh field acc upd 1" (simp_then_if_not_solved_blast_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd aux var disjoint" (#aux_var_disj_tac info ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd wf ty repr" (resolve_tac ctxt @{thms wf_ty_repr_basic}) ctxt) THEN'
-    (Rmsg' "inh field acc upd def mask and eval mask same" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+    (Rmsg' "inh field acc upd def mask and eval mask same" (assm_full_simp_solved_with_thms_tac (#tr_def_thms info) ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd ty interp eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "inh field acc mask update wf concrete" (resolve_tac ctxt [ @{thm mask_update_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
     (Rmsg' "inh field acc mask read wf concrete" (resolve_tac ctxt [ @{thm mask_read_wf_concrete} OF [#ctxt_wf_thm info, @{thm wf_ty_repr_basic}]]) ctxt) THEN'
     (Rmsg' "inh field acc upd 2" (assm_full_simp_solved_with_thms_tac @{thms update_mask_concrete_def ty_repr_basic_def} ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd 3" (assm_full_simp_solved_with_thms_tac @{thms read_mask_concrete_def ty_repr_basic_def} ctxt) ctxt) THEN'
-    (Rmsg' "inh field acc upd 4" (assm_full_simp_solved_with_thms_tac [#tr_def_thm info] ctxt) ctxt) THEN'
+    (Rmsg' "inh field acc upd 4" (assm_full_simp_solved_with_thms_tac (#tr_def_thms info) ctxt) ctxt) THEN'
     (Rmsg' "inh field acc field rel" (#field_rel_single_tac info ctxt) ctxt) THEN'
     (Rmsg' "inh field acc upd rcv rel" ((exp_rel_tac exp_rel_info ctxt) |> SOLVED') ctxt)
 
