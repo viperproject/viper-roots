@@ -119,17 +119,6 @@ text \<open>The result of the addition: (\<pi>', h') + (\<pi>, h) =
 - Heap: h' ++ h\<close>
 *)
 
-lemma pre_plus_def:
-  assumes "h' ## h"
-  shows "(\<pi>' :: preal mask, h') \<oplus> (\<pi>, h) = Some (add_masks \<pi>' \<pi>, h' ++ h)"
-proof -
-  obtain x y where "Some x = \<pi>' \<oplus> \<pi>" "Some y = h' \<oplus> h"
-    by (metis (mono_tags, lifting) assms compatible_fun_def defined_def option.discI plus_fun_def plus_preal_def)
-  then show ?thesis sorry
-qed
-
-
-
 
 subsection \<open>Virtual equi_states\<close>
 

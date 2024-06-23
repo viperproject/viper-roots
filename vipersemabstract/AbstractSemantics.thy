@@ -378,7 +378,7 @@ definition equal_on_set :: "var set \<Rightarrow> (var \<rightharpoonup> 'v) \<R
   "equal_on_set S \<sigma>1 \<sigma>2 \<longleftrightarrow> (\<forall>x \<in> S. \<sigma>1 x = \<sigma>2 x)"
 
 definition overapprox_fv :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> var set \<Rightarrow> bool" where
-  "overapprox_fv \<Delta> A S \<longleftrightarrow> (\<forall>\<sigma>1 \<sigma>2 \<gamma>. typed_store \<Delta> \<sigma>1 \<and> typed_store \<Delta> \<sigma>2 \<and> equal_on_set S \<sigma>1 \<sigma>2 \<longrightarrow> ((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A))"
+  "overapprox_fv \<Delta> A S \<longleftrightarrow> (\<forall>\<sigma>1 \<sigma>2 \<gamma>. typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set S \<sigma>1 \<sigma>2 \<longrightarrow> ((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A))"
 
 
 definition free_vars where

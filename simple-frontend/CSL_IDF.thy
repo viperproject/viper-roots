@@ -149,8 +149,9 @@ abbreviation fvA where
 
 lemma fvA_agrees:
   assumes "agrees (fvA \<Delta> Q) s s'"
-      and "TypedEqui.typed_store \<Delta> s"
-      and "TypedEqui.typed_store \<Delta> s'"
+      and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
+      and "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>)"
+      and "TypedEqui.wf_context \<Delta>"
     shows "(Ag s, \<tau>, \<omega>) \<in> Q \<longleftrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
   using assms(2-3)
 proof (rule TypedEqui.free_vars_agree)
@@ -158,151 +159,14 @@ proof (rule TypedEqui.free_vars_agree)
     using assms(1)
     unfolding agrees_def TypedEqui.equal_on_set_def
     by simp
+  show "TypedEqui.wf_context \<Delta>"
+    using assms(4) by simp
 qed
 
 
 abbreviation well_typed_cmd where
   "well_typed_cmd \<Delta> C \<equiv> custom_context \<Delta> = type_ctxt_heap \<and> well_typed_cmd_aux \<Delta> C"
 
-lemma safe_agrees:
-  assumes "safe \<Delta> n C s \<tau> \<omega> Q"
-      and "agrees (fvC C \<union> fvA \<Delta> Q) s s'"
-      and "TypedEqui.typed_store \<Delta> s"
-      and "well_typed_cmd \<Delta> C"
-      and "TypedEqui.typed_store \<Delta> s'"
-    shows "safe \<Delta> n C s' \<tau> \<omega> Q"
-  using assms
-proof (induct n arbitrary: C s s' \<omega>)
-  case (Suc n)
-  show ?case
-  proof (rule safeI)
-    show "C = Cskip \<Longrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
-      using safeE(1)[OF Suc.prems(1)]
-      using Suc.prems(2) Suc.prems(3) Suc.prems(5) agrees_simps(4) fvA_agrees by blast
-    show "accesses C s' \<subseteq> read_dom \<omega>"
-      using Suc.prems(1) Suc.prems(2) accesses_agrees by force
-    show "writes C s' \<subseteq> write_dom \<omega>"
-      using Suc.prems(1) Suc.prems(2) agrees_simps(4) safeE(3) writes_agrees by blast
-    show "no_aborts \<Delta> C s' \<tau> \<omega>"
-      by (meson Suc.prems(1) Suc.prems(2) Suc.prems(3) agrees_simps(4) no_aborts_agrees safeE(4))
-    fix \<omega>0' \<omega>f C' \<sigma>'
-    assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "\<langle>C, concretize s' \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-      "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>0')"
-    then obtain s'' h' where "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'"
-      using red_agrees[OF asm0(4)]
-      by (metis Suc.prems(2) Un_upper1 agrees_search(1) fst_conv snd_conv)
-    moreover have "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
-      by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(3) TypedEqui.typed_def asm0(5) get_abs_state_def snd_conv)
-    ultimately obtain \<omega>1 \<omega>1' where r1: "Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'
-  \<and> snd (s'', h') = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst (s'', h')) \<tau> \<omega>1 Q"
-      using safeE(5)[OF Suc(2), of \<omega>f \<omega>0' C']
-      using asm0(1) asm0(2) asm0(3) by blast
-    moreover have "safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
-    proof (rule Suc.hyps)
-      show "safe \<Delta> n C' (fst (s'', h')) \<tau> \<omega>1 Q"
-        using r1 by blast
-      show "agrees (fvC C' \<union> fvA \<Delta> Q) (fst (s'', h')) (fst \<sigma>')"
-        by (metis \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> agreesC agrees_simps(4) fst_eqD red_properties sup.absorb_iff1)
-      show "TypedEqui.typed_store \<Delta> (fst (s'', h'))"
-        using red_keeps_typed_store[OF asm0(4), of \<Delta>]
-        asm0(5) TypedEqui.typed_def[of \<Delta> "(Ag s', \<tau>, \<omega>0')"]
-        by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(4) TypedEqui.typed_state_axioms \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')\<close> \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> fst_eqD red_keeps_typed_store typed_state.typed_def)
-      show "well_typed_cmd \<Delta> C'"
-        using Suc.prems(4) asm0(4) well_typed_cmd_red by blast
-      show "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
-        by (metis Suc.prems(4) Suc.prems(5) asm0(4) fst_eqD red_keeps_typed_store)
-    qed
-    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
-      using \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> r1 by auto
-  qed
-qed (simp)
-
-
-
-subsection \<open>Skip\<close>
-
-lemma safe_skip[intro!]:
-  assumes "(Ag s, \<tau>, \<omega>) \<in> Q"
-  shows "safe \<Delta> n Cskip s \<tau> \<omega> Q"
-proof (induct n)
-  case (Suc n)
-  show ?case
-  proof (rule safeI)
-    show "no_aborts \<Delta> Cskip s \<tau> \<omega>"
-      by (simp add: no_abortsI)
-    show "Cskip = Cskip \<Longrightarrow> (Ag s, \<tau>, \<omega>) \<in> Q"
-      by (simp add: assms)
-    fix \<omega>0' \<omega>f C' \<sigma>'
-    assume "\<langle>Cskip, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
-      by force
-  qed (simp_all)
-qed (simp)
-
-proposition rule_skip:
-  "CSL \<Delta> P Cskip P"
-  using CSL_def by blast
-
-
-
-
-subsection \<open>Frame rule\<close>
-
-lemma read_dom_mono:
-  assumes "\<omega>' \<succeq> \<omega>"
-  shows "read_dom \<omega> \<subseteq> read_dom \<omega>'"
-  by (smt (verit, ccfv_SIG) EquiViper.add_masks_def antisym assms get_vm_additive greater_def mem_Collect_eq not_gr_0 order_less_le pos_perm_class.sum_larger read_dom_def subsetI)
-
-
-lemma write_dom_mono:
-  assumes "\<omega>' \<succeq> \<omega>"
-  shows "write_dom \<omega> \<subseteq> write_dom \<omega>'"
-proof -
-  have "\<And>l. get_vm \<omega>' l \<le> 1"
-    by (simp add: get_vm_bound)
-  moreover have "\<And>l. get_vm \<omega>' l \<ge> get_vm \<omega> l"
-    by (metis EquiViper.add_masks_def assms get_vm_additive greater_def pos_perm_class.sum_larger)
-  ultimately show ?thesis
-    by (metis (mono_tags, lifting) antisym mem_Collect_eq subsetI write_dom_def)
-qed
-
-lemma no_aborts_mono_aux:
-  assumes "aborts C \<sigma>'"
-      and "fst \<sigma>' = s"
-      and "snd \<sigma>' = h'"
-      and "h \<subseteq>\<^sub>m h'"
-    shows "aborts C (s, h)"
-  using assms
-proof (induct arbitrary:  rule: aborts.induct)
-  case (aborts_Read \<sigma> r l x)
-  then show ?case
-    by (metis (no_types, lifting) aborts.aborts_Read fst_conv map_le_implies_dom_le snd_conv subsetD)
-next
-  case (aborts_Write \<sigma> r l E)
-  then show ?case
-    by (metis (no_types, lifting) aborts.aborts_Write fst_conv map_le_implies_dom_le snd_conv subsetD)
-next
-  case (aborts_Free \<sigma> r l)
-  then show ?case
-    by (metis (no_types, lifting) aborts.aborts_Free fst_conv map_le_implies_dom_le snd_conv subsetD)
-qed (auto)
-
-
-lemma no_aborts_mono:
-  assumes "no_aborts \<Delta> C s \<tau> \<omega>"
-      and "\<omega>' \<succeq> \<omega>"
-      and "sep_algebra_class.stable \<omega>"
-    shows "no_aborts \<Delta> C s \<tau> \<omega>'"
-proof (rule no_abortsI)
-  fix \<omega>0' \<omega>f
-  assume asm0: "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')" "sep_algebra_class.stable \<omega>0'" "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
-  then obtain r where "Some \<omega>0' = \<omega> \<oplus> r"
-    using assms(2) bigger_sum_smaller by blast
-  then have "Some \<omega>0' = \<omega> \<oplus> stabilize r"
-    by (metis asm0(2) commutative stabilize_sum_result_stable)
-  then show "\<not> aborts C (concretize s \<omega>0')"
-    using asm0(1) asm0(2) asm0(4) assms(1) no_abortsE stabilize_is_stable by blast
-qed
 
 lemma compatibleI:
   assumes "get_store a = get_store b"
@@ -472,6 +336,159 @@ proof
   qed
 qed
 
+lemma safe_agrees:
+  assumes "safe \<Delta> n C s \<tau> \<omega> Q"
+      and "agrees (fvC C \<union> fvA \<Delta> Q) s s'"
+      and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
+      and "well_typed_cmd \<Delta> C"
+      and "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>)"
+      and "TypedEqui.wf_context \<Delta>"
+    shows "safe \<Delta> n C s' \<tau> \<omega> Q"
+  using assms
+proof (induct n arbitrary: C s s' \<omega>)
+  case (Suc n)
+  show ?case
+  proof (rule safeI)
+    show "C = Cskip \<Longrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
+      using safeE(1)[OF Suc.prems(1)]
+      using Suc.prems(2) Suc.prems(3) Suc.prems(5) agrees_simps(4) assms(6) fvA_agrees by blast
+    show "accesses C s' \<subseteq> read_dom \<omega>"
+      using Suc.prems(1) Suc.prems(2) accesses_agrees by force
+    show "writes C s' \<subseteq> write_dom \<omega>"
+      using Suc.prems(1) Suc.prems(2) agrees_simps(4) safeE(3) writes_agrees by blast
+    show "no_aborts \<Delta> C s' \<tau> \<omega>"
+      by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(1) Suc.prems(2) Suc.prems(3) TypedEqui.typed_def agrees_simps(4) no_aborts_agrees safeE(4))
+    fix \<omega>0' \<omega>f C' \<sigma>'
+    assume asm0: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "\<langle>C, concretize s' \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+      "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>0')"
+    then obtain s'' h' where "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'"
+      using red_agrees[OF asm0(4)]
+      by (metis Suc.prems(2) Un_upper1 agrees_search(1) fst_conv snd_conv)
+    moreover have "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
+      by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(3) TypedEqui.typed_def asm0(5) get_abs_state_def snd_conv)
+    ultimately obtain \<omega>1 \<omega>1' where r1: "Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'
+  \<and> snd (s'', h') = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst (s'', h')) \<tau> \<omega>1 Q"
+      using safeE(5)[OF Suc(2), of \<omega>f \<omega>0' C']
+      using asm0(1) asm0(2) asm0(3) by blast
+    moreover have "safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+    proof (rule Suc.hyps)
+      show "safe \<Delta> n C' (fst (s'', h')) \<tau> \<omega>1 Q"
+        using r1 by blast
+      show "agrees (fvC C' \<union> fvA \<Delta> Q) (fst (s'', h')) (fst \<sigma>')"
+        by (metis \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> agreesC agrees_simps(4) fst_eqD red_properties sup.absorb_iff1)
+      have "TypedEqui.typed \<Delta> (Ag (fst (s'', h')), \<tau>, \<omega>1')"
+      proof (rule typed_equi_red)
+        show "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle>"          
+          by (simp add: \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close>)
+        show "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
+          using \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')\<close> by auto
+        show "sep_algebra_class.stable \<omega>1'"
+          using asm0(1) r1 stable_sum by blast
+        show "snd (s'', h') = get_vh \<omega>1'"
+          using r1 by auto
+      qed (simp_all add: r1 Suc)
+      show "well_typed_cmd \<Delta> C'"
+        using Suc.prems(4) asm0(4) well_typed_cmd_red by blast
+      show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1)"
+        by (metis (no_types, lifting) Suc.prems(4) \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> asm0(1) asm0(4) asm0(5) commutative greater_equiv r1 sndI stable_sum typed_equi_red typed_smaller_state)
+      show "TypedEqui.wf_context \<Delta>"
+        by (simp add: assms(6))
+      show "TypedEqui.typed \<Delta> (Ag (fst (s'', h')), \<tau>, \<omega>1)"
+        using \<open>TypedEqui.typed \<Delta> (Ag (fst (s'', h')), \<tau>, \<omega>1')\<close> greater_def r1 typed_smaller_state by blast
+    qed
+    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+      using \<open>\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', (s'', h')\<rangle> \<and> agrees (fvC C \<union> fvA \<Delta> Q) (fst \<sigma>') s'' \<and> snd \<sigma>' = h'\<close> r1 by auto
+  qed
+qed (simp)
+
+
+
+subsection \<open>Skip\<close>
+
+lemma safe_skip[intro!]:
+  assumes "(Ag s, \<tau>, \<omega>) \<in> Q"
+  shows "safe \<Delta> n Cskip s \<tau> \<omega> Q"
+proof (induct n)
+  case (Suc n)
+  show ?case
+  proof (rule safeI)
+    show "no_aborts \<Delta> Cskip s \<tau> \<omega>"
+      by (simp add: no_abortsI)
+    show "Cskip = Cskip \<Longrightarrow> (Ag s, \<tau>, \<omega>) \<in> Q"
+      by (simp add: assms)
+    fix \<omega>0' \<omega>f C' \<sigma>'
+    assume "\<langle>Cskip, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+    then show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 Q"
+      by force
+  qed (simp_all)
+qed (simp)
+
+proposition rule_skip:
+  "CSL \<Delta> P Cskip P"
+  using CSL_def by blast
+
+
+
+
+subsection \<open>Frame rule\<close>
+
+lemma read_dom_mono:
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "read_dom \<omega> \<subseteq> read_dom \<omega>'"
+  by (smt (verit, ccfv_SIG) EquiViper.add_masks_def antisym assms get_vm_additive greater_def mem_Collect_eq not_gr_0 order_less_le pos_perm_class.sum_larger read_dom_def subsetI)
+
+
+lemma write_dom_mono:
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "write_dom \<omega> \<subseteq> write_dom \<omega>'"
+proof -
+  have "\<And>l. get_vm \<omega>' l \<le> 1"
+    by (simp add: get_vm_bound)
+  moreover have "\<And>l. get_vm \<omega>' l \<ge> get_vm \<omega> l"
+    by (metis EquiViper.add_masks_def assms get_vm_additive greater_def pos_perm_class.sum_larger)
+  ultimately show ?thesis
+    by (metis (mono_tags, lifting) antisym mem_Collect_eq subsetI write_dom_def)
+qed
+
+lemma no_aborts_mono_aux:
+  assumes "aborts C \<sigma>'"
+      and "fst \<sigma>' = s"
+      and "snd \<sigma>' = h'"
+      and "h \<subseteq>\<^sub>m h'"
+    shows "aborts C (s, h)"
+  using assms
+proof (induct arbitrary:  rule: aborts.induct)
+  case (aborts_Read \<sigma> r l x)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Read fst_conv map_le_implies_dom_le snd_conv subsetD)
+next
+  case (aborts_Write \<sigma> r l E)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Write fst_conv map_le_implies_dom_le snd_conv subsetD)
+next
+  case (aborts_Free \<sigma> r l)
+  then show ?case
+    by (metis (no_types, lifting) aborts.aborts_Free fst_conv map_le_implies_dom_le snd_conv subsetD)
+qed (auto)
+
+
+lemma no_aborts_mono:
+  assumes "no_aborts \<Delta> C s \<tau> \<omega>"
+      and "\<omega>' \<succeq> \<omega>"
+      and "sep_algebra_class.stable \<omega>"
+    shows "no_aborts \<Delta> C s \<tau> \<omega>'"
+proof (rule no_abortsI)
+  fix \<omega>0' \<omega>f
+  assume asm0: "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')" "sep_algebra_class.stable \<omega>0'" "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f \<and> binary_mask \<omega>0'"
+  then obtain r where "Some \<omega>0' = \<omega> \<oplus> r"
+    using assms(2) bigger_sum_smaller by blast
+  then have "Some \<omega>0' = \<omega> \<oplus> stabilize r"
+    by (metis asm0(2) commutative stabilize_sum_result_stable)
+  then show "\<not> aborts C (concretize s \<omega>0')"
+    using asm0(1) asm0(2) asm0(4) assms(1) no_abortsE stabilize_is_stable by blast
+qed
+
+
 lemma frame_safe:
   assumes "safe \<Delta> n C s \<tau> \<omega> Q"
       and "fvA \<Delta> R \<inter> wrC C = {}"
@@ -481,6 +498,7 @@ lemma frame_safe:
       and "sep_algebra_class.stable \<omega>"
       and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
       and "well_typed_cmd \<Delta> C"
+      and "TypedEqui.wf_context \<Delta>"
     shows "safe \<Delta> n C s \<tau> \<omega>' (Q \<otimes> R)"
   using assms
 proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
@@ -523,8 +541,19 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
         by (metis agrees_search(1) asm0(4) fst_conv red_properties)
       then have "agrees (fvA \<Delta> R) s (fst \<sigma>')"
         using Suc.prems(2) agrees_search(3) by auto
-      then show "(Ag (fst \<sigma>'), \<tau>, \<omega>f) \<in> R"
-        by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(4) Suc.prems(8) TypedEqui.typed_def asm0(4) asm0(5) fst_conv fvA_agrees red_keeps_typed_store)
+      show "(Ag (fst \<sigma>'), \<tau>, \<omega>f) \<in> R"
+      proof (rule TypedEqui.free_varsE)
+        show "TypedEqui.equal_on_set (fvA \<Delta> R) s (fst \<sigma>')"
+          by (meson TypedEqui.equal_on_set_def \<open>agrees (fvA \<Delta> R) s (fst \<sigma>')\<close> agrees_def)
+        show "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f)"
+          using \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f'')\<close> greater_def typed_smaller_state by blast
+        show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>f)"
+          by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(8) TypedEqui.typed_def \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f)\<close> asm0(4) fst_conv get_abs_state_def red_keeps_typed_store snd_conv)
+        show "(Ag s, \<tau>, \<omega>f) \<in> R"
+          by (simp add: Suc.prems(4))
+        show "TypedEqui.wf_context \<Delta>"
+          using assms(9) by auto
+      qed
       show "sep_algebra_class.stable \<omega>1''"
         by (simp add: \<open>sep_algebra_class.stable \<omega>1''\<close>)
       have "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1')"
@@ -575,6 +604,7 @@ proposition frame_rule:
       and "TypedEqui.typed_assertion \<Delta> P"
       and "TypedEqui.typed_assertion \<Delta> R"
       and "well_typed_cmd \<Delta> C"
+      and "TypedEqui.wf_context \<Delta>"
     shows "CSL \<Delta> (P \<otimes> R) C (Q \<otimes> R)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega> assume asm0: "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)" "(Ag s, \<tau>, \<omega>) \<in> P \<otimes> R" "sep_algebra_class.stable \<omega>"
@@ -596,7 +626,7 @@ proof (rule CSL_I)
       by (metis TypedEqui.self_framing_typedE \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>p) \<and> TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>r)\<close> assms(4) r(3) stabilize_equi_state)
     show "TypedEqui.typed \<Delta> (Ag s, \<tau>, stabilize \<omega>p)"
       using \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>p) \<and> TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>r)\<close> max_projection_propE(1) max_projection_prop_stable_stabilize typed_smaller_state by blast
-  qed (simp_all add: assms(7))
+  qed (simp_all add: assms(7-8))
 qed
 
 
@@ -664,6 +694,7 @@ lemma safe_par:
       and "sep_algebra_class.stable \<omega>2"
       and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
       and "well_typed_cmd \<Delta> ({A1} C1 {B1} || {A2} C2 {B2})"
+      and "TypedEqui.wf_context \<Delta>"
     shows "safe \<Delta> n ({A1} C1 {B1} || {A2} C2 {B2}) s \<tau> \<omega> (Q1 \<otimes> Q2)"
   using assms
 proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
@@ -742,12 +773,14 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
           by (metis agrees_search(1) asm2(2) fst_conv red_properties)
         then show "agrees (fvC C2 \<union> fvA \<Delta> Q2) s (fst \<sigma>')"
           using Suc.prems(5) agrees_minusD disjoint_search(1) by blast
-        show "TypedEqui.typed_store \<Delta> s"
-          using TypedEqui.typed_def asm0(1) by force
+        show "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>2)"
+          using types by blast
         show "well_typed_cmd \<Delta> C2"
           using Suc.prems(9) by auto
-        show "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
-          using calculation(4) by auto
+        show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>2)"
+          by (metis ConcreteSemantics.get_store_Ag_simplifies TypedEqui.typed_def calculation(4) get_abs_state_def snd_conv types)
+        show "TypedEqui.wf_context \<Delta>"
+          by (simp add: assms(10))
       qed
       moreover obtain \<omega>' where "Some \<omega>' = \<omega>a \<oplus> \<omega>2"
         by (metis (no_types, opaque_lifting) \<open>Some \<omega>f' = \<omega>2 \<oplus> \<omega>f\<close> asso2 calculation(1) commutative option.exhaust_sel)
@@ -793,12 +826,14 @@ proof (induct n arbitrary: C1 C2 \<omega>1 \<omega>2 \<omega> s)
           by (metis agrees_search(1) asm2(2) fst_conv red_properties)
         then show "agrees (fvC C1 \<union> fvA \<Delta> Q1) s (fst \<sigma>')"
           using Suc.prems(4) agrees_minusD disjoint_search(1) by blast
-        show "TypedEqui.typed_store \<Delta> s"
-          using TypedEqui.typed_def asm0(1) by force
+        show "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>1)"
+          using types by blast
+        show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1)"
+          by (metis ConcreteSemantics.get_store_Ag_simplifies TypedEqui.typed_def \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>1)\<close> calculation(4) get_abs_state_def snd_conv)
+        show "TypedEqui.wf_context \<Delta>"
+          by (simp add: assms(10))
         show "well_typed_cmd \<Delta> C1"
           using Suc.prems(9) by auto
-        show "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
-          using calculation(4) by blast
       qed
       moreover obtain \<omega>' where "Some \<omega>' = \<omega>a \<oplus> \<omega>1"
         by (metis (no_types, opaque_lifting) \<open>Some \<omega>f' = \<omega>1 \<oplus> \<omega>f\<close> asso2 calculation(1) commutative option.exhaust_sel)
@@ -838,6 +873,7 @@ proposition rule_par:
       and "TypedEqui.typed_assertion \<Delta> P1"
       and "TypedEqui.typed_assertion \<Delta> P2"
       and "well_typed_cmd \<Delta> ({A1} C1 {B1} || {A2} C2 {B2})"
+      and "TypedEqui.wf_context \<Delta>"
     shows "CSL \<Delta> (P1 \<otimes> P2) ({A1} C1 {B1} || {A2} C2 {B2}) (Q1 \<otimes> Q2)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
@@ -864,6 +900,7 @@ proof (rule CSL_I)
       using assms(9) by auto
   qed (simp_all add: assms r asm0)
 qed
+
 
 
 subsection \<open>Sequential composition\<close>
@@ -1555,8 +1592,9 @@ lemma fvA_agrees_better:
       and "get_trace a = get_trace b"
       and "get_state a = get_state b"
       and "a \<in> A"
-      and "TypedEqui.typed_store \<Delta> (get_store a)"
-      and "TypedEqui.typed_store \<Delta> (get_store b)"
+      and "TypedEqui.typed \<Delta> a"
+      and "TypedEqui.typed \<Delta> b"
+      and "TypedEqui.wf_context \<Delta>"
     shows "b \<in> A"
   by (metis assms fvA_agrees set_state_def set_state_get_state)
 
@@ -1572,16 +1610,17 @@ lemma get_store_assign_var[simp]:
 lemma fvA_assign_var_state:
   assumes "x \<notin> fvA \<Delta> A"
       and "\<omega> \<in> A"
-      and "TypedEqui.typed_store \<Delta> (get_store \<omega>)"
+      and "TypedEqui.typed \<Delta> \<omega>"
       and "variables \<Delta> x = Some ty"
       and "v \<in> ty"
+      and "TypedEqui.wf_context \<Delta>"
     shows "TypedEqui.assign_var_state x (Some v) \<omega> \<in> A"
 proof -
   have "agrees (fvA \<Delta> A) (get_store \<omega>) ((get_store \<omega>)(x := Some v))"
     using assms(1) by force
   then have "((Ag (get_store \<omega>), fst (snd \<omega>), snd (snd \<omega>)) \<in> A) = ((Ag ((get_store \<omega>)(x := Some v)), fst (snd \<omega>), snd (snd \<omega>)) \<in> A)"
     using fvA_agrees[of _ A "get_store \<omega>" "(get_store \<omega>)(x := Some v)" "fst (snd \<omega>)" "snd (snd \<omega>)"]
-    by (simp add: TypedEqui.typed_store_update assms(3) assms(4) assms(5))
+    by (metis ConcreteSemantics.get_store_Ag_simplifies TypedEqui.typed_def TypedEqui.typed_store_update assms(3) assms(4) assms(5) assms(6) get_abs_state_def prod.collapse snd_conv)
   then show ?thesis
     by (simp add: TypedEqui.assign_var_state_def assms(2) get_abs_state_def get_store_def set_store_def)
 qed
@@ -1590,15 +1629,16 @@ qed
 lemma fvA_assign_var_state_reciprocal:
   assumes "x \<notin> fvA \<Delta> A"
       and "TypedEqui.assign_var_state x (Some v) \<omega> \<in> A"
-      and "TypedEqui.typed_store \<Delta> (get_store \<omega>)"
+      and "TypedEqui.typed \<Delta> \<omega>"
       and "variables \<Delta> x = Some ty"
       and "v \<in> ty"
+      and "TypedEqui.wf_context \<Delta>"
     shows "\<omega> \<in> A"
 proof -
-  have "TypedEqui.typed_store \<Delta> (get_store (TypedEqui.assign_var_state x (Some v) \<omega>))"
-    by (simp add: TypedEqui.typed_store_update assms(3) assms(4) assms(5))
+  have "TypedEqui.typed \<Delta> (TypedEqui.assign_var_state x (Some v) \<omega>)"
+    by (simp add: TypedEqui.typed_assign_var assms(3) assms(4) assms(5))
   then show ?thesis
-    by (smt (verit, del_insts) TypedEqui.assign_var_state_def agreement.exhaust_sel agrees_search(4) assms(1) assms(2) assms(3) fvA_agrees get_abs_state_def get_abs_state_set_store get_store_assign_var get_store_def prod.collapse)
+    by (smt (verit, del_insts) TypedEqui.assign_var_state_def agreement.exhaust_sel agrees_search(4) assms fvA_agrees get_abs_state_def get_abs_state_set_store get_store_assign_var get_store_def prod.collapse)
 qed
 
 (*
@@ -1759,6 +1799,7 @@ inductive CSL_syn :: "concrete_type_context \<Rightarrow> int equi_state set \<R
 theorem CSL_sound:
   assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
       and "well_typed_cmd \<Delta> C"
+      and "TypedEqui.wf_context \<Delta>"
     shows "CSL \<Delta> P C Q"
   using assms
   by (induct rule: CSL_syn.induct) (simp_all add: rule_skip rule_seq rule_conseq rule_if rule_while
@@ -1889,6 +1930,7 @@ theorem adequacy:
       and "well_typed_cmd \<Delta> C"
       and "TypedEqui.typed_store \<Delta> (fst \<sigma>)"
       and "well_typed_concrete_heap type_ctxt_heap (snd \<sigma>)"
+      and "TypedEqui.wf_context \<Delta>"
     shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
 proof (rule safe_n_steps[OF assms(1), where ?Q = Q])
   fix n
@@ -1906,7 +1948,7 @@ proof (rule safe_n_steps[OF assms(1), where ?Q = Q])
   show "safe \<Delta> n C (fst \<sigma>) (Ag (Map.empty)) (mk_virtual_state (snd \<sigma>)) (assertify_state_exp Q)"
   proof (rule CSL_E)
     show "CSL \<Delta> (assertify_state_exp P) C (assertify_state_exp Q)"
-      by (simp add: CSL_sound assms(2) assms(4))
+      by (simp add: CSL_sound assms(2) assms(4) assms(7))
     show "(Ag (fst \<sigma>), Ag (\<lambda>x. None), mk_virtual_state (snd \<sigma>)) \<in> assertify_state_exp P"
       by (simp add: assms(3) in_assertify_equiv)
   qed (simp_all add: r)

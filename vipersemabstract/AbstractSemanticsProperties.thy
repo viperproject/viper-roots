@@ -132,17 +132,254 @@ lemma typed_store_update:
   by (smt (verit, ccfv_SIG) dom_fun_upd fun_upd_other fun_upd_same insert_dom option.discI option.inject typed_store_def)
 
 
+(*
+
+definition equal_on_set :: "var set \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> bool" where
+  "equal_on_set S \<sigma>1 \<sigma>2 \<longleftrightarrow> (\<forall>x \<in> S. \<sigma>1 x = \<sigma>2 x)"
+
+definition overapprox_fv :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> var set \<Rightarrow> bool" where
+  "overapprox_fv \<Delta> A S \<longleftrightarrow> (\<forall>\<sigma>1 \<sigma>2 \<gamma>. typed_store \<Delta> \<sigma>1 \<and> typed_store \<Delta> \<sigma>2 \<and> equal_on_set S \<sigma>1 \<sigma>2 \<longrightarrow> ((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A))"
+
+
+definition free_vars where
+  "free_vars \<Delta> A = (\<Inter>S \<in> {S. overapprox_fv \<Delta> A S \<and> S \<subseteq> dom (variables \<Delta>)}. S)"
+*)
+
+definition wf_context where
+  "wf_context \<Delta> \<longleftrightarrow> finite (dom (variables \<Delta>))"
+
 lemma fvaA_atrue_empty[simp]:
-  "free_vars \<Delta> (atrue \<Delta>) = {}"
-  sorry (* fvA \<Delta> *)
+  assumes "wf_context \<Delta>"
+  shows "free_vars \<Delta> (atrue \<Delta>) = {}"
+proof -
+  have "overapprox_fv \<Delta> (atrue \<Delta>) {}"
+    unfolding overapprox_fv_def atrue_def
+    by blast
+  then have "{} \<in> {S. overapprox_fv \<Delta> (atrue \<Delta>) S \<and> S \<subseteq> dom (variables \<Delta>)}"
+    by blast
+  then show ?thesis unfolding free_vars_def by blast
+qed
+
+lemma typed_assertion_fv_max:
+  assumes "typed_assertion \<Delta> A"
+  shows "overapprox_fv \<Delta> A (dom (variables \<Delta>))"
+  unfolding overapprox_fv_def
+proof clarify
+  fix \<sigma>1 \<sigma>2 \<gamma>
+  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2"
+  have "\<sigma>1 = \<sigma>2"
+  proof (rule ext)
+    fix x show "\<sigma>1 x = \<sigma>2 x"
+    proof (cases "x \<in> dom (variables \<Delta>)")
+      case True
+      then show ?thesis
+        by (meson \<open>equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2\<close> equal_on_set_def)
+    next
+      case False
+      then show ?thesis using asm0(1-2)
+        unfolding typed_def typed_store_def
+        by (metis agreement.sel domIff get_store_def prod.sel(1))
+    qed
+  qed
+  then show "((Ag \<sigma>1, \<gamma>) \<in> A) = ((Ag \<sigma>2, \<gamma>) \<in> A)"
+    by simp
+qed
+
+
+
+
+(* Free variables *)
+
+
+section \<open>Free variables\<close>
+
+lemma equal_on_setI:
+  assumes "\<And>x. x \<in> S \<Longrightarrow> \<sigma>1 x = \<sigma>2 x"
+  shows "equal_on_set S \<sigma>1 \<sigma>2"
+  using assms equal_on_set_def by blast
+
+
+lemma equal_on_set_inter:
+  assumes "equal_on_set S' \<sigma>1 \<sigma>2"
+      and "S \<subseteq> S'"
+    shows "equal_on_set S \<sigma>1 \<sigma>2"
+  by (meson assms(1) assms(2) equal_on_set_def in_mono)
+
+lemma equal_on_set_symmetric:
+  "equal_on_set S \<sigma>1 \<sigma>2 \<longleftrightarrow> equal_on_set S \<sigma>2 \<sigma>1"
+  using equal_on_set_def 
+  by metis
+
+lemma overapprox_fvI:
+  assumes "\<And>\<sigma>1 \<sigma>2 \<gamma>. typed \<Delta> (Ag \<sigma>1, \<gamma>) \<Longrightarrow> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<Longrightarrow> equal_on_set S \<sigma>1 \<sigma>2 \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
+  shows "overapprox_fv \<Delta> A S"
+  using assms equal_on_set_symmetric overapprox_fv_def by blast
+
+lemma overapprox_fvE:
+  assumes "overapprox_fv \<Delta> A S"
+      and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+      and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
+      and "equal_on_set S \<sigma>1 \<sigma>2"
+      and "(Ag \<sigma>1, \<gamma>) \<in> A"
+    shows "(Ag \<sigma>2, \<gamma>) \<in> A"
+  using assms overapprox_fv_def by blast
+
+lemma intermediate_equal_set:
+  assumes "equal_on_set (S1 \<inter> S2) \<sigma>1 \<sigma>2"
+      and "typed_store \<Delta> \<sigma>1"
+      and "typed_store \<Delta> \<sigma>2"
+  shows "\<exists>\<sigma>3. typed_store \<Delta> \<sigma>3 \<and> equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2"
+proof -
+  let ?\<sigma>3 = "(\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x)"
+  have "equal_on_set S1 \<sigma>1 ?\<sigma>3"
+    by (simp add: equal_on_set_def)
+  moreover have "equal_on_set S2 ?\<sigma>3 \<sigma>2" (* Needs a case split on x *)
+    by (smt (verit) IntI agreement.sel assms equal_on_set_def)
+  moreover have "typed_store \<Delta> ?\<sigma>3"
+  proof (rule typed_storeI)
+    show "dom (variables \<Delta>) = dom (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x)" (is "?A = ?B")
+    proof
+      show "?A \<subseteq> ?B"
+        by (smt (verit, best) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def)
+      show "?B \<subseteq> ?A"
+        by (smt (verit) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def)
+    qed
+    show "\<And>x v ty. (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x) x = Some v \<Longrightarrow> variables \<Delta> x = Some ty \<Longrightarrow> v \<in> ty"
+      by (smt (verit, best) agreement.sel assms(2) assms(3) typed_store_def)
+  qed
+  ultimately show ?thesis by blast
+qed
+
+
+lemma stable_by_intersection_overapprox_fv:
+  assumes "overapprox_fv \<Delta> A S1"
+      and "overapprox_fv \<Delta> A S2"
+    shows "overapprox_fv \<Delta> A (S1 \<inter> S2)"
+proof (rule overapprox_fvI)
+  fix \<sigma>1 \<sigma>2 \<gamma>
+  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (S1 \<inter> S2) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> A"
+  then obtain \<sigma>3 where "equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2" "typed_store \<Delta> \<sigma>3"
+    unfolding typed_def
+    using intermediate_equal_set[of S1 S2 \<sigma>1 \<sigma>2 \<Delta>]
+    by (metis agreement.sel fst_eqD get_store_def)
+  then have "typed \<Delta> (Ag \<sigma>3, \<gamma>)"
+    using asm0(1) unfolding typed_def
+    by (simp add: get_abs_state_def get_store_def)
+  then have "(Ag \<sigma>3, \<gamma>) \<in> A"
+    using overapprox_fvE[of \<Delta> A S1 \<sigma>1 \<gamma> \<sigma>3]
+    using \<open>equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2\<close> asm0(1) asm0(4) assms(1) by blast
+  then show "(Ag \<sigma>2, \<gamma>) \<in> A"
+    using overapprox_fvE[of \<Delta> A S2]
+    using \<open>equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2\<close> \<open>typed \<Delta> (Ag \<sigma>3, \<gamma>)\<close> asm0(2) assms(2) by blast
+qed
+
+lemma overapprox_fv_dom:
+  "overapprox_fv \<Delta> A (dom (variables \<Delta>))"
+proof (rule overapprox_fvI)
+  fix \<sigma>1 \<sigma>2 \<gamma>
+  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> A"
+  have "\<sigma>1 = \<sigma>2"
+  proof (rule ext)
+    fix x show "\<sigma>1 x = \<sigma>2 x"
+      apply (cases "x \<in> dom (variables \<Delta>)")
+      apply (meson asm0(3) equal_on_set_def)
+      by (smt (z3) Diff_iff agreement.sel asm0(1) asm0(2) asm0(3) insert_iff overapprox_fvE prod.sel(1) typed_assertionI typed_assertion_fv_max)
+  qed
+  then show "(Ag \<sigma>2, \<gamma>) \<in> A"
+    using agreement.expand asm0(4) by blast
+qed
+
+lemma typed_assertion_then_fv_in:
+  "free_vars \<Delta> A \<subseteq> dom (variables \<Delta>)"
+  unfolding free_vars_def
+  by (simp add: Inf_lower overapprox_fv_dom)
+
+lemma finite_family_property_aux:
+  assumes "finite F"
+      and "\<And>S. S \<in> F \<Longrightarrow> P S"
+      and "\<And>S1 S2. P S1 \<Longrightarrow> P S2 \<Longrightarrow> P (S1 \<inter> S2)"
+      and "card F = n + 1"
+    shows "P (\<Inter>S \<in> F. S)"
+  using assms
+proof (induct n arbitrary: F)
+  case 0
+  then show ?case
+    by (metis Inf_empty Inf_insert One_nat_def Suc_eq_plus1 card_1_singletonE image_ident inf_top.right_neutral insert_iff)
+next
+  case (Suc n)
+  then obtain S where "S \<in> F"
+    by (metis One_nat_def Suc_eq_plus1 card_le_Suc0_iff_eq le_add1 not_less_eq_eq plus_1_eq_Suc)
+  then have "P (\<Inter>S \<in> (F - {S}). S)"
+    using Suc(1)[of "F - {S}"]
+    using Suc.prems(1) Suc.prems(2) Suc.prems(4) assms(3) by auto
+  then show ?case
+    by (metis Inf_insert Suc.prems(2) \<open>S \<in> F\<close> assms(3) image_ident insert_Diff)
+qed
+
+lemma finite_family_property:
+  assumes "finite F"
+      and "\<And>S. S \<in> F \<Longrightarrow> P S"
+      and "\<And>S1 S2. P S1 \<Longrightarrow> P S2 \<Longrightarrow> P (S1 \<inter> S2)"
+      and "F \<noteq> {}"
+    shows "P (\<Inter>S \<in> F. S)"
+proof -
+  have "card F \<ge> 1"
+    by (simp add: Suc_leI assms(1) assms(4) card_gt_0_iff)
+  then show ?thesis
+    by (metis add.commute assms(1) assms(2) assms(3) finite_family_property_aux le_Suc_ex)
+qed
+
+
+lemma family_of_sets_included_in_finite_set_is_finite:
+  assumes "finite S"
+      and "\<And>S'. S' \<in> F \<Longrightarrow> S' \<subseteq> S"
+    shows "finite F"
+  by (meson Sup_least assms(1) assms(2) finite_UnionD finite_subset)
+
+lemma free_vars_exists_finite:
+  assumes "finite S"
+      and "overapprox_fv \<Delta> A S"
+    shows "overapprox_fv \<Delta> A (free_vars \<Delta> A)"
+proof -
+  let ?F = "{S'. S' \<subseteq> S \<and> overapprox_fv \<Delta> A S'}"
+
+  have "overapprox_fv \<Delta> A (\<Inter>S\<in>?F. S)"
+    using finite_family_property[of ?F "overapprox_fv \<Delta> A"]
+    by (metis (mono_tags, lifting) assms dual_order.refl empty_iff family_of_sets_included_in_finite_set_is_finite mem_Collect_eq stable_by_intersection_overapprox_fv)
+  moreover have "\<And>S'. overapprox_fv \<Delta> A S' \<Longrightarrow> (\<Inter>S\<in>?F. S) \<subseteq> S'"
+  proof -
+    fix S' assume "overapprox_fv \<Delta> A S'"
+    then have "S \<inter> S' \<in> ?F"
+      by (simp add: assms(2) stable_by_intersection_overapprox_fv)
+    then show "(\<Inter>S\<in>?F. S) \<subseteq> S'"
+      by blast
+  qed
+  ultimately show ?thesis
+    by (smt (verit, best) INT_greatest Inf_lower free_vars_def image_ident mem_Collect_eq subset_antisym)
+qed
+
+lemma free_vars_overapprox_wf_context:
+  assumes "wf_context \<Delta>"
+    shows "overapprox_fv \<Delta> A (free_vars \<Delta> A)"
+  by (meson assms free_vars_exists_finite overapprox_fv_dom wf_context_def)
 
 lemma free_vars_agree:
-  assumes "typed_store \<Delta> \<sigma>1"
-      and "typed_store \<Delta> \<sigma>2"
+  assumes "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+      and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
       and "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
+      and "wf_context \<Delta>"
     shows "((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A)"
-  sorry (* TODO: free_vars *)
+  using assms(1) assms(2) assms(3) assms(4) typed_state.free_vars_overapprox_wf_context typed_state.overapprox_fv_def typed_state_axioms by blast
 
+
+lemma free_varsE:
+  assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
+      and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+      and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
+      and "(Ag \<sigma>1, \<gamma>) \<in> A"
+      and "wf_context \<Delta>"
+    shows "(Ag \<sigma>2, \<gamma>) \<in> A"
+  using assms free_vars_agree[of \<Delta> \<sigma>1 \<gamma> \<sigma>2 A] by blast
 
 end
 
@@ -1331,13 +1568,14 @@ lemma entails_refl:
 
 
 lemma free_vars_subset:
-  assumes "\<And>\<sigma>1 \<sigma>2 \<tau> \<gamma>. typed_store \<Delta> \<sigma>1 \<and> typed_store \<Delta> \<sigma>2 \<and> equal_on_set V \<sigma>1 \<sigma>2 \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
-  shows "free_vars \<Delta> A \<subseteq> V"
+  assumes "\<And>\<sigma>1 \<sigma>2 \<tau> \<gamma>. typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set V \<sigma>1 \<sigma>2 \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
+      and "V \<subseteq> dom (variables \<Delta>)"
+     shows "free_vars \<Delta> A \<subseteq> V"
 proof -
   have "overapprox_fv \<Delta> A V"
     by (smt (verit, del_insts) assms equal_on_set_def overapprox_fv_def)
   then show ?thesis
-    by (simp add: Inf_lower free_vars_def)
+    by (simp add: Inf_lower free_vars_def assms(2))
 qed
 
 lemma entails_trans:
@@ -1348,14 +1586,6 @@ lemma entails_trans:
 
 
 
-lemma free_varsE:
-  assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
-      and "typed_store \<Delta> \<sigma>1"
-      and "typed_store \<Delta> \<sigma>2"
-      and "(Ag \<sigma>1, \<gamma>) \<in> A"
- (*     and "finite (dom (variables \<Delta>))" *)
-    shows "(Ag \<sigma>2, \<gamma>) \<in> A"
-  sorry (* TODO: Free variables *)
 
 lemma get_store_Ag_simplifies[simp]:
   "get_store (Ag \<sigma>, \<gamma>) = \<sigma>"
@@ -1369,10 +1599,12 @@ lemma set_store_Ag_simplies[simp]:
 
 
 lemma exists_assert_no_in_fv:
-  "free_vars \<Delta> (exists_assert \<Delta> x A) \<subseteq> free_vars \<Delta> A - {x}"
+  assumes "wf_context \<Delta>"
+      and "typed_assertion \<Delta> A"
+  shows "free_vars \<Delta> (exists_assert \<Delta> x A) \<subseteq> free_vars \<Delta> A - {x}"
 proof (rule free_vars_subset)
   fix \<sigma>1 \<sigma>2 \<gamma>
-  assume asm0: "typed_store \<Delta> \<sigma>1 \<and> typed_store \<Delta> \<sigma>2 \<and> equal_on_set (free_vars \<Delta> A - {x}) \<sigma>1 \<sigma>2"
+  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set (free_vars \<Delta> A - {x}) \<sigma>1 \<sigma>2"
          "(Ag \<sigma>1, \<gamma>) \<in> exists_assert \<Delta> x A"
   then obtain v0 v ty where r: "v0 \<in> ty" "get_store (Ag \<sigma>1, \<gamma>) x = Some v0" "variables \<Delta> x = Some ty" "v \<in> ty"
     "(set_store (Ag \<sigma>1, \<gamma>) ((get_store (Ag \<sigma>1, \<gamma>))(x \<mapsto> v))) \<in> A" "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
@@ -1384,16 +1616,26 @@ proof (rule free_vars_subset)
     by (simp add: equal_on_set_def)
 
   then have "(Ag (\<sigma>2(x \<mapsto> v)), \<gamma>) \<in> A"
-    by (rule free_varsE) (simp_all add: asm0 r typed_store_update calculation)
+  proof (rule free_varsE)
+    show "typed \<Delta> (Ag (\<sigma>1(x \<mapsto> v)), \<gamma>)"
+      by (metis get_abs_state_set_store get_store_Ag_simplifies r(3) r(4) r(6) set_store_Ag_simplies typed_state.typed_def typed_state_axioms typed_store_update)
+    show "typed \<Delta> (Ag (\<sigma>2(x \<mapsto> v)), \<gamma>)"
+      by (metis asm0(1) get_abs_state_set_store get_store_Ag_simplifies r(3) r(4) set_store_Ag_simplies typed_state.typed_def typed_state_axioms typed_store_update)
+    show "(Ag (\<sigma>1(x \<mapsto> v)), \<gamma>) \<in> A"
+      using calculation by blast
+  qed (simp add: assms(1))
   then have "set_store (Ag \<sigma>2, \<gamma>) ((get_store (Ag \<sigma>2, \<gamma>))(x \<mapsto> v)) \<in> A"
     by (simp add: get_abs_state_def set_store_def)
   moreover obtain v0' where "get_store (Ag \<sigma>2, \<gamma>) x = Some v0'"
-    by (metis agreement.exhaust_sel agreement.inject asm0(1) domD domI get_store_def prod.sel(1) r(3) typed_store_def)
+    by (metis (no_types, opaque_lifting) DiffD2 asm0(1) dom_fun_upd fun_upd_triv insertI1 option.distinct(1) option.exhaust_sel r(3) typed_state.typed_def typed_state_axioms typed_store_def)
   then have "v0' \<in> ty"
-    by (metis agreement.exhaust_sel agreement.inject asm0(1) get_store_def prod.sel(1) r(3) typed_store_def)
+    by (meson asm0(1) r(3) typed_state.typed_def typed_state_axioms typed_store_def)
   ultimately show "(Ag \<sigma>2, \<gamma>) \<in> exists_assert \<Delta> x A"
     unfolding exists_assert_def
     by (smt (verit) \<open>get_store (Ag \<sigma>2, \<gamma>) x = Some v0'\<close> asm0(1) asm0(2) assign_var_state_def get_store_Ag_simplifies mem_Collect_eq r(3) r(4) exists_assertE  set_store_Ag_simplies set_store_def snd_conv typed_def)
+next
+  show "free_vars \<Delta> A - {x} \<subseteq> dom (variables \<Delta>)"
+    using assms(2) typed_assertion_then_fv_in by fastforce
 qed
 
 
@@ -1415,14 +1657,16 @@ lemma SL_proof_Havoc_elim_entails:
   assumes "\<Delta> \<turnstile> [A] Havoc x [B]"
       and "typed_assertion \<Delta> A"
       and "variables \<Delta> x \<noteq> None"
+      and "wf_context \<Delta>"
   shows "entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - {x}"
-  using assms exists_assert_entails exists_assert_no_in_fv by force
+  using assms exists_assert_entails exists_assert_no_in_fv by blast
 
 
 
 lemma SL_proof_Havoc_list_elim:
   assumes "\<Delta> \<turnstile> [A] havoc_list l [B]"
       and "wf_abs_stmt \<Delta> (havoc_list l)"
+      and "wf_context \<Delta>"
   shows "self_framing_and_typed \<Delta> A \<and> self_framing_and_typed \<Delta> B \<and> entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - (set l)"
   using assms
 proof (induct l arbitrary: A B)
@@ -1441,10 +1685,10 @@ next
     using Cons.prems(2) by force
 
   then have "entails A R \<and> free_vars \<Delta> R \<subseteq> free_vars \<Delta> A - {x}"
-    using calculation SL_proof_Havoc_elim_entails by presburger
+    by (meson assms(3) calculation(4) r(1) semantics.SL_proof_Havoc_elim_entails semantics_axioms)
 
   ultimately show "self_framing_and_typed \<Delta> A \<and> self_framing_and_typed \<Delta> B \<and> entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - set (x # l)"
-    by (metis Cons.prems(1) Cons.prems(2) Diff_empty Diff_insert0 Diff_mono dual_order.eq_iff dual_order.trans list.simps(15) entails_trans proofs_are_self_framing_and_typed subset_Diff_insert)
+    by (smt (verit, ccfv_SIG) Diff_iff SL_proof_Havoc_elim entails_trans set_ConsD subsetD subsetI subset_Diff_insert)
 qed
 
 

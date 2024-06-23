@@ -88,6 +88,7 @@ lemma convert_proof_alloc:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (Havoc r;; Inhale (full_ownership_with_val r e)) Q"
       and "well_typed_cmd \<Delta> (Calloc r e)"
       and "wf_stmt \<Delta> (Calloc r e)"
+      and "TypedEqui.wf_context \<Delta>"
   shows "\<Delta> \<turnstile>CSL [P] Calloc r e [Q]"
 proof (rule RuleCons)
 
@@ -105,7 +106,7 @@ proof (rule RuleCons)
     then show "\<Delta> \<turnstile>CSL [atrue \<Delta>] Calloc r e [full_ownership_with_val r e]"
       using RuleAlloc[of r e] by simp
     show "disjoint (fvA \<Delta> (TypedEqui.exists_assert \<Delta> r P)) (wrC (Calloc r e))"
-      by (metis (no_types, opaque_lifting) Diff_iff Diff_insert_absorb disjoint_minus disjoint_simps(1) ex_in_conv ConcreteSemantics.exists_assert_no_in_fv subset_Diff_insert wrC.simps(5))
+      by (metis (no_types, lifting) ConcreteSemantics.SL_proof_Havoc_elim ConcreteSemantics.exists_assert_no_in_fv asm0 assms(4) disjoint_def disjoint_iff singletonD subset_Diff_insert wrC.simps(5))
     show "TypedEqui.self_framing_typed \<Delta> (atrue \<Delta>)"
       using TypedEqui.self_framing_typed_def TypedEqui.atrue_def
       using TypedEqui.typed_state_then_stabilize_typed by blast
@@ -426,6 +427,7 @@ lemma CSL_add_atrue:
   assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
       and "TypedEqui.self_framing_typed \<Delta> P"
       and "TypedEqui.typed_assertion \<Delta> P"
+      and "TypedEqui.wf_context \<Delta>"
     shows "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
   by (rule RuleFrame) (simp_all add: assms)
 
@@ -458,22 +460,26 @@ lemma invariant_translateI:
 lemma invariant_translate_simpler:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q \<Longrightarrow> \<Delta> \<turnstile>CSL [P] C [Q]"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
+      and "TypedEqui.wf_context \<Delta>"
     shows "invariant_translate \<Delta> P C Q"
-  by (simp add: CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms(1) assms(2) invariant_translateI)
+  by (simp add: CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms invariant_translateI)
 
 corollary invariant_translate_skip:
-  "invariant_translate \<Delta> P Cskip Q"
-  using convert_proof_skip invariant_translate_simpler by fastforce
+  assumes "TypedEqui.wf_context \<Delta>"
+  shows "invariant_translate \<Delta> P Cskip Q"
+  using convert_proof_skip invariant_translate_simpler assms by fastforce
 
 corollary invariant_translate_assign:
   assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cassign x e)))"
-  shows "invariant_translate \<Delta> P (Cassign x e) Q"
+      and "TypedEqui.wf_context \<Delta>"
+    shows "invariant_translate \<Delta> P (Cassign x e) Q"
   using convert_proof_assign invariant_translate_simpler assms by fastforce
 
 corollary invariant_translate_alloc:
   assumes "well_typed_cmd \<Delta> (Calloc r e)"
       and "wf_stmt \<Delta> (Calloc r e)"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Calloc r e)))"
+      and "TypedEqui.wf_context \<Delta>"
     shows "invariant_translate \<Delta> P (Calloc r e) Q"
   using assms cmd.distinct(37) convert_proof_alloc invariant_translate_simpler by fastforce
 
@@ -500,7 +506,8 @@ qed (simp add: atrue_twice_same)
 
 corollary invariant_translate_free:
   assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cfree r)))"
-  shows "invariant_translate \<Delta> P (Cfree r) Q"
+      and "TypedEqui.wf_context \<Delta>"
+    shows "invariant_translate \<Delta> P (Cfree r) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cfree r))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cfree r [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
@@ -512,7 +519,8 @@ qed
 
 corollary invariant_translate_write:
   assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cwrite r e)))"
-  shows "invariant_translate \<Delta> P (Cwrite r e) Q"
+      and "TypedEqui.wf_context \<Delta>"
+    shows "invariant_translate \<Delta> P (Cwrite r e) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cwrite r e))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwrite r e [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
@@ -524,7 +532,8 @@ qed
 
 corollary invariant_translate_read:
   assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cread x r)))"
-  shows "invariant_translate \<Delta> P (Cread x r) Q"
+      and "TypedEqui.wf_context \<Delta>"
+    shows "invariant_translate \<Delta> P (Cread x r) Q"
   using convert_proof_read invariant_translate_simpler assms by fastforce
 
 
@@ -648,6 +657,7 @@ lemma invariant_translate_parallel:
       and "\<And>P Q. invariant_translate \<Delta> P C2 Q"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
       and "wf_stmt \<Delta> ({P1} C1 {Q1} || {P2} C2 {Q2})"
+      and "TypedEqui.wf_context \<Delta>"
     shows "invariant_translate \<Delta> P ({P1} C1 {Q1} || {P2} C2 {Q2}) Q"
 proof (rule invariant_translateI)
   assume asm0: "proof_obligations_valid \<Delta> (snd (translate {P1} C1 {Q1} || {P2} C2 {Q2}))"
@@ -671,7 +681,7 @@ proof (rule invariant_translateI)
   then have P_Q_R_rels:
     "entails P (R0 \<otimes> (P1 \<otimes> P2)) \<and> Q = R1 \<otimes> (Q1 \<otimes> Q2)" by auto
   moreover have "entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - (set (wrL C1 @ wrL C2))"
-    using ConcreteSemantics.SL_proof_Havoc_list_elim R_defs(2) assms(3) by blast
+    using ConcreteSemantics.SL_proof_Havoc_list_elim R_defs(2) assms(3) assms(5) by blast
 (* R1 is the frame! *)
 
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> atrue \<Delta>]"
@@ -839,6 +849,7 @@ lemma invariant_translate_while:
   assumes "\<And>P Q. invariant_translate \<Delta> P C Q"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C))"
       and "wf_stmt \<Delta> (Cwhile b I C)"
+      and "TypedEqui.wf_context \<Delta>"
     shows "invariant_translate \<Delta> P (Cwhile b I C) Q"
 proof (rule invariant_translateI)
   assume asm0: "proof_obligations_valid \<Delta> (snd (translate (Cwhile b I C)))"
@@ -851,7 +862,7 @@ proof (rule invariant_translateI)
     "ConcreteSemantics.SL_proof \<Delta> R0 (ConcreteSemantics.havoc_list (wrL C)) R1"
     using asm0(2) by auto
   moreover have "entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - (set (wrL C))"
-    using ConcreteSemantics.SL_proof_Havoc_list_elim assms(2) calculation(5) by blast
+    using ConcreteSemantics.SL_proof_Havoc_list_elim assms(2) calculation(5) assms(4) by blast
 
   (* R1 is the frame *)
 
@@ -898,6 +909,7 @@ lemma invariant_translate_induct:
       and "well_typed_cmd \<Delta> C"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
       and "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      and "TypedEqui.wf_context \<Delta>"
     shows "invariant_translate \<Delta> P C Q"
   using assms
 proof (induct C arbitrary: P Q)
@@ -925,7 +937,7 @@ next
         using Cpar.prems(2) by auto
       show "wf_stmt \<Delta> C1"
         using Cpar.prems(1) by auto
-    qed
+    qed (simp add: Cpar)
     show "invariant_translate \<Delta> P C2 Q"
     proof (rule Cpar(2))
       have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale P2;; fst (translate C2);; Exhale Q2)"
@@ -938,8 +950,8 @@ next
         using Cpar.prems(2) by auto
       show "wf_stmt \<Delta> C2"
         using Cpar.prems(1) by auto
-    qed
-  qed
+    qed (simp add: Cpar)
+  qed (simp add: Cpar)
 next
   case (Cif b C1 C2)
   show ?case
@@ -955,7 +967,7 @@ next
         using Cif.prems(3) by fastforce
       show "\<And>Cv. Cv \<in> snd (translate C1) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cif.prems(4) Un_iff snd_eqD translate.simps(8))
-    qed
+    qed (simp add: Cif)
     show "invariant_translate \<Delta> P C2 Q"
     proof (rule Cif(2))
       show "wf_stmt \<Delta> C2"
@@ -966,7 +978,7 @@ next
         using Cif.prems(3) by fastforce
       show "\<And>Cv. Cv \<in> snd (translate C2) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cif.prems(4) Un_iff snd_eqD translate.simps(8))
-    qed
+    qed (simp add: Cif)
   qed
 next
   case (Cwhile b I C)
@@ -987,8 +999,8 @@ next
       then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))" by force
       show "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         using Cwhile.prems(4) by auto
-    qed
-  qed
+    qed (simp add: Cwhile)
+  qed (simp add: Cwhile)
 qed (simp_all add: invariant_translate_skip invariant_translate_free invariant_translate_alloc invariant_translate_seq
       invariant_translate_write invariant_translate_read invariant_translate_assign)
 
@@ -1003,6 +1015,8 @@ theorem sound_translation:
 
       and "ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate C);; Exhale Q)"
       and "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) Cv"
+
+      and "TypedEqui.wf_context \<Delta>"
     shows "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
 proof -
   obtain B where "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate C);; Exhale Q) B"
@@ -1018,7 +1032,7 @@ proof -
       show "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> atrue \<Delta>) (fst (translate C)) B'"
         by (metis \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta> \<otimes> P) (fst (translate C)) B'\<close> add_set_commm)
       show "invariant_translate \<Delta> (P \<otimes> atrue \<Delta>) C B'"
-        by (simp add: assms(1) assms(2) assms(3) assms(4) invariant_translate_induct)
+        by (simp add: assms(1) assms(2) assms(3) assms(4) assms(9) invariant_translate_induct)
       show "proof_obligations_valid \<Delta> (snd (translate C))"
         unfolding proof_obligations_valid_def
       proof clarify
