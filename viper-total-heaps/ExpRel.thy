@@ -342,9 +342,14 @@ lemma exp_rel_oldexp_inst:
   assumes RImpliesStateRel: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and "fst (label_hm_translation Tr) lbl = Some OldH"
       and "snd (label_hm_translation Tr) lbl = Some OldM"
-      and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH \<rparr>"
+      and "lbls = label_hm_translation Tr"
+      and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
+      and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH, label_hm_translation := lbls' \<rparr>"
       and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      and DisjAux: "OldM \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldH \<notin> state_rel0_disj_vars Tr AuxPred \<and> OldM \<noteq> OldH"
+      (* How to frame this assumption? *)
+      and DisjAux: "OldH \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
+                    OldM \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
+                    OldH \<noteq> OldM"
       and InnerExpRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep TrOld AuxPred ctxt) ctxt_vpr ctxt e e_bpl"
                    (is "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl")
                  shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
@@ -425,15 +430,22 @@ proof (rule exp_rel_oldexp)
     next
       show "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
       proof -
-        let ?TrOldHeap = "Tr \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
-        have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
-        proof (rule disjoint_list_change_heap)
+        let ?TrNoLabels = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+
+        have "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
+        proof (rule disjoint_list_remove_label[where ?lbls' = "lbls'" and ?lbl = "lbl"])
           show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
-            using StateRel state_rel_disjoint
-            by blast
-          show "OldH \<notin> state_rel0_disj_vars Tr AuxPred"
-            using DisjAux
-            by fast
+            using StateRel state_rel_disjoint by fast
+        qed (simp add: \<open>lbls' = _\<close> \<open>lbls = _\<close>, simp)
+
+        let ?TrOldHeap = "?TrNoLabels \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
+        have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
+        proof (rule disjoint_list_change_heap[where ?h' = "OldH"])
+          show "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
+            using \<open>disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)\<close>
+            by simp
+          show "OldH \<notin> state_rel0_disj_vars ?TrNoLabels AuxPred"
+            using DisjAux \<open>lbls' = _\<close> by simp
         qed (simp)
 
         thus "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
@@ -548,8 +560,8 @@ proof (rule exp_rel_oldexp)
         by fast
     next
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
-        using StateRel state_rel_label_hm_rel \<open>TrOld = _\<close>
-        by fastforce
+        using StateRel state_rel_label_hm_rel \<open>TrOld = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close>
+        sorry
     qed
   qed
 
