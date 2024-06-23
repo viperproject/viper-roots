@@ -54,7 +54,9 @@ ML \<open>
       
       bop_wf_rel_div_mod exp_rel_info ctxt |> SOLVED'
    ]            
- 
+
+
+
   fun exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt = 
      FIRST_AND_THEN' [
        resolve_tac ctxt [@{thm var_expr_wf_rel}], (* var *)
@@ -65,7 +67,8 @@ ML \<open>
        resolve_tac ctxt [@{thm syn_lazy_bop_wf_rel_2}] THEN' (* bop lazy *) 
        assm_full_simp_solved_tac ctxt,   
        resolve_tac ctxt [@{thm field_access_wf_rel}], (* field access *)
-       resolve_tac ctxt @{thms cond_exp_wf_rel} (* conditional expression *)
+       resolve_tac ctxt @{thms cond_exp_wf_rel}, (* conditional expression *)
+       resolve_tac ctxt @{thms old_expr_wf_rel_inst[where ?Q = "\<lambda>\<omega>def \<omega>. \<omega>def = \<omega>"]}
       ] [  
        fn _ => fn st => all_tac st, (* var *)
        fn _ => fn st => all_tac st, (* lit *)
@@ -73,8 +76,9 @@ ML \<open>
        fn i => fn st => binop_eager_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* bop eager *)
        fn i => fn st => binop_lazy_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* bop lazy *)
        fn i => fn st => field_access_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* field access *)
-       fn i => fn st => cond_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st (* cond exp *)
-      ]
+       fn i => fn st => cond_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st, (* cond exp *)
+       fn i => fn st => old_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt i st
+      ]                        
    and 
     binop_eager_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt =        
       (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN' (* e1 *)
@@ -127,6 +131,17 @@ ML \<open>
          (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED') THEN'
          progress_tac ctxt
        )
+   and
+    old_exp_wf_rel_tac _ exp_rel_info ctxt =
+       resolve_tac ctxt @{thms wf_total_consistency_trivial} THEN'
+       fast_tac ctxt THEN'
+       assm_full_simp_solved_tac ctxt THEN'
+       (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt THEN'
+       (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt THEN'
+       assm_full_simp_solved_tac ctxt THEN'
+       assm_full_simp_solved_tac ctxt THEN'
+       assm_full_simp_solved_tac ctxt
+       (* TODO include disjointness, and inner exprwfrel tactics? *)
 
    fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 
      (if k <= 0 then
