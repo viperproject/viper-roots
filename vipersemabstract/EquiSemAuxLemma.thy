@@ -571,13 +571,20 @@ subsection \<open>Properties about Addition on EquiViper states\<close>
 lemma state_add_iff:
   shows "\<And>\<omega> a b :: 'v equi_state. Some \<omega> = a \<oplus> b \<longleftrightarrow> Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
   sorry
+
 (*
 proof -
   fix \<omega> a b :: "'v equi_state"
   show "Some \<omega> = a \<oplus> b \<longleftrightarrow> Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
   proof
     assume LHS: "Some \<omega> = a \<oplus> b"
-    then have s_plus: "Some (get_store \<omega>) = get_store a \<oplus> get_store b" using plus_prodE sorry
+    have "the_ag (fst \<omega>) = the_ag (fst a) \<and> the_ag (fst \<omega>) = the_ag (fst b)"
+      using plus_prodE[OF HOL.sym[OF LHS]]
+      unfolding get_store_def using plus_AgE[of "fst \<omega>" "fst a" "fst b"]
+      by auto
+    then have s_plus: "Some (get_store \<omega>) = get_store a \<oplus> get_store b" 
+      sorry
+
       by (metis LHS getI plus_prodE)
     have snd_plus: "Some (snd \<omega>) = snd a \<oplus> snd b"
       by (metis LHS plus_prodE)

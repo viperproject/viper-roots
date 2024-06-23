@@ -88,7 +88,7 @@ lemma acc_heap_loc_Stable [simp] :
   "Stable (acc_heap_loc \<Delta> ty hl p)"
   apply (clarsimp simp add:acc_heap_loc_def)
   apply (rule StableI)
-  sorry (* TODO *)
+  sorry (* MS: TODO *)
 (*
   by (auto simp add: vstate_stabilize_structure restrict_map_eq_Some norm_preal preal_to_real stabilize_acc_virt)
 *)
@@ -110,7 +110,7 @@ lemma abs_state_star_singletonI :
     apply (rule refl)
    apply (rule assms(3))
   using assms
-  sorry
+  sorry (* MS: TODO *)
 (*
 TODO: plus_state_def not proven anymore
   by (smt (verit, best) abs_state_ext_iff get_state_make_equi_state get_store_make_equi_state get_trace_make_equi_state option.discI option.sel plus_state_def set_state_def set_state_make_equi_state)
@@ -1144,10 +1144,10 @@ lemma well_typedly_add_set_l :
 lemma Stable_well_typedly :
   assumes "Stable A"
   shows "Stable (well_typedly \<Delta> F A)"
-  using assms
+  using assms          
   apply (simp add:Stable_def Stabilize_def well_typedly_def)
   (* apply (auto) *)
-  sorry
+  sorry (* MS: TODO *)
 
 definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
   "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
@@ -1346,7 +1346,7 @@ lemma concrete_post_FieldAssign :
   apply (simp add: concrete_red_stmt_post_def)
   apply (rule exI, rule conjI)
 
-  sorry
+  sorry (* MS: TODO *)
 
 (* TODO:
    apply (solves \<open>rule ConcreteSemantics.RedFieldAssign; assumption\<close>)
@@ -1378,7 +1378,7 @@ lemma concrete_post_Label :
   unfolding concrete_red_stmt_post_def
   apply (rule exI, rule conjI)
    apply (rule ConcreteSemantics.RedCustom)
-  sorry
+  sorry (* MS: TODO *)
 (*
 TODO:
   by (auto)

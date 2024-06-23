@@ -24,10 +24,26 @@ type_synonym heap = "int partial_heap"
 (* address are nat here... *)
 type_synonym state = "stack \<times> heap"
 
+(*
+datatype binop =
+  Add | Sub | Mult | IntDiv | PermDiv | Mod
+| Eq | Neq
+| Gt | Gte | Lt | Lte
+| Or | BImp | And
+
+*)
+datatype int_binop = Add | Sub | Mult | Mod
+
+fun interp_int_binop :: "int_binop \<Rightarrow> int \<Rightarrow> int \<Rightarrow> int" where
+  "interp_int_binop Add = (+)"
+| "interp_int_binop Sub = (-)"
+| "interp_int_binop Mult = (*)"
+| "interp_int_binop Mod = (mod)"
+
 datatype exp =
 Evar var
 | Elit int
-| Ebinop exp "int \<Rightarrow> int \<Rightarrow> int" exp
+| Ebinop exp int_binop exp
 
 datatype bexp =
 Beq exp exp
@@ -44,16 +60,17 @@ datatype cmd =
 | Calloc var exp
 | Cfree var
 | Cseq cmd cmd
-| Cpar f_assertion cmd f_assertion f_assertion cmd f_assertion ("{_} _ {_} || {_} _ {_}")
+| Cpar "(pure_exp, pure_exp atomic_assert) assert" cmd "(pure_exp, pure_exp atomic_assert) assert"
+       "(pure_exp, pure_exp atomic_assert) assert" cmd "(pure_exp, pure_exp atomic_assert) assert" ("{_} _ {_} || {_} _ {_}")
 | Cif bexp cmd cmd
-| Cwhile bexp f_assertion cmd
+| Cwhile bexp "(pure_exp, pure_exp atomic_assert) assert" cmd
 
 
 primrec edenot :: "exp \<Rightarrow> stack \<Rightarrow> int"
   where
   "edenot (Evar v) s = the_int (the (s v))"
 | "edenot (Elit n) s = n"
-| "edenot (Ebinop e1 op e2) s = op (edenot e1 s) (edenot e2 s)"
+| "edenot (Ebinop e1 op e2) s = interp_int_binop op (edenot e1 s) (edenot e2 s)"
 
 primrec
   bdenot :: "bexp \<Rightarrow> stack \<Rightarrow> bool" where

@@ -63,20 +63,28 @@ proof
     using \<open>\<omega> \<in> P\<close> x_elem_set_product by blast
 qed
 
+(*
+definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
+  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+*)
+
 
 fun wf_stmt where
-  "wf_stmt \<Delta> (Cseq C1 C2) \<longleftrightarrow> wf_stmt \<Delta> C1 \<and> wf_stmt \<Delta> C2"
-| "wf_stmt \<Delta> (Calloc r e) \<longleftrightarrow> r \<notin> fvE e"
-| "wf_stmt \<Delta> ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
-  disjoint (fvC C1 \<union> fvA \<Delta> (Q1 \<otimes> atrue \<Delta>)) (wrC C2) \<and> disjoint (fvC C2 \<union> fvA \<Delta> (Q2 \<otimes> atrue \<Delta>)) (wrC C1) \<and>
-  TypedEqui.self_framing_typed \<Delta> P1 \<and> TypedEqui.typed_assertion \<Delta> P1 \<and>
-  TypedEqui.self_framing_typed \<Delta> P2 \<and> TypedEqui.typed_assertion \<Delta> P2 \<and>
-  wf_stmt \<Delta> C1 \<and> wf_stmt \<Delta> C2"
-| "wf_stmt \<Delta> (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Delta> C1 \<and> wf_stmt \<Delta> C2"
+  "wf_stmt \<Gamma> F \<Delta> (Cseq C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F \<Delta> C1 \<and> wf_stmt \<Gamma> F \<Delta> C2"
+| "wf_stmt \<Gamma> F \<Delta> (Calloc r e) \<longleftrightarrow> r \<notin> fvE e"
 
-| "wf_stmt \<Delta> (Cwhile b I C) \<longleftrightarrow> TypedEqui.self_framing_typed \<Delta> I \<and> TypedEqui.typed_assertion \<Delta> I \<and> wf_stmt \<Delta> C"
+| "wf_stmt \<Gamma> F \<Delta> ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
+  disjoint (fvC C1 \<union> fvA \<Delta> ((make_semantic_assertion \<Gamma> F Q1) \<otimes> atrue \<Delta>)) (wrC C2) \<and> disjoint (fvC C2 \<union> fvA \<Delta> ((make_semantic_assertion \<Gamma> F Q2) \<otimes> atrue \<Delta>)) (wrC C1) \<and>
+  TypedEqui.self_framing_typed \<Delta> (make_semantic_assertion \<Gamma> F P1) \<and> TypedEqui.typed_assertion \<Delta> (make_semantic_assertion \<Gamma> F P1) \<and>
+  TypedEqui.self_framing_typed \<Delta> (make_semantic_assertion \<Gamma> F P2) \<and> TypedEqui.typed_assertion \<Delta> (make_semantic_assertion \<Gamma> F P2) \<and>
+  wf_stmt \<Gamma> F \<Delta> C1 \<and> wf_stmt \<Gamma> F \<Delta> C2"
 
-| "wf_stmt \<Delta> _ \<longleftrightarrow> True"
+| "wf_stmt \<Gamma> F \<Delta> (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F \<Delta> C1 \<and> wf_stmt \<Gamma> F \<Delta> C2"
+
+| "wf_stmt \<Gamma> F \<Delta> (Cwhile b I C) \<longleftrightarrow> TypedEqui.self_framing_typed \<Delta> (make_semantic_assertion \<Gamma> F I)
+                              \<and> TypedEqui.typed_assertion \<Delta> (make_semantic_assertion \<Gamma> F I) \<and> wf_stmt \<Gamma> F \<Delta> C"
+
+| "wf_stmt \<Gamma> F \<Delta> _ \<longleftrightarrow> True"
 
 lemma atrue_self_framing_and_typed[simp]:
   "TypedEqui.typed_assertion \<Delta> (atrue \<Delta>)"
@@ -87,7 +95,7 @@ lemma atrue_self_framing_and_typed[simp]:
 lemma convert_proof_alloc:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (Havoc r;; Inhale (full_ownership_with_val r e)) Q"
       and "well_typed_cmd \<Delta> (Calloc r e)"
-      and "wf_stmt \<Delta> (Calloc r e)"
+      and "wf_stmt \<Gamma> F \<Delta> (Calloc r e)"
       and "TypedEqui.wf_context \<Delta>"
   shows "\<Delta> \<turnstile>CSL [P] Calloc r e [Q]"
 proof (rule RuleCons)
@@ -333,13 +341,13 @@ qed
 
 definition semantify_heap_loc :: "var \<Rightarrow> (int equi_state, int val) AbstractSemantics.exp" where
   "semantify_heap_loc r \<omega> =
-  (if (\<exists>l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_h \<omega> (l, field_val) = Some (VInt v))
+  (if (\<exists>l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_h \<omega> (l, field_val) = Some v)
   then Some (the (get_h \<omega> (SOME l. get_store \<omega> r = Some (VRef (Address l)), field_val)))
   else None)"
 
 lemma convert_proof_read:
   assumes "ConcreteSemantics.SL_proof \<Delta> P (LocalAssign x (semantify_heap_loc r)) Q"
-     (* and "custom_context \<Delta> = type_ctxt_heap" *)
+      and "custom_context \<Delta> = type_ctxt_heap"
   shows "\<Delta> \<turnstile>CSL [P] Cread x r [Q]"
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
@@ -351,18 +359,22 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
   \<and> (\<exists>v. get_h \<omega> (l, field_val) = Some (VInt v)))"
   proof -
     fix \<omega>
-    assume "\<omega> \<in> P"
-    then obtain l v where "get_store \<omega> r = Some (VRef (Address l))" "get_h \<omega> (l, field_val) = Some (VInt v)"
+    assume asm1: "\<omega> \<in> P"
+    then obtain l v0 where "get_store \<omega> r = Some (VRef (Address l))" "get_h \<omega> (l, field_val) = Some v0"
       by (metis asm0(2) framed_by_exp_def semantify_heap_loc_def)
+    then obtain v where "v0 = VInt v"
+      using TypedEqui.typed_assertionE[OF asm0(4) asm1] TypedEqui.typed_def[of \<Delta> \<omega>] well_typedE(1)[of "custom_context \<Delta>" "get_abs_state \<omega>"]
+      Instantiation.well_typed_heapE[of "custom_context \<Delta>" "get_state \<omega>" "(l, field_val)" v0]
+      by (smt (verit, best) CollectD assms(2) option.sel snd_conv snd_get_abs_state type_ctxt_heap_def vints_def)
     moreover have "stabilize \<omega> \<in> P"
       using TypedEqui.self_framing_typedE TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> asm0(3) asm0(4) typed_state.typed_assertionE by blast
     then have "get_h (stabilize \<omega>) (l, field_val) = Some (VInt v)"
-      by (metis (no_types, lifting) AbstractSemantics.get_store_stabilize asm0(2) calculation(1) calculation(2) framed_by_exp_def get_address_simp semantify_heap_loc_def stabilize_value_persists)
+      by (metis (no_types, lifting) AbstractSemantics.get_store_stabilize \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> asm0(2) calculation framed_by_exp_def get_address_simp semantify_heap_loc_def stabilize_value_persists)
     then have "get_m \<omega> (l, field_val) > 0"
       using EquiSemAuxLemma.gr_0_is_ppos stable_virtual_state_def by fastforce
     then show "(\<exists>l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0
   \<and> (\<exists>v. get_h \<omega> (l, field_val) = Some (VInt v)))"
-      using calculation(1) calculation(2) by blast
+      by (simp add: \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> calculation)
   qed
 
   show "\<Delta> \<turnstile>CSL [P] Cread x r [Q]"
@@ -379,39 +391,44 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
       then obtain \<omega> l where "\<omega>' = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>"
           "\<omega> \<in> P" "get_store \<omega> r = Some (VRef (Address l))"
         unfolding read_result_def by blast
-      moreover have "get_h \<omega> (l, field_val) = (if (\<exists>l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_h \<omega> (l, field_val) = Some (VInt v))
+      moreover have "get_h \<omega> (l, field_val) = (if (\<exists>l v. get_store \<omega> r = Some (VRef (Address l)) \<and> get_h \<omega> (l, field_val) = Some v)
             then Some (the (get_h \<omega> (SOME l. get_store \<omega> r = Some (VRef (Address l)), field_val))) else None)"
-        by (smt (verit, del_insts) calculation(2) calculation(3) get_address_simp option.distinct(1) option.expand option.sel r someI_ex vstate_wf_imp)
+        by (simp add: calculation(3))
       ultimately show "\<omega>' \<in> Q" using asm0(1)
         unfolding ConcreteSemantics.post_substitute_var_assert_def ConcreteSemantics.substitute_var_state_def
-          semantify_heap_loc_def by force
+          semantify_heap_loc_def
+        by (smt (verit, best) Eps_cong image_iff)
     qed
   qed (simp)
 qed
 
 
 
-fun translate :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" where
-  "translate Cskip = (Skip, {})"
-| "translate (Cassign x e) = (LocalAssign x (semantify_exp e), {})"
+fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
+  "translate \<Gamma> F Cskip = (Skip, {})"
+| "translate \<Gamma> F (Cassign x e) = (LocalAssign x (semantify_exp e), {})"
 
-| "translate (Calloc r e) = ((Havoc r;; Inhale (full_ownership_with_val r e)), {})"
-| "translate (Cfree r) = (Exhale (Stabilize (full_ownership r)), {})"
-| "translate (Cwrite r e) = (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e)), {})"
-| "translate (Cread x r) = (LocalAssign x (semantify_heap_loc r), {})"
+| "translate \<Gamma> F (Calloc r e) = ((Havoc r;; Inhale (full_ownership_with_val r e)), {})"
+| "translate \<Gamma> F (Cfree r) = (Exhale (Stabilize (full_ownership r)), {})"
+| "translate \<Gamma> F (Cwrite r e) = (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e)), {})"
+| "translate \<Gamma> F (Cread x r) = (LocalAssign x (semantify_heap_loc r), {})"
 
-| "translate (Cseq C1 C2) = (let r1 = translate C1 in let r2 = translate C2 in
+| "translate \<Gamma> F (Cseq C1 C2) = (let r1 = translate \<Gamma> F C1 in let r2 = translate \<Gamma> F C2 in
   (fst r1;; fst r2, snd r1 \<union> snd r2))"
 
-| "translate (Cif b C1 C2) = (If (semantify_bexp b) (fst (translate C1)) (fst (translate C2)), snd (translate C1) \<union> snd (translate C2))"
+| "translate \<Gamma> F (Cif b C1 C2) = (If (semantify_bexp b) (fst (translate \<Gamma> F C1)) (fst (translate \<Gamma> F C2)), snd (translate \<Gamma> F C1) \<union> snd (translate \<Gamma> F C2))"
 
-| "translate ({P1} C1 {Q1} || {P2} C2 {Q2}) =
-  ((Exhale (P1 \<otimes> P2);; ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);; Inhale (Q1 \<otimes> Q2)),
-  let r1 = translate C1 in let r2 = translate C2 in
-  { (Inhale P1;; fst r1;; Exhale Q1), (Inhale P2;; fst r2;; Exhale Q2) } \<union> snd r1 \<union> snd r2)"
+| "translate \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2}) =
+  ((Exhale (make_semantic_assertion \<Gamma> F P1 \<otimes> make_semantic_assertion \<Gamma> F P2);;
+  ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);;
+  Inhale (make_semantic_assertion \<Gamma> F Q1 \<otimes> make_semantic_assertion \<Gamma> F Q2)),
+  let r1 = translate \<Gamma> F C1 in let r2 = translate \<Gamma> F C2 in
+  { (Inhale (make_semantic_assertion \<Gamma> F P1);; fst r1;; Exhale (make_semantic_assertion \<Gamma> F Q1)),
+  (Inhale (make_semantic_assertion \<Gamma> F P2);; fst r2;; Exhale (make_semantic_assertion \<Gamma> F Q2)) } \<union> snd r1 \<union> snd r2)"
 
-| "translate (Cwhile b I C) = (Exhale I;; ConcreteSemantics.havoc_list (wrL C);; Inhale (I \<inter> assertify_bexp (Bnot b)),
-  { Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I } \<union> snd (translate C))"
+| "translate \<Gamma> F (Cwhile b I C) = (Exhale (make_semantic_assertion \<Gamma> F I);;
+  ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion \<Gamma> F I) \<inter> assertify_bexp (Bnot b)),
+  { Inhale ((make_semantic_assertion \<Gamma> F I) \<inter> assertify_bexp b);; fst (translate \<Gamma> F C);; Exhale (make_semantic_assertion \<Gamma> F I) } \<union> snd (translate \<Gamma> F C))"
 
 lemma CSL_weaken_post_atrue:
   assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
@@ -440,47 +457,47 @@ lemma proof_obligations_valid_union:
   by (meson Un_iff proof_obligations_valid_def)
 
 definition invariant_translate where
-  "invariant_translate \<Delta> P C Q \<longleftrightarrow>
-  ((proof_obligations_valid \<Delta> (snd (translate C)) \<and> ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q) \<longrightarrow> \<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>])"
+  "invariant_translate \<Gamma> F \<Delta> P C Q \<longleftrightarrow>
+  ((proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C)) \<and> ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F C)) Q) \<longrightarrow> \<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>])"
 
 lemma invariant_translateE:
-  assumes "invariant_translate \<Delta> P C Q"
-      and "proof_obligations_valid \<Delta> (snd (translate C))"
-      and "ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q"
+  assumes "invariant_translate \<Gamma> F \<Delta> P C Q"
+      and "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C))"
+      and "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F C)) Q"
     shows "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
   using assms(1) assms(2) assms(3) invariant_translate_def by blast
 
 
 lemma invariant_translateI:
-  assumes "proof_obligations_valid \<Delta> (snd (translate C)) \<Longrightarrow> ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q
+  assumes "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C)) \<Longrightarrow> ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F C)) Q
     \<Longrightarrow> \<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
-  shows "invariant_translate \<Delta> P C Q"
+  shows "invariant_translate \<Gamma> F \<Delta> P C Q"
   using assms invariant_translate_def proof_obligations_valid_def by blast
 
 lemma invariant_translate_simpler:
-  assumes "ConcreteSemantics.SL_proof \<Delta> P (fst (translate C)) Q \<Longrightarrow> \<Delta> \<turnstile>CSL [P] C [Q]"
-      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
+  assumes "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F C)) Q \<Longrightarrow> \<Delta> \<turnstile>CSL [P] C [Q]"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P C Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P C Q"
   by (simp add: CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms invariant_translateI)
 
 corollary invariant_translate_skip:
   assumes "TypedEqui.wf_context \<Delta>"
-  shows "invariant_translate \<Delta> P Cskip Q"
+  shows "invariant_translate \<Gamma> F \<Delta> P Cskip Q"
   using convert_proof_skip invariant_translate_simpler assms by fastforce
 
 corollary invariant_translate_assign:
-  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cassign x e)))"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F (Cassign x e)))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Cassign x e) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cassign x e) Q"
   using convert_proof_assign invariant_translate_simpler assms by fastforce
 
 corollary invariant_translate_alloc:
   assumes "well_typed_cmd \<Delta> (Calloc r e)"
-      and "wf_stmt \<Delta> (Calloc r e)"
-      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Calloc r e)))"
+      and "wf_stmt \<Gamma> F \<Delta> (Calloc r e)"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F (Calloc r e)))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Calloc r e) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Calloc r e) Q"
   using assms cmd.distinct(37) convert_proof_alloc invariant_translate_simpler by fastforce
 
 lemma atrue_twice_same:
@@ -505,11 +522,11 @@ qed (simp add: atrue_twice_same)
 
 
 corollary invariant_translate_free:
-  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cfree r)))"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F (Cfree r)))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Cfree r) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cfree r) Q"
 proof (rule invariant_translateI)
-  assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cfree r))) Q"
+  assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F (Cfree r))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cfree r [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
     using RuleFrame[OF convert_proof_free]
     by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_free fst_eqD translate.simps(4))
@@ -518,11 +535,11 @@ proof (rule invariant_translateI)
 qed
 
 corollary invariant_translate_write:
-  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cwrite r e)))"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F (Cwrite r e)))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Cwrite r e) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cwrite r e) Q"
 proof (rule invariant_translateI)
-  assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cwrite r e))) Q"
+  assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F (Cwrite r e))) Q"
   then have "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwrite r e [(Q \<otimes> atrue \<Delta>) \<otimes> atrue \<Delta>]"
     using RuleFrame[OF convert_proof_write]
     by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_write fst_eqD translate.simps(5))
@@ -531,21 +548,22 @@ proof (rule invariant_translateI)
 qed
 
 corollary invariant_translate_read:
-  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate (Cread x r)))"
+  assumes "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F (Cread x r)))"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Cread x r) Q"
+      and "custom_context \<Delta> = type_ctxt_heap"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cread x r) Q"
   using convert_proof_read invariant_translate_simpler assms by fastforce
 
 
 lemma invariant_translate_seq:
-  assumes "\<And>R. invariant_translate \<Delta> P C1 R"
-      and "\<And>R. invariant_translate \<Delta> R C2 Q"
-    shows "invariant_translate \<Delta> P (Cseq C1 C2) Q"
+  assumes "\<And>R. invariant_translate \<Gamma> F \<Delta> P C1 R"
+      and "\<And>R. invariant_translate \<Gamma> F \<Delta> R C2 Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cseq C1 C2) Q"
 proof (rule invariant_translateI)
-  assume asm0: "proof_obligations_valid \<Delta> (snd (translate (Cseq C1 C2)))"
-    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cseq C1 C2))) Q"
-  then obtain R where r: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate C1)) R"
-      "ConcreteSemantics.SL_proof \<Delta> R (fst (translate C2)) Q"
+  assume asm0: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F (Cseq C1 C2)))"
+    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F (Cseq C1 C2))) Q"
+  then obtain R where r: "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F C1)) R"
+      "ConcreteSemantics.SL_proof \<Delta> R (fst (translate \<Gamma> F C2)) Q"
     by (metis ConcreteSemantics.SL_proof_Seq_elim fst_eqD translate.simps(7))
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cseq C1 C2 [Q \<otimes> atrue \<Delta>]"
   proof (rule RuleSeq)
@@ -567,25 +585,25 @@ qed
 
 
 lemma invariant_translate_inhale_exhale_get_proof:
-  assumes "\<And>P Q. invariant_translate \<Delta> P C Q"
-      and "ConcreteSemantics.SL_proof \<Delta> P (Inhale A;; fst (translate C);; Exhale B) Q"
-      and "proof_obligations_valid \<Delta> (snd (translate C))"
+  assumes "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C Q"
+      and "ConcreteSemantics.SL_proof \<Delta> P (Inhale A;; fst (translate \<Gamma> F C);; Exhale B) Q"
+      and "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C))"
     shows "\<Delta> \<turnstile>CSL [P \<otimes> A \<otimes> atrue \<Delta>] C [Q \<otimes> B \<otimes> atrue \<Delta>]"
   using assms(2)
 proof (rule ConcreteSemantics.SL_proof_Seq_elim)
-  fix R1 assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.Inhale A ;; fst (translate C)) R1"
+  fix R1 assume asm0: "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.Inhale A ;; fst (translate \<Gamma> F C)) R1"
     "ConcreteSemantics.SL_proof \<Delta> R1 (abs_stmt.Exhale B) Q"
   then have "entails R1 (Q \<otimes> B)" by auto
   show "\<Delta> \<turnstile>CSL [P \<otimes> A \<otimes> atrue \<Delta>] C [Q \<otimes> B \<otimes> atrue \<Delta>]"
   proof (rule ConcreteSemantics.SL_proof_Seq_elim[OF asm0(1)])
     fix R0 assume asm1: "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.Inhale A) R0"
-          "ConcreteSemantics.SL_proof \<Delta> R0 (fst (translate C)) R1"
-    then have "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> A) (fst (translate C)) R1"
+          "ConcreteSemantics.SL_proof \<Delta> R0 (fst (translate \<Gamma> F C)) R1"
+    then have "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> A) (fst (translate \<Gamma> F C)) R1"
       by auto
     show "\<Delta> \<turnstile>CSL [P \<otimes> A \<otimes> atrue \<Delta>] C [Q \<otimes> B \<otimes> atrue \<Delta>]"
     proof (rule RuleCons)
       show "\<Delta> \<turnstile>CSL [P \<otimes> A \<otimes> atrue \<Delta>] C [R1 \<otimes> atrue \<Delta>]"
-        using \<open>ConcreteSemantics.SL_proof \<Delta> (P \<otimes> A) (fst (translate C)) R1\<close> assms(1) assms(3) invariant_translate_def by blast
+        using \<open>ConcreteSemantics.SL_proof \<Delta> (P \<otimes> A) (fst (translate \<Gamma> F C)) R1\<close> assms(1) assms(3) invariant_translate_def by blast
       show "R1 \<otimes> atrue \<Delta> \<subseteq> Q \<otimes> B \<otimes> atrue \<Delta>"
         by (meson \<open>entails R1 (Q \<otimes> B)\<close> add_set_mono entails_def order_refl)
     qed (simp)
@@ -600,9 +618,9 @@ lemma drop_conjunct_entails:
 
 
 (*
-| "translate ({P1} C1 {Q1} || {P2} C2 {Q2}) =
+| "translate \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2}) =
   ((Exhale (P1 \<otimes> P2);; ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);; Inhale (Q1 \<otimes> Q2)),
-  let r1 = translate C1 in let r2 = translate C2 in
+  let r1 = translate \<Gamma> F C1 in let r2 = translate \<Gamma> F C2 in
   { (Inhale P1;; fst r1;; Exhale Q1), (Inhale P2;; fst r2;; Exhale Q2) } \<union> snd r1 \<union> snd r2)"
 *)
 
@@ -653,108 +671,120 @@ lemma typed_assertion_star_atrue:
 
 
 lemma invariant_translate_parallel:
-  assumes "\<And>P Q. invariant_translate \<Delta> P C1 Q"
-      and "\<And>P Q. invariant_translate \<Delta> P C2 Q"
+  assumes "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C1 Q"
+      and "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C2 Q"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
-      and "wf_stmt \<Delta> ({P1} C1 {Q1} || {P2} C2 {Q2})"
+      and "wf_stmt \<Gamma> F \<Delta> ({P1} C1 {Q1} || {P2} C2 {Q2})"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P ({P1} C1 {Q1} || {P2} C2 {Q2}) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P ({P1} C1 {Q1} || {P2} C2 {Q2}) Q"
 proof (rule invariant_translateI)
-  assume asm0: "proof_obligations_valid \<Delta> (snd (translate {P1} C1 {Q1} || {P2} C2 {Q2}))"
-    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate {P1} C1 {Q1} || {P2} C2 {Q2})) Q"
-  then have r0: "proof_obligations_valid \<Delta> (snd (translate C1)) \<and> proof_obligations_valid \<Delta> (snd (translate C2))"
+  let ?P1 = "make_semantic_assertion \<Gamma> F P1"
+  let ?P2 = "make_semantic_assertion \<Gamma> F P2"
+  let ?Q1 = "make_semantic_assertion \<Gamma> F Q1"
+  let ?Q2 = "make_semantic_assertion \<Gamma> F Q2"
+
+  assume asm0: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F {P1} C1 {Q1} || {P2} C2 {Q2}))"
+    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F {P1} C1 {Q1} || {P2} C2 {Q2})) Q"
+  then have r0: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C1)) \<and> proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C2))"
     using proof_obligations_valid_union
     unfolding translate.simps by (metis sndI)
-  moreover obtain B1 where B1_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale P1;; fst (translate C1);; Exhale Q1) B1"
+  moreover obtain B1 where B1_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>)
+    (Inhale (make_semantic_assertion \<Gamma> F P1);; fst (translate \<Gamma> F C1);; Exhale (make_semantic_assertion \<Gamma> F Q1)) B1"
     using asm0 unfolding translate.simps proof_obligations_valid_def
     by (metis Un_iff insertCI snd_eqD)
-  moreover obtain B2 where B2_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale P2;; fst (translate C2);; Exhale Q2) B2"
+  moreover obtain B2 where B2_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>)
+  (Inhale (make_semantic_assertion \<Gamma> F P2);; fst (translate \<Gamma> F C2);; Exhale (make_semantic_assertion \<Gamma> F Q2)) B2"
     using asm0 unfolding translate.simps proof_obligations_valid_def
     by (metis Un_iff insertCI snd_eqD)
-  moreover have main: "ConcreteSemantics.SL_proof \<Delta> P (Exhale (P1 \<otimes> P2);; ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);; Inhale (Q1 \<otimes> Q2)) Q"
+  moreover have main: "ConcreteSemantics.SL_proof \<Delta> P (Exhale (make_semantic_assertion \<Gamma> F P1 \<otimes> make_semantic_assertion \<Gamma> F P2);;
+  ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);;
+  Inhale (make_semantic_assertion \<Gamma> F Q1 \<otimes> make_semantic_assertion \<Gamma> F Q2)) Q"
     using asm0 by simp
   then obtain R0 R1 where R_defs:
-    "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.Exhale (P1 \<otimes> P2)) R0"
+    "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.Exhale (make_semantic_assertion \<Gamma> F P1 \<otimes> make_semantic_assertion \<Gamma> F P2)) R0"
     "ConcreteSemantics.SL_proof \<Delta> R0 (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2)) R1"
-    "ConcreteSemantics.SL_proof \<Delta> R1 (abs_stmt.Inhale (Q1 \<otimes> Q2)) Q"
+    "ConcreteSemantics.SL_proof \<Delta> R1 (abs_stmt.Inhale (make_semantic_assertion \<Gamma> F Q1 \<otimes> make_semantic_assertion \<Gamma> F Q2)) Q"
     by (meson ConcreteSemantics.SL_proof_Seq_elim)
   then have P_Q_R_rels:
-    "entails P (R0 \<otimes> (P1 \<otimes> P2)) \<and> Q = R1 \<otimes> (Q1 \<otimes> Q2)" by auto
+    "entails P (R0 \<otimes> (make_semantic_assertion \<Gamma> F P1 \<otimes> make_semantic_assertion \<Gamma> F P2))
+  \<and> Q = R1 \<otimes> (make_semantic_assertion \<Gamma> F Q1 \<otimes> make_semantic_assertion \<Gamma> F Q2)" by auto
   moreover have "entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - (set (wrL C1 @ wrL C2))"
     using ConcreteSemantics.SL_proof_Havoc_list_elim R_defs(2) assms(3) assms(5) by blast
 (* R1 is the frame! *)
 
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> atrue \<Delta>]"
   proof (rule RuleCons)
-    show "\<Delta> \<turnstile>CSL [((P1 \<otimes> atrue \<Delta>) \<otimes> (P2 \<otimes> atrue \<Delta>)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((Q1 \<otimes> atrue \<Delta>) \<otimes> (Q2 \<otimes> atrue \<Delta>)) \<otimes> R1]"
+    show "\<Delta> \<turnstile>CSL [((?P1 \<otimes> atrue \<Delta>) \<otimes> (?P2 \<otimes> atrue \<Delta>)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((?Q1 \<otimes> atrue \<Delta>) \<otimes> (?Q2 \<otimes> atrue \<Delta>)) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "\<Delta> \<turnstile>CSL [P1 \<otimes> atrue \<Delta> \<otimes> (P2 \<otimes> atrue \<Delta>)] {P1} C1 {Q1} || {P2} C2 {Q2} [Q1 \<otimes> atrue \<Delta> \<otimes> (Q2 \<otimes> atrue \<Delta>)]"
+      show "\<Delta> \<turnstile>CSL [?P1 \<otimes> atrue \<Delta> \<otimes> (?P2 \<otimes> atrue \<Delta>)] {P1} C1 {Q1} || {P2} C2 {Q2} [?Q1 \<otimes> atrue \<Delta> \<otimes> (?Q2 \<otimes> atrue \<Delta>)]"
       proof (rule RulePar)
-        show "\<Delta> \<turnstile>CSL [P1 \<otimes> atrue \<Delta>] C1 [Q1 \<otimes> atrue \<Delta>]"
+        show "\<Delta> \<turnstile>CSL [?P1 \<otimes> atrue \<Delta>] C1 [?Q1 \<otimes> atrue \<Delta>]"
         proof (rule RuleCons)
-          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> P1 \<otimes> atrue \<Delta>] C1 [B1 \<otimes> Q1 \<otimes> atrue \<Delta>]"
+          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> ?P1 \<otimes> atrue \<Delta>] C1 [B1 \<otimes> ?Q1 \<otimes> atrue \<Delta>]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(1) B1_def]
             using r0 by blast
-          show "B1 \<otimes> Q1 \<otimes> atrue \<Delta> \<subseteq> Q1 \<otimes> atrue \<Delta>"
+          show "B1 \<otimes> ?Q1 \<otimes> atrue \<Delta> \<subseteq> ?Q1 \<otimes> atrue \<Delta>"
             using B1_def drop_conjunct_entails by blast
-          show "P1 \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta> \<otimes> P1 \<otimes> atrue \<Delta>"
-            by (simp add: add_set_asso add_set_left_comm atrue_twice_equal)
+          show "?P1 \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta> \<otimes> ?P1 \<otimes> atrue \<Delta>"
+            using add_set_asso assms(4) conjunct_with_true_entails typed_assertion_star_atrue wf_stmt.simps(3) by blast
         qed
-        show "\<Delta> \<turnstile>CSL [P2 \<otimes> atrue \<Delta>] C2 [Q2 \<otimes> atrue \<Delta>]"
+        show "\<Delta> \<turnstile>CSL [?P2 \<otimes> atrue \<Delta>] C2 [?Q2 \<otimes> atrue \<Delta>]"
         proof (rule RuleCons)
-          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> P2 \<otimes> atrue \<Delta>] C2 [B2 \<otimes> Q2 \<otimes> atrue \<Delta>]"
+          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> ?P2 \<otimes> atrue \<Delta>] C2 [B2 \<otimes> ?Q2 \<otimes> atrue \<Delta>]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(2) B2_def]
             using r0 by blast
-          show "B2 \<otimes> Q2 \<otimes> atrue \<Delta> \<subseteq> Q2 \<otimes> atrue \<Delta>"
+          show "B2 \<otimes> ?Q2 \<otimes> atrue \<Delta> \<subseteq> ?Q2 \<otimes> atrue \<Delta>"
             using B2_def drop_conjunct_entails by blast
-          show "P2 \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta> \<otimes> P2 \<otimes> atrue \<Delta>"
-            by (simp add: add_set_asso add_set_left_comm atrue_twice_equal)
+          show "?P2 \<otimes> atrue \<Delta> \<subseteq> atrue \<Delta> \<otimes> ?P2 \<otimes> atrue \<Delta>"
+            using add_set_asso add_set_left_comm atrue_twice_equal
+            by (metis (no_types, opaque_lifting) order_refl)
         qed
-        show "disjoint (fvC C1 \<union> fvA \<Delta> (Q1 \<otimes> atrue \<Delta>)) (wrC C2)"
+        show "disjoint (fvC C1 \<union> fvA \<Delta> (?Q1 \<otimes> atrue \<Delta>)) (wrC C2)"
           using assms(4) by auto
-        show "disjoint (fvC C2 \<union> fvA \<Delta> (Q2 \<otimes> atrue \<Delta>)) (wrC C1)"
+        show "disjoint (fvC C2 \<union> fvA \<Delta> (?Q2 \<otimes> atrue \<Delta>)) (wrC C1)"
           using assms(4) by auto
-        show "TypedEqui.self_framing_typed \<Delta> (P1 \<otimes> atrue \<Delta>)"
+        show "TypedEqui.self_framing_typed \<Delta> (?P1 \<otimes> atrue \<Delta>)"
           using assms(4) self_framing_typed_star_atrue wf_stmt.simps(3) by blast
-        show "TypedEqui.self_framing_typed \<Delta> (P2 \<otimes> atrue \<Delta>)"
+        show "TypedEqui.self_framing_typed \<Delta> (?P2 \<otimes> atrue \<Delta>)"
           using assms(4) self_framing_typed_star_atrue by auto
-        show "TypedEqui.typed_assertion \<Delta> (P1 \<otimes> atrue \<Delta>)"
+        show "TypedEqui.typed_assertion \<Delta> (?P1 \<otimes> atrue \<Delta>)"
           using assms(4) typed_assertion_star_atrue by auto
-        show "TypedEqui.typed_assertion \<Delta> (P2 \<otimes> atrue \<Delta>)"
+        show "TypedEqui.typed_assertion \<Delta> (?P2 \<otimes> atrue \<Delta>)"
           using assms(4) typed_assertion_star_atrue by auto
       qed
       show "disjoint (fvA \<Delta> R1) (wrC {P1} C1 {Q1} || {P2} C2 {Q2})"
         by (metis (mono_tags, opaque_lifting) Diff_subset_conv Orderings.order_eq_iff \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C1 @ wrL C2)\<close> bot.extremum disjoint_minus disjoint_simps(2) disjoint_simps(3) sup.order_iff wrC.simps(7) wrC.simps(8) wrL.simps(7) wrL_wrC_same)
-      show "TypedEqui.self_framing_typed \<Delta> (P1 \<otimes> atrue \<Delta> \<otimes> (P2 \<otimes> atrue \<Delta>))"
+      show "TypedEqui.self_framing_typed \<Delta> (?P1 \<otimes> atrue \<Delta> \<otimes> (?P2 \<otimes> atrue \<Delta>))"
         by (meson assms(4) self_framing_typed_star_atrue typed_self_framing_star wf_stmt.simps(3))
-      show "TypedEqui.typed_assertion \<Delta> (P1 \<otimes> atrue \<Delta> \<otimes> (P2 \<otimes> atrue \<Delta>))"
+      show "TypedEqui.typed_assertion \<Delta> (?P1 \<otimes> atrue \<Delta> \<otimes> (?P2 \<otimes> atrue \<Delta>))"
         using TypedEqui.typed_star assms(4) typed_assertion_star_atrue wf_stmt.simps(3) by blast
       show "TypedEqui.self_framing_typed \<Delta> R1"
         using R_defs(3) by blast
       show "TypedEqui.typed_assertion \<Delta> R1"
         using R_defs(3) by force
     qed
-    show "P \<otimes> atrue \<Delta> \<subseteq> P1 \<otimes> atrue \<Delta> \<otimes> (P2 \<otimes> atrue \<Delta>) \<otimes> R1"
+    show "P \<otimes> atrue \<Delta> \<subseteq> ?P1 \<otimes> atrue \<Delta> \<otimes> (?P2 \<otimes> atrue \<Delta>) \<otimes> R1"
     proof -
-      have "P \<otimes> atrue \<Delta> \<subseteq> (R0 \<otimes> (P1 \<otimes> P2)) \<otimes> atrue \<Delta>"
+      have "P \<otimes> atrue \<Delta> \<subseteq> (R0 \<otimes> (?P1 \<otimes> ?P2)) \<otimes> atrue \<Delta>"
         by (metis P_Q_R_rels add_set_mono atrue_twice_equal atrue_twice_same entails_def)
-      also have "... \<subseteq> R1 \<otimes> ((P1 \<otimes> P2) \<otimes> atrue \<Delta>)"
+      also have "... \<subseteq> R1 \<otimes> ((?P1 \<otimes> ?P2) \<otimes> atrue \<Delta>)"
         using \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C1 @ wrL C2)\<close> add_set_asso add_set_mono entails_def by blast
-      also have "... \<subseteq> P1 \<otimes> atrue \<Delta> \<otimes> (P2 \<otimes> atrue \<Delta>) \<otimes> R1"
-        by (simp add: add_set_commm add_set_left_comm atrue_twice_equal)
+      also have "... \<subseteq> ?P1 \<otimes> atrue \<Delta> \<otimes> (?P2 \<otimes> atrue \<Delta>) \<otimes> R1"
+        using add_set_commm add_set_left_comm atrue_twice_equal
+        by (smt (verit, del_insts) dual_order.refl)
       finally show ?thesis by simp
     qed
-    show "Q1 \<otimes> atrue \<Delta> \<otimes> (Q2 \<otimes> atrue \<Delta>) \<otimes> R1 \<subseteq> Q \<otimes> atrue \<Delta>"
-      by (simp add: P_Q_R_rels add_set_commm add_set_left_comm atrue_twice_equal)
+    show "?Q1 \<otimes> atrue \<Delta> \<otimes> (?Q2 \<otimes> atrue \<Delta>) \<otimes> R1 \<subseteq> Q \<otimes> atrue \<Delta>"
+      by (metis (no_types, lifting) Orderings.order_eq_iff P_Q_R_rels add_set_asso add_set_commm atrue_twice_equal)
   qed
 qed
 
 (*
 Maybe prove? Need to prove that assertions are wf...
 lemma translation_wf:
-  assumes "wf_stmt \<Delta> C"
+  assumes "wf_stmt \<Gamma> F \<Delta> C"
       and "well_typed_cmd \<Delta> C"
-    shows "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
+    shows "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C))"
   using assms
 proof (induct C)
   case (Cseq C1 C2)
@@ -766,20 +796,20 @@ qed (simp_all)
 *)
 
 lemma invariant_translate_if:
-  assumes "\<And>P Q. invariant_translate \<Delta> P C1 Q"
-      and "\<And>P Q. invariant_translate \<Delta> P C2 Q"
-    shows "invariant_translate \<Delta> P (Cif b C1 C2) Q"
+  assumes "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C1 Q"
+      and "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C2 Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cif b C1 C2) Q"
 proof (rule invariant_translateI)
-  assume asm0: "proof_obligations_valid \<Delta> (snd (translate (Cif b C1 C2)))"
-    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cif b C1 C2))) Q"
+  assume asm0: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F (Cif b C1 C2)))"
+    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F (Cif b C1 C2))) Q"
 
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cif b C1 C2 [Q \<otimes> atrue \<Delta>]"
   proof (rule ConcreteSemantics.SL_proof_If_elim)
-    show "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.If (semantify_bexp b) (fst (translate C1)) (fst (translate C2))) Q"
+    show "ConcreteSemantics.SL_proof \<Delta> P (abs_stmt.If (semantify_bexp b) (fst (translate \<Gamma> F C1)) (fst (translate \<Gamma> F C2))) Q"
       by (metis asm0(2) fst_eqD translate.simps(8))
     fix B1 B2 assume asm1: "Q = B1 \<union> B2" "framed_by_exp P (semantify_bexp b)"
-       "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> ConcreteSemantics.pure_typed \<Delta> (semantify_bexp b)) (fst (translate C1)) B1"
-       "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> ConcreteSemantics.pure_typed \<Delta> (negate (semantify_bexp b))) (fst (translate C2)) B2"
+       "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> ConcreteSemantics.pure_typed \<Delta> (semantify_bexp b)) (fst (translate \<Gamma> F C1)) B1"
+       "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> ConcreteSemantics.pure_typed \<Delta> (negate (semantify_bexp b))) (fst (translate \<Gamma> F C2)) B2"
        "TypedEqui.self_framing_typed \<Delta> P" "TypedEqui.typed_assertion \<Delta> P"
     show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cif b C1 C2 [Q \<otimes> atrue \<Delta>]"
     proof (rule RuleIf)
@@ -846,19 +876,20 @@ qed
 
 
 lemma invariant_translate_while:
-  assumes "\<And>P Q. invariant_translate \<Delta> P C Q"
+  assumes "\<And>P Q. invariant_translate \<Gamma> F \<Delta> P C Q"
       and "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C))"
-      and "wf_stmt \<Delta> (Cwhile b I C)"
+      and "wf_stmt \<Gamma> F \<Delta> (Cwhile b I C)"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P (Cwhile b I C) Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P (Cwhile b I C) Q"
 proof (rule invariant_translateI)
-  assume asm0: "proof_obligations_valid \<Delta> (snd (translate (Cwhile b I C)))"
-    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate (Cwhile b I C))) Q"
-  then have r1: "proof_obligations_valid \<Delta> (snd (translate C))"
+  let ?I = "make_semantic_assertion \<Gamma> F I"
+  assume asm0: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F (Cwhile b I C)))"
+    "ConcreteSemantics.SL_proof \<Delta> P (fst (translate \<Gamma> F (Cwhile b I C))) Q"
+  then have r1: "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C))"
     using proof_obligations_valid_union by fastforce
-  moreover obtain B where B_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I) B"
+  moreover obtain B where B_def: "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Gamma> F C);; Exhale ?I) B"
     by (metis (no_types, lifting) asm0(1) insertCI proof_obligations_valid_def proof_obligations_valid_union snd_eqD translate.simps(10))
-  moreover obtain R0 R1 where R_defs: "entails P (R0 \<otimes> I)" "Q = R1 \<otimes> (I \<inter> assertify_bexp (Bnot b))"
+  moreover obtain R0 R1 where R_defs: "entails P (R0 \<otimes> ?I)" "Q = R1 \<otimes> (?I \<inter> assertify_bexp (Bnot b))"
     "ConcreteSemantics.SL_proof \<Delta> R0 (ConcreteSemantics.havoc_list (wrL C)) R1"
     using asm0(2) by auto
   moreover have "entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - (set (wrL C))"
@@ -868,49 +899,49 @@ proof (rule invariant_translateI)
 
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] Cwhile b I C [Q \<otimes> atrue \<Delta>]"
   proof (rule RuleCons)
-    show "\<Delta> \<turnstile>CSL [(I \<otimes> atrue \<Delta>) \<otimes> R1] Cwhile b I C [((I \<otimes> atrue \<Delta>) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
+    show "\<Delta> \<turnstile>CSL [(?I \<otimes> atrue \<Delta>) \<otimes> R1] Cwhile b I C [((?I \<otimes> atrue \<Delta>) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "\<Delta> \<turnstile>CSL [I \<otimes> atrue \<Delta>] Cwhile b I C [(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b)]"
+      show "\<Delta> \<turnstile>CSL [?I \<otimes> atrue \<Delta>] Cwhile b I C [(?I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b)]"
       proof (rule RuleWhile)
-        show "\<Delta> \<turnstile>CSL [(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b] C [I \<otimes> atrue \<Delta>]"
+        show "\<Delta> \<turnstile>CSL [(?I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b] C [?I \<otimes> atrue \<Delta>]"
         proof (rule RuleCons)
-          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> I \<inter> assertify_bexp b \<otimes> atrue \<Delta>] C [B \<otimes> I \<otimes> atrue \<Delta>]"
+          show "\<Delta> \<turnstile>CSL [atrue \<Delta> \<otimes> ?I \<inter> assertify_bexp b \<otimes> atrue \<Delta>] C [B \<otimes> ?I \<otimes> atrue \<Delta>]"
             using invariant_translate_inhale_exhale_get_proof[OF _ B_def]
             using assms(1) r1 by blast
-          show "B \<otimes> I \<otimes> atrue \<Delta> \<subseteq> I \<otimes> atrue \<Delta>"
+          show "B \<otimes> ?I \<otimes> atrue \<Delta> \<subseteq> ?I \<otimes> atrue \<Delta>"
             using B_def drop_conjunct_entails by blast
-          show "(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b \<subseteq> atrue \<Delta> \<otimes> (I \<inter> assertify_bexp b) \<otimes> atrue \<Delta>"
+          show "(?I \<otimes> atrue \<Delta>) \<inter> assertify_bexp b \<subseteq> atrue \<Delta> \<otimes> (?I \<inter> assertify_bexp b) \<otimes> atrue \<Delta>"
             by (metis (no_types, lifting) add_set_asso add_set_commm atrue_twice_equal intersect_and_star)
         qed
       qed
       show "disjoint (fvA \<Delta> R1) (wrC (Cwhile b I C))"
         using \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C)\<close> disjoint_def wrL_wrC_same by fastforce
-      show "TypedEqui.self_framing_typed \<Delta> (I \<otimes> atrue \<Delta>)"
+      show "TypedEqui.self_framing_typed \<Delta> (?I \<otimes> atrue \<Delta>)"
         using assms(3) self_framing_typed_star_atrue by auto
       show "TypedEqui.self_framing_typed \<Delta> R1"
         using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
-      show "TypedEqui.typed_assertion \<Delta> (I \<otimes> atrue \<Delta>)"
+      show "TypedEqui.typed_assertion \<Delta> (?I \<otimes> atrue \<Delta>)"
         using assms(3) typed_assertion_star_atrue by auto
       show "TypedEqui.typed_assertion \<Delta> R1"
         using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
     qed
-    have "P \<subseteq> R1 \<otimes> I"
+    have "P \<subseteq> R1 \<otimes> ?I"
       by (meson \<open>entails R0 R1 \<and> fvA \<Delta> R1 \<subseteq> fvA \<Delta> R0 - set (wrL C)\<close> add_set_mono calculation(3) entails_def equalityD1 subset_trans)
-    then show "P \<otimes> atrue \<Delta> \<subseteq> I \<otimes> atrue \<Delta> \<otimes> R1"
-      by (metis (no_types, opaque_lifting) add_set_asso add_set_commm add_set_mono verit_comp_simplify1(2))
-    show "(I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b) \<otimes> R1 \<subseteq> Q \<otimes> atrue \<Delta>"      
+    then show "P \<otimes> atrue \<Delta> \<subseteq> ?I \<otimes> atrue \<Delta> \<otimes> R1"
+      by (smt (verit, best) add_set_asso add_set_commm add_set_mono atrue_twice_equal atrue_twice_same)
+    show "(?I \<otimes> atrue \<Delta>) \<inter> assertify_bexp (Bnot b) \<otimes> R1 \<subseteq> Q \<otimes> atrue \<Delta>"
       by (smt (verit, del_insts) add_set_asso add_set_commm add_set_mono calculation(4) intersect_and_star subsetI)
   qed
 qed
 
 
 lemma invariant_translate_induct:
-  assumes "wf_stmt \<Delta> C"
+  assumes "wf_stmt \<Gamma> F \<Delta> C"
       and "well_typed_cmd \<Delta> C"
-      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
-      and "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C))"
+      and "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
       and "TypedEqui.wf_context \<Delta>"
-    shows "invariant_translate \<Delta> P C Q"
+    shows "invariant_translate \<Gamma> F \<Delta> P C Q"
   using assms
 proof (induct C arbitrary: P Q)
   case (Cseq C1 C2)
@@ -918,86 +949,91 @@ proof (induct C arbitrary: P Q)
     by (metis (no_types, lifting) ConcreteSemantics.wf_abs_stmt.simps(7) Un_iff fst_eqD invariant_translate_seq snd_conv translate.simps(7) well_typed_cmd_aux.simps(2) wf_stmt.simps(1))
 next
   case (Cpar P1 C1 Q1 P2 C2 Q2)
+  let ?P1 = "make_semantic_assertion \<Gamma> F P1"
+  let ?P2 = "make_semantic_assertion \<Gamma> F P2"
+  let ?Q1 = "make_semantic_assertion \<Gamma> F Q1"
+  let ?Q2 = "make_semantic_assertion \<Gamma> F Q2"
   show ?case
-  proof (rule invariant_translate_parallel[of \<Delta> C1 C2 P1 Q1 P2 Q2 P])
+  proof (rule invariant_translate_parallel[of _ _ \<Delta> C1 C2 P1 Q1 P2 Q2 P])
     show "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
       using Cpar.prems(3) by fastforce
-    show "wf_stmt \<Delta> {P1} C1 {Q1} || {P2} C2 {Q2}"
+    show "wf_stmt \<Gamma> F \<Delta> {P1} C1 {Q1} || {P2} C2 {Q2}"
       using Cpar.prems(1) by blast
     fix P Q
-    show "invariant_translate \<Delta> P C1 Q"
+    show "invariant_translate \<Gamma> F \<Delta> P C1 Q"
     proof (rule Cpar(1))
-      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale P1;; fst (translate C1);; Exhale Q1)"
+      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale ?P1;; fst (translate \<Gamma> F C1);; Exhale ?Q1)"
         by (metis Cpar.prems(4) Un_iff insertCI snd_eqD translate.simps(9))
-      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C1))"
+      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C1))"
         by force
-      show "\<And>Cv. Cv \<in> snd (translate C1) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      show "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C1) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cpar.prems(4) Un_iff snd_eqD translate.simps(9))
       show "well_typed_cmd \<Delta> C1"
         using Cpar.prems(2) by auto
-      show "wf_stmt \<Delta> C1"
+      show "wf_stmt \<Gamma> F \<Delta> C1"
         using Cpar.prems(1) by auto
     qed (simp add: Cpar)
-    show "invariant_translate \<Delta> P C2 Q"
+    show "invariant_translate \<Gamma> F \<Delta> P C2 Q"
     proof (rule Cpar(2))
-      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale P2;; fst (translate C2);; Exhale Q2)"
+      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale ?P2;; fst (translate \<Gamma> F C2);; Exhale ?Q2)"
         by (metis Cpar.prems(4) Un_iff insertCI snd_eqD translate.simps(9))
-      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C2))"
+      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C2))"
         by force
-      show "\<And>Cv. Cv \<in> snd (translate C2) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      show "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C2) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cpar.prems(4) Un_iff snd_eqD translate.simps(9))
       show "well_typed_cmd \<Delta> C2"
         using Cpar.prems(2) by auto
-      show "wf_stmt \<Delta> C2"
+      show "wf_stmt \<Gamma> F \<Delta> C2"
         using Cpar.prems(1) by auto
     qed (simp add: Cpar)
   qed (simp add: Cpar)
 next
   case (Cif b C1 C2)
   show ?case
-  proof (rule invariant_translate_if[of \<Delta> C1 C2 P b ])
+  proof (rule invariant_translate_if[of _ _ \<Delta> C1 C2 P b ])
     fix P Q
-    show "invariant_translate \<Delta> P C1 Q"
+    show "invariant_translate \<Gamma> F \<Delta> P C1 Q"
     proof (rule Cif(1))
-      show "wf_stmt \<Delta> C1"
+      show "wf_stmt \<Gamma> F \<Delta> C1"
         using Cif.prems(1) by auto
       show "well_typed_cmd \<Delta> C1"
         using Cif.prems(2) by auto
-      show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C1))"
+      show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C1))"
         using Cif.prems(3) by fastforce
-      show "\<And>Cv. Cv \<in> snd (translate C1) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      show "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C1) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cif.prems(4) Un_iff snd_eqD translate.simps(8))
     qed (simp add: Cif)
-    show "invariant_translate \<Delta> P C2 Q"
+    show "invariant_translate \<Gamma> F \<Delta> P C2 Q"
     proof (rule Cif(2))
-      show "wf_stmt \<Delta> C2"
+      show "wf_stmt \<Gamma> F \<Delta> C2"
         using Cif.prems(1) by auto
       show "well_typed_cmd \<Delta> C2"
         using Cif.prems(2) by auto
-      show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C2))"
+      show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C2))"
         using Cif.prems(3) by fastforce
-      show "\<And>Cv. Cv \<in> snd (translate C2) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      show "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C2) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         by (metis Cif.prems(4) Un_iff snd_eqD translate.simps(8))
     qed (simp add: Cif)
   qed
 next
   case (Cwhile b I C)
+  let ?I = "make_semantic_assertion \<Gamma> F I"
   show ?case
   proof (rule invariant_translate_while)
     show "ConcreteSemantics.wf_abs_stmt \<Delta> (ConcreteSemantics.havoc_list (wrL C))"
       using Cwhile.prems(3) by force
-    show "wf_stmt \<Delta> (Cwhile b I C)"
+    show "wf_stmt \<Gamma> F \<Delta> (Cwhile b I C)"
       using Cwhile.prems(1) by auto
-    fix P Q show "invariant_translate \<Delta> P C Q"
+    fix P Q show "invariant_translate \<Gamma> F \<Delta> P C Q"
     proof (rule Cwhile(1)[of P Q])
-      show "wf_stmt \<Delta> C"
+      show "wf_stmt \<Gamma> F \<Delta> C"
         using Cwhile.prems(1) by auto
       show "well_typed_cmd \<Delta> C"
         using Cwhile.prems(2) by auto
-      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale (I \<inter> assertify_bexp b);; fst (translate C);; Exhale I)"
+      have "ConcreteSemantics.wf_abs_stmt \<Delta> (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Gamma> F C);; Exhale ?I)"
         using Cwhile.prems(4) by fastforce
-      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))" by force
-      show "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      then show "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C))" by force
+      show "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
         using Cwhile.prems(4) by auto
     qed (simp add: Cwhile)
   qed (simp add: Cwhile)
@@ -1006,37 +1042,37 @@ qed (simp_all add: invariant_translate_skip invariant_translate_free invariant_t
 
 
 theorem sound_translation:
-  assumes "wf_stmt \<Delta> C"
+  assumes "wf_stmt \<Gamma> F \<Delta> C"
       and "well_typed_cmd \<Delta> C"
-      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate C))"
-      and "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
+      and "ConcreteSemantics.wf_abs_stmt \<Delta> (fst (translate \<Gamma> F C))"
+      and "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt \<Delta> Cv"
       and "TypedEqui.wf_assertion \<Delta> P \<and> TypedEqui.wf_assertion \<Delta> Q"
       and "ConcreteSemantics.self_framing_and_typed \<Delta> P \<and> TypedEqui.typed_assertion \<Delta> P"
 
-      and "ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate C);; Exhale Q)"
-      and "\<And>Cv. Cv \<in> snd (translate C) \<Longrightarrow> ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) Cv"
+      and "ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate \<Gamma> F C);; Exhale Q)"
+      and "\<And>Cv. Cv \<in> snd (translate \<Gamma> F C) \<Longrightarrow> ConcreteSemantics.verifies_set \<Delta> (atrue \<Delta>) Cv"
 
       and "TypedEqui.wf_context \<Delta>"
     shows "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
 proof -
-  obtain B where "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate C);; Exhale Q) B"
+  obtain B where "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (Inhale P;; fst (translate \<Gamma> F C);; Exhale Q) B"
     by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(3) ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) assms(7) atrue_self_framing_and_typed(1) atrue_self_framing_and_typed(2))
-  then obtain B' where "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta> \<otimes> P) (fst (translate C)) B'" "entails B' (B \<otimes> Q)"
+  then obtain B' where "ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta> \<otimes> P) (fst (translate \<Gamma> F C)) B'" "entails B' (B \<otimes> Q)"
     by blast
 
 
   show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta>] C [Q \<otimes> atrue \<Delta>]"
   proof (rule RuleCons)
     show "\<Delta> \<turnstile>CSL [P \<otimes> atrue \<Delta> \<otimes> atrue \<Delta>] C [B' \<otimes> atrue \<Delta>]"
-    proof (rule invariant_translateE[of \<Delta> "P \<otimes> atrue \<Delta>" C])
-      show "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> atrue \<Delta>) (fst (translate C)) B'"
-        by (metis \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta> \<otimes> P) (fst (translate C)) B'\<close> add_set_commm)
-      show "invariant_translate \<Delta> (P \<otimes> atrue \<Delta>) C B'"
+    proof (rule invariant_translateE[of _ _ \<Delta> "P \<otimes> atrue \<Delta>" C])
+      show "ConcreteSemantics.SL_proof \<Delta> (P \<otimes> atrue \<Delta>) (fst (translate \<Gamma> F C)) B'"
+        by (metis \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta> \<otimes> P) (fst (translate \<Gamma> F C)) B'\<close> add_set_commm)
+      show "invariant_translate \<Gamma> F \<Delta> (P \<otimes> atrue \<Delta>) C B'"
         by (simp add: assms(1) assms(2) assms(3) assms(4) assms(9) invariant_translate_induct)
-      show "proof_obligations_valid \<Delta> (snd (translate C))"
+      show "proof_obligations_valid \<Delta> (snd (translate \<Gamma> F C))"
         unfolding proof_obligations_valid_def
       proof clarify
-        fix Cv assume "Cv \<in> snd (translate C)"
+        fix Cv assume "Cv \<in> snd (translate \<Gamma> F C)"
         then show "\<exists>B. ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) Cv B"
           by (simp add: ConcreteSemantics.Viper_implies_SL_proof assms(4) assms(8))
       qed
@@ -1044,7 +1080,7 @@ proof -
     show "P \<otimes> atrue \<Delta> \<subseteq> P \<otimes> atrue \<Delta> \<otimes> atrue \<Delta>"
       by (simp add: add_set_asso atrue_twice_equal)
     show "B' \<otimes> atrue \<Delta> \<subseteq> Q \<otimes> atrue \<Delta>"
-      by (smt (verit, ccfv_SIG) ConcreteSemantics.proofs_are_self_framing_and_typed ConcreteSemantics.semantics_axioms \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (abs_stmt.Inhale P ;; fst (translate C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono assms(3) assms(5) atrue_twice_equal drop_conjunct_entails entails_def order.trans semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) semantics.wf_abs_stmt.simps(7))
+      by (smt (verit, ccfv_SIG) ConcreteSemantics.proofs_are_self_framing_and_typed ConcreteSemantics.semantics_axioms \<open>ConcreteSemantics.SL_proof \<Delta> (atrue \<Delta>) (abs_stmt.Inhale P ;; fst (translate \<Gamma> F C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono assms(3) assms(5) atrue_twice_equal drop_conjunct_entails entails_def order.trans semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) semantics.wf_abs_stmt.simps(7))
   qed
 qed
 
