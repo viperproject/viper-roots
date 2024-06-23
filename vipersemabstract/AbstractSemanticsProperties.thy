@@ -1447,7 +1447,7 @@ next
     by argo
 next
   case (Assume P)
-  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (stable_on (snd \<omega>) P \<and> f \<omega> = {snd \<omega>} \<inter> P)"
+  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (stable_on \<Delta> (snd \<omega>) P \<and> f \<omega> = {snd \<omega>} \<inter> P)"
     by fastforce
 
   let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
@@ -1469,11 +1469,11 @@ next
       fix \<omega> assume "\<omega> \<in> ?A \<inter> P"
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
         using stabilize_typed_elem[of \<omega> \<Delta>] by blast
-      then have "stable_on (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P" using r by blast
+      then have "stable_on \<Delta> (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P" using r by blast
       then have "f \<alpha> = {stabilize \<omega>}"
-        by (metis (no_types, lifting) Assume.prems(1) IntD2 \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> pure_larger_stabilize red_stmt_Assume_elim stable_on_def)
+        by (metis Assume.prems(1) IntD1 IntD2 \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> pure_larger_stabilize semantics.red_stmt_Assume_elim semantics_axioms typed_Stabilize_typed typed_state.stable_on_def typed_state.typed_assertionE typed_state_axioms)
       then show "\<omega> \<in> ?B"
-        using \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stable_on (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P\<close> r stabilize_typed_elem[of _ \<Delta>] by auto
+        using \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stable_on \<Delta> (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P\<close> r stabilize_typed_elem[of _ \<Delta>] by auto
     qed
     show "?B \<subseteq> ?A \<inter> P"
     proof
@@ -1785,28 +1785,19 @@ next
     by (meson RuleAssert.prems(1) empty_subsetI insert_subsetI)
 next
   case (RuleAssume \<Delta> A P)
-  moreover have asm0: "stable_on \<omega> P" sorry (* TODO: Assume *)
+  then have "(\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))"
+    using self_framing_on_def by blast
 (*
+  self_framing_on A P = (\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))
+*)
+  moreover have asm0: "stable_on \<Delta> \<omega> P"
   proof (rule stable_onI)
-    fix x assume asm1: "pure_larger x \<omega>"
-    thm self_framing_on_def[of A P]
-
-    then have "(\<omega> \<in> P) = (x \<in> P)"
-
-(*
-self_framing_on A P
-*)
-    unfolding stable_on_def
-  proof -
-
-(*
-  proof
-    
-
-    by (metis (no_types, lifting) already_stable pure_larger_stabilize_same self_framing_on_def self_framing_typed_altE typed_assertion_def wf_abs_stmt.simps(5) stable_on_def wf_assertion_def) 
-(* long *)
-*)
-*)
+    fix x assume "pure_larger x \<omega>" "typed \<Delta> x"
+    then have "x \<in> A"
+      by (metis RuleAssume.hyps(1) RuleAssume.prems(1) pure_larger_stabilize_same self_framing_typed_altE typed_assertionE typed_state.self_framing_typedE typed_state_axioms)
+    then show "(\<omega> \<in> P) = (x \<in> P)"
+      by (metis RuleAssume.prems(1) \<open>\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P)\<close> \<open>pure_larger x \<omega>\<close> pure_larger_stabilize_same)
+  qed
   then show "\<exists>S. red_stmt \<Delta> (abs_stmt.Assume P) \<omega> S \<and> S \<subseteq> A \<inter> P"
   proof (cases "\<omega> \<in> P")
     case True

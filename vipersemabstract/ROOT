@@ -1,8 +1,8 @@
 session ViperAbstract = ViperCommon +
   theories [quick_and_dirty] (* Why is this quick_and_dirty necessary? *)
     AbstractSemantics
-  theories [quick_and_dirty] (* these should be fixed *)
     AbstractSemanticsProperties
+  theories [quick_and_dirty] (* these should be fixed *)
     EquiSemAuxLemma
     EquiViper
     Instantiation

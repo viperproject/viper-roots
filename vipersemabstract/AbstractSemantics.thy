@@ -478,6 +478,15 @@ qed
 definition atrue where
   "atrue \<Delta> = {\<omega>. typed \<Delta> \<omega>}"
 
+
+definition stable_on where
+  "stable_on \<Delta> \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<and> typed \<Delta> x \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
+
+lemma stable_onI:
+  assumes "\<And>x. pure_larger x \<omega> \<Longrightarrow> typed \<Delta> x \<Longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A)"
+  shows "stable_on \<Delta> \<omega> A"
+  using assms stable_on_def by blast
+
 end
 
 
@@ -523,8 +532,8 @@ where
 | RedSkip: "red_stmt \<Delta> Skip \<omega> ({\<omega>})"
 
 | RedAssertTrue: "\<lbrakk> \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assert A) \<omega> ({\<omega>})"
-| RedAssumeTrue: "\<lbrakk> stable_on \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
-| RedAssumeFalse: "\<lbrakk> stable_on \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
+| RedAssumeTrue: "\<lbrakk> stable_on \<Delta> \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
+| RedAssumeFalse: "\<lbrakk> stable_on \<Delta> \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
 
 | RedInhale: "\<lbrakk> rel_stable_assertion \<omega> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Inhale A) \<omega> (Set.filter stable ({\<omega>} \<otimes> A))"
 | RedExhale: "\<lbrakk> a \<in> A ; Some \<omega> = \<omega>' \<oplus> a ; stable \<omega>' \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Exhale A) \<omega> {\<omega>'}"
