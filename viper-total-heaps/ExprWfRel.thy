@@ -712,14 +712,13 @@ lemma old_expr_wf_rel_inst:
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"
       and OldM: "snd lbls lbl = Some OldM"
-      (* How to frame this assumption ?
-      and DisjAux: "OldH \<notin> (state_rel0_disj_vars Tr AuxPred - vars_label_hm_tr (label_hm_translation Tr)) \<and>
-                    OldM \<notin> (state_rel0_disj_vars Tr AuxPred - vars_label_hm_tr (label_hm_translation Tr)) \<and>
-                    OldH \<noteq> OldM"
-      *)
       and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
       and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
+      (* How to frame this assumption ? *)
+      and DisjAux: "OldH \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
+                    OldM \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
+                    OldH \<noteq> OldM"
       and BodyRel:
          "\<And>p1 p2 p3 p4. expr_wf_rel (state_rel Pr StateCons TyRep Tr' (AuxPred(mdef \<mapsto> p1, hdef \<mapsto> p2, m \<mapsto> p3, h \<mapsto> p4)) ctxt)
                                       ctxt_vpr StateCons P ctxt expr \<gamma> \<gamma>'"
@@ -1096,7 +1095,7 @@ proof -
               using \<open>disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)\<close>
               by simp
             show "OldH \<notin> \<Union> (set (state_rel0_disj_list ?TrNoLabels AuxPred))"
-              sorry
+              using DisjAux by simp
           qed (simp)
 
           (* Finally, change the mask *)
@@ -1105,7 +1104,7 @@ proof -
             show "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
               using \<open>disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)\<close> by simp
             show "OldM \<notin>  \<Union> (set (state_rel0_disj_list ?TrOldHeap AuxPred))"
-              sorry
+              using DisjAux by simp
           qed (simp add: \<open>Tr' = _\<close>)
         qed
         show "get_store_total ?\<omega>def_old = get_store_total ?\<omega>_old" using RInst state_rel_eval_welldef_eq by fastforce
@@ -1254,22 +1253,311 @@ proof -
               thus "disjnt ?M' A"
               proof (cases)
                 case HeapVars
-                show ?thesis sorry
+                thus ?thesis
+                  using \<open>Tr' = _\<close> DisjAux mh
+                  by simp
               next
                 case MaskVars
-                show ?thesis sorry
+                thus ?thesis
+                  using \<open>Tr' = _\<close> DisjAux mh
+                  by simp
               next
                 case VarTrans
-                show ?thesis sorry
+                have "disjnt (ran (var_translation Tr)) {mdef, m, hdef, h}"
+                proof (rule disjoint_list_set_vs_collected_members)
+                  show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+                    using RInst state_rel_disjoint
+                    by fast
+                  show "ListMem (ran (var_translation Tr)) (state_rel0_disj_list Tr AuxPred)"
+                    by (meson elem insert)
+                  show "\<forall>x\<in>{mdef, m, hdef, h}.
+                         \<exists>S. x \<in> S \<and>
+                             ListMem S (state_rel0_disj_list Tr AuxPred) \<and>
+                             S \<noteq> ran (var_translation Tr)"
+                  proof (intro ballI)
+                    fix x
+                    assume "x \<in> {mdef, m, hdef, h}"
+                    then consider (MDef) "x = mdef"
+                                | (M) "x = m"
+                                | (HDef) "x = hdef"
+                                | (H) "x = h"
+                      by fast
+                    thus "\<exists>S. x \<in> S \<and> ListMem S (ViperBoogieRelUtil.state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> ran (var_translation Tr)"
+                    proof (cases)
+                      case MDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh MDef by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> ran (var_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case M
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh M by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> ran (var_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case HDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh HDef by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> ran (var_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    next
+                      case H
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh H by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> ran (var_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    qed
+                  qed
+                qed
+                thus ?thesis
+                  using VarTrans disjnt_sym \<open>Tr' = _\<close>
+                  by simp
               next
                 case FieldTrans
-                show ?thesis sorry
+                have "disjnt (ran (field_translation Tr)) {mdef, m, hdef, h}"
+                proof (rule disjoint_list_set_vs_collected_members)
+                  show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+                    using RInst state_rel_disjoint
+                    by fast
+                  show "ListMem (ran (field_translation Tr)) (state_rel0_disj_list Tr AuxPred)"
+                    by (meson elem insert)
+                  show "\<forall>x\<in>{mdef, m, hdef, h}.
+                         \<exists>S. x \<in> S \<and>
+                             ListMem S (state_rel0_disj_list Tr AuxPred) \<and>
+                             S \<noteq> ran (field_translation Tr)"
+                  proof (intro ballI)
+                    fix x
+                    assume "x \<in> {mdef, m, hdef, h}"
+                    then consider (MDef) "x = mdef"
+                                | (M) "x = m"
+                                | (HDef) "x = hdef"
+                                | (H) "x = h"
+                      by fast
+                    thus "\<exists>S. x \<in> S \<and> ListMem S (state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> ran (field_translation Tr)"
+                    proof (cases)
+                      case MDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh MDef by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> ran (field_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case M
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh M by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> ran (field_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case HDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh HDef by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> ran (field_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    next
+                      case H
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh H by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> ran (field_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    qed
+                  qed
+                qed
+                thus ?thesis
+                  using FieldTrans disjnt_sym \<open>Tr' = _\<close>
+                  by simp
               next
                 case ConstRepr
-                show ?thesis sorry
+                have "disjnt (range (const_repr Tr)) {mdef, m, hdef, h}"
+                proof (rule disjoint_list_set_vs_collected_members)
+                  show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+                    using RInst state_rel_disjoint
+                    by fast
+                  show "ListMem (range (const_repr Tr)) (state_rel0_disj_list Tr AuxPred)"
+                    by (meson elem insert)
+                  show "\<forall>x\<in>{mdef, m, hdef, h}.
+                         \<exists>S. x \<in> S \<and>
+                             ListMem S (state_rel0_disj_list Tr AuxPred) \<and>
+                             S \<noteq> range (const_repr Tr)"
+                  proof (intro ballI)
+                    fix x
+                    assume "x \<in> {mdef, m, hdef, h}"
+                    then consider (MDef) "x = mdef"
+                                | (M) "x = m"
+                                | (HDef) "x = hdef"
+                                | (H) "x = h"
+                      by fast
+                    thus "\<exists>S. x \<in> S \<and> ListMem S (state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> range (const_repr Tr)"
+                    proof (cases)
+                      case MDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh MDef by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> range (const_repr Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case M
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh M by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> range (const_repr Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case HDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh HDef by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> range (const_repr Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    next
+                      case H
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh H by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> range (const_repr Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    qed
+                  qed
+                qed
+                thus ?thesis
+                  using ConstRepr disjnt_sym \<open>Tr' = _\<close>
+                  by simp
               next
                 case HMTranslation
-                show ?thesis sorry
+                have "disjnt (vars_label_hm_tr (label_hm_translation Tr)) {mdef, m, hdef, h}"
+                proof (rule disjoint_list_set_vs_collected_members)
+                  show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+                    using RInst state_rel_disjoint
+                    by fast
+                  show "ListMem (vars_label_hm_tr (label_hm_translation Tr)) (state_rel0_disj_list Tr AuxPred)"
+                    by (meson elem insert)
+                  show "\<forall>x\<in>{mdef, m, hdef, h}.
+                         \<exists>S. x \<in> S \<and>
+                             ListMem S (state_rel0_disj_list Tr AuxPred) \<and>
+                             S \<noteq> (vars_label_hm_tr (label_hm_translation Tr))"
+                  proof (intro ballI)
+                    fix x
+                    assume "x \<in> {mdef, m, hdef, h}"
+                    then consider (MDef) "x = mdef"
+                                | (M) "x = m"
+                                | (HDef) "x = hdef"
+                                | (H) "x = h"
+                      by fast
+                    thus "\<exists>S. x \<in> S \<and>
+                              ListMem S (state_rel0_disj_list Tr AuxPred) \<and>
+                              S \<noteq> (vars_label_hm_tr (label_hm_translation Tr))"
+                    proof (cases)
+                      case MDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh MDef by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> vars_label_hm_tr (label_hm_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case M
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {mask_var Tr, mask_var_def Tr}"
+                          using mh M by simp
+                        show "ListMem {mask_var Tr, mask_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{mask_var Tr, mask_var_def Tr} \<noteq> vars_label_hm_tr (label_hm_translation Tr)"
+                          using RInst state_rel_mask_var_disjoint by blast
+                      qed
+                    next
+                      case HDef
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh HDef by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> vars_label_hm_tr (label_hm_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    next
+                      case H
+                      show ?thesis
+                      proof (intro exI, intro conjI)
+                        show "x \<in> {heap_var Tr, heap_var_def Tr}"
+                          using mh H by simp
+                        show "ListMem {heap_var Tr, heap_var_def Tr} (state_rel0_disj_list Tr AuxPred)"
+                          using elem insert by fast
+                        show "{heap_var Tr, heap_var_def Tr} \<noteq> vars_label_hm_tr (label_hm_translation Tr)"
+                          using RInst state_rel_heap_var_disjoint by blast
+                      qed
+                    qed
+                  qed
+                qed
+                have "vars_label_hm_tr lbls' \<subseteq> vars_label_hm_tr lbls"
+                  unfolding vars_label_hm_tr_def
+                  using \<open>lbls' = _\<close> OldH OldM  OldH OldM fst_conv fun_upd_same fun_upd_triv fun_upd_upd ran_map_upd snd_conv subset_insertI sup.mono
+                  by (metis (no_types, opaque_lifting))
+                hence "disjnt (vars_label_hm_tr (label_hm_translation Tr')) {mdef, m, hdef, h}"
+                  using \<open>Tr' = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close> \<open>disjnt (vars_label_hm_tr (label_hm_translation Tr)) {mdef, m, hdef, h}\<close>
+                  by fastforce
+                thus ?thesis
+                  using HMTranslation disjnt_sym \<open>Tr' = _\<close>
+                  by simp
               qed
             qed
           qed

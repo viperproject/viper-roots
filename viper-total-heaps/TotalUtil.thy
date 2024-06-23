@@ -470,6 +470,46 @@ proof -
       by (metis antisym_conv1 list_update_length nless_le nth_append_length nth_list_update_neq sup.orderI sup.right_idem)
   qed simp
 qed
+
+lemma disjoint_list_members_disjoint:
+  assumes "disjoint_list xs"
+      and "ListMem A xs"
+      and "ListMem B xs"
+      and "A \<noteq> B"
+    shows "disjnt A B"
+proof -
+  obtain i where
+    "0 \<le> i \<and> i < length xs" and
+    "(xs ! i) = A"
+    by (meson ListMem_iff \<open>ListMem A xs\<close> in_set_conv_nth zero_le)
+  obtain j where
+    "0 \<le> j \<and> j < length xs" and
+    "(xs ! j) = B"
+    by (meson ListMem_iff \<open>ListMem B xs\<close> in_set_conv_nth zero_le)
+  have "i \<noteq> j"
+    using \<open>xs ! i = A\<close> \<open>xs ! j = B\<close> \<open>A \<noteq> B\<close> by fast
+  show "disjnt A B"
+    using \<open>0 \<le> i \<and> i < length xs\<close> \<open>0 \<le> j \<and> j < length xs\<close> \<open>i \<noteq> j\<close> \<open>xs ! i = A\<close> \<open>xs ! j = B\<close> \<open>disjoint_list xs\<close> disjoint_list_def
+    by fast
+qed
+
+lemma disjoint_list_set_vs_collected_members:
+  (* If xs is some list of mutually-disjoint sets *)
+  assumes "disjoint_list xs"
+  (* And A is a set within this list *)
+      and "ListMem A xs"
+  (* And for some set B, if every member is a member of S that is not A *)
+      and BinS: "\<forall>x \<in> B. \<exists>S. x \<in> S \<and> ListMem S xs \<and> S \<noteq> A"
+  (* Then A and B are disjoint *)
+    shows "disjnt A B"
+proof -
+  have "\<And>x. x \<in> B \<Longrightarrow> x \<notin> A"
+    by (metis BinS \<open>disjoint_list xs\<close> \<open>ListMem A xs\<close> disjnt_iff disjoint_list_members_disjoint)
+  hence "disjnt B A"
+    by (simp add: disjnt_iff)
+  thus "disjnt A B"
+    using disjnt_sym by fast
+qed
     
 
 lemma count_multiset_at_least_two:
