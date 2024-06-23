@@ -29,9 +29,28 @@ proof (induct e)
 next
   case (Elit x)
 (* One can be none, the other one not... *)
-  then show ?case sorry
+  show ?case
+  proof (rule ext)
+    fix \<omega>
+    have "(if \<exists>v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v then Some (SOME v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v) else None)
+      = Some (SOME v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v)"
+      by (metis RedLit translate_exp.simps(2))
+    also have "... = Some (VInt x)"
+      using someI[of "\<lambda>v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v" "VInt x"]
+    proof -
+      have "\<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val (VInt x)"
+        by (metis RedLitInt2Val_case calculation option.distinct(1) translate_exp.simps(2) val_of_lit.simps(2))
+      then have "\<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val (SOME v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v)"
+        using someI by metis
+      then show ?thesis
+        using \<open>\<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val (VInt x)\<close> red_pure_val_unique(1) by blast
+    qed
+    finally show "(if \<exists>v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v then Some (SOME v. \<Delta> \<turnstile> \<langle>translate_exp (Elit x);\<omega>\<rangle> [\<Down>] Val v) else None) =
+         Some (VInt (edenot (Elit x) (get_store \<omega>)))"
+      by fastforce
+  qed
 next
-  case (Ebinop e1 x2a e2)
+  case (Ebinop e1 bop e2)
   then show ?case sorry
 qed
 
