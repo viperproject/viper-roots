@@ -136,8 +136,8 @@ ML \<open>
        resolve_tac ctxt @{thms wf_total_consistency_trivial} THEN'
        fast_tac ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
-       (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt THEN'
-       (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt THEN'
+       #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
+       #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
        assm_full_simp_solved_tac ctxt
