@@ -715,7 +715,6 @@ lemma old_expr_wf_rel_inst:
       and mh: "m = mask_var Tr \<and> h = heap_var Tr \<and> mdef = mask_var_def Tr \<and> hdef = heap_var_def Tr"
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
       and "Tr' = Tr \<lparr> heap_var := OldH, mask_var := OldM, heap_var_def := OldH, mask_var_def := OldM, label_hm_translation := lbls' \<rparr>"
-      (* How to frame this assumption ? *)
       and DisjAux: "OldH \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldM \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldH \<noteq> OldM"
@@ -1579,53 +1578,39 @@ proof -
               by (metis (no_types, lifting) RInst aux_vars_pred_sat_def fun_upd_other PredicateDefined state_rel_aux_vars_pred_sat)
           next
             assume "\<not>(x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h)"
-            then consider (MDef) "x = mdef" | (M) "x = m" | (HDef) "x = hdef" | (H) "x = h"
-              by blast 
+            then consider
+                  (H)    "x = h"
+                | (M)    "x \<noteq> h \<and> x = m"
+                | (HDef) "x \<noteq> h \<and> x \<noteq> m \<and> x = hdef"
+                | (MDef) "x \<noteq> h \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x = mdef"
+              by fast
             thus ?thesis
             proof cases
-              case MDef
-              have "?AuxPredFun \<omega>def \<omega> mdef = Some (pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def)"
-                sorry (* Why doesn't this prove? *)
-              hence "P = pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def"
-                using MDef PredicateDefined
+              case H
+              have "?AuxPredFun \<omega>def \<omega> h = Some (pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>)"
                 by simp
-              from RInst state_rel_mask_var_def_rel mask_var_rel_def obtain mb where
-                MaskVarValue: "lookup_var ?\<Lambda> ns (mask_var_def Tr) = Some (AbsV (AMask mb))" and
-                MaskVarType:  "lookup_var_ty ?\<Lambda> (mask_var_def Tr) = Some (TConSingle (TMaskId TyRep))" and                
-                MaskRel:      "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def) mb" 
+              hence "P = pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>"
+                using H PredicateDefined
+                by simp                                     
+              from RInst state_rel_heap_var_rel heap_var_rel_def obtain hb where
+                 HeapVarValue: "lookup_var ?\<Lambda> ns (heap_var Tr) = Some (AbsV (AHeap hb))" and
+                 HeapVarType: "lookup_var_ty ?\<Lambda> (heap_var Tr) = Some (TConSingle (THeapId TyRep))" and
+                 HeapVarTyOpt: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])" and
+                 HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb" and
+                 HeapWellTyped: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
                 by blast
-              have "pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def (AbsV (AMask mb))"
-                unfolding pred_eq_mask_def
-                using MaskVarValue MaskVarType MaskRel mh
+              have "pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega> (AbsV (AHeap hb))"
+                unfolding pred_eq_heap_def pred_eq_heap_aux_def
+                using HeapVarType HeapVarTyOpt HeapRel HeapWellTyped mh
                 by simp
-              hence "P (AbsV (AMask mb))"
+              hence "P (AbsV (AHeap hb))"
                 by (simp add: \<open>P = _\<close>)
               thus "has_Some P (lookup_var ?\<Lambda> ns x)"
-                by (simp add: MDef MaskVarValue mh)
-            next
-              case M
-              have "?AuxPredFun \<omega>def \<omega> m = Some (pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)"
-                sorry (* Why doesn't this prove? *)
-              hence "P = pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>"
-                using M PredicateDefined
-                by simp
-              from RInst state_rel_mask_var_rel mask_var_rel_def obtain mb where
-                MaskVarValue: "lookup_var ?\<Lambda> ns (mask_var Tr) = Some (AbsV (AMask mb))" and
-                MaskVarType:  "lookup_var_ty ?\<Lambda> (mask_var Tr) = Some (TConSingle (TMaskId TyRep))" and                
-                MaskRel:      "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb" 
-                by blast
-              have "pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega> (AbsV (AMask mb))"
-                unfolding pred_eq_mask_def
-                using MaskVarValue MaskVarType MaskRel mh
-                by simp
-              hence "P (AbsV (AMask mb))"
-                by (simp add: \<open>P = _\<close>)
-              thus "has_Some P (lookup_var ?\<Lambda> ns x)"
-                by (simp add: M MaskVarValue mh)
+                by (simp add: H HeapVarValue mh)
             next
               case HDef
-              have "?AuxPredFun \<omega>def \<omega> hdef = Some (pred_eq_heap Pr TyRep (field_translation Tr) ctxt hdef \<omega>def)"
-                sorry (* Why doesn't this prove? *)
+              hence "?AuxPredFun \<omega>def \<omega> hdef = Some (pred_eq_heap Pr TyRep (field_translation Tr) ctxt hdef \<omega>def)"
+                by simp
               hence "P = pred_eq_heap Pr TyRep (field_translation Tr) ctxt hdef \<omega>def"
                 using HDef PredicateDefined
                 by simp                                     
@@ -1645,27 +1630,45 @@ proof -
               thus "has_Some P (lookup_var ?\<Lambda> ns x)"
                 by (simp add: HDef HeapVarValue mh)
             next
-              case H
-              have "?AuxPredFun \<omega>def \<omega> hdef = Some (pred_eq_heap Pr TyRep (field_translation Tr) ctxt hdef \<omega>def)"
-                sorry (* Why doesn't this prove? *)
-              hence "P = pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega>"
-                using H PredicateDefined
-                by simp                                     
-              from RInst state_rel_heap_var_rel heap_var_rel_def obtain hb where
-                 HeapVarValue: "lookup_var ?\<Lambda> ns (heap_var Tr) = Some (AbsV (AHeap hb))" and
-                 HeapVarType: "lookup_var_ty ?\<Lambda> (heap_var Tr) = Some (TConSingle (THeapId TyRep))" and
-                 HeapVarTyOpt: "vbpl_absval_ty_opt TyRep (AHeap hb) = Some ((THeapId TyRep) ,[])" and
-                 HeapRel: "heap_rel Pr (field_translation Tr) (get_hh_total_full \<omega>) hb" and
-                 HeapWellTyped: "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>)"
-                by blast
-              have "pred_eq_heap Pr TyRep (field_translation Tr) ctxt h \<omega> (AbsV (AHeap hb))"
-                unfolding pred_eq_heap_def pred_eq_heap_aux_def
-                using HeapVarType HeapVarTyOpt HeapRel HeapWellTyped mh
+              case MDef
+              hence "?AuxPredFun \<omega>def \<omega> mdef = Some (pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def)"
                 by simp
-              hence "P (AbsV (AHeap hb))"
+              hence "P = pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def"
+                using MDef PredicateDefined
+                by simp
+              from RInst state_rel_mask_var_def_rel mask_var_rel_def obtain mb where
+                MaskVarValue: "lookup_var ?\<Lambda> ns (mask_var_def Tr) = Some (AbsV (AMask mb))" and
+                MaskVarType:  "lookup_var_ty ?\<Lambda> (mask_var_def Tr) = Some (TConSingle (TMaskId TyRep))" and                
+                MaskRel:      "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def) mb" 
+                by blast
+              have "pred_eq_mask Pr TyRep (field_translation Tr) ctxt mdef \<omega>def (AbsV (AMask mb))"
+                unfolding pred_eq_mask_def
+                using MaskVarValue MaskVarType MaskRel mh
+                by simp
+              hence "P (AbsV (AMask mb))"
                 by (simp add: \<open>P = _\<close>)
               thus "has_Some P (lookup_var ?\<Lambda> ns x)"
-                by (simp add: H HeapVarValue mh)
+                by (simp add: MDef MaskVarValue mh)
+            next
+              case M
+              hence "?AuxPredFun \<omega>def \<omega> m = Some (pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>)"
+                by simp
+              hence "P = pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega>"
+                using M PredicateDefined
+                by simp
+              from RInst state_rel_mask_var_rel mask_var_rel_def obtain mb where
+                MaskVarValue: "lookup_var ?\<Lambda> ns (mask_var Tr) = Some (AbsV (AMask mb))" and
+                MaskVarType:  "lookup_var_ty ?\<Lambda> (mask_var Tr) = Some (TConSingle (TMaskId TyRep))" and                
+                MaskRel:      "mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>) mb" 
+                by blast
+              have "pred_eq_mask Pr TyRep (field_translation Tr) ctxt m \<omega> (AbsV (AMask mb))"
+                unfolding pred_eq_mask_def
+                using MaskVarValue MaskVarType MaskRel mh
+                by simp
+              hence "P (AbsV (AMask mb))"
+                by (simp add: \<open>P = _\<close>)
+              thus "has_Some P (lookup_var ?\<Lambda> ns x)"
+                by (simp add: M MaskVarValue mh)
             qed
           qed
         qed
