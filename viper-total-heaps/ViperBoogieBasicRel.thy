@@ -757,7 +757,8 @@ subsection \<open>Disjointness\<close>
 lemma disjoint_list_change_heap:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and hPrimeNew: "h' \<notin> state_rel0_disj_vars Tr AuxPred"
-      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := h' \<rparr>"
+      and hDefPrimeNew: "hdef' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := hdef' \<rparr>"
     shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
 proof -
   let ?xs = "[]"
@@ -768,17 +769,16 @@ proof -
               (range (const_repr Tr)),
               dom AuxPred,
               vars_label_hm_tr (label_hm_translation Tr)]"
-
   have "disjoint_list ((?xs @ {} # ?ys))"
   proof (rule disjoint_list_one_subset)
     show "disjoint_list (?xs @ (?M # ?ys))"
       using disjointList by simp
   qed (simp)
 
-  hence "disjoint_list (?xs @ ({} \<union> {h'}) # ?ys)"
-  proof (rule disjoint_list_add)
-    show "\<forall>A\<in>set (?xs @ ?ys). h' \<notin> A"
-      using hPrimeNew by simp
+  hence "disjoint_list (?xs @ ({} \<union> {h', hdef'}) # ?ys)"
+  proof (rule disjoint_list_add_set)
+    show "\<forall>A\<in>set (?xs @ ?ys). disjnt {h', hdef'} A"
+      using hPrimeNew hDefPrimeNew by simp
   qed
 
   thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
@@ -786,10 +786,22 @@ proof -
     by simp
 qed
 
+lemma disjoint_list_change_heap_same:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and hPrimeNew: "h' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := h' \<rparr>"
+    shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+proof (rule disjoint_list_change_heap[where ?Tr = "Tr" and ?h' = "h'" and ?hdef' = "h'"], tactic \<open>distinct_subgoals_tac\<close>)
+  show "disjoint_list (state_rel0_disj_list Tr AuxPred)" using disjointList by simp
+  show "h' \<notin> state_rel0_disj_vars Tr AuxPred" using hPrimeNew by simp
+  show "Tr' = Tr\<lparr>heap_var := h', heap_var_def := h'\<rparr> " using \<open>Tr' = _\<close> by simp
+qed
+
 lemma disjoint_list_change_mask:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and mPrimeNew: "m' \<notin> state_rel0_disj_vars Tr AuxPred"
-      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := m' \<rparr>"
+      and mDefPrimeNew: "mdef' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := mdef' \<rparr>"
     shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
 proof -
   let ?xs = "[{heap_var Tr, heap_var_def Tr}]"
@@ -799,22 +811,32 @@ proof -
               (range (const_repr Tr)),
               dom AuxPred,
               vars_label_hm_tr (label_hm_translation Tr)]"
-
   have "disjoint_list ((?xs @ {} # ?ys))"
   proof (rule disjoint_list_one_subset)
     show "disjoint_list (?xs @ (?M # ?ys))"
       using disjointList by simp
   qed (simp)
 
-  hence "disjoint_list (?xs @ ({} \<union> {m'}) # ?ys)"
-  proof (rule disjoint_list_add)
-    show "\<forall>A\<in>set (?xs @ ?ys). m' \<notin> A"
-      using mPrimeNew by simp
+  hence "disjoint_list (?xs @ ({} \<union> {m', mdef'}) # ?ys)"
+  proof (rule disjoint_list_add_set)
+    show "\<forall>A\<in>set (?xs @ ?ys). disjnt {m', mdef'} A"
+      using mPrimeNew mDefPrimeNew by simp
   qed
 
   thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
     using \<open>Tr' = _\<close>
     by simp
+qed
+
+lemma disjoint_list_change_mask_same:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and mPrimeNew: "m' \<notin> state_rel0_disj_vars Tr AuxPred"
+      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := m' \<rparr>"
+    shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+proof (rule disjoint_list_change_mask[where ?m' = "m'" and ?mdef' = "m'" ], tactic \<open>distinct_subgoals_tac\<close>)
+  show "disjoint_list (state_rel0_disj_list Tr AuxPred)" using disjointList by simp
+  show "m' \<notin> state_rel0_disj_vars Tr AuxPred" using mPrimeNew by simp
+  show "Tr' = Tr\<lparr> mask_var := m', mask_var_def := m'\<rparr> " using \<open>Tr' = _\<close> by simp
 qed
 
 (* Disjointness is preserved when removing one label from the label_hm_translation *)
@@ -855,6 +877,30 @@ proof -
   thus "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
     using \<open>Tr' = _\<close> by simp
 qed
+
+lemma disjoint_list_restrict_auxpred:
+  assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and "dom AuxPred' \<subseteq> dom AuxPred"
+    shows "disjoint_list (state_rel0_disj_list Tr AuxPred')"
+proof -
+  let ?xs = "[{heap_var Tr, heap_var_def Tr},
+              {mask_var Tr, mask_var_def Tr},
+              (ran (var_translation Tr)), 
+              (ran (field_translation Tr)),
+              (range (const_repr Tr))]"
+  let ?M = "dom AuxPred"
+  let ?M' = "dom AuxPred'"
+  let ?ys = "[vars_label_hm_tr (label_hm_translation Tr)]"
+  have "disjoint_list (?xs @ (?M' # ?ys))"
+  proof (rule disjoint_list_one_subset)
+    show "disjoint_list (?xs @ (?M # ?ys))"
+      using disjointList by simp
+  qed (simp add: \<open>dom AuxPred' \<subseteq> dom AuxPred\<close>)
+
+  thus ?thesis by simp
+qed
+
+thm disjoint_list_removed_from_set
 
 subsection \<open>Tactics\<close>
 

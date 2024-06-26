@@ -347,6 +347,8 @@ lemma exp_rel_oldexp_inst:
       and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH, label_hm_translation := lbls' \<rparr>"
       and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       (* How to frame this assumption? *)
+      (* Should be able to get this from the state relation *)
+      (* Will probably need "OldH neq OldM *)
       and DisjAux: "OldH \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldM \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldH \<noteq> OldM"
@@ -440,7 +442,7 @@ proof (rule exp_rel_oldexp)
 
         let ?TrOldHeap = "?TrNoLabels \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
         have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
-        proof (rule disjoint_list_change_heap[where ?h' = "OldH"])
+        proof (rule disjoint_list_change_heap_same[where ?h' = "OldH"])
           show "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
             using \<open>disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)\<close>
             by simp
@@ -449,7 +451,7 @@ proof (rule exp_rel_oldexp)
         qed (simp)
 
         thus "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
-        proof (rule disjoint_list_change_mask)
+        proof (rule disjoint_list_change_mask_same)
           show "OldM \<notin> state_rel0_disj_vars ?TrOldHeap AuxPred"
             using DisjAux
             by simp

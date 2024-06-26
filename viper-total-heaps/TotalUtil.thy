@@ -472,25 +472,35 @@ proof -
 qed
 
 lemma disjoint_list_members_disjoint:
+  assumes disjointList: "disjoint_list xs"
+      and DifferentPlacement:
+          "\<exists>i j. 0 \<le> i \<and> i < length xs \<and> xs ! i = A \<and>
+                 0 \<le> j \<and> j < length xs \<and> xs ! j = B \<and>
+                 i \<noteq> j"
+    shows "disjnt A B"
+proof -
+  from DifferentPlacement obtain i j where
+    "0 \<le> i \<and> i < length xs" and
+    "xs ! i = A" and
+    "0 \<le> j \<and> j < length xs" and
+    "xs ! j = B" and
+    "i \<noteq> j" 
+    by fast
+    show "disjnt A B"
+      using \<open>0 \<le> i \<and> i < length xs\<close> \<open>0 \<le> j \<and> j < length xs\<close> \<open>i \<noteq> j\<close> \<open>xs ! i = A\<close> \<open>xs ! j = B\<close> disjointList disjoint_list_def
+      by fast
+qed
+
+lemma disjoint_list_members_disjoint_2:
   assumes "disjoint_list xs"
       and "ListMem A xs"
       and "ListMem B xs"
       and "A \<noteq> B"
     shows "disjnt A B"
-proof -
-  obtain i where
-    "0 \<le> i \<and> i < length xs" and
-    "(xs ! i) = A"
-    by (meson ListMem_iff \<open>ListMem A xs\<close> in_set_conv_nth zero_le)
-  obtain j where
-    "0 \<le> j \<and> j < length xs" and
-    "(xs ! j) = B"
-    by (meson ListMem_iff \<open>ListMem B xs\<close> in_set_conv_nth zero_le)
-  have "i \<noteq> j"
-    using \<open>xs ! i = A\<close> \<open>xs ! j = B\<close> \<open>A \<noteq> B\<close> by fast
-  show "disjnt A B"
-    using \<open>0 \<le> i \<and> i < length xs\<close> \<open>0 \<le> j \<and> j < length xs\<close> \<open>i \<noteq> j\<close> \<open>xs ! i = A\<close> \<open>xs ! j = B\<close> \<open>disjoint_list xs\<close> disjoint_list_def
-    by fast
+proof (rule disjoint_list_members_disjoint)
+  show "disjoint_list xs" using \<open>disjoint_list xs\<close> by simp
+  show "\<exists>i j. 0 \<le> i \<and> i < length xs \<and> xs ! i = A \<and> 0 \<le> j \<and> j < length xs \<and> xs ! j = B \<and> i \<noteq> j"
+    by (metis ListMem_iff \<open>ListMem A xs\<close> \<open>ListMem B xs\<close> \<open>A \<noteq> B\<close> in_set_conv_nth le0)
 qed
 
 lemma disjoint_list_set_vs_collected_members:
@@ -504,13 +514,72 @@ lemma disjoint_list_set_vs_collected_members:
     shows "disjnt A B"
 proof -
   have "\<And>x. x \<in> B \<Longrightarrow> x \<notin> A"
-    by (metis BinS \<open>disjoint_list xs\<close> \<open>ListMem A xs\<close> disjnt_iff disjoint_list_members_disjoint)
+    by (metis BinS \<open>disjoint_list xs\<close> \<open>ListMem A xs\<close> disjnt_iff disjoint_list_members_disjoint_2)
   hence "disjnt B A"
     by (simp add: disjnt_iff)
   thus "disjnt A B"
     using disjnt_sym by fast
 qed
-    
+
+lemma disjoint_list_removed_from_set:
+  assumes "disjoint_list (xs @ (M # ys))"
+      (is "disjoint_list ?lis")
+      and "m \<in> M"
+      and "m \<notin> M'"
+    shows "m \<notin> \<Union> (set (xs @ (M' # ys)))"
+proof -
+  have "m \<notin> \<Union> (set xs)"
+  proof (rule ccontr)
+    assume "\<not> m \<notin> \<Union> (set xs)"
+    hence "m \<in> \<Union> (set xs)" by simp
+    from this obtain S where
+      "m \<in> S" and
+      "ListMem S xs"
+      using ListMem_iff by fastforce
+    have "disjnt S M"
+      using \<open>disjoint_list (xs @ (M # ys))\<close> \<open>ListMem S xs\<close> ListMem_iff disjoint_list_app_disj
+      by fastforce
+    thus "False"
+      using \<open>m \<in> S\<close> \<open>m \<in> M\<close>
+      by (simp add: disjnt_iff)
+  qed
+  have "m \<notin> \<Union> (set ys)"
+  proof (rule ccontr)
+    assume "\<not> m \<notin> \<Union> (set ys)"
+    hence "m \<in> \<Union> (set ys)" by simp
+    from this obtain j S where
+      "m \<in> S" and
+      "0 \<le> j" and
+      "j < length ys" and
+      "ys ! j = S"
+      by (meson Union_iff bot_nat_0.extremum in_set_conv_nth)
+    have "disjnt M S"
+    proof (rule disjoint_list_members_disjoint)
+      show "disjoint_list (xs @ (M # ys))"
+        using \<open>disjoint_list (xs @ (M # ys))\<close> by simp
+      show "\<exists>i j. 0 \<le> i \<and>
+          i < length (xs @ M # ys) \<and>
+          (xs @ M # ys) ! i = M \<and> 0 \<le> j \<and> j < length (xs @ M # ys) \<and> (xs @ M # ys) ! j = S \<and> i \<noteq> j"
+      proof (intro exI, intro conjI)
+        show "0 \<le> length xs" by simp
+        show "length xs < length (xs @ M # ys)" by simp
+        show "(xs @ M # ys) ! length xs = M" by simp
+        show "0 \<le> length xs + j + 1" by simp
+        show "length xs + j + 1 < length (xs @ M # ys)"
+          by (simp add: \<open>j < length ys\<close>)
+        show "(xs @ M # ys) ! (length xs + j + 1) = S"
+          by (simp add: \<open>ys ! j = S\<close> nth_append)
+        show "length xs \<noteq> length xs + j + 1" by simp
+      qed
+    qed
+    thus "False"
+      using \<open>m \<in> S\<close> \<open>m \<in> M\<close>
+      by (simp add: disjnt_iff)
+  qed
+  show ?thesis
+    using \<open>m \<notin> \<Union> (set xs)\<close> \<open>m \<notin> \<Union> (set ys)\<close> \<open>m \<notin> M'\<close>
+    by simp
+qed
 
 lemma count_multiset_at_least_two:
   assumes "xs ! i = xs ! j" and 
