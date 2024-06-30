@@ -2081,6 +2081,7 @@ lemma state_rel_capture_total_state_change_eval_and_def_state:
       and "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
       and "\<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
       and StateRel: "state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega>def_old \<omega>_old ns"
+      (* Do we actually need these? *)
       and MaskRelEquiv: "mdef = m \<Longrightarrow> (\<And>mb :: 'a bpl_mask_ty.  
                                              (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>)  mb) \<longleftrightarrow>
                                              (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def) mb))"
@@ -2257,7 +2258,47 @@ proof -
     show "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns"
       using StateRel state_rel_state_well_typed by fast
   next
-    show "aux_vars_pred_sat ?\<Lambda> AuxPred ns" sorry
+    show "aux_vars_pred_sat ?\<Lambda> AuxPred ns"
+      unfolding aux_vars_pred_sat_def
+    proof (intro allI, intro impI)
+      fix x P
+      assume PredicateDefined: "AuxPred x = Some P"
+      show "has_Some P (lookup_var ?\<Lambda> ns x)"
+      proof (cases "x = h \<or> x = m \<or> x = hdef \<or> x = mdef")
+        case False
+        hence "AuxPred' x = Some P"
+          using \<open>AuxPred' = _\<close> PredicateDefined by simp
+        thus "has_Some P (lookup_var ?\<Lambda> ns x)"
+          using StateRel \<open>AuxPred' x = Some P\<close> state_rel_aux_pred_sat_lookup
+          by blast
+      next
+        case True
+        then consider
+             (H)    "x = h"
+           | (M)    "x \<noteq> h \<and> x = m"
+           | (HDef) "x \<noteq> h \<and> x \<noteq> m \<and> x = hdef"
+           | (MDef) "x \<noteq> h \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x = mdef"
+          by fast
+        thus "has_Some P (lookup_var ?\<Lambda> ns x)"
+        proof (cases)
+          case H
+          thus ?thesis
+            using DisjAuxPred PredicateDefined by fast
+        next
+          case M
+          thus ?thesis
+            using DisjAuxPred PredicateDefined by fast
+        next
+          case HDef
+          thus ?thesis
+            using DisjAuxPred PredicateDefined by fast
+        next
+          case MDef
+          thus ?thesis
+            using DisjAuxPred PredicateDefined by fast
+        qed
+      qed
+    qed
   next
     show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
       unfolding label_hm_rel_def
@@ -2332,6 +2373,7 @@ proof -
   qed
 qed
 
+(*
 lemma state_rel_capture_total_state_change_eval_state_alt:
   assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' FieldTr0 AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
       and "m \<noteq> h"
@@ -2347,7 +2389,7 @@ proof (rule state_rel_capture_total_state_change_eval_and_def_state[where ?mdef=
   show " state_rel Pr StateCons TyRep Tr' (AuxPred(m \<mapsto> pred_eq_mask Pr TyRep FieldTr0 ctxt m \<omega>0, h \<mapsto> pred_eq_heap Pr TyRep FieldTr0 ctxt h \<omega>0)) ctxt \<omega>def
      \<omega> ns"
     by (simp add: aux_pred_capture_state_def)    
-qed (insert assms, auto)
+qed (insert assms, auto) *)
 
 lemma state_rel_capture_total_state_change_eval_state:
   assumes StateRel: "state_rel_capture_total_state Pr StateCons TyRep Tr' FieldTr0 AuxPred ctxt m h \<omega>0 \<omega>def \<omega> ns"      
