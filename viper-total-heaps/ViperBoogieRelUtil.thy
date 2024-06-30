@@ -2260,7 +2260,75 @@ proof -
     show "aux_vars_pred_sat ?\<Lambda> AuxPred ns" sorry
   next
     show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
-      sorry
+      unfolding label_hm_rel_def
+    proof (intro conjI)
+      show "label_rel (\<lambda>h \<phi>. heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) h (get_hh_total \<phi>)) (fst (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
+        unfolding label_rel_def
+      proof (intro allI, intro impI)
+        fix l h
+        assume LabelDefined: "fst (label_hm_translation Tr) l = Some h"
+        have LabelRel: "\<forall>lbl h. (fst (label_hm_translation Tr')) lbl = Some h \<longrightarrow>
+                          (\<exists>\<phi>. (get_trace_total \<omega>_old) lbl = Some \<phi> \<and>
+                          heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>) ns)"
+          using StateRel state_rel_label_hm_rel
+          unfolding label_hm_rel_def label_rel_def
+          by fast
+        then obtain \<phi> where
+          "get_trace_total \<omega>_old l = Some \<phi>" and
+          HeapVarRel: "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_hh_total \<phi>) ns"
+          using \<open>Tr = _\<close> LabelDefined
+          by fastforce
+        show "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
+            heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
+        proof (intro exI, intro conjI)
+          show "get_trace_total \<omega> l = Some \<phi>"
+            using \<open>get_trace_total \<omega>_old l = Some \<phi>\<close> \<open>\<omega>_old = _\<close> by simp
+          show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
+          proof -
+            have "field_translation Tr = field_translation Tr'"
+              using \<open>Tr = _\<close> by simp
+            thus ?thesis
+              using HeapVarRel by simp
+          qed
+        qed
+      qed
+      show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) m (get_mh_total \<phi>)) (snd (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
+        unfolding label_rel_def
+      proof (intro allI, intro impI)
+        fix l m
+        assume LabelDefined: "snd (label_hm_translation Tr) l = Some m"
+        have LabelRel: "\<forall>lbl m. (snd (label_hm_translation Tr')) lbl = Some m \<longrightarrow>
+                          (\<exists>\<phi>. (get_trace_total \<omega>_old) lbl = Some \<phi> \<and>
+                          mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') m (get_mh_total \<phi>) ns)"
+          using StateRel state_rel_label_hm_rel
+          unfolding label_hm_rel_def label_rel_def
+          by fast
+        then obtain \<phi> where
+          "get_trace_total \<omega>_old l = Some \<phi>" and
+          MaskVarRel: "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') m (get_mh_total \<phi>) ns"
+          using \<open>Tr = _\<close> LabelDefined by fastforce
+        show "\<exists>\<phi>. get_trace_total \<omega> l = Some \<phi> \<and>
+            mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>) ns"
+        proof (intro exI, intro conjI)
+          show "get_trace_total \<omega> l = Some \<phi>"
+            using \<open>get_trace_total \<omega>_old l = _\<close> \<open>\<omega>_old = _\<close> by simp
+          show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) m (get_mh_total \<phi>) ns"
+          proof -
+            have "field_translation Tr = field_translation Tr'"
+              using \<open>Tr = _\<close> by simp
+            thus ?thesis
+              using MaskVarRel by simp
+          qed
+        qed
+      qed
+      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+      proof (intro allI, intro impI)
+        fix lbl \<phi>
+        assume "get_trace_total \<omega> lbl = Some \<phi>"
+        show "valid_heap_mask (get_mh_total \<phi>)"
+          by (metis StateRel \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>\<omega>_old = _\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def state_rel_label_hm_rel)
+      qed
+    qed
   qed
 qed
 
