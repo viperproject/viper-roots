@@ -2078,10 +2078,13 @@ lemma state_rel_capture_total_state_change_eval_and_def_state:
                             (hdef \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt hdef \<omega>def)
                             (m \<mapsto> pred_eq_mask Pr TyRep FieldTr ctxt m (\<omega> :: 'a full_total_state))                    
                             (h \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt h \<omega>)"
+      (* Added these two assumptions so that we can know that these only differ on the total state *)
+      (* Should we re-frame this by defining \<omega>def in terms of \<omega>def_old? *)
       and "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
       and "\<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+      (* Do we need additional assumptions about the "current" state? e.g. that it is well-formed *)
       and StateRel: "state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega>def_old \<omega>_old ns"
-      (* Do we actually need these? *)
+      (* May not actually need these two *)
       and MaskRelEquiv: "mdef = m \<Longrightarrow> (\<And>mb :: 'a bpl_mask_ty.  
                                              (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>)  mb) \<longleftrightarrow>
                                              (mask_rel Pr (field_translation Tr) (get_mh_total_full \<omega>def) mb))"
@@ -2125,12 +2128,12 @@ proof -
       by fast
   next
     case False
-    hence Pred: "AuxPred' mdef = Some (pred_eq_mask Pr TyRep FieldTr0 ctxt mdef \<omega>def0)"
+    hence Pred: "AuxPred' mdef = Some (pred_eq_mask Pr TyRep FieldTr ctxt mdef \<omega>def)"
       using \<open>AuxPred' =_\<close> DisjMaskHeap
       by simp
     with that state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=mdef, OF Pred] 
     show ?thesis
-      using \<open>FieldTr0 = _\<close>
+      using \<open>FieldTr = _\<close>
       unfolding pred_eq_mask_def 
       by blast
   qed
@@ -2147,12 +2150,12 @@ proof -
       by auto      
   next
     case False
-    hence Pred: "AuxPred' hdef = Some (pred_eq_heap Pr TyRep FieldTr0 ctxt hdef \<omega>def0)"
+    hence Pred: "AuxPred' hdef = Some (pred_eq_heap Pr TyRep FieldTr ctxt hdef \<omega>def)"
       using \<open>AuxPred' =_\<close> DisjMaskHeap
       by simp
     with that state_rel_aux_pred_sat_lookup_2[OF StateRel, where ?aux_var=hdef, OF Pred] 
     show ?thesis
-      using \<open>FieldTr0 = _\<close>
+      using \<open>FieldTr = _\<close>
       unfolding pred_eq_heap_def 
       by blast
   qed
@@ -2161,22 +2164,20 @@ proof -
      get_mh_total \<omega> and get_mh_total \<omega>def are the same on the relevant locations *)
   show "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   proof (subst state_rel_def, subst state_rel0_def, intro conjI)
-    show "valid_heap_mask (get_mh_total_full \<omega>def)"
-      unfolding wf_mask_simple_def
-    proof (intro allI)
-      fix hl
-      show "get_mh_total_full \<omega>def hl \<le> PosReal.pwrite" sorry
-    qed
+    (* Need an assumption that says that the current state is well formed *)
+    show "valid_heap_mask (get_mh_total_full \<omega>def)" sorry
   next
     show "valid_heap_mask (get_mh_total_full \<omega>)" sorry (* Same issue here *)
   next
-    show "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
       (* Do we need an assumption
          WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       ? *)
+    show "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
       sorry
+  next
     show "type_interp ctxt = vbpl_absval_ty TyRep"
       using StateRel state_rel_type_interp by fast
+  next
     show "store_rel (type_interp ctxt) ?\<Lambda> (var_translation Tr) (get_store_total \<omega>) ns"
     proof -
       have "var_translation Tr = var_translation Tr'"
@@ -2185,7 +2186,118 @@ proof -
       thus ?thesis
         using StateRel state_rel_store_rel \<open>var_translation Tr = var_translation Tr'\<close> by fastforce
     qed
-    show "disjoint_list (state_rel0_disj_list Tr AuxPred)" sorry
+  next
+    show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+    proof -
+      \<comment>\<open>This is our starting point\<close>
+      have DisjointList: "disjoint_list (state_rel0_disj_list Tr' AuxPred')"
+        using StateRel state_rel_disjoint by fast
+      \<comment>\<open>We proceed in three steps\<close>
+      \<comment>\<open>First, we switch from AuxPred' to AuxPred\<close>
+      have DisjointListAuxPred: "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+      proof (rule disjoint_list_restrict_auxpred[where ?AuxPred = "AuxPred'"],
+             simp add: DisjointList)
+        show "dom AuxPred \<subseteq> dom AuxPred'"
+          using \<open>AuxPred' = _\<close> by fastforce
+      qed
+      \<comment>\<open>Next, we switch the heap variables\<close>
+      let ?TrCurrentHeap = "Tr' \<lparr> heap_var := h, heap_var_def := hdef \<rparr>"
+      have DisjointListCurrentHeap: "disjoint_list (state_rel0_disj_list ?TrCurrentHeap AuxPred)"
+      proof (rule disjoint_list_change_heap[where ?Tr = "Tr'"], simp add: DisjointListAuxPred, simp)
+        show "h \<notin> \<Union> (set (state_rel0_disj_list Tr' AuxPred))"
+        proof -
+          let ?xs = "[{heap_var Tr', heap_var_def Tr'},
+                      {mask_var Tr', mask_var_def Tr'},
+                      (ran (var_translation Tr')), 
+                      (ran (field_translation Tr')),
+                      (range (const_repr Tr'))]"
+          let ?M = "dom AuxPred'"
+          let ?M' = "dom AuxPred"
+          let ?ys ="[vars_label_hm_tr (label_hm_translation Tr')]"
+          have "h \<notin> \<Union> (set (?xs @ (?M' # ?ys)))"
+          proof (rule disjoint_list_removed_from_set)
+            show "disjoint_list (?xs @ (?M # ?ys))"
+              using DisjointList by simp
+            show "h \<in> dom AuxPred'"
+              using \<open>AuxPred' = _\<close> by simp
+            show "h \<notin> dom AuxPred"
+              using DisjAuxPred by simp
+          qed
+          thus ?thesis by simp
+        qed
+        show "hdef \<notin> \<Union> (set (ViperBoogieRelUtil.state_rel0_disj_list Tr' AuxPred))"
+        proof -
+          let ?xs = "[{heap_var Tr', heap_var_def Tr'},
+                      {mask_var Tr', mask_var_def Tr'},
+                      (ran (var_translation Tr')), 
+                      (ran (field_translation Tr')),
+                      (range (const_repr Tr'))]"
+          let ?M = "dom AuxPred'"
+          let ?M' = "dom AuxPred"
+          let ?ys ="[vars_label_hm_tr (label_hm_translation Tr')]"
+          have "hdef \<notin> \<Union> (set (?xs @ (?M' # ?ys)))"
+          proof (rule disjoint_list_removed_from_set)
+            show "disjoint_list (?xs @ (?M # ?ys))"
+              using DisjointList by simp
+            show "hdef \<in> dom AuxPred'"
+              using \<open>AuxPred' = _\<close> by simp
+            show "hdef \<notin> dom AuxPred"
+              using DisjAuxPred by simp
+          qed
+          thus ?thesis by simp
+        qed
+      qed
+
+      \<comment>\<open>Finally change the mask variables\<close>
+      thus "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      proof (rule disjoint_list_change_mask[where Tr = ?TrCurrentHeap and ?m' = m and ?mdef' = mdef],
+             simp add: \<open>Tr = _\<close>)
+        show "m \<notin> \<Union> (set (state_rel0_disj_list ?TrCurrentHeap AuxPred))"
+        proof -
+          let ?xs = "[{heap_var Tr', heap_var_def Tr'},
+                      {mask_var Tr', mask_var_def Tr'},
+                      (ran (var_translation Tr')), 
+                      (ran (field_translation Tr')),
+                      (range (const_repr Tr'))]"
+          let ?M = "dom AuxPred'"
+          let ?M' = "dom AuxPred"
+          let ?ys ="[vars_label_hm_tr (label_hm_translation Tr')]"
+          have "m \<notin> \<Union> (set (?xs @ (?M' # ?ys)))"
+          proof (rule disjoint_list_removed_from_set)
+            show "disjoint_list (?xs @ (?M # ?ys))"
+              using DisjointList by simp
+            show "m \<in> dom AuxPred'"
+              using \<open>AuxPred' = _\<close> by simp
+            show "m \<notin> dom AuxPred"
+              using DisjAuxPred by simp
+          qed
+          thus ?thesis
+            using DisjMaskHeap by fastforce
+        qed
+        show "mdef \<notin> \<Union> (set (state_rel0_disj_list ?TrCurrentHeap AuxPred))"
+        proof -
+          let ?xs = "[{heap_var Tr', heap_var_def Tr'},
+                      {mask_var Tr', mask_var_def Tr'},
+                      (ran (var_translation Tr')), 
+                      (ran (field_translation Tr')),
+                      (range (const_repr Tr'))]"
+          let ?M = "dom AuxPred'"
+          let ?M' = "dom AuxPred"
+          let ?ys ="[vars_label_hm_tr (label_hm_translation Tr')]"
+          have "mdef \<notin> \<Union> (set (?xs @ (?M' # ?ys)))"
+          proof (rule disjoint_list_removed_from_set)
+            show "disjoint_list (?xs @ (?M # ?ys))"
+              using DisjointList by simp
+            show "mdef \<in> dom AuxPred'"
+              using \<open>AuxPred' = _\<close> by simp
+            show "mdef \<notin> dom AuxPred"
+              using DisjAuxPred by simp
+          qed
+          thus ?thesis
+            using DisjMaskHeap by fastforce
+        qed
+      qed
+    qed
   next
     show "get_store_total \<omega>def = get_store_total \<omega>"
       using \<open>\<omega>def_old = _\<close> \<open>\<omega>_old = _\<close> StateRel state_rel_eval_welldef_eq
@@ -2195,9 +2307,9 @@ proof -
       using \<open>\<omega>def_old = _\<close> \<open>\<omega>_old = _\<close> StateRel state_rel_eval_welldef_eq
       by fastforce
   next
+    (* Need an assumption that says that the total states are the same *)
     show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
-      using \<open>\<omega>def_old = _\<close> \<open>\<omega>_old = _\<close> StateRel state_rel_eval_welldef_eq
-      sorry (* May need an assumption here *)
+      sorry
   next
     show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>) ns"
       unfolding heap_var_rel_def
