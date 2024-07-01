@@ -756,9 +756,9 @@ subsection \<open>Disjointness\<close>
 
 lemma disjoint_list_change_heap:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := hdef' \<rparr>"
       and hPrimeNew: "h' \<notin> state_rel0_disj_vars Tr AuxPred"
       and hDefPrimeNew: "hdef' \<notin> state_rel0_disj_vars Tr AuxPred"
-      and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := hdef' \<rparr>"
     shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
 proof -
   let ?xs = "[]"
@@ -799,9 +799,9 @@ qed
 
 lemma disjoint_list_change_mask:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
+      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := mdef' \<rparr>"
       and mPrimeNew: "m' \<notin> state_rel0_disj_vars Tr AuxPred"
       and mDefPrimeNew: "mdef' \<notin> state_rel0_disj_vars Tr AuxPred"
-      and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := mdef' \<rparr>"
     shows "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
 proof -
   let ?xs = "[{heap_var Tr, heap_var_def Tr}]"
@@ -899,8 +899,6 @@ proof -
 
   thus ?thesis by simp
 qed
-
-thm disjoint_list_removed_from_set
 
 subsection \<open>Tactics\<close>
 
@@ -3259,5 +3257,53 @@ lemma field_rel_single_elim:
   using assms
   unfolding field_rel_single_def
   by (meson has_Some_iff)
-   
+
+
+lemma total_state_exists_for_label:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and "lbls = label_hm_translation Tr"
+      and OldH: "fst lbls lbl = Some OldH"
+      and OldM: "snd lbls lbl = Some OldM"
+    shows "\<exists>\<phi>. get_trace_total \<omega> lbl = Some \<phi> \<and> 
+               heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns \<and>
+               mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
+proof -
+  let ?\<Lambda> = "var_context ctxt"
+  have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+    using StateRel state_rel_label_hm_rel by fast
+  then obtain \<phi> where "get_trace_total \<omega> lbl = Some \<phi>"
+    using \<open>lbls = _\<close> OldM label_hm_rel_def label_rel_def
+    by meson
+
+  show ?thesis
+  proof (intro exI, intro conjI)
+    show "get_trace_total \<omega> lbl = Some \<phi>"
+      using \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> by simp
+    show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
+      by (metis (mono_tags, lifting) LabelHMRel OldH \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>lbls = _\<close> label_hm_rel_def label_rel_def option.sel)
+    show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
+      by (metis (mono_tags, lifting) LabelHMRel OldM \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>lbls = _\<close> label_hm_rel_def label_rel_def option.sel)
+  qed
+qed
+
+lemma obtain_total_state_for_label:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and "lbls = label_hm_translation Tr"
+      and OldH: "fst lbls lbl = Some OldH"
+      and OldM: "snd lbls lbl = Some OldM"
+    obtains \<phi>
+    where "get_trace_total \<omega> lbl = Some \<phi>"
+      and "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
+      and "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
+proof -
+  let ?\<Lambda> = "var_context ctxt"
+  have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+    using StateRel state_rel_label_hm_rel by fast
+  then obtain \<phi> where "get_trace_total \<omega> lbl = Some \<phi>"
+    using \<open>lbls = _\<close> OldM label_hm_rel_def label_rel_def
+    by meson
+
+  show ?thesis sorry
+qed
+
 end
