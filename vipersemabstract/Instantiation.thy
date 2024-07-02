@@ -1090,47 +1090,51 @@ proof
 
 qed
 
-definition well_typedly :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set" where
-"well_typedly \<Delta> F A = A \<inter> {\<omega> |\<omega>. well_typed ((map_option (make_semantic_vtyp \<Delta>)) \<circ> F) (get_abs_state \<omega>)}"
+abbreviation typed where
+  "typed \<equiv> TypedEqui.typed"
+
+definition make_context_semantic where
+  "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
+
+definition well_typedly (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set"*)
+  where
+    "well_typedly \<Delta> F A = Set.filter (typed (make_context_semantic \<Delta> F)) A"
+(*
+A \<inter> {\<omega> |\<omega>. typed (make_context_semantic \<Delta> F)}"
+*)
 
 lemma well_typedly_incl :
   shows "well_typedly \<Delta> F A \<subseteq> A"
-  by (simp add:well_typedly_def)
+  by (simp add: subset_iff well_typedly_def)
 
 lemma well_typedly_add_set1 :
   shows "well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2 \<subseteq> well_typedly \<Delta> F (A1 \<otimes> A2)"
   unfolding well_typedly_def add_set_def
   apply (auto)
    apply blast
-  by (meson full_add_charact(2) well_typed_sum)
+  using TypedEqui.typed_sum by blast
 
 lemma well_typedly_plus1 :
   assumes "Some \<phi> = a \<oplus> b"
-  assumes "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state \<phi>)"
-  shows "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state a)"
-proof (rule well_typedI)
-  show "Instantiation.well_typed_heap (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (snd (get_abs_state a))"
-    by (metis (no_types, opaque_lifting) assms(1) assms(2) get_abs_state_def greater_def greater_prod_eq well_typed_def well_typed_heap_smaller)
-  have "fst (get_abs_state a) = fst (get_abs_state \<phi>)"
-    using plus_prodE[OF HOL.sym[OF assms(1)]] plus_prodE[of "snd a" "snd b" "snd \<phi>"]
-    by (metis get_abs_state_def option.discI option.inject plus_agreement_def)
-  then show "\<And>l \<phi>. the_ag (fst (get_abs_state a)) l = Some \<phi> \<Longrightarrow> Instantiation.well_typed_heap (map_option (make_semantic_vtyp \<Delta>) \<circ> F) \<phi>"
-    by (metis assms(2) well_typedE(2))
-qed
+  assumes "typed (make_context_semantic \<Delta> F) \<phi>"
+  shows "typed (make_context_semantic \<Delta> F) a"
+  using TypedEqui.typed_state_axioms assms(1) assms(2) greater_def typed_state.typed_smaller by blast
 
 
 lemma well_typedly_plus :
   assumes "Some \<phi> = a \<oplus> b"
-  assumes "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state \<phi>)"
-  shows "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state a)"
-        "well_typed (map_option (make_semantic_vtyp \<Delta>) \<circ> F) (get_abs_state b)"
+  assumes "typed (make_context_semantic \<Delta> F) \<phi>"
+  shows "typed (make_context_semantic \<Delta> F) a"
+   and "typed (make_context_semantic \<Delta> F) b"
   using assms(1) assms(2) well_typedly_plus1 apply blast
   by (metis assms(1) assms(2) commutative well_typedly_plus1)
 
 lemma well_typedly_add_set2 :
   shows "well_typedly \<Delta> F (A1 \<otimes> A2) \<subseteq> well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2"
   unfolding well_typedly_def add_set_def
-  using well_typedly_plus by blast
+  using well_typedly_plus
+  by (smt (verit) mem_Collect_eq member_filter subsetI)
+
 
 lemma well_typedly_add_set :
   shows "well_typedly \<Delta> F A1 \<otimes> well_typedly \<Delta> F A2 = well_typedly \<Delta> F (A1 \<otimes> A2)"
@@ -1139,7 +1143,8 @@ lemma well_typedly_add_set :
 lemma well_typedly_add_set_l :
   shows "well_typedly \<Delta> F (A1 \<otimes> A2) \<subseteq> A1 \<otimes> well_typedly \<Delta> F A2"
   unfolding well_typedly_def add_set_def
-  using well_typedly_plus by blast
+  using well_typedly_plus
+  by (smt (verit) CollectD CollectI member_filter subsetI)
 
 lemma Stable_well_typedly :
   assumes "Stable A"
@@ -1149,14 +1154,16 @@ lemma Stable_well_typedly :
   (* apply (auto) *)
   sorry (* MS: TODO *)
 
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+definition make_semantic_assertion
+  (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" *)
+  where
+  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 
 lemma make_semantic_assertion_in_unfold :
-  shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>"
+  shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>"
   by (simp add:make_semantic_assertion_def well_typedly_incl)
 
-fun compile :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt"
+fun compile (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt" *)
   where
   "compile \<Delta> F stmt.Skip = abs_stmt.Skip"
 

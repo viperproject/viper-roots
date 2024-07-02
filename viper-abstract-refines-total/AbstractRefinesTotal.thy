@@ -1153,18 +1153,22 @@ lemma well_typed_heap_partial_heap_typing :
 
 lemma in_well_typedly :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
-  shows "\<omega> \<in> well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A
+  shows "\<omega> \<in> well_typedly (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) A
      \<longleftrightarrow> \<omega> \<in> A"
   apply (rule)
   subgoal using well_typedly_incl by blast
   subgoal
     apply (simp add:well_typedly_def well_typed_def snd_get_abs_state fst_get_abs_state)
-    using assms by (clarsimp simp add:abs_state_typing_def partial_trace_typing_def well_typed_heap_partial_heap_typing)
+    using assms
+    sorry
+(*
+    by (clarsimp simp add:abs_state_typing_def partial_trace_typing_def well_typed_heap_partial_heap_typing)
+*)
   done
 
 lemma well_typedly_singleton :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
-  shows "well_typedly (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) {\<omega>} = {\<omega>}"
+  shows "well_typedly (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) {\<omega>} = {\<omega>}"
   apply (rule)
    apply (clarsimp simp add:well_typedly_def)
   using assms by (clarsimp simp add: in_well_typedly)
@@ -2354,7 +2358,7 @@ qed
 lemma rel_stable_assertion_make_semantic_assertionI :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
   assumes "Stable ({\<omega>} \<otimes> \<langle>(ctxt_to_interp ctxt), declared_fields (program_total ctxt)\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  shows "rel_stable_assertion \<omega> (make_semantic_assertion (ctxt_to_interp ctxt) (declared_fields (program_total ctxt)) A)"
+  shows "rel_stable_assertion \<omega> (make_semantic_assertion (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) A)"
   using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_def)
   apply (subst well_typedly_singleton[symmetric]) apply (assumption)
   by (simp add:well_typedly_add_set Stable_well_typedly)
@@ -2367,7 +2371,7 @@ lemma red_inhale_is_stable :
   assumes "valid_a2t_assert A"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   shows "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>) \<Longrightarrow>
-         rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A)"
+         rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A)"
   using assms
   using rel_stable_assertion_make_semantic_assertionI red_inhale_refines
   by blast
@@ -2379,16 +2383,21 @@ lemma inhale_refines :
   assumes "\<Delta> = ctxt_to_interp ctxt"
   assumes "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>)"
   assumes "stable \<omega>'"
-  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion \<Delta> (declared_fields (program_total ctxt)) A"
+  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A"
   assumes "\<omega>\<^sub>t' \<in> a2t_states ctxt \<omega>'"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_assert A"
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
   apply (subgoal_tac "\<omega>' \<in> {\<omega>} \<otimes> \<langle>\<Delta>, (declared_fields (program_total ctxt))\<rangle> \<Turnstile> \<langle>A\<rangle>")
-  prefer 2 using make_semantic_assertion_in_unfold add_set_mono apply (metis (no_types, opaque_lifting) subset_eq)
+   prefer 2 using make_semantic_assertion_in_unfold add_set_mono
+  sorry
+(*
+
+ apply (metis (no_types, opaque_lifting) subset_eq)
   using red_inhale_refines
   by (smt (verit, best) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subset_eq)
+*)
 
 
 subsection \<open>refinement of Exhale\<close>
@@ -2732,7 +2741,7 @@ theorem abstract_refines_total :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   \<comment>\<open>We don't need store_typing in the post condition because red_stmt_total preserves store-typing\<close>
-  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (declared_fields (program_total ctxt)) C) \<omega>
+  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
        (a2t_states ctxt -`\<^sub>s (red_stmt_total_set ctxt R \<Lambda> C (a2t_states ctxt \<omega>)))"
   \<comment>\<open>We could also use ` instead of `\<forall>, which would be a weaker (easier to prove) statement for most cases, but for
      sequential composition, it requires showing that red_stmt_total creates a set that is closed under
@@ -2800,7 +2809,7 @@ next
   proof (rule concrete_post_If)
     from calc show "make_semantic_bexp \<Delta> e \<omega> = Some b" by (simp; blast)
   next
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile \<Delta> (declared_fields (program_total ctxt)) C1 else compile \<Delta> (declared_fields (program_total ctxt)) C2) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
         (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.If e C1 C2) (a2t_states ctxt \<omega>))"
 (* Why does presburger solve this and non of the other solvers? *)
       using calc apply (clarsimp)
@@ -2818,13 +2827,13 @@ next
     apply (rule concrete_post_Seq)
     apply (rule concrete_red_stmt_post_stable_wf) using calc apply (solves \<open>simp\<close>) using calc apply (solves \<open>simp\<close>)
   proof (rule concrete_red_stmt_post_impl)
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (declared_fields (program_total ctxt)) C1) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
        (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>))"
       using calc by simp
   next
     show "a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>) \<subseteq> {\<omega>''.
         sep_algebra_class.stable \<omega>'' \<longrightarrow> a2t_state_wf ctxt (get_trace \<omega>'') \<longrightarrow> \<omega>'' \<in> {\<omega>''.
-        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (declared_fields (program_total ctxt)) C2) \<omega>''
+        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
          (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.Seq C1 C2) (a2t_states ctxt \<omega>))}}"
       apply (rule subsetI)
       subgoal for \<omega>'

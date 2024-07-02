@@ -32,13 +32,12 @@ datatype binop =
 | Or | BImp | And
 
 *)
-datatype int_binop = Add | Sub | Mult | Mod
+datatype int_binop = Add | Sub | Mult
 
 fun interp_int_binop :: "int_binop \<Rightarrow> int \<Rightarrow> int \<Rightarrow> int" where
   "interp_int_binop Add = (+)"
 | "interp_int_binop Sub = (-)"
 | "interp_int_binop Mult = (*)"
-| "interp_int_binop Mod = (mod)"
 
 datatype exp =
 Evar var
@@ -489,7 +488,46 @@ qed (simp_all)
 
 
 definition type_ctxt_heap where
-  "type_ctxt_heap = (\<lambda>f. if f = field_val then Some vints else None)"
+  "type_ctxt_heap f = (if f = field_val then Some vints else None)"
+
+definition type_ctxt_store where
+  "type_ctxt_store x = (if x < undefined then if x mod 2 = 0 then Some vints else Some vrefs else None)"
+
+definition type_ctxt_front_end where
+  "type_ctxt_front_end = \<lparr> variables = type_ctxt_store, custom_context = type_ctxt_heap \<rparr>"
+
+definition type_ctxt_front_end_syntactic where
+  "type_ctxt_front_end_syntactic = ( (\<lambda>x. if x < undefined then if x mod 2 = 0 then Some TInt else Some TRef else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
+
+(*
+definition make_context_semantic where
+  "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
+*)
+lemma make_semantic_tint[simp]:
+  "make_semantic_vtyp \<Delta> TInt = vints"
+  unfolding make_semantic_vtyp_def vints_def has_type_def set_from_type.simps
+  by blast
+
+lemma make_semantic_tref[simp]:
+  "make_semantic_vtyp \<Delta> TRef = vrefs"
+  unfolding make_semantic_vtyp_def vrefs_def has_type_def set_from_type.simps
+  by blast
+
+lemma make_context_semantic_type_ctxt[simp]:
+  "make_context_semantic \<Delta> type_ctxt_front_end_syntactic = type_ctxt_front_end"
+proof -
+  have "variables (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = variables type_ctxt_front_end"
+    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
+    apply (rule ext)
+    by (simp add: make_semantic_tint make_semantic_tref)
+  moreover have "custom_context (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = custom_context type_ctxt_front_end"
+    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
+    apply (rule ext)
+    by (simp add: make_semantic_tint make_semantic_tref)
+  ultimately show ?thesis
+    by (simp add: type_ctxt_front_end_def)
+qed
+
 
 lemma red_keeps_well_typed_cmd:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
