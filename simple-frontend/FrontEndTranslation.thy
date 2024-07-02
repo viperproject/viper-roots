@@ -352,15 +352,12 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
           show "get_trace \<omega>' = get_trace (update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))))"
             by (metis \<open>stabilize f = remove_only \<omega> (l', field_val)\<close> get_trace_set_state get_trace_stabilize greater_equiv greater_state_has_greater_parts(2) r(1) remove_only_def)
         qed
-
-
         moreover have "update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))) \<in> Q"
-          using \<open>l = l'\<close>
-          sorry
-(*
-
-          by (smt (verit, ccfv_SIG) AbstractSemantics.get_store_stabilize ConcreteSemantics.stabilize_typed_elem \<open>\<omega> \<in> P\<close> \<open>get_store ptr r = Some (VRef (Address l)) \<and> get_m ptr (l, field_val) = 1 \<and> get_h ptr (l, field_val) = Some (VInt (edenot e (get_store ptr)))\<close> \<open>semantify_addr r \<omega> = Some l'\<close> \<open>stabilize f = remove_only \<omega> (l', field_val)\<close> asm1(1) full_add_charact(1) full_add_defined get_store_set_state in_update_value r(1) r(2) remove_only_def semantify_exp_def snd_conv typed_get_vh)
-*)
+          using \<open>l = l'\<close> AbstractSemantics.get_store_stabilize ConcreteSemantics.stabilize_typed_elem \<open>\<omega> \<in> P\<close>
+            \<open>get_store ptr r = Some (VRef (Address l)) \<and> get_m ptr (l, field_val) = 1 \<and> get_h ptr (l, field_val) = Some (VInt (edenot e (get_store ptr)))\<close>
+            \<open>semantify_addr r \<omega> = Some l'\<close> \<open>stabilize f = remove_only \<omega> (l', field_val)\<close> asm1(1) full_add_charact(1)
+            full_add_defined get_store_set_state in_update_value r(1) r(2) remove_only_def semantify_exp_def snd_conv typed_get_vh
+          by (smt (verit, ccfv_SIG))
         ultimately show "\<omega>' \<in> Q \<otimes> atrue tcfe"
           by (meson TypedEqui.typed_assertionE TypedEqui.typed_state_axioms \<open>\<omega>' \<in> TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e) \<otimes> TypedEqui.Stabilize_typed tcfe {remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}\<close> in_times_atrue typed_state.typed_Stabilize_typed typed_state.typed_star)
       qed
