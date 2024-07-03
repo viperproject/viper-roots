@@ -253,7 +253,7 @@ subsection \<open>s2a_well_typedly\<close>
 lemma s2a_in_well_typedly :
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  shows "\<omega> \<in> well_typedly def_interp F A
+  shows "\<omega> \<in> well_typedly def_interp (\<Lambda>, F) A
      \<longleftrightarrow> \<omega> \<in> A"
   apply (rule)
   subgoal using well_typedly_incl by blast
@@ -268,7 +268,7 @@ lemma s2a_in_well_typedly :
 lemma s2a_well_typedly_singleton :
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  shows "well_typedly def_interp F {\<omega>} = {\<omega>}"
+  shows "well_typedly def_interp (\<Lambda>, F) {\<omega>} = {\<omega>}"
   apply (rule)
    apply (clarsimp simp add:well_typedly_def)
   using assms by (clarsimp simp add: s2a_in_well_typedly)
@@ -722,7 +722,7 @@ lemma s2a_rel_stable_assertion_from_Stable :
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "Stable ({\<omega>} \<otimes> \<langle>def_interp, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  shows "rel_stable_assertion \<omega> (make_semantic_assertion def_interp F A)"
+  shows "rel_stable_assertion \<omega> (make_semantic_assertion def_interp (\<Lambda>, F) A)"
   using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_def)
   apply (subst s2a_well_typedly_singleton[symmetric]) apply (assumption) apply (assumption)
   by (simp add:well_typedly_add_set Stable_well_typedly)
@@ -1127,7 +1127,7 @@ theorem sexec_sound :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile def_interp F C) \<omega> {\<omega>'.
+  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
     \<exists> V' \<sigma>'. \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and> s2a_state_wf \<Lambda> F V' \<sigma>' \<and> Q \<sigma>'}"
   using assms
 proof (induction C arbitrary: \<sigma> \<omega> V Q)
@@ -1138,8 +1138,9 @@ proof (induction C arbitrary: \<sigma> \<omega> V Q)
     apply (clarsimp)
     apply (rule concrete_post_Inhale)
     subgoal by (simp add:s2a_rel_stable_assertion_from_Stable)
+    apply (auto)
     using make_semantic_assertion_in_unfold add_set_mono
-    by (smt (verit, del_insts) mem_Collect_eq member_filter subset_eq)
+    by (smt (verit) mem_Collect_eq member_filter snd_conv subsetD subsetI)
 next
   case (Exhale A)
   then show ?case
