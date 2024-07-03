@@ -37,13 +37,6 @@ fun fast_force_tac_with_elims_simps ctxt elim_thms simp_thms =
 
 fun TRY_TAC' tac = tac ORELSE' (K all_tac)
 
-type method_data =
-     { method_arg_thm : thm,
-       method_rets_thm : thm,
-       method_pre_thm : thm,
-       method_post_thm : thm,
-       method_lookup_thm : thm }
-
 (* TODO: move to HelperML.thy
 
 The following example illustrates the difference between \<open>FIRST'\<close> and \<open>FIRST_and_THEN'\<close>. For the a goal

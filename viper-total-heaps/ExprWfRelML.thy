@@ -1,5 +1,5 @@
 theory ExprWfRelML
-imports ExprWfRel ExpRelML TotalViperHelperML TotalViperHelperML CPGHelperML
+imports ExprWfRel ExpRelML TotalViperHelperML TotalViperHelperML CPGHelperML MLTypeDeclarations
 begin
 
 text \<open>We define a tactic for proving that a Boogie statement captures the well-definedness check
@@ -12,11 +12,6 @@ tactic A may need to progress the current Boogie configuration after tactic B ha
 \<close>
 ML \<open>
   val Rmsg' = run_and_print_if_fail_tac'
-
-  type exp_wf_rel_info = {
-    (* tactic that solves wf_rel_fieldacc *)       
-    field_access_wf_rel_syn_tac : Proof.context -> int -> tactic 
-  }
   
   fun bop_wf_rel_div_mod exp_rel_info ctxt = 
       (* need to first progress the configuration in case the currently active bigblock is not unfolded or
@@ -68,7 +63,7 @@ ML \<open>
        assm_full_simp_solved_tac ctxt,   
        resolve_tac ctxt [@{thm field_access_wf_rel}], (* field access *)
        resolve_tac ctxt @{thms cond_exp_wf_rel}, (* conditional expression *)
-       resolve_tac ctxt @{thms old_expr_wf_rel_inst[where ?Q = "\<lambda>\<omega>def \<omega>. \<omega>def = \<omega>"]}
+       resolve_tac ctxt @{thms old_expr_wf_rel_inst[where ?Q = "\<lambda>\<omega>def \<omega>. \<omega>def = \<omega>"]} (* old expression *)
       ] [  
        fn _ => fn st => all_tac st, (* var *)
        fn _ => fn st => all_tac st, (* lit *)
@@ -132,15 +127,18 @@ ML \<open>
          progress_tac ctxt
        )
    and
-    old_exp_wf_rel_tac _ exp_rel_info ctxt =
-       resolve_tac ctxt @{thms wf_total_consistency_trivial} THEN'
+    old_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt =
+       (* TODO get this from basic stmt rel *)
+       resolve_tac ctxt [#consistency_wf_thm (#basic_stmt_rel_info exp_rel_info)] THEN'
        fast_tac ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
        #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
        #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
        assm_full_simp_solved_tac ctxt THEN'
-       assm_full_simp_solved_tac ctxt
+       assm_full_simp_solved_tac ctxt THEN'
+       (#aux_var_disj_tac (#basic_stmt_rel_info exp_rel_info) ctxt) THEN'
+       (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED')
        (* TODO include disjointness, and inner exprwfrel tactics? *)
 
    fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 

@@ -3286,24 +3286,4 @@ proof -
   qed
 qed
 
-lemma obtain_total_state_for_label:
-  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      and "lbls = label_hm_translation Tr"
-      and OldH: "fst lbls lbl = Some OldH"
-      and OldM: "snd lbls lbl = Some OldM"
-    obtains \<phi>
-    where "get_trace_total \<omega> lbl = Some \<phi>"
-      and "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
-      and "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
-proof -
-  let ?\<Lambda> = "var_context ctxt"
-  have LabelHMRel: "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
-    using StateRel state_rel_label_hm_rel by fast
-  then obtain \<phi> where "get_trace_total \<omega> lbl = Some \<phi>"
-    using \<open>lbls = _\<close> OldM label_hm_rel_def label_rel_def
-    by meson
-
-  show ?thesis sorry
-qed
-
 end

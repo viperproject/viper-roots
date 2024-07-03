@@ -561,8 +561,9 @@ proof (rule exp_rel_oldexp)
         using StateRel state_rel_aux_vars_pred_sat
         by fast
     next
+      (* This should hold because it held previously and we removed the one case where it didn't *)
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
-        using StateRel state_rel_label_hm_rel \<open>TrOld = _\<close> \<open>lbls' = _\<close> \<open>lbls = _\<close>
+        unfolding label_hm_rel_def label_rel_def
         sorry
     qed
   qed

@@ -1,5 +1,5 @@
 theory ExpRelML
-imports ExpRel Boogie_Lang.TypingML Boogie_Lang.HelperML
+imports ExpRel MLTypeDeclarations Boogie_Lang.TypingML Boogie_Lang.HelperML
 begin
 
 subsection \<open>Auxiliary lemmas for the tactics\<close>
@@ -11,11 +11,6 @@ lemmas state_rel_state_well_typed = state_rel0_state_well_typed[OF state_rel_sta
 subsection \<open>ML tactics\<close>
 
 ML \<open>
-
-datatype type_safety_key = TBool | TInt | TReal | TSameType
-
-(* provide type safety theorems *)
-type type_safety_thm_map = type_safety_key -> thm
 
 fun gen_type_safety_thm_map fun_interp_wf fun_decls_wf var_context_wf state_wf =
    let val type_safety_bpl_aux_bool = 
@@ -35,19 +30,6 @@ fun gen_type_safety_thm_map fun_interp_wf fun_decls_wf var_context_wf state_wf =
         | TSameType => type_safety_bpl_aux_same_type
     )
    end
-
-type exp_rel_info = {
-    type_safety_thm_map : type_safety_thm_map,
-    lookup_var_rel_tac : Proof.context -> int -> tactic,
-    vpr_lit_bpl_exp_rel_tac : Proof.context -> int -> tactic,
-    lookup_var_thms : thm list,
-    lookup_fun_bpl_thms: thm list,
-    (* tactic to simplify the context projection on the runtype interpretation *)
-    simplify_rtype_interp_tac: Proof.context -> int -> tactic,
-    (* should be tactic that given goal to relate Viper field access reduces the goal to a single
-       goal where the receiver expression must be related *)       
-    field_access_rel_pre_tac : Proof.context -> int -> tactic
-}
 
 fun var_rel_tac lookup_var_rel_tac ctxt =
   resolve_tac ctxt [@{thm exp_rel_var}] THEN'
@@ -155,8 +137,9 @@ and
     assm_full_simp_solved_tac ctxt THEN'
     assm_full_simp_solved_tac ctxt THEN'
     assm_full_simp_solved_tac ctxt THEN'
-    resolve_tac ctxt @{thms wf_total_consistency_trivial}
-    (* TODO tactics to solve disjointness and two contained expressions? *)
+    resolve_tac ctxt [#consistency_wf_thm (#basic_stmt_rel_info info)] THEN'
+    (#aux_var_disj_tac (#basic_stmt_rel_info info) ctxt) THEN'
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
 and 
   (* the reason for abstraction over the state st in multiple places is to avoid infinite recursion due
      to eager evaluation of arguments in a function call *)
@@ -169,7 +152,7 @@ and
         (fn i => fn st => binop_lazy_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => field_access_rel_tac info ctxt i st) |> SOLVED',
         (fn i => fn st => cond_exp_rel_tac info ctxt i st) |> SOLVED',
-        (fn i => fn st => old_exp_rel_tac info ctxt i st) (* |> SOLVED' *)
+        (fn i => fn st => old_exp_rel_tac info ctxt i st) |> SOLVED'
       ]
 \<close>
 

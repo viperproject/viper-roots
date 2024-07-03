@@ -1,5 +1,5 @@
 theory CPGHelperML
-  imports ViperBoogieRelUtil TotalViperHelperML ExpRelML  "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools"
+  imports ViperBoogieRelUtil MLTypeDeclarations TotalViperHelperML ExpRelML  "HOL-Eisbach.Eisbach" "HOL-Eisbach.Eisbach_Tools"
 begin
 
 ML \<open>
