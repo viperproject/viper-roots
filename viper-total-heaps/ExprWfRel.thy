@@ -766,15 +766,17 @@ proof -
       (* Should add a lemma that says this, could be obtains or shows *)
 
 \<comment>\<open>In a first step, let's revert the heap and mask, while leaving the labels.\<close>
-
-      let ?Tr2 = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
-      have "state_rel Pr StateCons TyRep ?Tr2 AuxPred ctxt \<omega>def \<omega> ns"
-      proof (rule state_rel_capture_total_state_change_eval_and_def_state[OF _ ROld], simp)
+      let ?TrNoLabel = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
+      have "state_rel Pr StateCons TyRep ?TrNoLabel AuxPred ctxt \<omega>def \<omega> ns"
+      proof (rule state_rel_capture_total_state_change_eval_and_def_state)
+        show "state_rel Pr StateCons TyRep Tr' (?AuxPredFun \<omega>def \<omega>) ctxt \<omega>def_old \<omega>_old ns"
+          using ROld by simp
+        next
         show "{m, mdef} \<inter> {h, hdef} = {}"
           using RPrev[simplified \<open>R = _\<close>] mh state_rel_mask_var_disjoint
           by blast
       next
-        show "field_translation Tr = field_translation ?Tr2"
+        show "field_translation Tr = field_translation ?TrNoLabel"
           using \<open>Tr' = _\<close>
           by auto
       next
@@ -820,7 +822,11 @@ proof -
           total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>) =
           total_heap_well_typed Pr (domain_type TyRep) (get_hh_total_full \<omega>def)"
           by (metis RPrevInst fst_conv get_h_total_full.simps pred_eq_heap_aux_def state_rel_eval_welldef_eq)
-      qed (simp add: \<open>Tr' = _\<close> mh)
+      next
+        show "Tr\<lparr>label_hm_translation := lbls'\<rparr> = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := mdef, heap_var_def := hdef\<rparr>"
+          using \<open>Tr' = _\<close> \<open>lbls' = _\<close> mh
+          by simp
+      qed (simp add: \<open>Tr' = _\<close> mh, simp add: \<omega>_old, simp add: \<omega>_old)
 
 \<comment>\<open>In a second step, let's revert the labels\<close>
       thus "R \<omega>def \<omega> ns"
@@ -831,11 +837,11 @@ proof -
             using LabelExists
             by simp
 
-          show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) OldH (get_hh_total \<phi>) ns"
+          show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation ?TrNoLabel) OldH (get_hh_total \<phi>) ns"
             using HeapRelOld
             by simp
 
-          show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?Tr2) OldM (get_mh_total \<phi>) ns"
+          show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation ?TrNoLabel) OldM (get_mh_total \<phi>) ns"
             using MaskRelOld
             by simp
 
@@ -1076,7 +1082,7 @@ proof -
         proof -
           (* First, remove the labels *)
           let ?TrNoLabels = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
-          have "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
+          have disjointListNoLabels: "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
           proof (rule disjoint_list_remove_label)
             show "disjoint_list (state_rel0_disj_list Tr AuxPred)"
               using RInst state_rel_disjoint by blast
@@ -1089,9 +1095,9 @@ proof -
           (* Next, change the heap *)
           let ?TrOldHeap = "?TrNoLabels \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
           have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
-          proof (rule disjoint_list_change_heap)
+          proof (rule disjoint_list_change_heap_same)
             show "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
-              using \<open>disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)\<close>
+              using disjointListNoLabels
               by simp
             show "OldH \<notin> \<Union> (set (state_rel0_disj_list ?TrNoLabels AuxPred))"
               using DisjAux by simp
@@ -1099,7 +1105,7 @@ proof -
 
           (* Finally, change the mask *)
           show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
-          proof (rule disjoint_list_change_mask)
+          proof (rule disjoint_list_change_mask_same)
             show "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
               using \<open>disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)\<close> by simp
             show "OldM \<notin>  \<Union> (set (state_rel0_disj_list ?TrOldHeap AuxPred))"
