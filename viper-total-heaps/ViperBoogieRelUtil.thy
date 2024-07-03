@@ -1232,7 +1232,7 @@ proof -
 
   have LabelRel: 
     "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
-    (* TODO prove this *)
+    (* This should be true because the trace meets the definitions we need, see assumptions *)
     sorry
 
   show ?thesis
@@ -2078,10 +2078,13 @@ lemma state_rel_capture_total_state_change_eval_and_def_state:
                             (hdef \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt hdef \<omega>def)
                             (m \<mapsto> pred_eq_mask Pr TyRep FieldTr ctxt m (\<omega> :: 'a full_total_state))                    
                             (h \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt h \<omega>)"
+      and ValidHeapMask: "valid_heap_mask (get_mh_total_full \<omega>def) \<and> valid_heap_mask (get_mh_total_full \<omega>)"
+      and Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
       (* Added these two assumptions so that we can know that these only differ on the total state *)
       (* Should we re-frame this by defining \<omega>def in terms of \<omega>def_old? *)
-      and "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
-      and "\<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+      and "\<omega>def = \<omega>def_old \<lparr> get_total_full := \<phi>def_old \<rparr>"
+      and "\<omega>   = \<omega>_old     \<lparr> get_total_full := \<phi>_old \<rparr>"
+      and SameHeap: "get_h_total_full \<omega>def = get_h_total_full \<omega>"
       (* Do we need additional assumptions about the "current" state? e.g. that it is well-formed *)
       and StateRel: "state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega>def_old \<omega>_old ns"
       (* May not actually need these two *)
@@ -2165,15 +2168,17 @@ proof -
   show "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   proof (subst state_rel_def, subst state_rel0_def, intro conjI)
     (* Need an assumption that says that the current state is well formed *)
-    show "valid_heap_mask (get_mh_total_full \<omega>def)" sorry
+    show "valid_heap_mask (get_mh_total_full \<omega>def)"
+      using ValidHeapMask by simp
   next
-    show "valid_heap_mask (get_mh_total_full \<omega>)" sorry (* Same issue here *)
+    show "valid_heap_mask (get_mh_total_full \<omega>)"
+      using ValidHeapMask by simp
   next
       (* Do we need an assumption
          WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       ? *)
     show "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
-      sorry
+      using Consistent by simp
   next
     show "type_interp ctxt = vbpl_absval_ty TyRep"
       using StateRel state_rel_type_interp by fast
@@ -2182,7 +2187,7 @@ proof -
     proof -
       have "var_translation Tr = var_translation Tr'"
         using \<open>Tr = _\<close> by simp
-      have "get_store_total \<omega> = get_store_total \<omega>_old" using \<open>\<omega>_old = _\<close> by simp
+      have "get_store_total \<omega> = get_store_total \<omega>_old" using \<open>\<omega> = _\<close> by simp
       thus ?thesis
         using StateRel state_rel_store_rel \<open>var_translation Tr = var_translation Tr'\<close> by fastforce
     qed
@@ -2300,16 +2305,16 @@ proof -
     qed
   next
     show "get_store_total \<omega>def = get_store_total \<omega>"
-      using \<open>\<omega>def_old = _\<close> \<open>\<omega>_old = _\<close> StateRel state_rel_eval_welldef_eq
+      using \<open>\<omega>def = _\<close> \<open>\<omega> = _\<close> StateRel state_rel_eval_welldef_eq
       by fastforce
   next
     show "get_trace_total \<omega>def = get_trace_total \<omega>"
-      using \<open>\<omega>def_old = _\<close> \<open>\<omega>_old = _\<close> StateRel state_rel_eval_welldef_eq
+      using \<open>\<omega>def = _\<close> \<open>\<omega> = _\<close> StateRel state_rel_eval_welldef_eq
       by fastforce
   next
     (* Need an assumption that says that the total states are the same *)
     show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
-      sorry
+      using SameHeap by simp
   next
     show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) (heap_var Tr) (get_hh_total_full \<omega>) ns"
       unfolding heap_var_rel_def
@@ -2435,7 +2440,7 @@ proof -
             heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
         proof (intro exI, intro conjI)
           show "get_trace_total \<omega> l = Some \<phi>"
-            using \<open>get_trace_total \<omega>_old l = Some \<phi>\<close> \<open>\<omega>_old = _\<close> by simp
+            using \<open>get_trace_total \<omega>_old l = Some \<phi>\<close> \<open>\<omega> = _\<close> by simp
           show "heap_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) h (get_hh_total \<phi>) ns"
           proof -
             have "field_translation Tr = field_translation Tr'"
@@ -2464,7 +2469,7 @@ proof -
             mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) m (get_mh_total \<phi>) ns"
         proof (intro exI, intro conjI)
           show "get_trace_total \<omega> l = Some \<phi>"
-            using \<open>get_trace_total \<omega>_old l = _\<close> \<open>\<omega>_old = _\<close> by simp
+            using \<open>get_trace_total \<omega>_old l = _\<close> \<open>\<omega> = _\<close> by simp
           show "mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr) m (get_mh_total \<phi>) ns"
           proof -
             have "field_translation Tr = field_translation Tr'"
@@ -2479,7 +2484,7 @@ proof -
         fix lbl \<phi>
         assume "get_trace_total \<omega> lbl = Some \<phi>"
         show "valid_heap_mask (get_mh_total \<phi>)"
-          by (metis StateRel \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>\<omega>_old = _\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def state_rel_label_hm_rel)
+          by (metis StateRel \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>\<omega> = _\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def state_rel_label_hm_rel)
       qed
     qed
   qed

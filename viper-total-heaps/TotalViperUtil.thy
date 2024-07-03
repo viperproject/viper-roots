@@ -171,7 +171,7 @@ fun supported_atomic_assert :: "pure_exp atomic_assert \<Rightarrow> bool"
 
 abbreviation supported_assertion
   where "supported_assertion \<equiv> assert_pred (\<lambda>_. True) supported_atomic_assert supported_pure_exp"
-
+                                                                                  
 lemma supported_pure_exp_no_unfolding:
   assumes "supported_pure_exp e"
   shows "no_unfolding_pure_exp e"

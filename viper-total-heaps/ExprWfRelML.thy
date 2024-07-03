@@ -139,7 +139,6 @@ ML \<open>
        assm_full_simp_solved_tac ctxt THEN'
        (#aux_var_disj_tac (#basic_stmt_rel_info exp_rel_info) ctxt) THEN'
        (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED')
-       (* TODO include disjointness, and inner exprwfrel tactics? *)
 
    fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 
      (if k <= 0 then

@@ -758,10 +758,13 @@ proof -
 
       from RPrevInst and OldH OldM obtain \<phi>
         where LabelExists: "get_trace_total \<omega> lbl = Some \<phi>"
-          and HeapRelOld: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
-          and MaskRelOld: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
-        sorry \<comment>\<open>There should be an auxiliary lemma in ViperBoogieBasicRel that shows this 
-              (this lemma can then also be used for the final goal of this theorem)\<close>
+        using \<open>lbls = _\<close> total_state_exists_for_label by fast
+
+      (* Get these from ROld and the definitions of \<omega>_old and \<omega>def_old *)
+      have HeapRelOld: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
+        sorry
+      have MaskRelOld: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
+        sorry
 
       (* Should add a lemma that says this, could be obtains or shows *)
 
@@ -826,7 +829,25 @@ proof -
         show "Tr\<lparr>label_hm_translation := lbls'\<rparr> = Tr'\<lparr>mask_var := m, heap_var := h, mask_var_def := mdef, heap_var_def := hdef\<rparr>"
           using \<open>Tr' = _\<close> \<open>lbls' = _\<close> mh
           by simp
-      qed (simp add: \<open>Tr' = _\<close> mh, simp add: \<omega>_old, simp add: \<omega>_old)
+      next
+        show "valid_heap_mask (get_mh_total_full \<omega>def) \<and> valid_heap_mask (get_mh_total_full \<omega>)"
+          using RPrevInst[simplified state_rel_def state_rel0_def]
+          by simp
+      next
+        show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
+          using RPrevInst[simplified state_rel_def state_rel0_def]
+          by simp
+      next 
+        show "consistent_state_rel_opt (state_rel_opt (Tr\<lparr>label_hm_translation := lbls'\<rparr>)) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
+          using RPrevInst[simplified state_rel_def state_rel0_def]
+          by simp
+      next
+        show "\<omega>def = \<omega>def_old\<lparr> get_total_full := (get_total_full \<omega>def) \<rparr>"
+          sorry
+      next
+        show "\<omega> = \<omega>_old\<lparr> get_total_full := (get_total_full \<omega>def) \<rparr>"
+          sorry
+      qed (simp_all add: \<open>Tr' = _\<close> mh \<omega>_old) 
 
 \<comment>\<open>In a second step, let's revert the labels\<close>
       thus "R \<omega>def \<omega> ns"
