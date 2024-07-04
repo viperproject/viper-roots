@@ -1250,11 +1250,43 @@ theorem sexec_verifies :
   using assms
   apply (simp add: ConcreteSemantics.verifies_def)
   using sexec_sound concrete_red_stmt_post_def by blast
-
 (*
+lemma sinit_sound :
+  assumes "sinit tys F Q"
+  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<And> \<sigma> V.
+   \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<Longrightarrow> 
+   s2a_state_wf \<Lambda> F V \<sigma> \<Longrightarrow>
+   Q \<sigma> \<Longrightarrow>
+   P"
+  shows "P"
+  using assms
+proof (induction tys arbitrary:Q \<Lambda> \<omega>)
+  case Nil
+  from Nil.prems(1-2) show ?case
+    apply (simp)
+    apply (rule Nil.prems(3); assumption?; simp?)
+    sorry
+next
+  case (Cons ty tys)
+  then show ?case sorry
+qed
+
 theorem sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma>. sexec \<sigma> C Q)"
+  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
   shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile def_interp (\<Lambda>, F) C)"
+proof (rule ConcreteSemantics.verifies_setI)
+  fix \<omega> assume HX:  "\<omega> \<in> A" "stable \<omega>" "typed (s2a_ctxt F \<Lambda>) \<omega>"
+  show "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega>"
+    apply (insert assms(2))
+(* TODO: Why does the following not work? *)
+    apply (erule sinit_sound[where ?\<omega>=\<omega>])
+     apply (simp)
+    using assms HX
+    apply (clarsimp)
+    apply (rule sexec_verifies; assumption?)
+    apply (auto)
 *)
 end
