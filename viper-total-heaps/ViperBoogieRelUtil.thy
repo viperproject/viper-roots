@@ -1224,16 +1224,87 @@ lemma state_rel_upd_trace_subset:
           \<comment>\<open>the active (i.e., tracked by \<^const>\<open>label_hm_translation\<close>) labels tracked by the new trace 
              must match the previous trace\<close>
       and ActiveLabels: "\<And>lbl. lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
+          \<comment>\<open>All untracked members of the trace must be valid\<close>
+      and NewStatesValid: "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
 proof - 
+  let ?\<Lambda> = "var_context ctxt"
+  let ?FieldTr = "field_translation Tr"
   from assms have ConsistencyUpd: "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons (update_trace_total \<omega>def t) \<and> StateCons (update_trace_total \<omega> t)"
     using state_rel_consistent total_consistency_trace_update_2
     by (metis update_trace_total.simps)
 
   have LabelRel: 
-    "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
+    "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
     (* This should be true because the trace meets the definitions we need, see assumptions *)
-    sorry
+  proof (subst label_hm_rel_def, (subst label_rel_def)+, intro conjI)
+    show "\<forall>lbl h.
+       fst (label_hm_translation Tr) lbl = Some h \<longrightarrow>
+       (\<exists>\<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<and>
+            heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ns)"
+    proof (intro allI, intro impI)
+      fix lbl h
+      assume LabelDefined: "fst (label_hm_translation Tr) lbl = Some h"
+      hence "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)"
+        using active_labels_hm_tr_def by fast
+      then obtain \<phi> where
+        "t lbl = Some \<phi>" and
+        "get_trace_total \<omega> lbl = Some \<phi>"
+        using ActiveLabels by fast
+      show "\<exists>\<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<and>
+                heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ns"
+      proof (intro exI, intro conjI)
+        show "get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi>"
+          using \<open>t lbl = _\<close> by simp
+        show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_hh_total \<phi>) ns"
+          using StateRel LabelDefined \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> label_tracked_implies_heap_rel state_rel_label_hm_rel
+          by fast
+      qed
+    qed
+
+    show "\<forall>lbl h.
+       snd (label_hm_translation Tr) lbl = Some h \<longrightarrow>
+       (\<exists>\<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<and>
+            mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_mh_total \<phi>) ns)"
+    proof (intro allI, intro impI)
+      fix lbl h
+      assume LabelDefined: "snd (label_hm_translation Tr) lbl = Some h"
+      hence "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)"
+        using active_labels_hm_tr_def by fast
+      then obtain \<phi> where
+        "t lbl = Some \<phi>" and
+        "get_trace_total \<omega> lbl = Some \<phi>"
+        using ActiveLabels by fast
+      show "\<exists>\<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<and>
+                mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_mh_total \<phi>) ns"
+      proof (intro exI, intro conjI)
+        show "get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi>"
+          using \<open>t lbl = _\<close> by simp
+        show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr h (get_mh_total \<phi>) ns"
+          using StateRel LabelDefined \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> label_tracked_implies_mask_rel state_rel_label_hm_rel
+          by fast
+      qed
+    qed
+
+    (* Show that all members of the trace are valid *)
+    show "\<forall>lbl \<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    proof (intro allI, intro impI)
+      fix lbl \<phi>
+      assume LabelInTrace: "get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi>"
+      show "valid_heap_mask (get_mh_total \<phi>)"
+      proof (cases "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)")
+        case False
+        thus ?thesis
+          using LabelInTrace NewStatesValid by simp
+      next
+        case True
+        hence "get_trace_total \<omega> lbl = Some \<phi>"
+          using ActiveLabels LabelInTrace by fastforce
+        thus ?thesis
+          using StateRel state_rel_label_hm_rel label_hm_rel_def by fast
+      qed
+    qed
+  qed
 
   show ?thesis
     unfolding state_rel_def state_rel0_def
@@ -1729,9 +1800,19 @@ proof -
       using DomLabelMap state_rel_active_label_exists[OF StateRel] OldStateSame
       by auto
 
+    have UntrackedStatesValid: "\<forall>lbl \<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    proof (intro allI, intro impI)
+      fix lbl \<phi>
+      assume "get_trace_total \<omega>1 lbl = Some \<phi>"
+         and "lbl \<notin> active_labels_hm_tr (label_hm_translation Tr)"
+      show "valid_heap_mask (get_mh_total \<phi>)"
+        (* TODO how to prove this *)
+        sorry
+    qed
+
     show ?thesis
     apply (rule state_rel_upd_trace_subset[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]])
-      by (simp_all add: *)       
+      by (simp_all add: * UntrackedStatesValid)
   qed
 
   \<comment>\<open>Here, we reenable the state consistency using the consistency assumption on the final state.\<close>
