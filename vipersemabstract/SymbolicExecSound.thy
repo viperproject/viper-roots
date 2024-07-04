@@ -1251,4 +1251,10 @@ theorem sexec_verifies :
   apply (simp add: ConcreteSemantics.verifies_def)
   using sexec_sound concrete_red_stmt_post_def by blast
 
+(*
+theorem sexec_verifies_set :
+  assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
+  assumes "sinit tys F (\<lambda> \<sigma>. sexec \<sigma> C Q)"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile def_interp (\<Lambda>, F) C)"
+*)
 end

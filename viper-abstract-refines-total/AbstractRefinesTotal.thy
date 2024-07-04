@@ -2953,23 +2953,18 @@ theorem abstract_refines_total_verifies :
   using abstract_refines_total
   by (metis concrete_red_stmt_post_def)
 
-lemma typed_implies_abs_state_typing :
-  assumes "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"
-  shows "abs_state_typing ctxt \<Lambda> \<omega>"
-  using assms
-  apply (simp add:TypedEqui.typed_def abs_state_typing_def)
-  sorry
-
 theorem abstract_refines_total_verifies_set :
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
   assumes "stmt_typing (program_total ctxt) \<Lambda> C"
+  (* TODO: This should be provable *)
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> typed (t2a_ctxt ctxt \<Lambda>) \<omega> \<Longrightarrow> abs_state_typing ctxt \<Lambda> \<omega>"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
      (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
   using assms 
   apply (simp add:ConcreteSemantics.verifies_set_def)
-  using abstract_refines_total_verifies typed_implies_abs_state_typing
+  using abstract_refines_total_verifies
   by blast
 
 end
