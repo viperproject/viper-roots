@@ -1545,6 +1545,14 @@ lemma stable_rel_virtual_stateE:
 
 subsection \<open>determinism and monotonicity properties of red_pure\<close>
 
+lemma core_charact_equi:
+  shows "get_store |\<omega>| = get_store \<omega>"
+    and "get_state |\<omega>| = |get_state \<omega>|"
+    and "get_trace |\<omega>| = get_trace \<omega>"
+    apply (simp add: full_core_def get_store_def)
+   apply (simp add: core_def get_state_def)
+  by (metis (no_types, lifting) core_is_smaller greater_equiv greater_state_has_greater_parts(2))
+
 lemma set_state_core :
   "set_state ( |\<omega>| ) st = set_state \<omega> st"
   apply(rule full_state_ext)
@@ -1658,20 +1666,8 @@ next
   case (RedForallFailure v \<Delta> ty e \<omega>)
   then show ?case
     by (simp add: red_pure_red_pure_exps.RedForallFailure shift_and_add_core)
-next
-  case (RedField \<Delta> e \<omega> a f v)
-  then show ?case sorry
-next
-  case (RedFunApp \<Delta> \<omega> exps vals f v)
-  then show ?case sorry
-next
-  case (RedFunAppFailure \<Delta> \<omega> exps vals f)
-  then show ?case sorry
-qed
-(* TODO: Reprove, or rephrase *)
-(*
-qed (clarsimp simp add:red_pure_simps core_charact set_state_core core_structure shift_and_add_core; metis?; fastforce)+
-*)
+qed (clarsimp simp add:red_pure_simps core_charact_equi set_state_core core_structure shift_and_add_core; metis?; fastforce)+
+
 
 lemma red_pure_core :
   assumes "\<And> f vals st. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals |st|"
