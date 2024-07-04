@@ -1159,6 +1159,17 @@ definition make_semantic_assertion
   where
   "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 
+(*
+lemma well_behaved:
+  "TypedEqui.typed_assertion \<Delta> (Set.filter stable (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>))" oops
+*)
+
+(*
+
+
+typed (make_context_semantic \<Delta> F)
+*)
+
 lemma make_semantic_assertion_in_unfold :
   shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>"
   by (simp add:make_semantic_assertion_def well_typedly_incl)

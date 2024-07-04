@@ -428,6 +428,9 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
   qed (simp)
 qed
 
+abbreviation make_semantic_wf where
+  "make_semantic_wf \<Gamma> P \<equiv> typed_stabilize (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P)"
+
 fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
   "translate \<Gamma> Cskip = (Skip, {})"
 | "translate \<Gamma> (Cassign x e) = (LocalAssign x (semantify_exp e), {})"

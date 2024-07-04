@@ -169,7 +169,8 @@ qed
 
 
 lemma full_ownership_translation_sound:
-  "make_semantic_assertion \<Delta> type_ctxt_front_end_syntactic (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1))))) = typed_stabilize (full_ownership r)"
+  "make_semantic_assertion \<Delta> type_ctxt_front_end_syntactic (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1)))))
+  = typed_stabilize (full_ownership r)"
   unfolding make_semantic_assertion_def well_typedly_def full_ownership_def sat_set.simps atomic_assert.simps
     TypedEqui.Stabilize_typed_def red_pure_assert_def corely_def emp_core_def
   apply simp
@@ -256,11 +257,15 @@ lemma havoc_list_n_havoc_same:
 
 thm ConcreteSemantics.verifies_set_def ConcreteSemantics.verifies_def
 
+(*
+inhale acc(x.f)
+*)
+
 lemma translation_refines:
   assumes "ConcreteSemantics.red_stmt tcfe (compile \<Delta> F (fst (translate_syn \<Delta> F C))) \<omega> S"
       and "typed tcfe \<omega>"
       and "stable \<omega>"
-  shows "ConcreteSemantics.red_stmt tcfe (fst (translate \<Delta> C)) \<omega> S"
+  shows "\<exists>S'. ConcreteSemantics.red_stmt tcfe (fst (translate \<Delta> C)) \<omega> S' \<and> S' \<subseteq> S"
   using assms
 proof (induct C arbitrary: \<omega> S)
   case (Cassign x1 x2)

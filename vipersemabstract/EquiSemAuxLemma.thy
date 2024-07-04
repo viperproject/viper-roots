@@ -583,7 +583,7 @@ proof -
       unfolding get_store_def using plus_AgE[of "fst \<omega>" "fst a" "fst b"]
       by auto
     then have s_plus: "Some (get_store \<omega>) = get_store a \<oplus> get_store b" 
-      sorry
+      oops
 
       by (metis LHS getI plus_prodE)
     have snd_plus: "Some (snd \<omega>) = snd a \<oplus> snd b"
@@ -832,10 +832,9 @@ qed
 definition shift_and_add_ag :: "'v ag_store \<Rightarrow> 'v \<Rightarrow> 'v ag_store" where
   "shift_and_add_ag \<sigma> x = Ag ((\<lambda>m. (the_ag \<sigma>) (m - 1))(0 \<mapsto> x))"
 
+(*
 lemma mult_shift_and_add_equi_state_interchange:
   "p \<odot> (shift_and_add_equi_state \<omega> v) = shift_and_add_equi_state (p \<odot> \<omega>) v"
-  sorry
-(*
 proof -
   obtain \<sigma> \<gamma> where "\<omega> = (\<sigma>, \<gamma>)"
     by (meson surj_pair)
@@ -1077,9 +1076,11 @@ proof -
 qed
 *)
 
+(*
 lemma red_mult:
   assumes "p > 0"
-  shows "((I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VPerm v)) \<or> (\<exists>v_int. v = real_of_int v_int \<and> I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VInt v_int)))  \<longleftrightarrow> (I \<turnstile> \<langle>Binop (real_to_expr p) Mult e; \<omega>\<rangle> [\<Down>] Val (VPerm (p * v)))" (is "?LHS \<longleftrightarrow> ?RHS")
+  shows "((I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VPerm v)) \<or> (\<exists>v_int. v = real_of_int v_int \<and> I \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VInt v_int)))
+  \<longleftrightarrow> (I \<turnstile> \<langle>Binop (real_to_expr p) Mult e; \<omega>\<rangle> [\<Down>] Val (VPerm (p * v)))" (is "?LHS \<longleftrightarrow> ?RHS")
 proof
   assume ?LHS
   moreover have "I \<turnstile> \<langle>real_to_expr p; \<omega>\<rangle> [\<Down>] Val (VPerm p)"
@@ -1098,7 +1099,7 @@ next
        and eval_res: "eval_binop v1 Mult v2 = BinopNormal (VPerm (p * v))"
     then have "v1 = VPerm p"
       using red_real_to_expr_unique by blast
-    then obtain v' where "v2 = VPerm v'" sorry
+    then obtain v' where "v2 = VPerm v'" oops
 (*
       using eval_res   by (auto elim: eval_binop.elims)
     then have "p * v' = p * v"
@@ -1136,9 +1137,11 @@ next
     qed
   qed
 qed
+*)
 
 subsection \<open>Multiply p and its Inverse on State and Expressions\<close>
 
+(*
 \<comment>\<open>TODO: recheck whether this lemma holds and whether it is useful for clients 
          (earlier permission multiplication was feasible only with permission operands,
           but now integer operands are possible, which led to an experimental change for the lemma)\<close>
@@ -1166,7 +1169,7 @@ proof -
     using \<open>0 < q\<close> \<open>?MULT\<close> red_mult by blast
   then show ?ORIGIN
     using \<open>v' = p * v\<close> assms(1) red_mult
-    sorry
+    oops
 qed
 
 
@@ -1190,6 +1193,7 @@ proof -
     using \<open>P \<sigma>\<close> by auto
 qed
 
+*)
 
 section \<open>Separealion Algebra Instantiations\<close>
 

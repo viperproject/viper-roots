@@ -832,14 +832,6 @@ This rule should be complete (maybe not yet): as long as the LocalAssign stateme
 \<close>
 | RuleLocalAssign: "\<lbrakk> self_framing_and_typed \<Delta> A; framed_by_exp A e \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
 
-(*
-  assumes "wf_exp e"
-      and "self_framing A"
-      and "framed_by_exp A e"
-    shows "assertion_frame_exp A e"
-*)
-
-
 \<comment>\<open>Like inhale and the if rule, needs to frame r and e.
 Interestingly, does not work if we only have
 - self_framing A
