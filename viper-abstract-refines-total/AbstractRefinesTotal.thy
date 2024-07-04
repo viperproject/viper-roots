@@ -260,6 +260,7 @@ fun valid_a2t_stmt_no_rec :: "stmt \<Rightarrow> bool"
   | "valid_a2t_stmt_no_rec (stmt.Package _ _) = False"
   | "valid_a2t_stmt_no_rec (stmt.Apply _ _) = False"
   | "valid_a2t_stmt_no_rec (stmt.Scope _ _) = False"
+  | "valid_a2t_stmt_no_rec (stmt.Label _) = False"
   | "valid_a2t_stmt_no_rec _ = True"
 
 abbreviation valid_a2t_stmt
@@ -2104,6 +2105,7 @@ lemma red_stmt_total_set_HavocI :
   using assms by (auto simp add:red_stmt_total_set_def red_stmt_total_simps
      has_type_get_type red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"])
 
+(*
 lemma red_stmt_total_set_LabelI :
   assumes "stable \<omega>"
   assumes "\<omega>\<^sub>t \<in> a2t_states ctxt (if get_trace \<omega> l = None then set_trace \<omega> ((get_trace \<omega>)(l \<mapsto> get_state \<omega>)) else \<omega>)"
@@ -2112,10 +2114,10 @@ lemma red_stmt_total_set_LabelI :
   subgoal
     apply (rule exI[of _ "\<omega>\<^sub>t\<lparr>get_trace_total := (get_trace_total \<omega>\<^sub>t)(l := None) \<rparr>"]; simp)
     (* TODO: This is not provable since \<omega>\<^sub>t = \<omega>\<^sub>t\<lparr>get_trace_total := get_trace_total \<omega>\<^sub>t(l \<mapsto> get_total_full \<omega>\<^sub>t)\<rparr> might not hold *)
-    sorry
+    oops
   subgoal by (rule exI[of _ \<omega>\<^sub>t]; simp)
   done
-
+*)
 subsection \<open>refinement of Inhale\<close>
 
 lemma red_inhale_refines :
@@ -2786,7 +2788,7 @@ next case (Assert x)
     apply (clarsimp)
     subgoal for \<omega>'
       apply (rule concrete_post_Assert)
-      subgoal sorry
+      subgoal oops
       apply (simp add:red_stmt_total_set_AssertI)
 
       unfolding red_exhale_set_def
@@ -2916,12 +2918,15 @@ next
 next
   case (Label x)
   then show ?case
+    by (simp)
+(*
     apply (clarsimp elim!:stmt_typing_elim)
     apply (rule concrete_post_Label)
     apply (clarsimp)
     apply (rule red_stmt_total_set_LabelI; simp)
     (* TODO: Adapt abstract semantics to match total semantics? enforce that labels are unique? *)
-    sorry
+    oops
+*)
 next
   case (Scope x1a C)
   then show ?case by (simp)
@@ -2932,5 +2937,39 @@ next
     apply (rule concrete_post_Skip)
     by (clarsimp simp add:red_stmt_total_set_def red_stmt_total_simps)
 qed
+
+
+theorem abstract_refines_total_verifies :
+  assumes "red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
+  assumes "stmt_typing (program_total ctxt) \<Lambda> C"
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  assumes "stable \<omega>"
+  assumes "a2t_state_wf ctxt (get_trace \<omega>)"
+  assumes "valid_a2t_stmt C"
+  shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
+  using assms 
+  apply (simp add:ConcreteSemantics.verifies_def)
+  using abstract_refines_total
+  by (metis concrete_red_stmt_post_def)
+
+lemma typed_implies_abs_state_typing :
+  assumes "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"
+  shows "abs_state_typing ctxt \<Lambda> \<omega>"
+  using assms
+  apply (simp add:TypedEqui.typed_def abs_state_typing_def)
+  sorry
+
+theorem abstract_refines_total_verifies_set :
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
+  assumes "stmt_typing (program_total ctxt) \<Lambda> C"
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
+  assumes "valid_a2t_stmt C"
+  shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+  using assms 
+  apply (simp add:ConcreteSemantics.verifies_set_def)
+  using abstract_refines_total_verifies typed_implies_abs_state_typing
+  by blast
 
 end

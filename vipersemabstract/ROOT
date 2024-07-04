@@ -6,3 +6,6 @@ session ViperAbstract = ViperCommon +
     EquiSemAuxLemma
     EquiViper
     Instantiation
+    SymbolicExecDef
+    SymbolicExecAuto
+    SymbolicExecSound

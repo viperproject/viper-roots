@@ -88,10 +88,7 @@ lemma acc_heap_loc_Stable [simp] :
   "Stable (acc_heap_loc \<Delta> ty hl p)"
   apply (clarsimp simp add:acc_heap_loc_def)
   apply (rule StableI)
-  sorry (* MS: TODO *)
-(*
-  by (auto simp add: vstate_stabilize_structure restrict_map_eq_Some norm_preal preal_to_real stabilize_acc_virt)
-*)
+  by (smt (verit) get_state_stabilize mem_Collect_eq norm_preal(1) positive_real_preal preal_not_0_gt_0 stabilize_acc_virt)
 
 lemma abs_state_ext_iff :
   "\<omega>1 = \<omega>2 \<longleftrightarrow> get_store \<omega>1 = get_store \<omega>2 \<and> get_trace \<omega>1 = get_trace \<omega>2 \<and> get_state \<omega>1 = get_state \<omega>2"
@@ -110,11 +107,7 @@ lemma abs_state_star_singletonI :
     apply (rule refl)
    apply (rule assms(3))
   using assms
-  sorry (* MS: TODO *)
-(*
-TODO: plus_state_def not proven anymore
-  by (smt (verit, best) abs_state_ext_iff get_state_make_equi_state get_store_make_equi_state get_trace_make_equi_state option.discI option.sel plus_state_def set_state_def set_state_make_equi_state)
-*)
+  by (smt (verit, best) core_charact(1) core_is_smaller get_state_make_equi_state get_store_make_equi_state get_trace_make_equi_state greater_equiv greater_state_has_greater_parts(2) state_add_iff)
 
 
 lemma acc_heap_loc_starI :
@@ -1151,13 +1144,13 @@ lemma Stable_well_typedly :
   shows "Stable (well_typedly \<Delta> F A)"
   using assms          
   apply (simp add:Stable_def Stabilize_def well_typedly_def)
-  (* apply (auto) *)
-  sorry (* MS: TODO *)
+  using TypedEqui.typed_state_then_stabilize_typed by fastforce
 
 definition make_semantic_assertion
-  (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" *)
+  :: "('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
   where
   "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+  (*"make_semantic_assertion \<Delta> F A = \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>" *)
 
 (*
 lemma well_behaved:
@@ -1361,15 +1354,10 @@ lemma concrete_post_FieldAssign :
   assumes "set_state \<omega> (set_value (get_state \<omega>) (hl, f) v) \<in> S"
   shows "concrete_red_stmt_post \<Delta> (abs_stmt.Custom (FieldAssign r f e)) \<omega> S"
   using assms
-  apply (simp add: concrete_red_stmt_post_def)
+  apply (simp add: concrete_red_stmt_post_def has_write_perm_only_def)
   apply (rule exI, rule conjI)
-
-  sorry (* MS: TODO *)
-
-(* TODO:
-   apply (solves \<open>rule ConcreteSemantics.RedFieldAssign; assumption\<close>)
-  by (simp)
-*)
+   apply (rule ConcreteSemantics.RedCustom, rule RedFieldAssign; assumption)
+  by simp
 
 lemma concrete_post_Havoc :
   assumes "variables \<Delta> x = Some ty"
@@ -1396,11 +1384,8 @@ lemma concrete_post_Label :
   unfolding concrete_red_stmt_post_def
   apply (rule exI, rule conjI)
    apply (rule ConcreteSemantics.RedCustom)
-  sorry (* MS: TODO *)
-(*
-TODO:
-  by (auto)
-*)
+   apply (rule RedLabel)
+  by simp
 
 lemma concrete_post_Skip :
   shows "\<omega> \<in> S \<Longrightarrow> concrete_red_stmt_post \<Delta> Skip \<omega> S"
