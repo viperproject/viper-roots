@@ -723,7 +723,7 @@ lemma s2a_rel_stable_assertion_from_Stable :
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "Stable ({\<omega>} \<otimes> \<langle>def_interp, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
   shows "rel_stable_assertion \<omega> (make_semantic_assertion def_interp (\<Lambda>, F) A)"
-  using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_def)
+  using assms apply (simp add:rel_stable_assertion_def make_semantic_assertion_gen_def)
   apply (subst s2a_well_typedly_singleton[symmetric]) apply (assumption) apply (assumption)
   by (simp add:well_typedly_add_set Stable_well_typedly)
 
@@ -1127,7 +1127,7 @@ theorem sexec_sound :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
+  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile True def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
     \<exists> V' \<sigma>'. \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and> s2a_state_wf \<Lambda> F V' \<sigma>' \<and> Q \<sigma>'}"
   using assms
 proof (induction C arbitrary: \<sigma> \<omega> V Q)
@@ -1151,7 +1151,7 @@ next
       apply (rule concrete_post_Exhale[where \<omega>'=\<omega>'])
         apply (solves \<open>simp\<close>)
       subgoal
-        apply (clarsimp simp add:make_semantic_assertion_def)
+        apply (clarsimp simp add:make_semantic_assertion_gen_def)
         using well_typedly_add_set_l s2a_in_well_typedly by blast
       apply (erule (2) sym_stabilize_soundE)
       by blast
@@ -1246,10 +1246,21 @@ theorem sexec_verifies :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega>"
+  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile True def_interp (\<Lambda>, F) C) \<omega>"
   using assms
   apply (simp add: ConcreteSemantics.verifies_def)
   using sexec_sound concrete_red_stmt_post_def by blast
+
+theorem sexec_verifies_set :
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow>
+    \<exists> \<sigma> V. \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<and>
+      s2a_state_wf \<Lambda> F V \<sigma> \<and> sexec \<sigma> C Q"
+  assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile True def_interp (\<Lambda>, F) C)"
+  using assms
+  apply (simp add: ConcreteSemantics.verifies_set_def)
+  using sexec_verifies by blast
+
 (*
 lemma sinit_sound :
   assumes "sinit tys F Q"

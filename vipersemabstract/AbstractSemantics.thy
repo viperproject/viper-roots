@@ -918,6 +918,10 @@ definition verifies :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_st
 definition verifies_set where
   "verifies_set \<Delta> A C \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<and> typed \<Delta> \<omega> \<longrightarrow> verifies \<Delta> C \<omega>)"
 
+lemma verifies_setI :
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> verifies \<Delta> C \<omega>"
+  shows "verifies_set \<Delta> A C"
+  using assms unfolding verifies_set_def by (auto)
 
 end
 

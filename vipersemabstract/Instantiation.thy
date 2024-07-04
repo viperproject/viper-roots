@@ -1146,11 +1146,21 @@ lemma Stable_well_typedly :
   apply (simp add:Stable_def Stabilize_def well_typedly_def)
   using TypedEqui.typed_state_then_stabilize_typed by fastforce
 
-definition make_semantic_assertion
-  :: "('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
+definition make_semantic_assertion_gen
+  :: "bool \<Rightarrow> ('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
   where
-  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+  "make_semantic_assertion_gen ta \<Delta> F A = (if ta then well_typedly \<Delta> F else (\<lambda> x. x)) (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
   (*"make_semantic_assertion \<Delta> F A = \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>" *)
+
+abbreviation make_semantic_assertion where
+ "make_semantic_assertion \<equiv> make_semantic_assertion_gen True"
+
+lemma make_semantic_assertion_def :
+  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+  by (simp add:make_semantic_assertion_gen_def)
+
+abbreviation make_semantic_assertion_untyped where
+ "make_semantic_assertion_untyped \<equiv> make_semantic_assertion_gen False"
 
 (*
 lemma well_behaved:
@@ -1165,36 +1175,36 @@ typed (make_context_semantic \<Delta> F)
 
 lemma make_semantic_assertion_in_unfold :
   shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>"
-  by (simp add:make_semantic_assertion_def well_typedly_incl)
+  by (simp add:make_semantic_assertion_gen_def well_typedly_incl)
 
 fun compile (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt" *)
   where
-  "compile \<Delta> F stmt.Skip = abs_stmt.Skip"
+  "compile ta \<Delta> F stmt.Skip = abs_stmt.Skip"
 
-| "compile \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile \<Delta> F C1) (compile \<Delta> F C2)"
-| "compile \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile \<Delta> F C1) (compile \<Delta> F C2)"
+| "compile ta \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
+| "compile ta \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
 
-| "compile \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
-| "compile \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
+| "compile ta \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
+| "compile ta \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
 
 
-| "compile \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion \<Delta> F A)"
-| "compile \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion \<Delta> F A)"
-| "compile \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion \<Delta> F A)"
-| "compile \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion \<Delta> F A)"
+| "compile ta \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion_gen ta \<Delta> F A)"
+| "compile ta \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion_gen ta \<Delta> F A)"
+| "compile ta \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion_gen ta \<Delta> F A)"
+| "compile ta \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion_gen ta \<Delta> F A)"
 
-| "compile \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
-| "compile \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
-| "compile \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
-| "compile \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
+| "compile ta \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
+| "compile ta \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
+| "compile ta \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
+| "compile ta \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
 
 (* TODO: We can take the program as input, and emit the encodings *)
-| "compile \<Delta> F (stmt.MethodCall _ _ _) = undefined"
-| "compile \<Delta> F (stmt.While b I C) = undefined"
-| "compile \<Delta> F (stmt.Scope _ _) = undefined"
+| "compile ta \<Delta> F (stmt.MethodCall _ _ _) = undefined"
+| "compile ta \<Delta> F (stmt.While b I C) = undefined"
+| "compile ta \<Delta> F (stmt.Scope _ _) = undefined"
 
-| "compile \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
-| "compile \<Delta> F (stmt.Label l) = abs_stmt.Custom (Label l)"
+| "compile ta \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
+| "compile ta \<Delta> F (stmt.Label l) = abs_stmt.Custom (Label l)"
 
 
 

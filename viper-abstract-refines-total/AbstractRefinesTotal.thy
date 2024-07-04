@@ -2743,7 +2743,7 @@ theorem abstract_refines_total :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   \<comment>\<open>We don't need store_typing in the post condition because red_stmt_total preserves store-typing\<close>
-  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
+  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile True \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
        (a2t_states ctxt -`\<^sub>s (red_stmt_total_set ctxt R \<Lambda> C (a2t_states ctxt \<omega>)))"
   \<comment>\<open>We could also use ` instead of `\<forall>, which would be a weaker (easier to prove) statement for most cases, but for
      sequential composition, it requires showing that red_stmt_total creates a set that is closed under
@@ -2811,7 +2811,7 @@ next
   proof (rule concrete_post_If)
     from calc show "make_semantic_bexp \<Delta> e \<omega> = Some b" by (simp; blast)
   next
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile True \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile True \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
         (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.If e C1 C2) (a2t_states ctxt \<omega>))"
 (* Why does presburger solve this and non of the other solvers? *)
       using calc apply (clarsimp)
@@ -2829,13 +2829,13 @@ next
     apply (rule concrete_post_Seq)
     apply (rule concrete_red_stmt_post_stable_wf) using calc apply (solves \<open>simp\<close>) using calc apply (solves \<open>simp\<close>)
   proof (rule concrete_red_stmt_post_impl)
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile True \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
        (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>))"
       using calc by simp
   next
     show "a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>) \<subseteq> {\<omega>''.
         sep_algebra_class.stable \<omega>'' \<longrightarrow> a2t_state_wf ctxt (get_trace \<omega>'') \<longrightarrow> \<omega>'' \<in> {\<omega>''.
-        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
+        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile True \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
          (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.Seq C1 C2) (a2t_states ctxt \<omega>))}}"
       apply (rule subsetI)
       subgoal for \<omega>'
@@ -2947,7 +2947,7 @@ theorem abstract_refines_total_verifies :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
-     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
+     (compile True (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
   using assms 
   apply (simp add:ConcreteSemantics.verifies_def)
   using abstract_refines_total
@@ -2961,7 +2961,7 @@ theorem abstract_refines_total_verifies_set :
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
-     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+     (compile True (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
   using assms 
   apply (simp add:ConcreteSemantics.verifies_set_def)
   using abstract_refines_total_verifies
