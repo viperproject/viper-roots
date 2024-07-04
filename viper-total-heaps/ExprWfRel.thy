@@ -751,7 +751,7 @@ proof -
       assume RPrev: "\<exists>ns0. R \<omega>def \<omega> ns0"
         and ROld: "?ROld (?AuxPredFun \<omega>def \<omega>) \<omega>def_old \<omega>_old ns"
         and \<omega>_old: "\<omega>def_old = \<omega>def \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr> \<and>
-                   \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
+                    \<omega>_old    = \<omega>    \<lparr> get_total_full := the (get_trace_total \<omega> lbl) \<rparr>"
 
       from RPrev \<open>R =_\<close> obtain ns0 where RPrevInst: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns0"
         by auto
@@ -760,13 +760,10 @@ proof -
         where LabelExists: "get_trace_total \<omega> lbl = Some \<phi>"
         using \<open>lbls = _\<close> total_state_exists_for_label by fast
 
-      (* Get these from ROld and the definitions of \<omega>_old and \<omega>def_old *)
       have HeapRelOld: "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldH (get_hh_total \<phi>) ns"
-        sorry
+        using LabelExists ROld \<omega>_old state_rel_heap_var_def_rel \<open>Tr' = _\<close> by fastforce
       have MaskRelOld: "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) OldM (get_mh_total \<phi>) ns"
-        sorry
-
-      (* Should add a lemma that says this, could be obtains or shows *)
+        using LabelExists ROld \<omega>_old state_rel_mask_var_def_rel \<open>Tr' = _\<close> by fastforce
 
 \<comment>\<open>In a first step, let's revert the heap and mask, while leaving the labels.\<close>
       let ?TrNoLabel = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
@@ -843,10 +840,10 @@ proof -
           by simp
       next
         show "\<omega>def = \<omega>def_old\<lparr> get_total_full := (get_total_full \<omega>def) \<rparr>"
-          sorry
+          by (simp add: \<omega>_old)
       next
-        show "\<omega> = \<omega>_old\<lparr> get_total_full := (get_total_full \<omega>def) \<rparr>"
-          sorry
+        show "\<omega> = \<omega>_old\<lparr> get_total_full := (get_total_full \<omega>) \<rparr>"
+          by (simp add: \<omega>_old)
       qed (simp_all add: \<open>Tr' = _\<close> mh \<omega>_old) 
 
 \<comment>\<open>In a second step, let's revert the labels\<close>

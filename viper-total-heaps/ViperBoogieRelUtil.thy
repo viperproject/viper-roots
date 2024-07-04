@@ -1225,7 +1225,7 @@ lemma state_rel_upd_trace_subset:
              must match the previous trace\<close>
       and ActiveLabels: "\<And>lbl. lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
           \<comment>\<open>All untracked members of the trace must be valid\<close>
-      and NewStatesValid: "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+      and UntrackedStatesValid: "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
 proof - 
   let ?\<Lambda> = "var_context ctxt"
@@ -1295,7 +1295,7 @@ proof -
       proof (cases "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)")
         case False
         thus ?thesis
-          using LabelInTrace NewStatesValid by simp
+          using LabelInTrace UntrackedStatesValid by simp
       next
         case True
         hence "get_trace_total \<omega> lbl = Some \<phi>"
