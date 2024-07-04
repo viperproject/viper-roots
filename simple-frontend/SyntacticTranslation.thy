@@ -114,6 +114,7 @@ lemma make_semantic_inter_1:
   "make_semantic_assertion \<Delta> F (I && Atomic (Pure (Unop Not (translate_bexp b)))) = (make_semantic_assertion \<Delta> F I) \<inter> assertify_bexp (Bnot b)"
   sorry
 
+(*
 lemma make_semantic_inter_2:
   "make_semantic_assertion \<Delta> type_ctxt_front_end_syntactic (I && Atomic (Pure (translate_bexp b))) = (make_semantic_assertion \<Delta> type_ctxt_front_end_syntactic I) \<inter> assertify_bexp b"
 proof
@@ -166,8 +167,8 @@ proof
       by (smt (verit, ccfv_threshold) IntD1 member_filter sat_set.simps(4) snd_conv type_ctxt_front_end_syntactic_def)
   qed
 qed
-
-
+*)
+(*
 lemma full_ownership_translation_sound:
   "make_semantic_assertion \<Delta> type_ctxt_front_end_syntactic (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1)))))
   = typed_stabilize (full_ownership r)"
@@ -209,12 +210,13 @@ proof -
     unfolding red_pure_assert_def corely_def emp_core_def
     by fastforce
 qed
-
+*)
 
 lemma full_ownership_with_val_sound:
   "make_semantic_assertion \<Delta> F (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1)))) && Atomic (Pure (FieldAcc (Var r) field_val)))
   = typed_stabilize (full_ownership_with_val r e)"
-  sorry
+  (* Does not hold if make_semantic_assertion does not use well_typedly*)
+  oops
 
 
 fun translate_syn where
@@ -257,31 +259,109 @@ lemma havoc_list_n_havoc_same:
 
 thm ConcreteSemantics.verifies_set_def ConcreteSemantics.verifies_def
 
-(*
-inhale acc(x.f)
-*)
+inductive_simps ConcreteSemantics_red_stmt_simps :
+  "ConcreteSemantics.red_stmt \<Delta> (abs_stmt.LocalAssign x e) \<omega> S"
+  "ConcreteSemantics.red_stmt \<Delta> (abs_stmt.Exhale A) \<omega> S"
+  "ConcreteSemantics.red_stmt \<Delta> (abs_stmt.Inhale A) \<omega> S"
+  "ConcreteSemantics.red_stmt \<Delta> (C1;;C2) \<omega> S"
+  "ConcreteSemantics.red_stmt \<Delta> (Custom (custom.FieldAssign e1 f e2)) \<omega> S"
+
+lemma make_semantic_exp_implies_semantify_exp :
+  assumes "make_semantic_exp \<Delta> (translate_exp e) \<omega> = Some v"
+  assumes "typed tcfe \<omega>"
+  (* TODO: also needs to e has integer type *)
+  shows "semantify_exp e \<omega> = Some v"
+  using assms
+proof (induction e arbitrary:v)
+  case (Evar x)
+  then show ?case
+    apply (simp add:semantify_exp_def red_pure_simps)
+    sorry
+next
+  case (Elit x)
+  then show ?case by (simp add:semantify_exp_def red_pure_simps)
+next
+  case (Ebinop e1 op e2)
+  then show ?case
+    by (cases "op"; clarsimp simp add:semantify_exp_def red_pure_simps; fastforce)
+qed
+
+lemma red_stmt_LocalAssign_mono :
+  assumes "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.LocalAssign x e1) \<omega> S"
+  assumes "\<And> v. e1 \<omega> = Some v \<Longrightarrow> e2 \<omega> = Some v"
+  shows "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.LocalAssign x e2) \<omega> S"
+  using assms by (clarsimp simp add:ConcreteSemantics_red_stmt_simps)
+
+lemma red_stmt_FieldAssign_mono :
+  assumes "ConcreteSemantics.red_stmt \<Gamma> (Custom (custom.FieldAssign e1 f e2)) \<omega> S"
+  assumes "\<And> v. e2 \<omega> = Some v \<Longrightarrow> e2' \<omega> = Some v"
+  shows "ConcreteSemantics.red_stmt \<Gamma> (Custom (custom.FieldAssign e1 f e2')) \<omega> S"
+  using assms by (clarsimp simp add:ConcreteSemantics_red_stmt_simps red_custom_stmt.simps)
+
+lemma red_stmt_Seq_mono :
+  assumes "ConcreteSemantics.red_stmt \<Gamma> (C1;;C2) \<omega> S"
+  assumes "\<And> S'. ConcreteSemantics.red_stmt \<Gamma> C1 \<omega> S' \<Longrightarrow> 
+       ConcreteSemantics.red_stmt \<Gamma> C1' \<omega> S' \<and> (\<forall> \<omega>' S''. \<omega>' \<in> S' \<longrightarrow>
+      ConcreteSemantics.red_stmt \<Gamma> C2 \<omega>' S'' \<longrightarrow> ConcreteSemantics.red_stmt \<Gamma> C2' \<omega>' S'')"
+  shows "ConcreteSemantics.red_stmt \<Gamma> (C1';;C2') \<omega> S"
+  using assms
+  apply (clarsimp simp add:ConcreteSemantics_red_stmt_simps ConcreteSemantics.sequential_composition.simps)
+  by blast
+
+lemma red_stmt_Exhale_mono :
+  assumes "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.Exhale A1) \<omega> S"
+  assumes "\<And> \<omega>'. stable \<omega>' \<Longrightarrow> \<omega> \<in> {\<omega>'} \<otimes> A1 \<Longrightarrow> \<omega> \<in> {\<omega>'} \<otimes> A2"
+  shows "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.Exhale A2) \<omega> S"
+  using assms
+  apply (clarsimp simp add:ConcreteSemantics_red_stmt_simps add_set_def)
+  by blast
+
+lemma red_stmt_Inhale_mono :
+  assumes "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.Inhale A1) \<omega> S"
+  assumes "rel_stable_assertion \<omega> A1 \<Longrightarrow> rel_stable_assertion \<omega> A2"
+  assumes "Set.filter stable ({\<omega>} \<otimes> A1) = Set.filter stable ({\<omega>} \<otimes> A2)"
+  assumes "\<And> \<omega>'. stable \<omega>' \<Longrightarrow> \<omega> \<in> {\<omega>'} \<otimes> A1 \<Longrightarrow> \<omega> \<in> {\<omega>'} \<otimes> A2"
+  shows "ConcreteSemantics.red_stmt \<Gamma> (abs_stmt.Inhale A2) \<omega> S"
+  using assms
+  by (clarsimp simp add:ConcreteSemantics_red_stmt_simps)
 
 lemma translation_refines:
   assumes "ConcreteSemantics.red_stmt tcfe (compile \<Delta> F (fst (translate_syn \<Delta> F C))) \<omega> S"
       and "typed tcfe \<omega>"
       and "stable \<omega>"
-  shows "\<exists>S'. ConcreteSemantics.red_stmt tcfe (fst (translate \<Delta> C)) \<omega> S' \<and> S' \<subseteq> S"
+  shows "ConcreteSemantics.red_stmt tcfe (fst (translate \<Delta> C)) \<omega> S"
   using assms
 proof (induct C arbitrary: \<omega> S)
   case (Cassign x1 x2)
-  then show ?case sorry
+  then show ?case
+    apply (simp)
+    apply (rule red_stmt_LocalAssign_mono) apply (assumption)
+    by (rule make_semantic_exp_implies_semantify_exp)
 next
   case (Cwrite x1 x2)
-  then show ?case sorry
+  then show ?case
+    apply (simp add:sound_translate_addr)
+    apply (rule red_stmt_FieldAssign_mono) apply (assumption)
+    by (rule make_semantic_exp_implies_semantify_exp)
 next
   case (Calloc x1 x2)
-  then show ?case sorry
+  then show ?case
+    apply (simp)
+    apply (rule red_stmt_Seq_mono) apply (assumption)
+    apply (rule) apply (assumption)
+    apply (rule; simp)
+    sorry
 next
   case (Cfree x)
-  then show ?case sorry
+  then show ?case
+    apply (simp)
+    apply (rule red_stmt_Exhale_mono) apply (assumption)
+    sorry
 next
   case (Cseq C1 C2)
-  then show ?case sorry
+  then show ?case
+    apply (simp add:)
+    sorry
 next
   case (Cpar x1 C1 x3 x4 C2 x6a)
   then show ?case sorry
@@ -299,6 +379,8 @@ qed (simp_all add: sound_translate_heap_loc)
 *)
 
 (* main theorem *)
+(* does not hold since the sets are not actually equal *)
+(*
 lemma translation_same:
   "compile \<Delta> F (fst (translate_syn \<Delta> F C)) = fst (translate \<Delta> C) \<and> compile \<Delta> F ` (snd (translate_syn \<Delta> F C)) = snd (translate \<Delta> C)"
 proof (induct C)
@@ -354,7 +436,7 @@ next
       using Cwhile by presburger
   qed
 qed (simp_all)
-
+*)
 
 
 
