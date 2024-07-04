@@ -2938,4 +2938,38 @@ next
     by (clarsimp simp add:red_stmt_total_set_def red_stmt_total_simps)
 qed
 
+
+theorem abstract_refines_total_verifies :
+  assumes "red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
+  assumes "stmt_typing (program_total ctxt) \<Lambda> C"
+  assumes "abs_state_typing ctxt \<Lambda> \<omega>"
+  assumes "stable \<omega>"
+  assumes "a2t_state_wf ctxt (get_trace \<omega>)"
+  assumes "valid_a2t_stmt C"
+  shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
+  using assms 
+  apply (simp add:ConcreteSemantics.verifies_def)
+  using abstract_refines_total
+  by (metis concrete_red_stmt_post_def)
+
+lemma typed_implies_abs_state_typing :
+  assumes "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"
+  shows "abs_state_typing ctxt \<Lambda> \<omega>"
+  using assms
+  apply (simp add:TypedEqui.typed_def abs_state_typing_def)
+  sorry
+
+theorem abstract_refines_total_verifies_set :
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
+  assumes "stmt_typing (program_total ctxt) \<Lambda> C"
+  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
+  assumes "valid_a2t_stmt C"
+  shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+  using assms 
+  apply (simp add:ConcreteSemantics.verifies_set_def)
+  using abstract_refines_total_verifies typed_implies_abs_state_typing
+  by blast
+
 end

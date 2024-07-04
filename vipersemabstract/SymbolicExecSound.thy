@@ -1240,4 +1240,15 @@ next
     by (blast) 
 qed (simp add:sfail_def)+
 
+theorem sexec_verifies :
+  assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
+  assumes "stable \<omega>"
+  assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
+  assumes "s2a_state_wf \<Lambda> F V \<sigma>"
+  assumes "sexec \<sigma> C Q"
+  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega>"
+  using assms
+  apply (simp add: ConcreteSemantics.verifies_def)
+  using sexec_sound concrete_red_stmt_post_def by blast
+
 end
