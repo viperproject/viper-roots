@@ -569,7 +569,10 @@ lemma shift_and_add_core :
 subsection \<open>Properties about Addition on EquiViper states\<close>
 
 lemma state_add_iff:
-  shows "\<And>\<omega> a b :: 'v equi_state. Some \<omega> = a \<oplus> b \<longleftrightarrow> Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
+  shows "\<And>\<omega> a b :: 'v equi_state. Some \<omega> = a \<oplus> b \<longleftrightarrow>
+   get_store \<omega> = get_store a \<and> get_store \<omega> = get_store b \<and>
+   get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b \<and> 
+   Some (get_state \<omega>) = get_state a \<oplus> get_state b"
   sorry
 
 (*
