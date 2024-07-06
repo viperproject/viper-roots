@@ -1012,13 +1012,6 @@ proof (induct rule: red_custom_stmt.induct)
   case (RedFieldAssign r \<omega> hl e v f \<Delta> ty)
   then show ?case
     by (metis already_stable pperm_pnone_pgt singleton_iff stabilize_is_stable stabilize_set_value zero_neq_one)
-next
-  case (RedLabel \<Delta> l \<omega>)
-  then show ?case
-    by (metis (no_types, opaque_lifting) AbstractSemantics.get_store_stabilize EquiViper.full_state_ext already_stable empty_iff get_state_set_trace get_state_stabilize get_trace_stabilize insert_iff stabilize_is_stable)
-(*
-    by (metis already_stable set_trace_stabilize singletonD stabilize_is_stable)
-*)
 qed
 
 lemma red_custom_well_typed:
@@ -1041,6 +1034,7 @@ proof (induct rule: red_custom_stmt.induct)
         by (metis RedFieldAssign.hyps(4) RedFieldAssign.hyps(5) RedFieldAssign.prems(1) RedFieldAssign.prems(3) fun_upd_other fun_upd_same get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) option.sel singletonD snd_conv well_typedE(1) well_typed_heapE)
     qed
   qed
+(*
 next
   case (RedLabel \<Delta> l \<omega>)
   show "well_typed (custom_context \<Delta>) (get_abs_state \<omega>')"
@@ -1055,6 +1049,7 @@ next
         by (metis RedLabel.prems(1) RedLabel.prems(3) asm0 fun_upd_apply get_abs_state_def get_state_def get_trace_def get_trace_set_trace option.sel singletonD well_typed_def well_typed_heapE)
     qed
   qed
+*)
 qed
 
 
@@ -1200,9 +1195,9 @@ fun compile (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rig
 | "compile ta \<Delta> F (stmt.MethodCall _ _ _) = undefined"
 | "compile ta \<Delta> F (stmt.While b I C) = undefined"
 | "compile ta \<Delta> F (stmt.Scope _ _) = undefined"
+| "compile ta \<Delta> F (stmt.Label l) = undefined"
 
 | "compile ta \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
-| "compile ta \<Delta> F (stmt.Label l) = abs_stmt.Custom (Label l)"
 
 
 
@@ -1386,7 +1381,7 @@ lemma concrete_post_Scope :
   (* TODO: add semantics for Scope *)
   oops
 *)
-
+(*
 lemma concrete_post_Label :
   shows "set_trace \<omega> ((get_trace \<omega>)(l \<mapsto> get_state \<omega>)) \<in> S \<Longrightarrow> concrete_red_stmt_post \<Delta> (Custom (Label l)) \<omega> S"
   unfolding concrete_red_stmt_post_def
@@ -1394,6 +1389,7 @@ lemma concrete_post_Label :
    apply (rule ConcreteSemantics.RedCustom)
    apply (rule RedLabel)
   by simp
+*)
 
 lemma concrete_post_Skip :
   shows "\<omega> \<in> S \<Longrightarrow> concrete_red_stmt_post \<Delta> Skip \<omega> S"
