@@ -1,5 +1,5 @@
 session ViperAbstractRefinesTotal = ViperAbstract +
   sessions
     TotalViper
-  theories [quick_and_dirty]
+  theories
     AbstractRefinesTotal

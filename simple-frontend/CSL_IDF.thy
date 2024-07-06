@@ -1360,13 +1360,6 @@ proof (rule stable_virtual_stateI)
     by (metis EquiSemAuxLemma.gr_0_is_ppos assms(1) assms(2) assms(3) fun_upd_apply stable_virtual_state_def update_perm_simps(1) update_perm_simps(2))
 qed
 
-lemma plus_virtual_stateI:
-  assumes "Some (get_vh \<phi>) = get_vh a \<oplus> get_vh b"
-      and "Some (get_vm \<phi>) = get_vm a \<oplus> get_vm b"
-    shows "Some \<phi> = a \<oplus> b"
-  using assms(1) assms(2) vstate_add_iff by blast
-
-
 
 lemma alloc_helper:
   assumes "Some \<omega>' = \<omega> \<oplus> \<omega>f"

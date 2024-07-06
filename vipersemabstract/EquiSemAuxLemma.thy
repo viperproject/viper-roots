@@ -573,43 +573,46 @@ lemma state_add_iff:
    get_store \<omega> = get_store a \<and> get_store \<omega> = get_store b \<and>
    get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b \<and> 
    Some (get_state \<omega>) = get_state a \<oplus> get_state b"
-  sorry
-
-(*
 proof -
   fix \<omega> a b :: "'v equi_state"
-  show "Some \<omega> = a \<oplus> b \<longleftrightarrow> Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
+  show "(Some \<omega> = a \<oplus> b) =
+       (get_store \<omega> = get_store a \<and>
+        get_store \<omega> = get_store b \<and>
+        get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b)"
   proof
     assume LHS: "Some \<omega> = a \<oplus> b"
     have "the_ag (fst \<omega>) = the_ag (fst a) \<and> the_ag (fst \<omega>) = the_ag (fst b)"
       using plus_prodE[OF HOL.sym[OF LHS]]
       unfolding get_store_def using plus_AgE[of "fst \<omega>" "fst a" "fst b"]
       by auto
-    then have s_plus: "Some (get_store \<omega>) = get_store a \<oplus> get_store b" 
-      oops
-
-      by (metis LHS getI plus_prodE)
+    then have "get_store \<omega> = get_store a"
+      using LHS full_add_charact(1) by blast
+    moreover have "get_store \<omega> = get_store b"
+      by (metis \<open>the_ag (fst \<omega>) = the_ag (fst a) \<and> the_ag (fst \<omega>) = the_ag (fst b)\<close> get_store_def)
     have snd_plus: "Some (snd \<omega>) = snd a \<oplus> snd b"
       by (metis LHS plus_prodE)
-    have t_plus: "Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b"
-      by (metis getI plus_prodE snd_plus)
+    then have "get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b"
+      by (metis get_trace_def plus_AgE plus_prodE)
     have v_plus: "Some (get_state \<omega>) = get_state a \<oplus> get_state b"
-      by (metis getI plus_prodE snd_plus)
-    show "Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
-      using s_plus t_plus v_plus by simp
+      by (metis get_state_def plus_prodE snd_plus)
+    ultimately show "get_store \<omega> = get_store a \<and>
+    get_store \<omega> = get_store b \<and>
+    get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
+      using \<open>get_store \<omega> = get_store b\<close> \<open>get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b\<close> by blast
   next
-    assume RHS: "Some (get_store \<omega>) = get_store a \<oplus> get_store b \<and> Some (get_trace \<omega>) = get_trace a \<oplus> get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
+    assume RHS: "get_store \<omega> = get_store a \<and>
+    get_store \<omega> = get_store b \<and>
+    get_trace \<omega> = get_trace a \<and> get_trace \<omega> = get_trace b \<and> Some (get_state \<omega>) = get_state a \<oplus> get_state b"
     have fst_plus: "Some (fst \<omega>) = fst a \<oplus> fst b"
-      using RHS getI by auto
+      by (metis RHS ag_the_ag_same get_store_def plus_AgI)
     have snd_plus: "Some (snd \<omega>) = snd a \<oplus> snd b"
-      by (metis RHS getI plus_prodI prod.exhaust_sel)
-    have "\<omega> = (fst \<omega>, snd \<omega>)"
-      by simp
+      apply (rule plus_prodI)
+      apply (metis RHS agreement.exhaust_sel get_trace_def plus_AgI)
+      by (metis RHS get_state_def)
     then show "Some \<omega> = a \<oplus> b"
       using fst_plus plus_prodI snd_plus by fastforce
   qed
 qed
-*)
 
 lemma vstate_add_iff:
   "Some (c :: 'v virtual_state) = a \<oplus> b \<longleftrightarrow> Some (get_vh c) = get_vh a \<oplus> get_vh b \<and> Some (get_vm c) = get_vm a \<oplus> get_vm b" (is "?FULL \<longleftrightarrow> ?PART")
@@ -694,23 +697,8 @@ qed
 lemma add_shift_and_add_equi_state_interchange:
   assumes "Some c = a \<oplus> b"
   shows "Some (shift_and_add_equi_state c v) = (shift_and_add_equi_state a v) \<oplus> (shift_and_add_equi_state b v)"
-proof -
-  obtain cs cr as ar bs br where
-        "c = (cs, cr)"
-    and "a = (as, ar)"
-    and "b = (bs, br)"
-    using prod.exhaust_sel by blast
-  moreover have "Some cr = ar \<oplus> br"
-    by (metis (no_types, lifting) assms calculation(1) calculation(2) calculation(3) plus_prodE snd_conv)
-(*
-  moreover have "Some (shift_and_add cs v) = shift_and_add as v \<oplus> shift_and_add bs v"
-    by (metis add_shift_and_add_interchange assms calculation(1) calculation(2) calculation(3) fst_eqD plus_prodE)
-*)
-  ultimately show ?thesis sorry
-(*
-    using plus_prodI snd_eqD by fastforce
-*)
-qed
+  unfolding shift_and_add_equi_state_def
+  by (smt (verit) add_defined_lift assms full_add_charact(1) full_add_charact(2) full_add_defined set_store_def)
 
 lemma add_shift_and_add_list_interchange:
   assumes "Some (c :: 'v store) = a \<oplus> b"
@@ -1433,6 +1421,13 @@ end
 
 subsection \<open>Instantiation of state as sep_algebra\<close>
 
+
+lemma plus_virtual_stateI:
+  assumes "Some (get_vh \<phi>) = get_vh a \<oplus> get_vh b"
+      and "Some (get_vm \<phi>) = get_vm a \<oplus> get_vm b"
+    shows "Some \<phi> = a \<oplus> b"
+  using assms(1) assms(2) vstate_add_iff by blast
+
 instantiation virtual_state :: (type) sep_algebra
 begin
 
@@ -1502,7 +1497,7 @@ lemma virtual_state_ext :
   by (metis assms(1) assms(2) core_is_smaller option.simps(1) vstate_add_iff)
 
 instance proof
-  fix x y a b :: "'v virtual_state"
+  fix x y a b :: "'a virtual_state"
 
   show "sep_algebra_class.stable (stabilize x)"
     by (simp add: EquiSemAuxLemma.vstate_stabilize_structure(1) EquiSemAuxLemma.vstate_stabilize_structure(2) pperm_pnone_pgt stable_virtual_state_def restrict_map_def)
@@ -1513,17 +1508,39 @@ instance proof
     by (metis core_option.cases eq_snd_iff mem_Collect_eq restrict_in restrict_out)
 
   show "Some x = stabilize x \<oplus> |x|"
-    sorry
+  proof (rule plus_virtual_stateI)
+    show "Some (get_vh x) = get_vh (stabilize x) \<oplus> get_vh |x|"
+    proof (rule plus_funI)
+      fix l show "Some (get_vh x l) = get_vh (stabilize x) l \<oplus> get_vh |x| l"
+        apply (cases "get_vh x l"; cases "get_vm x l > 0")
+        using vstate_wf_imp apply blast
+        apply (metis EquiSemAuxLemma.gr_0_is_ppos EquiSemAuxLemma.vstate_stabilize_structure(1) \<open>sep_algebra_class.stable (stabilize x)\<close> core_is_pure core_option.simps(1) core_structure(2) stable_virtual_state_def)
+        apply (simp add: EquiSemAuxLemma.vstate_stabilize_structure(2) core_structure(2) plus_val_id restrict_map_def)
+        by (metis EquiSemAuxLemma.gr_0_is_ppos \<open>sep_algebra_class.stable (stabilize x)\<close> commutative core_structure(2) plus_option.simps(2) stable_virtual_state_def vstate_stabilize_structure(1))
+    qed
+    show "Some (get_vm x) = get_vm (stabilize x) \<oplus> get_vm |x|"
+      by (simp add: EquiSemAuxLemma.vstate_stabilize_structure(1) core_structure(1) zero_mask_identity)
+  qed
+
+
   show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
     apply (clarsimp simp add: vstate_add_iff EquiSemAuxLemma.vstate_stabilize_structure restrict_map_def)
     apply (rule plus_funI)
-    apply (simp; safe; simp?)
-    sorry
+    by (smt (verit) EquiSemAuxLemma.gr_0_is_ppos EquiViper.add_masks_def PosReal.ppos.rep_eq commutative core_is_pure core_option.simps(1) plus_funE plus_preal.rep_eq pperm_pnone_pgt val_option_sum vstate_wf_ppos)
 
   show "Some x = a \<oplus> stabilize |b| \<Longrightarrow> x = a"
     apply (clarsimp simp add: vstate_add_iff EquiSemAuxLemma.vstate_stabilize_structure
            EquiSemAuxLemma.core_structure ValueAndBasicState.zero_mask_def)
-    sorry
+  proof -
+    assume a1: "Some (get_vh x) = get_vh a \<oplus> get_vh b |` (if PosReal.ppos 0 then UNIV else {})"
+    assume a2: "Some (get_vm x) = get_vm a \<oplus> zero_mask"
+    have "\<not> PosReal.ppos 0"
+      using EquiSemAuxLemma.gr_0_is_ppos by blast
+    then have "Some (get_vh a) = Some (get_vh x)"
+      using a1 by (simp add: empty_heap_def empty_heap_identity)
+    then show ?thesis
+      using a2 by (metis EquiViper.virtual_state_ext option.inject zero_mask_identity)
+  qed
 qed
 
 end

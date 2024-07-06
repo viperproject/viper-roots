@@ -265,42 +265,6 @@ qed
 
 end
 
-lemma mult_wf_is_wf:
-  assumes "wf_pre_virtual_state x"
-    shows "wf_pre_virtual_state (\<alpha> \<odot> x)"
-  sorry (* False *)
-
-
-instantiation virtual_state :: (type) pcm_mult
-begin
-
-lift_definition mult_virtual_state :: "preal \<Rightarrow> 'a virtual_state \<Rightarrow> 'a virtual_state" is "(\<odot>)"
-  by (simp add: mult_wf_is_wf)
-
-instance proof
-  fix x a b :: "'a virtual_state"
-  fix \<alpha> \<beta> :: preal
-  let ?a = "Rep_virtual_state a"
-  let ?b = "Rep_virtual_state b"
-  let ?x = "Rep_virtual_state x"
-
-  show "pwrite \<odot> x = x"
-    by (simp add: Rep_virtual_state_inverse mult_virtual_state_def unit_mult)
-
-  show "\<alpha> \<odot> (\<beta> \<odot> x) = pmult \<alpha> \<beta> \<odot> x"
-    by (metis (mono_tags, opaque_lifting) Rep_virtual_state_inverse mult_mult mult_virtual_state.rep_eq)
-
-  show "Some (padd \<alpha> \<beta> \<odot> x) = \<alpha> \<odot> x \<oplus> \<beta> \<odot> x"
-    by (simp add: compatible_virtual_state_implies_pre_virtual_state_rev distrib_scala_mult mult_virtual_state.rep_eq)
-
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
-    sorry (* Should not be needed, because this instantiation is invalid *)
-qed
-
-end
-
-
-
 subsection \<open>Normal equi_states\<close>
 
 type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement"
@@ -648,13 +612,14 @@ inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pu
   \<Longrightarrow> red_atomic_assert \<Delta> (Acc e f (PureExp p)) \<omega> None"
 
 \<comment>\<open>acc(P(exps), p)\<close>
-
+(*
 | RedAtomicPred: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals ; red_pure \<Delta> p \<omega> (Val (VPerm v)) ; v \<ge> 0 ; predicates \<Delta> (P, vals) = Some A \<rbrakk>
 \<Longrightarrow> red_atomic_assert \<Delta> (AccPredicate P exps (PureExp p)) \<omega> (Some (v > 0 \<longrightarrow> (\<exists>a \<in> A. get_state \<omega> = (Abs_preal v) \<odot> a)))"
 | RedAtomicPredWildcard: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals ; (predicates \<Delta>) (P, vals) = Some A \<rbrakk>
 \<Longrightarrow> red_atomic_assert \<Delta> (AccPredicate P exps Wildcard) \<omega> (Some (\<exists>a \<in> A. \<exists>\<alpha>. \<alpha> > 0 \<and> get_state \<omega> = \<alpha> \<odot> a))"
 | RedAtomicPredNeg: "\<lbrakk> red_pure \<Delta> p \<omega> (Val (VPerm v)) ; v < 0 \<rbrakk>
   \<Longrightarrow> red_atomic_assert \<Delta> (AccPredicate P exps (PureExp p)) \<omega> None"
+*)
 
 (*
 | RedAtomicPredNone: "\<lbrakk> red_pure_exps \<Delta> \<omega> exps vals ; red_pure \<Delta> p \<omega> (Val (VPerm v)) ; v \<ge> 0 ;
@@ -788,9 +753,6 @@ lemma set_trace_make_equi_state[simp] :
 lemma set_state_make_equi_state[simp] :
   "set_state (make_equi_state s t st) st' = make_equi_state s t st'"
   by (simp add: EquiViper.full_state_ext)
-
-
-(* END OF partial DUMP *)
 
 
 

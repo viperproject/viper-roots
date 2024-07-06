@@ -211,15 +211,10 @@ record ('v, 'a) interp =
 
 datatype 'a custom =
   FieldAssign "('a equi_state, address) exp" field_ident "('a equi_state, 'a val) exp"
-  | Label label
+(* | Label label *)
 
-(*
-type_synonym 'a equi_state = "('a trace \<times> 'a virtual_state, 'a val) state"
-*)
 definition has_write_perm_only :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> bool" where
   "has_write_perm_only \<phi> hl \<longleftrightarrow> get_vm \<phi> hl = 1"
-(* Could be expressed as "set_value" is frame-preserving
-*)
 
 definition has_value :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> 'a val \<Rightarrow> bool" where
   "has_value \<phi> hl v \<longleftrightarrow> get_vh \<phi> hl = Some v"
@@ -427,7 +422,7 @@ proof -
   let ?h = "get_vh (get_state \<omega>)"
   define ptr where "ptr = set_state \<omega> (Abs_virtual_state (?m, ?h))"
 
-  have "wf_pre_virtual_state (?m, ?h)"
+  have rwf: "wf_pre_virtual_state (?m, ?h)"
     using \<open>get_vh (get_state \<omega>) l = Some v\<close> gr_0_is_ppos
     by (smt (verit, best) PosReal.ppos.rep_eq all_pos option.distinct(1) order.refl wf_mask_simple_def wf_pre_virtual_stateI zero_preal.rep_eq)
 
@@ -460,24 +455,33 @@ proof -
           snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la \<oplus> snd (Rep_virtual_state (snd (snd ptr))) la"
             proof (cases "la = l")
               case True
-              then show ?thesis sorry (* TD: TODO *)
+              then have "Some (snd (Rep_virtual_state (snd (snd \<omega>))) la) = Some (get_h \<omega> l)"
+                by (simp add: get_state_def get_vh_def)
+              moreover have "snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la = None"
+                by (metis True fun_upd_same get_state_def get_vh_def remove_only_charact(1))
+              moreover have "snd (Rep_virtual_state (snd (snd ptr))) la = get_vh (get_state \<omega>) l"
+                unfolding ptr_def using rwf
+                by (metis Abs_virtual_state_inverse True get_state_def get_state_set_state mem_Collect_eq snd_conv)
+              ultimately show ?thesis
+                by simp
             next
               case False
-              then show ?thesis sorry (* TD: TODO *)
+              then have "Some (snd (Rep_virtual_state (snd (snd \<omega>))) la) = Some (get_h \<omega> la)"
+                by (simp add: get_state_def get_vh_def)
+              moreover have "snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la = get_h \<omega> la"
+                by (metis False fun_upd_def get_abs_state_def get_vh_def remove_only_charact(1) snd_get_abs_state)
+              moreover have "snd (Rep_virtual_state (snd (snd ptr))) la = get_vh (get_state \<omega>) la"
+                unfolding ptr_def using rwf
+                by (metis Abs_virtual_state_inverse get_state_def get_state_set_state mem_Collect_eq snd_conv)
+              ultimately show ?thesis
+              proof -
+                have "\<forall>z. (z::'a val option) \<oplus> z = Some z \<or> z = None"
+                  by (smt (z3) core_option.cases plus_option.simps(3) plus_val_def)
+                then show ?thesis
+                  by (smt (z3) \<open>Some (snd (Rep_virtual_state (snd (snd \<omega>))) la) = Some (get_h \<omega> la)\<close> \<open>snd (Rep_virtual_state (snd (snd (remove_only \<omega> l)))) la = get_h \<omega> la\<close> \<open>snd (Rep_virtual_state (snd (snd ptr))) la = get_h \<omega> la\<close> plus_option.simps(1))
+              qed
             qed
           qed
-(*
-            thm partial_heap_same_sum
-          
-          proof (rule partial_heap_same_sum)
-            show "snd (Rep_virtual_state (snd (snd \<omega>))) = snd (Rep_virtual_state (snd (snd (remove_only \<omega> l))))"
-              
-
-              by (metis get_state_def get_vh_def remove_only_charact(1))
-            show "snd (Rep_virtual_state (snd (snd \<omega>))) = snd (Rep_virtual_state (snd (snd ptr)))"
-              by (metis Abs_virtual_state_inverse \<open>wf_pre_virtual_state (\<lambda>l'. if l = l' then PosReal.pwrite else PosReal.pnone, get_vh (get_state \<omega>))\<close> get_state_def get_state_set_state get_vh_def mem_Collect_eq ptr_def snd_eqD)
-          qed
-*)
         qed
       qed
     qed
@@ -577,7 +581,7 @@ qed
 fun wf_custom_stmt where
   "wf_custom_stmt \<Delta> (FieldAssign r f e) \<longleftrightarrow> sep_algebra_class.wf_exp r \<and> sep_algebra_class.wf_exp e
   \<and> (\<exists>ty. custom_context \<Delta> f = Some ty \<and> TypedEqui.typed_exp ty e)"
-| "wf_custom_stmt _ (Label _) \<longleftrightarrow> True"
+(* | "wf_custom_stmt _ (Label _) \<longleftrightarrow> True" *)
 
 definition update_value where
   "update_value \<Delta> A r f e =
@@ -608,11 +612,11 @@ inductive SL_Custom :: "('a val, (field_ident \<rightharpoonup> 'a val set)) abs
   where
   RuleFieldAssign: "\<lbrakk> TypedEqui.self_framing_typed \<Delta> A; entails A { \<omega> |\<omega> l. get_m \<omega> (l, f) = 1 \<and> r \<omega> = Some l};
   framed_by_exp A r; framed_by_exp A e \<rbrakk> \<Longrightarrow> SL_Custom \<Delta> A (FieldAssign r f e) (update_value \<Delta> A r f e)"
-| RuleLabel: "SL_Custom \<Delta> A (Label l) (assertion_holds_at l A)"
+(* | RuleLabel: "SL_Custom \<Delta> A (Label l) (assertion_holds_at l A)" *)
 
 
 inductive_cases SL_custom_FieldAssign[elim!]: "SL_Custom \<Delta> A (FieldAssign r f e) B"
-inductive_cases SL_custom_Label[elim!]: "SL_Custom \<Delta> A (Label l) B"
+(* inductive_cases SL_custom_Label[elim!]: "SL_Custom \<Delta> A (Label l) B" *)
 
 
 lemma typed_then_update_value_typed:
@@ -854,10 +858,10 @@ inductive red_custom_stmt :: "('a val, field_ident \<rightharpoonup> 'a val set)
   where
   RedFieldAssign: "\<lbrakk> r \<omega> = Some hl ; e \<omega> = Some v ; get_vm (get_state \<omega>) (hl, f) = 1; custom_context \<Delta> f = Some ty; v \<in> ty \<rbrakk>
   \<Longrightarrow> red_custom_stmt \<Delta> (FieldAssign r f e) \<omega> {set_state \<omega> (set_value (get_state \<omega>) (hl, f) v)}"
-| RedLabel: "red_custom_stmt \<Delta> (Label l) \<omega> {set_trace \<omega> ((get_trace \<omega>)(l \<mapsto> get_state \<omega>)) }"
+(* | RedLabel: "red_custom_stmt \<Delta> (Label l) \<omega> {set_trace \<omega> ((get_trace \<omega>)(l \<mapsto> get_state \<omega>)) }" *)
 
 inductive_cases red_custom_stmt_FieldAssign[elim!]: "red_custom_stmt \<Delta> (FieldAssign r f e) \<omega> S"
-inductive_cases red_custom_stmt_Label[elim!]: "red_custom_stmt \<Delta> (Label l) \<omega> S"
+(* inductive_cases red_custom_stmt_Label[elim!]: "red_custom_stmt \<Delta> (Label l) \<omega> S" *)
 
 lemma SL_proof_FieldAssign_easy:
   assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> (FieldAssign r g e) (snd \<omega>) (f \<omega>)"
@@ -975,9 +979,6 @@ proof (cases C)
   case (FieldAssign r g e)
   then show ?thesis
     using SL_proof_FieldAssign_easy assms by blast
-next
-  case (Label l)
-  then show ?thesis sorry (* Label *)
 qed
 
 lemma custom_reciprocal:
@@ -999,9 +1000,6 @@ proof (induct rule: SL_Custom.induct)
     using \<open>e \<omega> = Some v\<close> \<open>get_m \<omega> (hl, f) = PosReal.pwrite\<close> \<open>r \<omega> = Some hl\<close> by fastforce
   then show "\<exists>S. red_custom_stmt \<Delta> (custom.FieldAssign r f e) \<omega> S \<and> S \<subseteq> update_value \<Delta> A r f e"
     by (meson RuleFieldAssign.prems(1) \<open>custom_context \<Delta> f = Some ty\<close> \<open>e \<omega> = Some v\<close> \<open>r \<omega> = Some hl\<close> \<open>v \<in> ty\<close> empty_subsetI in_update_value insert_subset)
-next
-  case (RuleLabel \<Delta> A l)
-  then show ?case sorry (* Label *)
 qed
 
 lemma red_custom_stable:
