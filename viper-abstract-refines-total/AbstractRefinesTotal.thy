@@ -1162,10 +1162,12 @@ next
     from Custom this show ?thesis
       apply (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
       by (metis Custom.hyps(2) Custom.hyps(3) get_state_set_state red_custom_stable stable_get_state)
+(*
   next
     case (Label l)
     from Custom this show ?thesis
       by (clarsimp simp add:stable_get_state[symmetric] a2t_state_wf_def)
+*)
   qed
 next
   case (Havoc \<Delta> x ty \<omega> v)
