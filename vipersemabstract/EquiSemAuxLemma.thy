@@ -840,7 +840,6 @@ proof -
   then show ?thesis
     using LHS_eq by simp
 qed
-*)
 
 lemma mult_partial_heap_red:
   "p \<odot> (h :: 'v partial_heap) = h"
@@ -948,7 +947,7 @@ proof -
   ultimately show ?thesis using assms
     by (simp add: add_shift_and_add_list_state_interchange)
 qed
-
+*)
 
 subsection \<open>\<succeq> relation\<close>
 
