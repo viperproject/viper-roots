@@ -56,7 +56,6 @@ ML \<open>
        (Rmsg' "Scope variable disjointness" (#aux_var_disj_tac (#basic_stmt_rel_info info) ctxt) ctxt) THEN'
        (Rmsg' "Scope lookup var decl" (assm_full_simp_solved_with_thms_tac [lookup_decl_thm] ctxt) ctxt) THEN'
        (Rmsg' "Scope vpr to bpl ty" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
-       (* TODO: add var tr0 equality *)
        (Rmsg' "Scope simplify translation record" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
        (stmt_rel_tac ctxt info body_hint |> SOLVED')
     | _ => stmt_rel_single_stmt_tac ctxt info stmt_rel_hint

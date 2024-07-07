@@ -2743,5 +2743,20 @@ lemma true_mono_prop_downward: "mono_prop_downward (\<lambda>_. True)"
 lemma true_mono_prop_downward_ord: "mono_prop_downward_ord (\<lambda>_. True)"
   unfolding mono_prop_downward_ord_def
   by blast
-         
+
+subsection \<open>Utility theorems for Proof Generation\<close>
+
+lemma state_rel_eq_conj_helper_1:
+  assumes "R = (\<lambda>\<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and> (\<omega>def = \<omega>)))"
+  shows "R = (\<lambda>\<omega>def \<omega> ns. (state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and> (\<omega>def = \<omega>)))"
+  using assms
+  by simp
+  
+
+lemma state_rel_eq_conj_helper_2:
+  assumes "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt"
+  shows "R = (\<lambda>\<omega>def \<omega> ns. state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and> ((\<lambda> \<omega>def \<omega>. True) \<omega>def \<omega>))"
+  using assms
+  by simp
+
 end

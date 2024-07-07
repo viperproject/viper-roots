@@ -707,7 +707,6 @@ form to all subgoals and (simp | argo)+ applies simp or argo until neither works
 
 lemma old_expr_wf_rel_inst:
   assumes WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      (* and "R = state_rel Pr StateCons TyRep Tr AuxPred ctxt" *)
       and "R = (\<lambda>\<omega>def \<omega> ns. state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns \<and> Q \<omega>def \<omega>)"
       and "lbls = label_hm_translation Tr"
       and OldH: "fst lbls lbl = Some OldH"

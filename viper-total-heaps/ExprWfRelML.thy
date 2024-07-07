@@ -63,7 +63,7 @@ ML \<open>
        assm_full_simp_solved_tac ctxt,   
        resolve_tac ctxt [@{thm field_access_wf_rel}], (* field access *)
        resolve_tac ctxt @{thms cond_exp_wf_rel}, (* conditional expression *)
-       resolve_tac ctxt @{thms old_expr_wf_rel_inst[where ?Q = "\<lambda>\<omega>def \<omega>. \<omega>def = \<omega>"]} (* old expression *)
+       resolve_tac ctxt @{thms old_expr_wf_rel_inst} (* old expression *)
       ] [  
        fn _ => fn st => all_tac st, (* var *)
        fn _ => fn st => all_tac st, (* lit *)
@@ -128,17 +128,19 @@ ML \<open>
        )
    and
     old_exp_wf_rel_tac exp_wf_rel_info exp_rel_info ctxt =
-       (* TODO get this from basic stmt rel *)
-       resolve_tac ctxt [#consistency_wf_thm (#basic_stmt_rel_info exp_rel_info)] THEN'
-       fast_tac ctxt THEN'
-       assm_full_simp_solved_tac ctxt THEN'
-       #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
-       #vpr_lit_bpl_exp_rel_tac exp_rel_info ctxt THEN'
-       assm_full_simp_solved_tac ctxt THEN'
-       assm_full_simp_solved_tac ctxt THEN'
-       assm_full_simp_solved_tac ctxt THEN'
-       (#aux_var_disj_tac (#basic_stmt_rel_info exp_rel_info) ctxt) THEN'
-       (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info ctxt |> SOLVED')
+       (resolve_tac ctxt [#consistency_wf_thm (#basic_stmt_rel_info exp_rel_info)] |> SOLVED') THEN'
+       (((resolve_tac ctxt @{thms state_rel_eq_conj_helper_2}) THEN' (Rmsg' "Fast attempt 1" fast_tac ctxt)) ORELSE'
+        ((resolve_tac ctxt @{thms state_rel_eq_conj_helper_1}) THEN' (Rmsg' "Fast attempt 2" fast_tac ctxt))) THEN'
+       (*(Rmsg' "state_rel_eq_conj_helper" ((fast_tac ctxt) THEN' (fast_tac ctxt)) |> SOLVED') THEN' *)
+       (Rmsg' "Simp 1" assm_full_simp_solved_tac ctxt) THEN'
+       (Rmsg' "Simp with Tr 1" (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
+       (Rmsg' "Simpl with Tr 2" (#vpr_lit_bpl_exp_rel_tac exp_rel_info) ctxt |> SOLVED') THEN'
+       (Rmsg' "Simp 2" assm_full_simp_solved_tac ctxt) THEN'
+       (Rmsg' "Simp 3" assm_full_simp_solved_tac ctxt) THEN'
+       (Rmsg' "Simp 4" assm_full_simp_solved_tac ctxt) THEN'
+       (Rmsg' "Aux Disj Tac" (#aux_var_disj_tac (#basic_stmt_rel_info exp_rel_info)) ctxt |> SOLVED') THEN'
+       (Rmsg' "OldExp inner expression Wf" (exp_wf_rel_non_trivial_tac exp_wf_rel_info exp_rel_info) ctxt |> SOLVED')
+
 
    fun exps_wf_rel_aux_tac exp_wf_rel_info exp_rel_info ctxt k = 
      (if k <= 0 then
