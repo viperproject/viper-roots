@@ -858,7 +858,7 @@ lemma exhale_stmt_rel_finish:
           WfTyRepr: "wf_ty_repr_bpl TyRep" and
           ProgramTotal: "Pr = program_total ctxt_vpr" and
           DomainType:  "domain_type TyRep = absval_interp_total ctxt_vpr" and
-          WellDefSame: "heap_var Tr = heap_var_def Tr \<and> mask_var Tr = mask_var_def Tr" and 
+          HeapWellDefSame: "heap_var Tr = heap_var_def Tr" and 
           "id_on_known_locs_name = FunMap FIdenticalOnKnownLocs" and
           TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           "StateCons \<omega>'" and
@@ -1027,7 +1027,7 @@ proof -
   moreover have "state_rel_def_same Pr StateCons TyRep Tr AuxPred ctxt \<omega>' ?ns2"
   proof (rule state_rel_heap_update_2[OF StateRel1])
     show " \<omega> = \<omega> \<and> \<omega>' = \<omega>' \<and> heap_var Tr = heap_var_def Tr"
-      using WellDefSame
+      using HeapWellDefSame
       by simp
   next
     fix x
