@@ -6,6 +6,7 @@ ML \<open>
 
   fun post_framing_rel_init_tac ctxt (basic_info : basic_stmt_rel_info) lookup_heap_var_thm lookup_mask_var_thm =
     (Rmsg' "Post Framing Init - Start" (resolve_tac ctxt [ @{thm post_framing_rel_aux} OF [@{thm wf_ty_repr_basic}, #consistency_wf_thm basic_info]]) ctxt) THEN'
+    (Rmsg' "StateRel" (fast_tac ctxt) ctxt) THEN'                 
     (Rmsg' "Post Framing Init - Type Interp" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Domain Type" (assm_full_simp_solved_with_thms_tac @{thms ty_repr_basic_def} ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Program" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
@@ -17,6 +18,7 @@ ML \<open>
              resolve_tac ctxt [lookup_mask_var_thm]) ctxt) THEN'
     (Rmsg' "Post Framing Init - Zero Mask" 
             (assm_full_simp_solved_with_thms_tac (#tr_def_thms basic_info) ctxt) ctxt) THEN'
+    (Rmsg' "Post Framing Init - Active Labels" (assm_full_simp_solved_with_thms_tac (@{thm active_labels_hm_tr_def} :: #tr_def_thms basic_info) ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Disjointntess" ((#aux_var_disj_tac basic_info) ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Heap and Mask Disjoint" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
     (Rmsg' "Post Framing Init - Propagate 1"

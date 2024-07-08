@@ -328,9 +328,9 @@ ML \<open>
                red_assign_tac ctxt basic_info exp_wf_rel_info exp_rel_info lookup_bpl_target_thm
      |  FieldAssignHint _ => field_assign_rel_tac ctxt basic_info atomic_hint
      | InhaleHint inh_complete_hint => 
-        (Rmsg' "AtomincInh Start" (resolve_tac ctxt [#inhale_stmt_rel_thm inh_complete_hint]) ctxt) THEN'
-        (Rmsg' "AtomincInh StateRel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
-        (Rmsg' "AtomincInh Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "AtomicInh Start" (resolve_tac ctxt [#inhale_stmt_rel_thm inh_complete_hint]) ctxt) THEN'
+        (Rmsg' "AtomicInh StateRel" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "AtomicInh Invariant" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (inhale_rel_tac ctxt inhale_info (#inhale_rel_hint inh_complete_hint))
      | ExhaleHint (NormalExhCompleteHint exh_complete_hint) =>
         (Rmsg' "AtomicExh1 Start" (resolve_tac ctxt [(#exhale_stmt_rel_thm exh_complete_hint) OF [(#consistency_wf_thm basic_info)]]) ctxt) THEN'

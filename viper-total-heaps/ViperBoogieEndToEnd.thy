@@ -294,16 +294,17 @@ definition method_rel
           )"
 
 lemma post_framing_rel_aux:
-  assumes StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred \<omega> ns \<and>
-                                         get_trace_total \<omega> old_label = Some (get_total_full \<omega>)"
-      and WfTyRep: "wf_ty_repr_bpl TyRep" 
+  assumes WfTyRep: "wf_ty_repr_bpl TyRep" 
       and WfConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
+      and StateRel: "\<And> \<omega> ns. R \<omega> ns \<Longrightarrow> state_rel_well_def_same ctxt Pr StateCons (TyRep :: 'a ty_repr_bpl) Tr AuxPred \<omega> ns \<and>
+                                         get_trace_total \<omega> old_label = Some (get_total_full \<omega>)"
       and TypeInterp: "type_interp ctxt = vbpl_absval_ty TyRep"
       and "domain_type TyRep = absval_interp_total ctxt_vpr"
       and "Pr = program_total ctxt_vpr"
       and LookupDeclHeap: "lookup_var_decl (var_context ctxt) hvar' = Some (TConSingle (THeapId TyRep), None)"
       and LookupTyMask: "lookup_var_ty (var_context ctxt) mvar' = Some (TConSingle (TMaskId TyRep))"
       and ZeroMaskConst: "const_repr Tr CZeroMask = zero_mask_var"
+      (* this one needs to be solved *)
       and DomLabelMap: "active_labels_hm_tr (label_hm_translation Tr) = {old_label}"
       and Disj: "{hvar', mvar'} \<inter> ({heap_var Tr, heap_var_def Tr} \<union>
                               {mask_var Tr, mask_var_def Tr} \<union>
