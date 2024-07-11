@@ -1081,16 +1081,13 @@ theorem sound_translation:
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Gamma> C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
       and "TypedEqui.wf_assertion tcfe P \<and> TypedEqui.wf_assertion tcfe Q"
-      and "ConcreteSemantics.self_framing_and_typed tcfe P \<and> TypedEqui.typed_assertion tcfe P"
-
       and "ConcreteSemantics.verifies_set tcfe (atrue tcfe) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q)"
       and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.verifies_set tcfe (atrue tcfe) Cv"
 
-      and "TypedEqui.wf_context tcfe"
     shows "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
 proof -
   obtain B where "ConcreteSemantics.SL_proof tcfe (atrue tcfe) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q) B"
-    by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(3) ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) assms(7) atrue_self_framing_and_typed(1) atrue_self_framing_and_typed(2))
+    by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(3) ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) assms(6) atrue_self_framing_and_typed(1) atrue_self_framing_and_typed(2))
   then obtain B' where "ConcreteSemantics.SL_proof tcfe (atrue tcfe \<otimes> P) (fst (translate \<Gamma> C)) B'" "entails B' (B \<otimes> Q)"
     by blast
 
@@ -1108,7 +1105,7 @@ proof -
       proof clarify
         fix Cv assume "Cv \<in> snd (translate \<Gamma> C)"
         then show "\<exists>B. ConcreteSemantics.SL_proof tcfe (atrue tcfe) Cv B"
-          by (simp add: ConcreteSemantics.Viper_implies_SL_proof assms(4) assms(8))
+          by (simp add: ConcreteSemantics.Viper_implies_SL_proof assms(4) assms(7))
       qed
     qed
     show "P \<otimes> atrue tcfe \<subseteq> P \<otimes> atrue tcfe \<otimes> atrue tcfe"

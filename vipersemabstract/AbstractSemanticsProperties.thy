@@ -85,7 +85,7 @@ lemma typed_intersection:
 
 lemma self_framing_typed_star:
   assumes "self_framing_typed \<Delta> A"
-      and "framed_by A P" (* TODO: should this be changed as well? *)
+      and "framed_by A P"
     shows "self_framing_typed \<Delta> (A \<otimes> P)"
 proof (rule self_framing_typedI)
   fix \<omega>
@@ -392,10 +392,6 @@ end
 
 context semantics
 begin
-
-\<comment>\<open>Results needed:
-1. If state starts stable, then it stays stable
-\<close>
 
 section \<open>Properties of the semantics: States are always wf_state\<close>
 

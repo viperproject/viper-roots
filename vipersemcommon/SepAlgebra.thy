@@ -143,7 +143,7 @@ subsection \<open>Function\<close>
 datatype 'v agreement = Ag (the_ag: 'v)
 
 
-instantiation "agreement" :: (type) pcm
+instantiation agreement :: (type) pcm
 begin
 
 definition plus_agreement :: "'a agreement \<Rightarrow> 'a agreement \<Rightarrow> 'a agreement option" where
@@ -539,7 +539,7 @@ section \<open>Instantiations of PCMs with core\<close>
 
 subsection \<open>Agreement\<close>
 
-instantiation "agreement" :: (type) pcm_with_core
+instantiation agreement :: (type) pcm_with_core
 begin
 
 definition core_agreement :: "'a agreement \<Rightarrow> 'a agreement" where
@@ -1068,7 +1068,7 @@ section \<open>Instantiations of SepAlgebra\<close>
 
 subsection \<open>Agreement\<close>
 
-instantiation "agreement" :: (type) sep_algebra
+instantiation agreement :: (type) sep_algebra
 begin
 
 definition stable_agreement :: "'a agreement \<Rightarrow> bool" where
@@ -1144,11 +1144,11 @@ definition stabilize_fun: "stabilize_fun f l = stabilize  (f l)"
 
 definition stable_fun: "stable_fun f \<longleftrightarrow> (\<forall>l. stable (f l))"
 
-instance 
+instance
 proof
   fix x a b c :: "'a \<Rightarrow> 'b :: sep_algebra"
   show "sep_algebra_class.stable (stabilize x)"
-    by (simp add: stabilize_fun stabilize_is_stable stable_fun)
+    by (simp add: stabilize_fun stable_fun)
   show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
     by (smt (verit, ccfv_SIG) plus_funE plus_funI stabilize_fun stabilize_sum)
   show "Some x = stabilize x \<oplus> |x|"

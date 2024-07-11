@@ -475,7 +475,6 @@ qed (auto)
 lemma no_aborts_mono:
   assumes "no_aborts \<Delta> C s \<tau> \<omega>"
       and "\<omega>' \<succeq> \<omega>"
-      and "sep_algebra_class.stable \<omega>"
     shows "no_aborts \<Delta> C s \<tau> \<omega>'"
 proof (rule no_abortsI)
   fix \<omega>0' \<omega>f
@@ -495,7 +494,6 @@ lemma frame_safe:
       and "Some \<omega>' = \<omega> \<oplus> \<omega>f"
       and "(Ag s, \<tau>, \<omega>f) \<in> R"
       and "sep_algebra_class.stable \<omega>f"
-      and "sep_algebra_class.stable \<omega>"
       and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
       and "well_typed_cmd \<Delta> C"
       and "TypedEqui.wf_context \<Delta>"
@@ -503,6 +501,7 @@ lemma frame_safe:
   using assms
 proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
   case (Suc n)
+  thm Suc.prems(6) safeE(4) Suc.prems(3)
   show ?case
   proof (rule safeI)
     show "C = Cskip \<Longrightarrow> (Ag s, \<tau>, \<omega>') \<in> Q \<otimes> R"
@@ -514,7 +513,8 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
     show "writes C s \<subseteq> write_dom \<omega>'"
       by (metis (no_types, lifting) Suc.prems(1) Suc.prems(3) greater_def inf.absorb_iff2 inf.coboundedI1 safeE(3) write_dom_mono)
     show "no_aborts \<Delta> C s \<tau> \<omega>'"
-      by (meson Suc.prems(1) Suc.prems(3) Suc.prems(6) greater_def no_aborts_mono safeE(4))
+      using safeE(4)[OF Suc.prems(1)]
+      using Suc.prems(3) greater_def no_aborts_mono by blast
     fix \<omega>0' \<omega>f' C' \<sigma>'
     assume asm0: "sep_algebra_class.stable \<omega>f'" "Some \<omega>0' = \<omega>' \<oplus> \<omega>f'" "binary_mask \<omega>0'" "\<langle>C, concretize s \<omega>0'\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
       "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>0')"
@@ -548,21 +548,19 @@ proof (induct n arbitrary: C \<omega> \<omega>' \<omega>f s)
         show "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f)"
           using \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f'')\<close> greater_def typed_smaller_state by blast
         show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>f)"
-          by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(8) TypedEqui.typed_def \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f)\<close> asm0(4) fst_conv get_abs_state_def red_keeps_typed_store snd_conv)
+          by (metis ConcreteSemantics.get_store_Ag_simplifies Suc.prems(7) TypedEqui.typed_def \<open>TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>f)\<close> asm0(4) fst_conv get_abs_state_def red_keeps_typed_store snd_conv)
         show "(Ag s, \<tau>, \<omega>f) \<in> R"
           by (simp add: Suc.prems(4))
         show "TypedEqui.wf_context \<Delta>"
-          using assms(9) by auto
+          using assms(8) by auto
       qed
-      show "sep_algebra_class.stable \<omega>1''"
-        by (simp add: \<open>sep_algebra_class.stable \<omega>1''\<close>)
       have "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1')"
         using typed_equi_red[OF _ asm0(4)]
-        by (meson Suc.prems(5) Suc.prems(8) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>sep_algebra_class.stable \<omega>1''\<close> asm0(1) asm0(5) assms(8) stable_sum)
+        by (metis Suc.prems(5) Suc.prems(7) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>sep_algebra_class.stable \<omega>1''\<close> asm0(1) asm0(5) stable_sum)
       then show "TypedEqui.typed \<Delta> (Ag (fst \<sigma>'), \<tau>, \<omega>1'')"
         using \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'\<close> greater_def typed_smaller_state by blast
       show "well_typed_cmd \<Delta> C'"
-        using Suc.prems(8) asm0(4) well_typed_cmd_red by blast
+        using Suc.prems(7) asm0(4) well_typed_cmd_red by blast
     qed (simp_all add: Suc.prems)
     ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f' \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (Q \<otimes> R)"
       by (metis Suc.prems(5) \<open>Some \<omega>1' = \<omega>1'' \<oplus> \<omega>f'' \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'\<close> \<open>Some \<omega>f'' = \<omega>f \<oplus> \<omega>f'\<close> \<open>sep_algebra_class.stable \<omega>1''\<close> asso1 stable_sum)
