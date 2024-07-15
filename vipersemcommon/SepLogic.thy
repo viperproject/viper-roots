@@ -783,81 +783,9 @@ proof (rule StableI)
 qed
 
 
-(*
-context sep_algebra
-begin
-
-definition conj where
-  "conj A B \<omega> \<longleftrightarrow> A \<omega> \<and> B \<omega>"
-
-definition star where
-  "star A B \<omega> \<longleftrightarrow> (\<exists>a b. A a \<and> B b \<and> Some \<omega> = a \<oplus> b)"
-
-definition monotonic where
-  "monotonic A \<longleftrightarrow> (\<forall>\<omega> \<omega>'. \<omega>' \<succeq> \<omega> \<and> A \<omega> \<longrightarrow> A \<omega>')"
-
-definition non_overlapping where
-  "non_overlapping A B \<longleftrightarrow> (\<forall>\<omega>. A \<omega> \<and> B \<omega> \<longrightarrow> (\<exists>a b. Some \<omega> = a \<oplus> b \<and> A a \<and> B b))"
-
-lemma star_entails_and:
-  assumes "star A B \<omega>"
-      and "monotonic A"
-      and "monotonic B"
-    shows "conj A B \<omega>"
-  by (metis (no_types, lifting) assms(1) assms(2) assms(3) conj_def local.commutative local.greater_equiv monotonic_def star_def)
-<<<<<<< HEAD
-
-=======
-  
->>>>>>> abssem_proof
-
-lemma and_entails_star:
-  assumes "A \<omega>"
-      and "B \<omega>"
-      and "non_overlapping A B"
-    shows "star A B \<omega>"
-<<<<<<< HEAD
-  using non_overlapping_def star_def[of A B \<omega>] assms(1) assms(2) assms(3)
-=======
-  using non_overlapping_def star_def[of A B \<omega>] assms(1) assms(2) assms(3) 
->>>>>>> abssem_proof
-  by metis
-
-end
-*)
 
 definition rel_stable_assertion where
-(*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>\<omega>'. \<omega> ## \<omega>' \<longrightarrow> (A \<omega>' \<longleftrightarrow> A (stabilize_rel \<omega> \<omega>')))" *)
   "rel_stable_assertion \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> A)"
-
-(*
-(\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (a \<in> A \<longleftrightarrow> x \<in> A))"
-*)
-
-(*
-text \<open>The truth of A in a only depends on parts of a (for a ## \<omega>) that:
-1) are stable, or
-2) are given by |\<omega>|\<close>
-definition rel_stable_assertion where
-(*  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>\<omega>'. \<omega> ## \<omega>' \<longrightarrow> (A \<omega>' \<longleftrightarrow> A (stabilize_rel \<omega> \<omega>')))" *)
-  "rel_stable_assertion \<omega> A \<longleftrightarrow> (\<forall>x a. \<omega> ## a \<and> pure_larger x (stabilize a) \<and> x \<succeq> |\<omega>| \<longrightarrow> (a \<in> A \<longleftrightarrow> x \<in> A))"
-*)
-
-(*
-lemma refines_rel_stable:
-  assumes "rel_stable_assertion_alt \<omega> A"
-      and "\<And>\<omega> \<omega>'. \<omega> \<in> A \<and> pure_larger \<omega>' \<omega> \<longrightarrow> \<omega>' \<in> A" 
-    shows "rel_stable_assertion \<omega> A"
-  unfolding rel_stable_assertion_def
-proof (clarify)
-  fix x a assume asm0: "\<omega> ## a" "pure_larger x (stabilize a)" "x \<succeq> |\<omega>|"
-  show "(a \<in> A) = (x \<in> A)"
-  proof
-    show "x \<in> A \<Longrightarrow> a \<in> A"
-      sledgehammer
-
-  obtain \<omega> a where "Some \<omega> = 
-*)
 
 
 

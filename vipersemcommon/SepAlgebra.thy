@@ -498,43 +498,6 @@ lemma result_sum_partial_functions:
   using assms option.discI option.inject plus_funE[of x a b] plus_option.simps(3)[of va vb]
   by (metis (full_types))
 
-(*
-subsection \<open>Sum\<close>
-
-instantiation sum :: (pcm, pcm) pcm
-begin
-
-fun plus_sum :: "'a + 'b \<Rightarrow> 'a + 'b \<Rightarrow> ('a + 'b) option" where
-  "plus_sum (Inl a) (Inl b) = (let r = a \<oplus> b in if r = None then None else Some (Inl (the r)))"
-| "plus_sum (Inr a) (Inr b) = (let r = a \<oplus> b in if r = None then None else Some (Inr (the r)))"
-| "plus_sum _ _ = None"
-
-instance proof
-
-  fix a b c ab bc :: "('a :: pcm) + ('b :: pcm)"
-  show "a \<oplus> b = b \<oplus> a"
-    apply (cases a)
-    apply (cases b)
-      apply (simp_all add: commutative)
-    apply (cases b)
-     apply (simp_all add: commutative)
-    done
-
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    apply (cases ab; cases bc)
-    
-       apply (cases bc)
-    
-
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None" 
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
-qed
-
-end
-*)
-
-
-
 section \<open>Instantiations of PCMs with core\<close>
 
 subsection \<open>Agreement\<close>
@@ -771,74 +734,6 @@ qed
 end
 
 
-(*
-subsection \<open>Sum\<close>
-
-instantiation sum :: (pcm_with_core, pcm_with_core) pcm_with_core
-begin
-
-fun core_sum where
-  "core_sum (Inl x) = Inl |x|"
-| "core_sum (Inr x) = Inr |x|"
-
-instance proof
-  fix x y a b c :: "'a + 'b"
-  show "Some x = x \<oplus> |x|"
-  proof (cases x)
-    case (Inl a)
-    then have "Some a = a \<oplus> |a|"
-      by (simp add: core_is_smaller)
-    then show ?thesis
-      using Inl option.discI by fastforce
-  next
-    case (Inr b)
-    then have "Some b = b \<oplus> |b|"
-      by (simp add: core_is_smaller)
-    then show ?thesis
-      using Inr option.discI by fastforce
-  qed
-  show "Some |x| = |x| \<oplus> |x|"
-  proof (cases x)
-    case (Inl a)
-    then have "Some |a| = |a| \<oplus> |a|"
-      by (simp add: core_is_pure)
-    then show ?thesis
-      using Inl option.discI by fastforce
-  next
-    case (Inr b)
-    then have "Some |b| = |b| \<oplus> |b|"
-      by (simp add: core_is_pure)
-    then show ?thesis
-      using Inr option.discI by fastforce
-  qed
-
-  show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
-    
-
-  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
-
-  show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-   
-qed
-
-end
-
-
-instantiation sum :: (pcm_mult, pcm_mult) pcm_mult
-begin
-
-fun mult_sum :: "preal \<Rightarrow> ('a + 'b) \<Rightarrow> ('a + 'b)" where
-  "mult_sum \<alpha> (Inl x) = Inl (\<alpha> \<odot> x)"
-| "mult_sum \<alpha> (Inr x) = Inr (\<alpha> \<odot> x)"
-
-(* TODO *)
-instance
-
-end
-
-*)
-
-
 lemma padd_pnone:
   "padd x pnone = x"
   by simp
@@ -997,7 +892,6 @@ fun mult_option :: "preal \<Rightarrow> 'a option \<Rightarrow> 'a option" where
   "mult_option \<alpha> None = None"
 | "mult_option \<alpha> (Some x) = Some (\<alpha> \<odot> x)"
 
-(* TODO *)
 instance proof
   fix x a b :: "'a option"
   fix \<alpha> \<beta> :: preal
@@ -1044,7 +938,6 @@ begin
 definition mult_agreement :: "preal \<Rightarrow> 'a agreement \<Rightarrow> 'a agreement" where
   "mult_agreement \<alpha> x = x"
 
-(* TODO *)
 instance proof
   fix x a b :: "'a agreement"
   fix \<alpha> \<beta> :: preal
@@ -1171,41 +1064,104 @@ qed
 
 end
 
-(*
-instantiation "option" :: (sep_algebra) sep_algebra
+
+section \<open>PermValue\<close>
+
+datatype ('p, 'v) PermValue = NoValue | Pair (the_perm: 'p) (the_value: 'v)
+
+
+instantiation PermValue :: (pos_perm, type) pcm
 begin
 
-fun stabilize_option where
-  "stabilize_option None = None"
-| "stabilize_option (Some x) = Some (stabilize x)"
-
-fun stable_option where
-  "stable_option None \<longleftrightarrow> True"
-| "stable_option (Some x) \<longleftrightarrow> stable x"
+fun plus_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue option" where
+  "plus_PermValue NoValue pv = Some pv"
+| "plus_PermValue pv NoValue = Some pv"
+| "plus_PermValue (Pair p1 v1) (Pair p2 v2) = (if v1 = v2 then Some (Pair (p1 + p2) v1) else None)"
+(* the values must agree *)
 
 instance proof
-  fix x a b c :: "'a option"
-  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
-    by (metis already_stable stabilize_option.elims stable_option.simps(2))
-  show "sep_algebra_class.stable (stabilize x)"
-    by (metis option.inject stabilize_is_stable stabilize_option.elims stable_option.elims(3) stable_option.simps(1))
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
-    apply (cases x; cases a; cases b)
-           apply auto[3]
-        apply (smt (verit, del_insts) option.sel option.simps(3) plus_option.simps(3))
-       apply auto[3]
-    by (smt (verit, ccfv_threshold) option.discI option.inject plus_option.elims stabilize_option.simps(2) stabilize_sum)
-  show "Some x = stabilize x \<oplus> |x|"
-    apply (cases x)
-     apply auto[1]
-    using decompose_stabilize_pure plus_optionI by fastforce
-  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b" (* false *)
+  fix a b c ab bc :: "('a, 'b) PermValue"
+
+  show "a \<oplus> b = b \<oplus> a"
+    by (smt (verit) SepAlgebra.plus_PermValue.elims SepAlgebra.plus_PermValue.simps(3) add.commute)
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
+    by (smt (verit) PermValue.distinct(1) PermValue.inject group_cancel.add1 option.discI option.inject plus_PermValue.elims)
+  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
+    apply (cases a; cases b)
+       apply simp_all
+    apply blast
+    by (smt (verit) PermValue.distinct(1) PermValue.inject option.discI option.sel plus_PermValue.elims)
+  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a"
+    apply (cases a; cases b; cases c)
+           apply simp_all
+     apply (meson PermValue.discI not_Some_eq option.inject)
+    by (metis PermValue.inject group_cancel.add1 option.discI option.inject order_antisym pos_perm_class.padd_cancellative pos_perm_class.sum_larger)
+qed
 
 end
-*)
+
+instantiation PermValue :: (pos_perm, type) pcm_with_core
+begin
+
+fun core_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue" where
+  "core_PermValue NoValue = NoValue"
+| "core_PermValue (Pair p v) = Pair 0 v"
+
+instance proof
+  fix x y a b c :: "('a, 'b) PermValue"
+  show "Some x = x \<oplus> |x|"
+    by (smt (verit, del_insts) SepAlgebra.core_PermValue.elims group_cancel.rule0 plus_PermValue.simps(1) plus_PermValue.simps(3))
+  show "Some |x| = |x| \<oplus> |x|"
+    by (smt (verit, del_insts) PermValue.distinct(1) PermValue.inject SepAlgebra.core_PermValue.elims add_0 core_PermValue.cases plus_PermValue.elims plus_PermValue.simps(1))
+  show "Some x = x \<oplus> c \<Longrightarrow> \<exists>r. Some |x| = c \<oplus> r"
+    apply (cases x; cases c)
+       apply simp_all
+    by (metis PermValue.inject add.commute add.right_neutral option.discI option.inject plus_PermValue.simps(2) pos_perm_class.padd_cancellative)
+  show "Some c = a \<oplus> b \<Longrightarrow> Some |c| = |a| \<oplus> |b|"
+    apply (cases a; cases b)
+       apply simp_all
+    by (metis core_PermValue.simps(2) option.discI option.inject)
+
+  show "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
+    apply (cases b; cases x; cases y)
+           apply simp_all
+    by (metis PermValue.inject add.commute option.discI option.inject pos_perm_class.padd_cancellative)
+qed
+
+end
 
 
+instantiation PermValue :: (pos_perm, type) sep_algebra
+begin
 
+fun stable_PermValue :: "('a, 'b) PermValue \<Rightarrow> bool" where
+  "stable_PermValue NoValue \<longleftrightarrow> True"
+| "stable_PermValue (Pair p v) \<longleftrightarrow> p > 0"
+
+fun stabilize_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue" where
+  "stabilize_PermValue NoValue = NoValue"
+| "stabilize_PermValue (Pair p v) = (if p > 0 then Pair p v else NoValue)" \<comment> \<open>We erase the knowledge if p = 0\<close>
+
+instance proof
+  fix x a b c :: "('a, 'b) PermValue"
+  show "sep_algebra_class.stable x \<Longrightarrow> stabilize x = x"
+    by (metis stabilize_PermValue.elims stable_PermValue.simps(2))
+  show "sep_algebra_class.stable (stabilize x)"
+    by (metis SepAlgebra.stable_PermValue.simps(1) stabilize_PermValue.elims stable_PermValue.simps(2))
+  show "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize b"
+    apply (cases a; cases b)
+    apply simp_all
+    by (metis add.monoid_axioms add.right_neutral monoid.left_neutral option.discI option.inject order_less_le_trans pos_perm_class.sum_larger pperm_pnone_pgt stabilize_PermValue.simps(2))
+
+
+  show "Some x = stabilize x \<oplus> |x|"
+    by (metis \<open>sep_algebra_class.stable x \<Longrightarrow> stabilize x = x\<close> core_PermValue.simps(2) core_is_smaller plus_PermValue.simps(1) pperm_pnone_pgt stabilize_PermValue.simps(2) stable_PermValue.elims(3))
+
+  show "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
+    by (metis SepAlgebra.stabilize_PermValue.simps(2) commutative core_PermValue.elims option.inject plus_PermValue.simps(1) pperm_pgt_pnone stabilize_PermValue.simps(1))
+qed
+
+end
 
 
 end

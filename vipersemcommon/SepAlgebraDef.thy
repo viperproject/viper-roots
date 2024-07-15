@@ -860,21 +860,6 @@ class sep_algebra = pcm_with_core +
     and stabilize_core_emp : "Some a = b \<oplus> stabilize |c| \<Longrightarrow> a = b"
 
 
-(*
-  fixes u :: 'a
-
-  fixes stable_rel :: "'a \<Rightarrow> 'a \<Rightarrow> bool"
-  fixes stabilize_rel :: "'a \<Rightarrow> 'a \<Rightarrow> 'a"
-
-  assumes stabilize_rel_sum_pure: "Some x = stabilize_rel a x \<oplus> |x|"
-      and stabilize_rel_mono_left: "a \<succeq> b \<Longrightarrow> stabilize_rel a x \<succeq> stabilize_rel b x"
-      and stabilize_rel_all_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel y x) = stabilize_rel y a \<oplus> stabilize_rel y b"
-      and stabilize_rel_is_stable_rel: "stable_rel a (stabilize_rel a x)"
-      and already_stable_rel: "stable_rel a x \<Longrightarrow> stabilize_rel a x = x"
-      and stabilize_rel_sum_double: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize_rel u x) = stabilize_rel u a \<oplus> stabilize_rel a b"
-(* TODO: Think about this one *)
-      and u_neutral: "Some x = x \<oplus> u"
-*)
 
 begin
 
@@ -888,32 +873,6 @@ lemma stable_relI:
 
 lemma stabilize_mono: "x \<succeq> a \<Longrightarrow> stabilize x \<succeq> stabilize a"
   using local.greater_equiv local.stabilize_sum by blast
-
-(*
-lemma stabilize_rel:
-  assumes "Some x = a \<oplus> b"
-  shows "stable_rel a b \<Longrightarrow> stable x" unfolding stable_def
-
-
-lemma stabilize_rel_order:
-  "stabilize_rel a x \<succeq> stabilize x"
-  by (metis local.greater_equiv local.stabilize_rel_mono_left local.u_neutral stabilize_def)
-
-lemma stabilize_rel_mono_right:
-  "x \<succeq> a \<Longrightarrow> stabilize_rel b x \<succeq> stabilize_rel b a"
-  using local.greater_def local.stabilize_rel_all_sum by blast
-
-
-lemma stabilize_rel_sum: "Some x = a \<oplus> b \<Longrightarrow> Some (stabilize x) = stabilize a \<oplus> stabilize_rel a b"
-  by (simp add: local.stabilize_rel_sum_double stabilize_def)
-
-lemma max_projection_prop_stable_rel_stabilize_rel:
-  "max_projection_prop (stable_rel x) (stabilize_rel x)"
-  apply (rule max_projection_propI)
-  using local.greater_def local.stabilize_rel_sum_pure apply blast
-  apply (simp add: local.stabilize_rel_is_stable_rel)
-  by (metis local.already_stable_rel stabilize_rel_mono_right)
-*)
 
 lemma max_projection_prop_stable_stabilize:
   "max_projection_prop stable stabilize"
@@ -933,32 +892,6 @@ lemma stable_sum:
       and "Some x = a \<oplus> b"
     shows "stable x"
   by (metis already_stable assms(1) assms(2) assms(3) option.sel stabilize_is_stable stabilize_sum)
-
-(* Should hold in practice, maybe more axioms? *)
-(*
-lemma stability_cancellative:
-  assumes "stable a"
-      and "stable b"
-      and "Some x = a \<oplus> r"
-      and "Some x = b \<oplus> r"
-    shows "a = b"
-proof (rule cancellative)
-  show "Some x = r \<oplus> a"
-    by (simp add: assms(3) local.commutative)
-  show "Some x = r \<oplus> b"
-    by (simp add: assms(4) local.commutative)
-  show "|a| = |b|"
-
-(*      and cancellative: "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
-*)
-qed
-*)
-
-(*
-lemma stabilize_rel_invo:
-  "stabilize_rel x (stabilize_rel x a) = stabilize_rel x a"
-  using local.already_stable_rel local.stabilize_rel_is_stable_rel by blast
-*)
 
 definition pure_larger where
   "pure_larger a b \<longleftrightarrow> (\<exists>r. pure r \<and> Some a = b \<oplus> r)"
@@ -998,12 +931,6 @@ proof -
     using \<open>Some a' = a \<oplus> p\<close> \<open>pure p\<close> pure_larger_def by blast
 qed
 
-(*
-lemma pure_larger_stabilize:
-  "pure_larger x (stabilize_rel y x)"
-  using local.core_is_pure local.pure_def local.stabilize_rel_sum_pure pure_larger_def by blast
-*)
-
 lemma stabilize_sum_of_stable:
   assumes "stable x"
       and "Some x = a \<oplus> b"
@@ -1024,47 +951,12 @@ proof -
   ultimately show ?thesis
     by (metis local.asso1)
 qed
-(*
-lemma neutral_smallest:
-  "\<omega> \<succeq> u"
-  using greater_equiv u_neutral by blast
-
-lemma pure_larger_stabilize_rel:
-  assumes "\<omega>' \<succeq> \<omega>"
-  shows "pure_larger (stabilize_rel \<omega>' x) (stabilize_rel \<omega> x)"
-proof -
-  have "stabilize_rel \<omega>' x \<succeq> stabilize_rel \<omega> x"
-    by (simp add: assms local.stabilize_rel_mono_left)
-  moreover have "Some x = stabilize_rel \<omega>' x \<oplus> |x|"
-    by (simp add: local.stabilize_rel_sum_pure)
-  moreover have "Some x = stabilize_rel \<omega> x \<oplus> |x|"
-    by (simp add: local.stabilize_rel_sum_pure)
-  ultimately have "Some (stabilize_rel \<omega>' x) = stabilize_rel \<omega> x \<oplus> |stabilize_rel \<omega>' x|"
-qed
-*)
 
 lemma obtain_pure_remainder:
   assumes "a \<succeq> b"
   shows "\<exists>r. Some a = r \<oplus> b \<and> |r| = |a|"
   using assms local.commutative local.minus_core local.minus_equiv_def by auto
-(*
-(* TODO EXPLORE more *)
-definition is_minimum_sat where
-  "is_minimum_sat P \<omega> \<longleftrightarrow> P \<omega> \<and> (\<forall>\<omega>' x. \<omega>' \<succeq> \<omega> \<and> \<omega>' \<succeq> x \<and> P x \<longrightarrow> x \<succeq> \<omega>)"
 
-lemma is_minimum_satI:
-  assumes "A \<omega>"
-      and "\<And>x. \<omega>' \<succeq> x \<and> A x \<Longrightarrow> x \<succeq> \<omega>"
-    shows "is_minimum_sat A \<omega>' \<omega>"
-  using assms(1) assms(2) is_minimum_sat_def by blast
-
-lemma is_minimum_satE:
-  assumes "is_minimum_sat A \<omega>' \<omega>"
-      and "A x"
-      and "\<omega>' \<succeq> x"
-    shows "x \<succeq> \<omega>"
-  by (metis assms is_minimum_sat_def)
-*)
 
 lemma plus_pure_stabilize_eq :
   "Some a = b \<oplus> |c| \<Longrightarrow> stabilize a = stabilize b"
