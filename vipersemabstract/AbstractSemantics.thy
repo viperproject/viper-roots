@@ -1,5 +1,5 @@
 theory AbstractSemantics
-  imports ViperCommon.SepLogic ViperCommon.SepAlgebra ViperCommon.PartialMap ViperCommon.ViperLang
+  imports ViperCommon.DeBruijn ViperCommon.SepLogic ViperCommon.SepAlgebra ViperCommon.PartialMap ViperCommon.ViperLang
 begin
 
 section \<open>Add a store to the state\<close>
@@ -41,6 +41,13 @@ lemma get_store_stabilize[simp]:
 lemma set_store_stabilize[simp]:
   "set_store (stabilize \<omega>) s = stabilize (set_store \<omega> s)"
   by (simp add: get_abs_state_def set_store_def stabilize_ag stabilize_prod_def)
+
+lemma set_store_set_store [simp] :
+  "set_store (set_store \<omega> st1) st2 = set_store \<omega> st2"
+  by (simp add: get_abs_state_def set_store_def)
+lemma set_store_get_store [simp] :
+  "set_store \<omega> (get_store \<omega>) = \<omega>"
+  by (simp add: get_abs_state_def get_store_def set_store_def)
 
 lemma ag_the_ag_same:
   "a = b \<longleftrightarrow> the_ag a = the_ag b"
@@ -237,6 +244,25 @@ lemma typed_storeI:
       and "\<And>x v ty. \<sigma> x = Some v \<Longrightarrow> variables \<Delta> x = Some ty \<Longrightarrow> v \<in> ty"
     shows "typed_store \<Delta> \<sigma>"
   using assms(1) assms(2) typed_store_def by meson
+
+lemma typed_store_lookup :
+  assumes "typed_store \<Delta> \<sigma>"
+  assumes "variables \<Delta> n = Some ty"
+  shows "\<exists> v. \<sigma> n = Some v \<and> v \<in> ty"
+  using assms unfolding typed_store_def by blast
+
+lemma typed_store_delete :
+  assumes "typed_store \<Delta> \<sigma>"
+  assumes "variables \<Delta>' = (variables \<Delta>)(n := None)"
+  assumes "\<sigma>' = \<sigma>(n := None)"
+  shows "typed_store \<Delta>' \<sigma>'"
+  using assms by (simp add:typed_store_def)
+
+lemma typed_store_unshift :
+  assumes "typed_store \<Delta> \<sigma>"
+  assumes "variables \<Delta>' = (unshift_2 n (variables \<Delta>))"
+  shows "typed_store \<Delta>' (unshift_2 n \<sigma>)"
+  using assms by (auto simp add:typed_store_def unshift_2_def; blast)
 
 lemma wf_custom_state_core: "wf_custom_state \<Gamma> |x| \<longleftrightarrow> wf_custom_state \<Gamma> x"
   using max_projection_prop_pure_core mpp_smaller wf_custom_state_core_aux wf_custom_state_smaller by blast

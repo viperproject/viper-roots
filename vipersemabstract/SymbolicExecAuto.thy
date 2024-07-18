@@ -32,7 +32,8 @@ declare conjI [sexec_intro]
 
 named_theorems sexec_simp
 lemmas [sexec_simp] =
-  sym_gen_fresh_def 
+  sym_gen_fresh_def
+  shift_and_add_def
 
 named_theorems sexec_solve_intro
 declare sym_impliesI [sexec_solve_intro]

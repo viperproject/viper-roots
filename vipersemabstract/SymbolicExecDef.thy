@@ -539,8 +539,8 @@ fun sinit :: "vtyp list \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Righ
 | "sinit (ty#tys) fs Q =
     sinit tys fs (\<lambda> \<sigma>.
     sym_gen_fresh \<sigma> ty (\<lambda> \<sigma> v. Q (\<sigma>
-     \<lparr> sym_store := sym_store \<sigma>(length tys\<mapsto>SVar v),
-       sym_store_type := sym_store_type \<sigma>(length tys\<mapsto>ty) \<rparr>)))"
+     \<lparr> sym_store := shift_and_add (sym_store \<sigma>) (SVar v),
+       sym_store_type := shift_and_add (sym_store_type \<sigma>) ty \<rparr>)))"
 
 (* old
 (* C of https://arxiv.org/pdf/2311.07559 *)
