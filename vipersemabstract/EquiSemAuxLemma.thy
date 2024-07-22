@@ -1,5 +1,5 @@
 theory EquiSemAuxLemma
-  imports EquiViper ViperCommon.PredicatesUtil
+  imports EquiViper ViperCommon.PredicatesUtil ViperCommon.ViperUtil
 begin
 
 text\<open>This file is lemmas used in proving properties of EquiSem\<close>
@@ -1561,6 +1561,15 @@ lemma stable_rel_virtual_stateE:
 (* This does not hold! But it also should not hold. If there is a contradiction between a and x, all locations become stable. *)
   oops
   (* by (metis assms option.discI stable_rel_virtual_state_def) *)
+
+
+subsection \<open>heap_typed\<close>
+
+lemma heap_typed_stabilize :
+  assumes "heap_typed F (get_vh st)"
+  shows "heap_typed F (get_vh (stabilize st))"
+  using assms by (auto simp add:heap_typed_def vstate_stabilize_structure(2) restrict_map_eq_Some)
+
 
 subsection \<open>determinism and monotonicity properties of red_pure\<close>
 

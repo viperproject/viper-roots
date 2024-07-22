@@ -1,5 +1,5 @@
 theory AbstractSemantics
-  imports ViperCommon.DeBruijn ViperCommon.SepLogic ViperCommon.SepAlgebra ViperCommon.PartialMap ViperCommon.ViperLang
+  imports ViperCommon.DeBruijn ViperCommon.SepLogic ViperCommon.SepAlgebra ViperCommon.PartialMap ViperCommon.ViperLang ViperCommon.ViperTyping
 begin
 
 section \<open>Add a store to the state\<close>
@@ -236,33 +236,14 @@ locale typed_state =
 begin
 
 definition typed_store :: "('v, 'c) abs_type_context \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> bool" where
-  "typed_store \<Delta> \<sigma> \<longleftrightarrow> (dom (variables \<Delta>) = dom \<sigma> \<and> (\<forall>x v ty. \<sigma> x = Some v \<and> variables \<Delta> x = Some ty \<longrightarrow> v \<in> ty))"
+  "typed_store \<Delta> \<sigma> \<longleftrightarrow> store_typed (variables \<Delta>) \<sigma>"
 
 
 lemma typed_storeI:
   assumes "dom (variables \<Delta>) = dom \<sigma>"
       and "\<And>x v ty. \<sigma> x = Some v \<Longrightarrow> variables \<Delta> x = Some ty \<Longrightarrow> v \<in> ty"
     shows "typed_store \<Delta> \<sigma>"
-  using assms(1) assms(2) typed_store_def by meson
-
-lemma typed_store_lookup :
-  assumes "typed_store \<Delta> \<sigma>"
-  assumes "variables \<Delta> n = Some ty"
-  shows "\<exists> v. \<sigma> n = Some v \<and> v \<in> ty"
-  using assms unfolding typed_store_def by blast
-
-lemma typed_store_delete :
-  assumes "typed_store \<Delta> \<sigma>"
-  assumes "variables \<Delta>' = (variables \<Delta>)(n := None)"
-  assumes "\<sigma>' = \<sigma>(n := None)"
-  shows "typed_store \<Delta>' \<sigma>'"
-  using assms by (simp add:typed_store_def)
-
-lemma typed_store_unshift :
-  assumes "typed_store \<Delta> \<sigma>"
-  assumes "variables \<Delta>' = (unshift_2 n (variables \<Delta>))"
-  shows "typed_store \<Delta>' (unshift_2 n \<sigma>)"
-  using assms by (auto simp add:typed_store_def unshift_2_def; blast)
+  using assms(1) assms(2) typed_store_def store_typed_def by meson
 
 lemma wf_custom_state_core: "wf_custom_state \<Gamma> |x| \<longleftrightarrow> wf_custom_state \<Gamma> x"
   using max_projection_prop_pure_core mpp_smaller wf_custom_state_core_aux wf_custom_state_smaller by blast
@@ -394,7 +375,7 @@ lemma typed_assign_var:
       and "v \<in> ty"
     shows "typed \<Delta> (assign_var_state x (Some v) \<omega>)"
   using assms unfolding  assign_var_state_def typed_def
-  by (smt (verit, del_insts) dom_fun_upd get_abs_state_set_store get_store_set_store insert_dom map_upd_Some_unfold option.discI typed_store_def)
+  by (smt (verit, del_insts) dom_fun_upd get_abs_state_set_store get_store_set_store insert_dom map_upd_Some_unfold option.discI typed_store_def store_typed_def)
 
 
 

@@ -173,10 +173,10 @@ lemma SBinop_eq_Some :
   by (auto simp add:SBinop_def bind_eq_Some_conv)
 
 definition SHasType :: "vtyp \<Rightarrow> sym_val \<Rightarrow> 'a sym_exp" where
-"SHasType ty v V = Option.bind (V v) (\<lambda> v'. if has_type def_domains ty v' then Some (VBool True) else None)"
+"SHasType ty v V = Option.bind (V v) (\<lambda> v'. if v' \<in> sem_vtyp def_domains ty then Some (VBool True) else None)"
 
 lemma SHasType_eq_Some :
-  "SHasType ty t V = Some b \<longleftrightarrow> (\<exists> v. V t = Some v \<and> has_type def_domains ty v \<and> b = VBool True)"
+  "SHasType ty t V = Some b \<longleftrightarrow> (\<exists> v. V t = Some v \<and> v \<in> sem_vtyp def_domains ty \<and> b = VBool True)"
   by (auto simp add:SHasType_def bind_eq_Some_conv)
 
 definition SBinopSafe :: "'a sym_exp \<Rightarrow> binop \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_exp" where

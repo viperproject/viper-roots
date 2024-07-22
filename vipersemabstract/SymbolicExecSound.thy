@@ -1,11 +1,6 @@
 theory SymbolicExecSound
-  imports Instantiation EquiSemAuxLemma ViperAbstract.AbstractSemanticsProperties SymbolicExecDef
+  imports Instantiation EquiSemAuxLemma ViperAbstract.AbstractSemanticsProperties SymbolicExecDef ViperCommon.ViperUtil
 begin
-
-(* TODO: Does this already exist ? *)
-fun the_default :: "'a \<Rightarrow> 'a option \<Rightarrow> 'a" where
-  "the_default d None = d"
-| "the_default d (Some x) = x"
 
 lemma greater_charact_equi:
   "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_trace \<omega>' = get_trace \<omega>  \<and> get_state \<omega>' \<succeq> get_state \<omega>"
@@ -80,27 +75,28 @@ lemma greater_uu :
   apply (simp add:vstate_greater_charact uu_get)
   by (meson empty_heap_identity greater_equiv zero_mask_identity)
 
-(* TODO: unify with well_typed_heap? *)
-definition s2a_heap_typed :: "(field_ident \<rightharpoonup> vtyp) \<Rightarrow>'a partial_heap \<Rightarrow> bool" where
-"s2a_heap_typed F h = (\<forall> hl v. h hl = Some v \<longrightarrow> (\<exists> ty. F (snd hl) = Some ty \<and> has_type def_domains ty v))"
+
+definition s2a_heap_typed :: "(field_ident \<rightharpoonup> vtyp) \<Rightarrow> 'a partial_heap \<Rightarrow> bool" where
+"s2a_heap_typed F = heap_typed_syn def_domains F"
 
 lemma s2a_heap_typed_lookup :
   assumes "s2a_heap_typed F h"
   assumes "h hl = Some v"
   assumes "F (snd hl) = Some ty"
-  shows "has_type def_domains ty v"
-  using assms apply (auto simp add:s2a_heap_typed_def) by (metis eq_snd_iff option.inject)
+  shows "v \<in> sem_vtyp def_domains ty"
+  using assms by (simp add:s2a_heap_typed_def heap_typed_lookup)
 
 lemma s2a_heap_typed_insert :
   assumes "s2a_heap_typed F h"
-  shows "s2a_heap_typed F (h(hl \<mapsto> v)) \<longleftrightarrow> (\<exists> ty. F (snd hl) = Some ty \<and> has_type def_domains ty v)"
-  using assms apply (auto simp add:s2a_heap_typed_def) using prod.collapse by blast
+  assumes "F (snd hl) = Some ty"
+  shows "s2a_heap_typed F (h(hl \<mapsto> v)) \<longleftrightarrow> (v \<in> sem_vtyp def_domains ty)"
+  using assms by (auto simp add:s2a_heap_typed_def heap_typed_insert map_comp_Some_iff)
 
 lemma s2a_heap_typed_conc_incl :
   assumes "s2a_heap_typed F (get_vh ch)"
   assumes "ch \<succeq> ch'"
   shows "s2a_heap_typed F (get_vh ch')"
-  using assms apply (simp add:s2a_heap_typed_def)
+  using assms apply (simp add:s2a_heap_typed_def heap_typed_def)
   by (metis read_field.elims read_field_mono)
 
 section \<open>basic definitions\<close>
@@ -129,13 +125,13 @@ definition s2a_heap :: "'a valuation \<Rightarrow> 'a sym_heap \<Rightarrow> 'a 
 "s2a_heap V h = the (concretize_heap h V)"
 
 definition s2a_heap_wf :: "(field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a valuation \<Rightarrow> 'a sym_heap \<Rightarrow> bool" where
-"s2a_heap_wf F V h = (\<exists> ch. concretize_heap h V = Some ch \<and> s2a_heap_typed F (get_vh ch))" 
+"s2a_heap_wf F V h = (\<exists> ch. concretize_heap h V = Some ch \<and> s2a_heap_typed F (get_vh ch))"
 
 definition s2a_store :: "'a valuation \<Rightarrow> 'a sym_store \<Rightarrow> (var \<rightharpoonup> 'a val)" where
 "s2a_store V \<gamma> = (\<lambda> v. Some (the (v V))) \<circ>\<^sub>m \<gamma>"
 
-definition s2a_store_wf :: "type_env \<Rightarrow> 'a valuation \<Rightarrow> 'a sym_store \<Rightarrow> bool" where
-"s2a_store_wf \<Lambda> V \<gamma> = (\<forall> n ty. \<Lambda> n = Some ty \<longrightarrow> (\<exists> t v. \<gamma> n = Some t \<and> t V = Some v \<and> has_type def_domains ty v))"
+definition s2a_store_wf :: "type_context \<Rightarrow> 'a valuation \<Rightarrow> 'a sym_store \<Rightarrow> bool" where
+"s2a_store_wf \<Lambda> V \<gamma> = (\<forall> n ty. \<Lambda> n = Some ty \<longrightarrow> (\<exists> t v. \<gamma> n = Some t \<and> t V = Some v \<and> v \<in> sem_vtyp def_domains ty))"
 
 definition s2a_state :: "'a valuation \<Rightarrow> 'a sym_store \<Rightarrow> 'a sym_heap \<Rightarrow> 'a equi_state" where
 "s2a_state V \<gamma> h = make_equi_state (s2a_store V \<gamma>) Map.empty (s2a_heap V h)"
@@ -146,7 +142,7 @@ definition s2a_state_indep :: "'a sym_state \<Rightarrow> bool" where
   (\<forall> c. c \<in> set (sym_heap \<sigma>) \<longrightarrow> valu_indep (sym_used \<sigma>)
     (\<lambda> V. (chunk_recv c V, chunk_perm c V, chunk_val c V))))"
 
-definition s2a_state_wf :: "type_env \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a valuation \<Rightarrow> 'a sym_state \<Rightarrow> bool" where
+definition s2a_state_wf :: "type_context \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a valuation \<Rightarrow> 'a sym_state \<Rightarrow> bool" where
 "s2a_state_wf \<Lambda> F V \<sigma> = (s2a_store_wf \<Lambda> V (sym_store \<sigma>) \<and> s2a_heap_wf F V (sym_heap \<sigma>) \<and>
   sym_cond \<sigma> V = Some (VBool True) \<and> sym_store_type \<sigma> = \<Lambda> \<and> sym_fields \<sigma> = F \<and> s2a_state_indep \<sigma>)"
 
@@ -155,19 +151,19 @@ lemma s2a_state_wf_store :
   assumes "sym_store \<sigma> n = Some t"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "\<Lambda> n = Some ty"
-  shows "\<exists> v. t V = Some v \<and> has_type def_domains ty v \<and> valu_indep (sym_used \<sigma>) t" 
+  shows "\<exists> v. t V = Some v \<and> v \<in> sem_vtyp def_domains ty \<and> valu_indep (sym_used \<sigma>) t"
   using assms apply (clarsimp simp add:s2a_state_wf_def s2a_store_wf_def s2a_state_indep_def)
   by (metis the_default.simps(2))
 
 (* This rule can easily lead to simp loops when unfolding s2a_state_wf_def so it is not added to the simp set. *)
 lemma s2a_state_wf_store_type :
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  shows "sym_store_type \<sigma> x = \<Lambda> x" 
+  shows "sym_store_type \<sigma> x = \<Lambda> x"
   using assms by (simp add:s2a_state_wf_def)
 
 lemma s2a_state_wf_fields :
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  shows "sym_fields \<sigma> x = F x" 
+  shows "sym_fields \<sigma> x = F x"
   using assms by (simp add:s2a_state_wf_def)
 
 lemma s2a_state_get_store [simp] :
@@ -194,7 +190,7 @@ lemma s2a_state_store_shift_and_add :
 lemma s2a_wf_store_insert :
   assumes "t V = Some v"
   assumes "\<Lambda> x = Some ty"
-  assumes "has_type def_domains ty v"
+  assumes "v \<in> sem_vtyp def_domains ty"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "valu_indep (sym_used \<sigma>) t"
   assumes "\<gamma> = sym_store \<sigma>"
@@ -204,7 +200,7 @@ lemma s2a_wf_store_insert :
 lemma s2a_wf_store_shift_and_add :
   assumes "t V = Some v"
   assumes "\<Lambda> 0 = Some ty"
-  assumes "has_type def_domains ty v"
+  assumes "v \<in> sem_vtyp def_domains ty"
   assumes "s2a_state_wf \<Lambda>0 F V \<sigma>"
   assumes "valu_indep (sym_used \<sigma>) t"
   assumes "\<gamma> = sym_store \<sigma>"
@@ -235,7 +231,7 @@ lemma val_indep_sym_cond [simp] :
 lemma s2a_state_wf_sym_cond_add [simp] :
   assumes "valu_indep (sym_used \<sigma>) t"
   assumes "valu_indep (sym_used \<sigma>) (sym_cond \<sigma>)"
-  shows "s2a_state_wf \<Lambda> F V (sym_cond_add \<sigma> t) \<longleftrightarrow> 
+  shows "s2a_state_wf \<Lambda> F V (sym_cond_add \<sigma> t) \<longleftrightarrow>
          s2a_state_wf \<Lambda> F V \<sigma> \<and> t V = Some (VBool True)"
   using assms unfolding s2a_state_wf_def s2a_state_indep_def by (auto simp add: SBinop_eq_Some eval_binop_And_eq_True)
 
@@ -279,20 +275,21 @@ lemma valu_agree_sym_cond :
 
 subsection \<open>s2a_ctxt\<close>
 
+(* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
 definition s2a_ctxt :: "(field_name \<rightharpoonup> vtyp) \<Rightarrow> type_context \<Rightarrow> ('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context" where
 "s2a_ctxt F \<Lambda> = \<lparr>
-   variables = \<lambda> v. map_option (\<lambda> ty. {v. has_type def_domains ty v}) (\<Lambda> v),
-   custom_context = \<lambda> f. map_option (\<lambda> ty. {v. has_type def_domains ty v}) (F f) \<rparr>"
+   variables = sem_store def_domains \<Lambda>,
+   custom_context = sem_fields def_domains F \<rparr>"
 
 lemma s2a_ctxt_variables [simp] :
   assumes "\<Lambda> x = Some ty"
-  shows "variables (s2a_ctxt F \<Lambda>) x = Some {v. has_type def_domains ty v}"
+  shows "variables (s2a_ctxt F \<Lambda>) x = Some (sem_vtyp def_domains ty)"
   using assms
   by (simp add:s2a_ctxt_def)
 
 lemma s2a_ctxt_custom_context [simp] :
   assumes "F x = Some ty"
-  shows "custom_context (s2a_ctxt F \<Lambda>) x = Some {v. has_type def_domains ty v}"
+  shows "custom_context (s2a_ctxt F \<Lambda>) x = Some (sem_vtyp def_domains ty)"
   using assms
   by (simp add:s2a_ctxt_def)
 
@@ -303,7 +300,7 @@ lemma sym_gen_freshE :
   assumes "sym_gen_fresh \<sigma> ty Q"
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  assumes "has_type def_domains ty v"
+  assumes "v \<in> sem_vtyp def_domains ty"
   assumes "valu_indep (sym_used \<sigma>) f"
   assumes HP:"\<And> V' \<sigma>' x.
     s2a_state_wf \<Lambda> F V' \<sigma>' \<Longrightarrow>
@@ -331,7 +328,7 @@ proof (rule HP)
   show "valu_indep (sym_used \<sigma>') f" using assms(5) valu_indep_lt H\<sigma>' by auto
   show "s2a_state_wf \<Lambda> F V' \<sigma>'"
     using assms(3,4) Hag apply (simp add:HV' H\<sigma>' s2a_state_wf_def)
-    apply (clarsimp simp add: valu_indep_lt SBinop_eq_Some eval_binop_And_eq_True SHasType_eq_Some s2a_state_indep_def 
+    apply (clarsimp simp add: valu_indep_lt SBinop_eq_Some eval_binop_And_eq_True SHasType_eq_Some s2a_state_indep_def
         valu_agree_sym_cond valu_agree_s2a_store_wf)
     apply (safe)
     subgoal by (subst valu_agree_s2a_heap_wf; simp add:valu_agree_concretize_heap)
@@ -399,7 +396,7 @@ lemma sym_stabilize_soundE :
   assumes "sym_stabilize \<sigma> Q"
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  assumes HP:"\<And> \<sigma>'. 
+  assumes HP:"\<And> \<sigma>'.
     stabilize \<omega> \<succeq> s2a_state V (sym_store \<sigma>') (sym_heap \<sigma>') \<Longrightarrow>
     s2a_state_wf \<Lambda> F V \<sigma>' \<Longrightarrow>
     sym_used \<sigma>' = sym_used \<sigma> \<Longrightarrow>
@@ -436,7 +433,7 @@ lemma s2a_heap_consE :
      valu_indep (sym_used \<sigma>) (\<lambda>V. (chunk_recv c V, chunk_perm c V, chunk_val c V)) \<Longrightarrow>
      0 \<le> p \<Longrightarrow>
      p \<le> 1 \<Longrightarrow>
-     has_type def_domains ty v \<Longrightarrow>
+     v \<in> sem_vtyp def_domains ty \<Longrightarrow>
      P"
   shows "P"
 proof -
@@ -444,7 +441,7 @@ proof -
     "Some ch0 = chh \<oplus> ch" "s2a_heap_typed F (get_vh ch0)"
     using assms(2,3) unfolding s2a_state_wf_def s2a_heap_wf_def by (auto simp add:bind_eq_Some_conv)
 
-  obtain a p v where Hc : "chunk_recv c V = Some (VRef (Address a))" "chunk_val c V = Some v" 
+  obtain a p v where Hc : "chunk_recv c V = Some (VRef (Address a))" "chunk_val c V = Some v"
     "chunk_perm c V = Some (VPerm p)" "ch = acc_virt (a, chunk_field c) (Abs_preal p) v" "0 \<le> p" "p \<le> 1"
   using Hch by (clarsimp simp add:concretize_chunk_eq_Some)
 
@@ -482,7 +479,7 @@ proof -
 
     show "valu_indep (sym_used \<sigma>) (\<lambda>V. (chunk_recv c V, chunk_perm c V, chunk_val c V))"
       using assms(2,3) by (simp add:s2a_state_wf_def s2a_state_indep_def)
-    show "has_type def_domains ty v"
+    show "v \<in> sem_vtyp def_domains ty"
       apply (rule s2a_heap_typed_lookup[where hl="(a, chunk_field c)"]) using Hch0 Hch assms by (simp)+
   qed
 qed
@@ -505,7 +502,7 @@ lemma sym_heap_extract_soundE :
      chunk_perm c V = Some (VPerm (Rep_preal p)) \<Longrightarrow>
      chunk_val c V = Some v \<Longrightarrow>
      valu_indep (sym_used \<sigma>) (\<lambda>V. (chunk_recv c V, chunk_perm c V, chunk_val c V)) \<Longrightarrow>
-     has_type def_domains ty v \<Longrightarrow>
+     v \<in> sem_vtyp def_domains ty \<Longrightarrow>
      sym_used \<sigma>' = sym_used \<sigma> \<Longrightarrow>
      Q \<sigma>' c \<Longrightarrow>
      P"
@@ -544,7 +541,7 @@ lemma sym_heap_add_soundE :
   assumes "0 \<le> p" "get_vm (get_state \<omega>) (a, chunk_field c) + Abs_preal p \<le> 1"
   assumes "get_vh (get_state \<omega>) ## [(a, chunk_field c) \<mapsto> v]"
   assumes "valu_indep (sym_used \<sigma>) (\<lambda>V. (chunk_recv c V, chunk_perm c V, chunk_val c V))"
-  assumes "F (chunk_field c) = Some ty" "has_type def_domains ty v"
+  assumes "F (chunk_field c) = Some ty" "v \<in> sem_vtyp def_domains ty"
   assumes HP: "\<And> \<sigma>'.
     set_state \<omega> (add_perm (get_state \<omega>) (a, chunk_field c) (Abs_preal p) v) \<succeq> s2a_state V (sym_store \<sigma>') (sym_heap \<sigma>') \<Longrightarrow>
     s2a_state_wf \<Lambda> F V \<sigma>' \<Longrightarrow>
@@ -599,7 +596,7 @@ lemma sym_heap_do_add_soundE :
   assumes "0 \<le> p" "get_vm (get_state \<omega>) (a, chunk_field c) + Abs_preal p \<le> 1"
   assumes "get_vh (get_state \<omega>) ## [(a, chunk_field c) \<mapsto> v]"
   assumes "valu_indep (sym_used \<sigma>) (\<lambda>V. (chunk_recv c V, chunk_perm c V, chunk_val c V))"
-  assumes "F (chunk_field c) = Some ty" "has_type def_domains ty v"
+  assumes "F (chunk_field c) = Some ty" "v \<in> sem_vtyp def_domains ty"
   assumes HP: "\<And> \<sigma>'.
     set_state \<omega> (add_perm (get_state \<omega>) (a, chunk_field c) (Abs_preal p) v) \<succeq> s2a_state V (sym_store \<sigma>') (sym_heap \<sigma>') \<Longrightarrow>
     s2a_state_wf \<Lambda> F V \<sigma>' \<Longrightarrow>
@@ -622,7 +619,7 @@ lemma sexec_exp_sound :
   assumes "pure_exp_typing (fields_to_prog F) \<Lambda> e ty"
   shows "\<exists> t v \<sigma>'. (def_interp \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] Val v) \<and>
    s2a_state_wf \<Lambda> F V \<sigma>' \<and> \<omega> \<succeq> s2a_state V (sym_store \<sigma>') (sym_heap \<sigma>') \<and>
-   t V = Some v \<and> has_type def_domains ty v \<and> valu_indep (sym_used \<sigma>) t \<and> 
+   t V = Some v \<and> v \<in> sem_vtyp def_domains ty \<and> valu_indep (sym_used \<sigma>) t \<and>
    sym_used \<sigma>' = sym_used \<sigma> \<and> Q \<sigma>' t"
   using assms
 proof (induction e arbitrary:\<sigma> Q V ty)
@@ -663,7 +660,7 @@ next
       by (simp add:SBinop_eq_Some)+
     subgoal for _ _ a (* lazy binop *)
       apply (clarsimp simp add:binop_lazy_bool_binop_type)
-      apply (case_tac "a = n"; simp)
+      apply (case_tac "a = ba"; simp)
       subgoal
         apply (rule exI, rule exI, rule conjI)
          apply (rule disjI1, rule exI, rule conjI, assumption)
@@ -689,15 +686,15 @@ next
     apply (clarsimp simp add:red_pure_simps pure_exp_typing_simps)
     apply (drule (3) CondExp.IH(1))
     apply (clarsimp)
-    apply (case_tac "n"; simp)
+    apply (case_tac "b"; simp)
     subgoal
-      apply (drule CondExp.IH(2)) 
+      apply (drule CondExp.IH(2))
          apply (simp+)[3]
       apply (clarsimp)
       apply (safe del:exI intro!:exI disjI1; assumption?; simp)
       done
     subgoal
-      apply (drule CondExp.IH(3)) 
+      apply (drule CondExp.IH(3))
          apply (simp)
         apply (solves \<open>auto simp add:SNot_eq_Some\<close>)
        apply (simp)
@@ -709,7 +706,7 @@ next
   case (FieldAcc e x2a)
   from FieldAcc.prems show ?case
     apply (clarsimp simp add:red_pure_simps pure_exp_typing_simps)
-    apply (drule (3) FieldAcc.IH(1)) 
+    apply (drule (3) FieldAcc.IH(1))
     apply (clarsimp)
     apply (erule (3) sym_heap_extract_soundE)
     apply (clarsimp simp add:SLit_def)
@@ -834,7 +831,7 @@ proof (induction A arbitrary: \<sigma> \<omega> V Q)
   qed
 next
   case (Imp e A)
-  from Imp.prems show ?case 
+  from Imp.prems show ?case
     apply (clarsimp simp add:assertion_typing_simps simp del: Product_Type.split_paired_All)
     apply (drule (3) sexec_exp_sound)
     apply (clarsimp simp add:add_set_ex_comm_r simp del: Product_Type.split_paired_All)
@@ -851,7 +848,7 @@ next
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
           apply (case_tac "x = VBool b"; simp)
           apply (case_tac "b"; simp)
-          subgoal 
+          subgoal
             by (drule Imp.IH[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
           subgoal by (safe del:exI intro!:exI; assumption?; (auto simp add:SNot_eq_Some)?)
           done
@@ -879,9 +876,9 @@ next
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
           apply (case_tac "x = VBool b"; clarsimp split:bool_to_assertion_splits)
           apply (case_tac "b"; simp)
-          subgoal 
+          subgoal
             by (drule CondAssert.IH(1)[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
-          subgoal 
+          subgoal
             by (drule CondAssert.IH(2)[of "(sym_cond_add \<sigma>' (\<not>\<^sub>s t))"]; assumption?; (simp del: Product_Type.split_paired_All)?; auto simp add:SNot_eq_Some)
           done
         done
@@ -911,7 +908,7 @@ lemma sconsume_sound :
   assumes "\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)"
   assumes "assertion_typing (fields_to_prog F) \<Lambda> A"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
-  shows "\<exists> \<omega>' V' \<sigma>'. \<omega> \<in> {\<omega>'} \<otimes> \<langle>def_interp, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<and> \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and> 
+  shows "\<exists> \<omega>' V' \<sigma>'. \<omega> \<in> {\<omega>'} \<otimes> \<langle>def_interp, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<and> \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and>
     s2a_state_wf \<Lambda> F V' \<sigma>' \<and> Q \<sigma>'"
   using assms
 proof (induction A arbitrary: \<sigma> \<omega> V Q)
@@ -953,7 +950,7 @@ proof (induction A arbitrary: \<sigma> \<omega> V Q)
          apply (simp)
         apply (simp del: Product_Type.split_paired_Ex)
         apply (subst (asm) add_perm_del_perm_le) apply (simp) apply (simp) apply (simp add:preal_to_real)
-        apply (subgoal_tac "(p - Abs_preal (Rep_preal p - na)) = Abs_preal na") prefer 2 apply (simp add:preal_to_real)
+        apply (subgoal_tac "(p - Abs_preal (Rep_preal p - ra)) = Abs_preal ra") prefer 2 apply (simp add:preal_to_real)
         apply (safe del:exI intro!:exI; assumption?)
         apply (simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
         apply (rule exI)+
@@ -1034,7 +1031,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp) 
+         apply (rule exI[of _ "VBool True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1045,7 +1042,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp del: Product_Type.split_paired_Ex)  
+         apply (rule exI[of _ "VBool False"]; simp del: Product_Type.split_paired_Ex)
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
          apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
         apply (simp)
@@ -1067,7 +1064,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp) 
+         apply (rule exI[of _ "VBool True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1080,7 +1077,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp) 
+         apply (rule exI[of _ "VBool False"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1128,7 +1125,7 @@ theorem sexec_sound :
 proof (induction C arbitrary: \<sigma> \<omega> V Q)
   case (Inhale A)
   then show ?case
-    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_gen_def)    
+    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_gen_def)
     apply (drule (3) sproduce_sound)
     apply (clarsimp)
     apply (rule concrete_post_Inhale)
@@ -1175,7 +1172,6 @@ next
     apply (drule (3) sexec_exp_sound)
     apply (clarsimp)
     apply (rule concrete_post_LocalAssign; simp?)
-     apply (solves \<open>simp\<close>)
     apply (clarsimp simp add:greater_charact_equi)
     apply (safe del:exI intro!:exI; assumption?; (simp add:s2a_store_insert)?)
     by (rule s2a_wf_store_insert; simp?)
@@ -1194,7 +1190,6 @@ next
     subgoal
       apply (simp add:has_write_perm_only_def)
       using get_vm_bound nle_le by blast
-     apply (solves \<open>simp\<close>)
     apply (erule (2) sym_stabilize_soundE)
     apply (erule (2) sym_heap_do_add_soundE; (simp add:preal_to_real valu_indep_pair)?; (simp add:preal_to_real vstate_stabilize_structure)?)
     subgoal using get_vm_bound preal_to_real by (metis nle_le)
@@ -1228,7 +1223,7 @@ next
   then show ?case
     apply (simp)
     apply (rule concrete_post_Skip)
-    by (blast) 
+    by (blast)
 qed (simp add:sfail_def)+
 
 theorem sexec_verifies :
@@ -1268,9 +1263,9 @@ lemma sinit_sound :
   assumes "sinit tys F Q"
   assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
   assumes "get_trace \<omega> = Map.empty"
-  assumes "TypedEqui.typed_store (s2a_ctxt F \<Lambda>) (get_store \<omega>)"
+  assumes "store_typed (sem_store def_domains \<Lambda>) (get_store \<omega>)"
   assumes "\<And> \<sigma> V.
-   \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<Longrightarrow> 
+   \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<Longrightarrow>
    s2a_state_wf \<Lambda> F V \<sigma> \<Longrightarrow>
    Q \<sigma> \<Longrightarrow>
    P"
@@ -1282,7 +1277,7 @@ proof (induction tys arbitrary:Q \<Lambda> \<omega> P)
     apply (simp)
     apply (rule Nil.prems(5); assumption?; simp?; (rule s2a_state_empty s2a_state_wf_empty)?; simp?)
     subgoal
-      apply (simp add:TypedEqui.typed_store_def s2a_ctxt_def)
+      apply (simp add:store_typed_def s2a_ctxt_def)
       by (metis dom_eq_empty_conv)
     done
 next
@@ -1292,10 +1287,10 @@ next
     apply (erule Cons.IH[where \<omega>="set_store \<omega> (unshift_2 1 (get_store \<omega>))"]) apply (solves \<open>simp\<close>) apply (solves \<open>simp\<close>)
     subgoal
       apply (simp del:Fun.fun_upd_apply)
-      apply (rule TypedEqui.typed_store_unshift; assumption?)
-      apply (simp add: s2a_ctxt_def)
+      apply (rule store_typed_unshift; assumption?)
+      apply (simp add: sem_store_def map_comp_def)
       by (rule ext; simp add:List.nth_append unshift_2_def)
-    apply (frule TypedEqui.typed_store_lookup[where n="0"]) apply (solves \<open>simp\<close>) apply (clarsimp simp add:List.nth_append)
+    apply (frule store_typed_lookup[where n="0"]) apply (solves \<open>simp\<close>) apply (clarsimp simp add:List.nth_append)
     apply (erule sym_gen_freshE[where f="SNull"]; assumption?; simp?)
     subgoal for V \<sigma> v V' \<sigma>' x
       apply (rule Cons.prems(5); assumption?; simp del:Fun.fun_upd_apply)
@@ -1310,6 +1305,7 @@ qed
 theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
+  (* TODO: replace with nth_option from TotalUtil? *)
   assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
   shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
@@ -1317,6 +1313,6 @@ theorem sinit_sexec_verifies_set :
   using assms apply -
   subgoal for \<omega>
     apply (erule (1) sinit_sound[where \<omega>=\<omega>])
-    by (auto simp add:TypedEqui.typed_def)
+    by (auto simp add:TypedEqui.typed_def TypedEqui.typed_store_def s2a_ctxt_def)
   done
 end

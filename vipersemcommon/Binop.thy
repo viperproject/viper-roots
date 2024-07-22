@@ -223,16 +223,16 @@ lemma eval_binop_implies_eval_normal:
 
 
 lemma eval_binop_typing_agree:
-  assumes "has_type \<Delta> ty1 a" "has_type \<Delta> ty2 b"
+  assumes "a \<in> sem_vtyp \<Delta> ty1" "b \<in> sem_vtyp \<Delta> ty2"
   assumes "eval_binop a op b \<noteq> BinopOpFailure"
-  shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> has_type \<Delta> ty3 v)"
+  shows "(binop_type op ty1 ty2 ty3) \<longleftrightarrow> (\<exists> v. BinopNormal v = eval_binop a op b \<and> v \<in> sem_vtyp \<Delta> ty3)"
   using assms
   apply (cases ty1; cases ty2; safe elim!:binop_type_elim; clarsimp split:if_splits)
   by (cases op; auto split:if_splits intro:binop_type.intros)+
 
 lemma binop_type_non_fail_exists :
   assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
-  assumes "has_type \<Delta> \<tau>1 v1"
+  assumes "v1 \<in> sem_vtyp \<Delta> \<tau>1"
   shows "\<exists>v2. eval_binop v1 bop v2 \<noteq> BinopTypeFailure"
   using assms
   apply (induction rule:binop_type.induct; clarsimp)
@@ -250,14 +250,14 @@ lemma binop_type_non_fail_exists :
 lemma eval_binop_lazy_type_res :
   assumes "eval_binop_lazy v1 bop = Some v"
   assumes "binop_type bop \<tau>1 \<tau>2 \<tau>"
-  assumes "has_type \<Delta> \<tau>1 v1"
-  shows "has_type \<Delta> \<tau> v"
+  assumes "v1 \<in> sem_vtyp \<Delta> \<tau>1"
+  shows "v \<in> sem_vtyp \<Delta> \<tau>"
   using assms by (simp add: eval_binop_lazy_iff[symmetric]; auto elim!:binop_type_elim)
 
 lemma eval_unop_typing_agree:
-  assumes "has_type \<Delta> ty1 a"
+  assumes "a \<in> sem_vtyp \<Delta> ty1"
   shows "(unop_type op ty1 ty2) \<longleftrightarrow>
-    (\<exists> v. BinopNormal v = eval_unop op a \<and> has_type \<Delta> ty2 v)"
+    (\<exists> v. BinopNormal v = eval_unop op a \<and> v \<in> sem_vtyp \<Delta> ty2)"
   using assms
   by (cases ty1; simp; safe elim!:unop_type_elim; cases op; auto intro:unop_type.intros)
 

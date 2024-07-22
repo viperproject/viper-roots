@@ -503,15 +503,6 @@ definition type_ctxt_front_end_syntactic where
 definition make_context_semantic where
   "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
 *)
-lemma make_semantic_tint[simp]:
-  "make_semantic_vtyp \<Delta> TInt = vints"
-  unfolding make_semantic_vtyp_def vints_def has_type_def set_from_type.simps
-  by blast
-
-lemma make_semantic_tref[simp]:
-  "make_semantic_vtyp \<Delta> TRef = vrefs"
-  unfolding make_semantic_vtyp_def vrefs_def has_type_def set_from_type.simps
-  by blast
 
 lemma make_context_semantic_type_ctxt[simp]:
   "make_context_semantic \<Delta> type_ctxt_front_end_syntactic = type_ctxt_front_end"
@@ -519,11 +510,11 @@ proof -
   have "variables (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = variables type_ctxt_front_end"
     unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
     apply (rule ext)
-    by (simp add: make_semantic_tint make_semantic_tref)
+    by (simp add:vints_def vrefs_def)
   moreover have "custom_context (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = custom_context type_ctxt_front_end"
     unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
     apply (rule ext)
-    by (simp add: make_semantic_tint make_semantic_tref)
+    by (simp add:vints_def vrefs_def)
   ultimately show ?thesis
     by (simp add: type_ctxt_front_end_def)
 qed

@@ -136,6 +136,7 @@ lemma shift_1_shift_and_add_total:
 
 subsection \<open>Well-typed states\<close>
 
+(* TODO: replace this by [heap_typed_syn ... (Some \<circ> hh)] (see refinement proof)? *)
 definition total_heap_well_typed :: "program \<Rightarrow> ('a \<Rightarrow> abs_type) \<Rightarrow> 'a total_heap \<Rightarrow> bool"
   where "total_heap_well_typed Pr \<Delta> h \<equiv>                      
            \<forall>loc \<tau>. declared_fields Pr (snd loc) = Some \<tau> \<longrightarrow> has_type \<Delta> \<tau> (h loc)"
