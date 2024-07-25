@@ -2,13 +2,6 @@ theory Instantiation
   imports AbstractSemanticsProperties EquiViper EquiSemAuxLemma
 begin
 
-(* TODO: Where to put this? *)
-(* TODO: make this a simp lemma? *)
-lemma restrict_map_eq_Some :
-  "(m |` A) x = Some y \<longleftrightarrow> m x = Some y \<and> x \<in> A"
-  by (simp add:restrict_map_def)
-
-
 definition make_semantic_bexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'a equi_state bexp" where
   "make_semantic_bexp \<Delta> b \<omega> =
   (if \<Delta> \<turnstile> \<langle>b; \<omega>\<rangle> [\<Down>] Val (VBool True) then Some True
@@ -80,7 +73,7 @@ lemma red_pure_assert_elim :
   by (metis option.discI)
 
 definition acc_heap_loc :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> heap_loc \<Rightarrow> real \<Rightarrow> 'a equi_state set" where
-"acc_heap_loc \<Delta> ty hl p = {\<omega> | v \<omega>. get_state \<omega> = acc_virt hl (Abs_preal p) v \<and> 0 < p \<and> p \<le> 1 \<and> has_type (domains \<Delta>) ty v }"
+"acc_heap_loc \<Delta> ty hl p = {\<omega> | v \<omega>. get_state \<omega> = acc_virt hl (Abs_preal p) v \<and> 0 < p \<and> p \<le> 1 \<and> v \<in> sem_vtyp (domains \<Delta>) ty }"
 
 
 
@@ -115,7 +108,7 @@ lemma acc_heap_loc_starI :
   assumes "Abs_preal p \<le> get_vm (get_state \<omega>') hl"
   assumes "get_vh (get_state \<omega>') hl = Some v"
   assumes "\<omega> = set_state \<omega>' (del_perm (get_state \<omega>') hl (Abs_preal p))"
-  assumes "has_type (domains \<Delta>) ty v"
+  assumes "v \<in> sem_vtyp (domains \<Delta>) ty"
   shows "\<omega>' \<in> {\<omega>} \<otimes> acc_heap_loc \<Delta> ty hl p"
   apply (rule abs_state_star_singletonI)
   using assms apply (solves \<open>simp\<close>)
@@ -144,7 +137,7 @@ lemma abs_state_star_singletonE :
 lemma acc_heap_loc_starE :
   assumes "\<omega>' \<in> {\<omega>} \<otimes> acc_heap_loc \<Delta> ty hl p"
   shows "\<exists> v. \<omega>' = set_state \<omega> (add_perm (get_state \<omega>) hl (Abs_preal p) v) \<and> 0 < p \<and> p \<le> 1 \<and> get_vm (get_state \<omega>) hl + Abs_preal p \<le> 1 \<and>
-      has_type (domains \<Delta>) ty v \<and> (get_vh (get_state \<omega>) ## [hl \<mapsto> v])"
+      v \<in> sem_vtyp (domains \<Delta>) ty \<and> (get_vh (get_state \<omega>) ## [hl \<mapsto> v])"
   apply (insert assms)
   apply (erule abs_state_star_singletonE) subgoal for \<omega>''
     apply (clarsimp simp add:acc_heap_loc_def) subgoal for v
@@ -199,9 +192,6 @@ definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarro
 definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
   "make_semantic_assertion \<Delta> A = { \<omega> |\<omega>. \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle> }"
 *)
-
-definition make_semantic_vtyp :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp \<Rightarrow> 'a val abs_vtyp" where
-"make_semantic_vtyp \<Delta> ty = { v. has_type (domains \<Delta>) ty v}"
 
 (*
 TODO: Ignoring domains so far...
@@ -355,6 +345,7 @@ lemma well_typed_concrete_heap_remove:
     shows "well_typed_concrete_heap \<Gamma> (h(hl := None))"
   using assms(1) by auto
 
+(* TODO: change this to "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (heap_typed \<Gamma> (get_vh \<phi>))" *)
 definition well_typed_heap where
   "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (well_typed_concrete_heap \<Gamma> (get_vh \<phi>))"
 
@@ -1079,8 +1070,9 @@ qed
 abbreviation typed where
   "typed \<equiv> TypedEqui.typed"
 
+(* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
 definition make_context_semantic where
-  "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
+  "make_context_semantic \<Delta> F = \<lparr> variables = (sem_store (domains \<Delta>) (fst F)), custom_context = (sem_fields (domains \<Delta>) (snd F))  \<rparr>"
 
 definition well_typedly (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set"*)
   where

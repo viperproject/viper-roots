@@ -55,26 +55,26 @@ section \<open>Separation logic basics\<close>
 
 subsection \<open>partial_heap_typing\<close>
 
-abbreviation "partial_heap_typing ctxt h \<equiv> ValueAndBasicState.well_typed_heap (program_total ctxt) (absval_interp_total ctxt) h"
+abbreviation "partial_heap_typing ctxt h \<equiv> heap_typed_syn (absval_interp_total ctxt) (declared_fields (program_total ctxt)) h"
 
 lemma partial_heap_typing_stabilize :
   assumes "partial_heap_typing ctxt (get_vh st)"
   shows "partial_heap_typing ctxt (get_vh (stabilize st))"
-  using assms by (simp add:ValueAndBasicState.well_typed_heap_def vstate_stabilize_structure(2) restrict_map_eq_Some)
+  using assms heap_typed_stabilize by blast
 
 lemma partial_heap_typing_elim :
   assumes "partial_heap_typing ctxt h"
   assumes "h a = Some v"
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
-  shows "has_type (absval_interp_total ctxt) ty v"
-  using assms apply (simp add: ValueAndBasicState.well_typed_heap_def) by (metis option.sel prod.collapse)
+  shows "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
+  using assms heap_typed_lookup by fastforce
 
 lemma partial_heap_typing_insert :
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
   assumes "partial_heap_typing ctxt h"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   shows "partial_heap_typing ctxt (h (a\<mapsto>v))"
-  using assms unfolding ValueAndBasicState.well_typed_heap_def by (auto)
+  using assms heap_typed_insert sem_fields_eq_Some by blast
 
 subsection \<open>PosReal\<close>
 
@@ -315,53 +315,68 @@ next
   case (PForall x1a e) then show ?case by (safe elim!:red_pure_exp_elim; simp; auto)
 qed
 
-section \<open>Abstract sem expressions are deterministic\<close>
+subsection \<open>translation of ctxt\<close>
+
+(* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
+definition t2a_ctxt :: "'a total_context \<Rightarrow> type_context \<Rightarrow> ('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context" where
+"t2a_ctxt ctxt \<Lambda> = \<lparr>
+   variables = sem_store (absval_interp_total ctxt) \<Lambda>,
+   custom_context = sem_fields (absval_interp_total ctxt) (declared_fields (program_total ctxt)) \<rparr>"
+
+lemma t2a_ctxt_variables [simp] :
+  assumes "\<Lambda> x = Some ty"
+  shows "variables (t2a_ctxt ctxt \<Lambda>) x = Some (sem_vtyp (absval_interp_total ctxt) ty)"
+  using assms
+  by (simp add:t2a_ctxt_def)
+
+lemma t2a_ctxt_custom_context [simp] :
+  assumes "declared_fields (program_total ctxt) x = Some ty"
+  shows "custom_context (t2a_ctxt ctxt \<Lambda>) x = Some (sem_vtyp (absval_interp_total ctxt) ty)"
+  using assms
+  by (simp add:t2a_ctxt_def)
 
 section \<open>typing soundness for THSem\<close>
 
 subsection \<open>store typing for THSem\<close>
 
-definition store_typing :: "'a total_context \<Rightarrow> type_env \<Rightarrow> 'a store \<Rightarrow> bool" where
-"store_typing ctxt \<Lambda> st \<longleftrightarrow> (\<forall> n ty. \<Lambda> n = Some ty \<longrightarrow>
-    (\<exists> v. st n = Some v \<and> has_type (absval_interp_total ctxt) ty v))"
+definition store_typing :: "'a total_context \<Rightarrow> type_context \<Rightarrow> 'a store \<Rightarrow> bool" where
+"store_typing ctxt \<Lambda> = store_typed_syn (absval_interp_total ctxt) \<Lambda>"
 
 lemma store_typing_elim :
   assumes "store_typing ctxt \<Lambda> st"
   assumes "\<Lambda> n = Some ty"
-  shows "(\<exists> v. st n = Some v \<and> has_type (absval_interp_total ctxt) ty v)"
-  using assms by (simp add: store_typing_def)
+  shows "(\<exists> v. st n = Some v \<and> v \<in> sem_vtyp (absval_interp_total ctxt) ty)"
+  using assms by (simp add:store_typed_lookup store_typing_def)
 
 lemma store_typing_insert :
   assumes "\<Lambda> x = Some ty"
   assumes "store_typing ctxt \<Lambda> st"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   shows "store_typing ctxt \<Lambda> (st (x\<mapsto>v))"
-  using assms unfolding store_typing_def by (auto)
+  using assms unfolding store_typing_def by (simp add:store_typed_insert)
 
 subsection \<open>heap typing for THSem\<close>
 
-(* TODO: combine with total_heap_well_typed or ValueAndBasicState.well_typed_heap? *)
 definition heap_typing :: "'a total_context \<Rightarrow> 'a total_heap \<Rightarrow> bool" where
-"heap_typing ctxt hh \<longleftrightarrow> (\<forall> a ty. declared_fields (program_total ctxt) (snd a) = Some ty \<longrightarrow>
-   has_type (absval_interp_total ctxt) ty (hh a))"
+"heap_typing ctxt hh \<longleftrightarrow> partial_heap_typing ctxt (Some \<circ> hh)"
 
 lemma heap_typing_total_heap_well_typed :
   "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) hh \<longleftrightarrow> heap_typing ctxt hh"
-  by (simp add:total_heap_well_typed_def heap_typing_def)
+  by (auto simp add:total_heap_well_typed_def heap_typing_def heap_typed_def has_type_def)
 
 lemma heap_typing_elim :
   assumes "heap_typing ctxt hh"
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
-  shows "has_type (absval_interp_total ctxt) ty (hh a)"
-  using assms by (simp add: heap_typing_def; cases a; simp)
-
+  shows "hh a \<in> sem_vtyp (absval_interp_total ctxt) ty"
+  using assms by (simp add: heap_typing_def heap_typed_lookup)
 
 lemma heap_typing_insert :
   assumes "declared_fields (program_total ctxt) (snd a) = Some ty"
   assumes "heap_typing ctxt hh"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   shows "heap_typing ctxt (hh (a:=v))"
-  using assms unfolding heap_typing_def by (auto)
+  using assms unfolding heap_typing_def
+  by (simp add: fun_upd_comp partial_heap_typing_insert)
 
 subsection \<open>state typing\<close>
 
@@ -371,12 +386,20 @@ definition partial_trace_typing :: "'a total_context \<Rightarrow> (string \<rig
 definition trace_typing :: "'a total_context \<Rightarrow> (string \<rightharpoonup> 'a total_state) \<Rightarrow> bool" where
 "trace_typing ctxt t = (\<forall> l st. t l = Some st \<longrightarrow> heap_typing ctxt (get_hh_total st))"
 
-definition abs_state_typing :: "'a total_context \<Rightarrow> type_env \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
+definition abs_state_typing :: "'a total_context \<Rightarrow> type_context \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
 "abs_state_typing ctxt \<Lambda> \<omega> \<longleftrightarrow> (store_typing ctxt \<Lambda> (get_store \<omega>) \<and>
    partial_heap_typing ctxt (get_vh (get_state \<omega>)) \<and>
    partial_trace_typing ctxt (get_trace \<omega>))"
 
-definition total_state_typing :: "'a total_context \<Rightarrow> type_env \<Rightarrow> 'a full_total_state \<Rightarrow> bool" where
+(* TODO: replace abs_state_typing by typed? *)
+lemma abs_state_typing_typed :
+  "abs_state_typing ctxt \<Lambda> = TypedEqui.typed (t2a_ctxt ctxt \<Lambda>)"
+  apply (rule ext)
+  apply (auto simp add:abs_state_typing_def TypedEqui.typed_def TypedEqui.typed_store_def store_typing_def 
+    t2a_ctxt_def well_typed_def partial_trace_typing_def)
+  oops
+
+definition total_state_typing :: "'a total_context \<Rightarrow> type_context \<Rightarrow> 'a full_total_state \<Rightarrow> bool" where
 "total_state_typing ctxt \<Lambda> \<omega> \<longleftrightarrow> (store_typing ctxt \<Lambda> (get_store_total \<omega>) \<and>
   heap_typing ctxt (get_hh_total (get_total_full \<omega>)) \<and>
   trace_typing ctxt (get_trace_total \<omega>))"
@@ -388,11 +411,11 @@ lemma red_pure_exp_typed :
   \<comment>\<open>assumes "program_total ctxt = Pr"\<close>
   (* TODO: Why can the following not be in an assumes? *)
   shows "total_state_typing ctxt \<Lambda> \<omega> \<Longrightarrow> valid_a2t_exp e \<Longrightarrow>
-     \<exists> r. ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t r \<and> (\<forall> v. r = Val v \<longrightarrow> has_type (absval_interp_total ctxt) ty v)"
+     \<exists> r. ctxt, R, \<omega>_def \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t r \<and> (\<forall> v. r = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) ty)"
   unfolding total_state_typing_def using assms
 proof (induction arbitrary:\<omega>_def \<omega> rule: pure_exp_typing.induct )
   case (TypVar \<Lambda> x ty)
-  obtain v where "(get_store_total \<omega>) x = Some v \<and> has_type  (absval_interp_total ctxt) ty v"
+  obtain v where "(get_store_total \<omega>) x = Some v \<and> v \<in> sem_vtyp (absval_interp_total ctxt) ty"
     by (insert TypVar store_typing_elim; blast)
   then show ?case by (simp add: red_pure_exp_simps)
 next
@@ -401,7 +424,7 @@ next
 next
   case (TypUnop uop \<tau>1 \<tau> \<Lambda> e)
   obtain r where Hr : "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t r \<and>
-        (\<forall>v. r = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau>1 v)" using TypUnop.prems TypUnop.IH by fastforce
+        (\<forall>v. r = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>1)" using TypUnop.prems TypUnop.IH by fastforce
   from this TypUnop.hyps show ?case
     apply (simp add: red_pure_exp_simps)
     apply (cases r; clarsimp simp add:eval_unop_typing_agree; rule exI; rule conjI)
@@ -412,9 +435,9 @@ next
 next
   case (TypBinop bop \<tau>1 \<tau>2 \<tau> \<Lambda> e1 e2)
   obtain r1 where Hr1 : "ctxt, R, \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t r1 \<and>
-        (\<forall>v. r1 = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau>1 v)" using TypBinop by fastforce
+        (\<forall>v. r1 = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>1)" using TypBinop by fastforce
   obtain r2 where Hr2 : "ctxt, R, \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t r2 \<and>
-        (\<forall>v. r2 = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau>2 v)" using TypBinop by fastforce
+        (\<forall>v. r2 = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>2)" using TypBinop by fastforce
   then show ?case
   proof (cases r1)
     case (Val v1)
@@ -482,11 +505,11 @@ next
 next
   case (TypCondExp \<Lambda> b e1 \<tau> e2)
   obtain rb where Hb : "ctxt, R, \<omega>_def \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>]\<^sub>t rb \<and>
-        (\<forall>v. rb = Val v \<longrightarrow> has_type (absval_interp_total ctxt) TBool v)" using TypCondExp by fastforce
+        (\<forall>v. rb = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) TBool)" using TypCondExp by fastforce
   obtain r1 where Hr1 : "ctxt, R, \<omega>_def \<turnstile> \<langle>e1;\<omega>\<rangle> [\<Down>]\<^sub>t r1 \<and>
-        (\<forall>v. r1 = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau> v)" using TypCondExp by fastforce
+        (\<forall>v. r1 = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>)" using TypCondExp by fastforce
   obtain r2 where Hr2 : "ctxt, R, \<omega>_def \<turnstile> \<langle>e2;\<omega>\<rangle> [\<Down>]\<^sub>t r2 \<and>
-        (\<forall>v. r2 = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau> v)" using TypCondExp by fastforce
+        (\<forall>v. r2 = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>)" using TypCondExp by fastforce
   show ?case
   proof (cases rb)
     case (Val vb)
@@ -504,7 +527,7 @@ next
 next
   case (TypFieldAcc \<Lambda> e f \<tau>)
   obtain r where Hr : "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t r \<and>
-        (\<forall>v. r = Val v \<longrightarrow> has_type (absval_interp_total ctxt) TRef v)" using TypFieldAcc by fastforce
+        (\<forall>v. r = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) TRef)" using TypFieldAcc by fastforce
   show ?case
   proof (cases r)
     case (Val v)
@@ -535,7 +558,7 @@ next
   proof (cases "get_trace_total \<omega> lbl")
     case (Some \<phi>)
     then obtain r where Hr : "ctxt, R, map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def \<turnstile> \<langle>e;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t r \<and>
-        (\<forall>v. r = Val v \<longrightarrow> has_type (absval_interp_total ctxt) \<tau> v)"
+        (\<forall>v. r = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) \<tau>)"
       using TypOld.prems TypOld.IH[of "\<omega>\<lparr>get_total_full := \<phi>\<rparr>" "map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def"]
       apply (simp add:trace_typing_def)
       by fastforce
@@ -552,7 +575,7 @@ next
 next
   case (TypPerm \<Lambda> e f \<tau>)
   obtain r where Hr : "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t r \<and>
-        (\<forall>v. r = Val v \<longrightarrow> has_type (absval_interp_total ctxt) TRef v)" using TypPerm by fastforce
+        (\<forall>v. r = Val v \<longrightarrow> v \<in> sem_vtyp (absval_interp_total ctxt) TRef)" using TypPerm by fastforce
   show ?case
   proof (cases r)
     case (Val v)
@@ -675,19 +698,20 @@ next
   then show ?case
     (* TODO: Why is this del: necessary? Where does the beta-expansion that makes the rule apply come from? *)
     apply (simp del: fun_upd_apply add:total_state_typing_def)
-    apply (rule store_typing_insert; auto iff:has_type_get_type)
+    apply (rule store_typing_insert; auto)
+    apply (simp)
     done
 next
   case (RedLocalAssign \<omega> e v \<Lambda> x ty)
   then show ?case
     apply (simp del: fun_upd_apply add:total_state_typing_def)
-    apply (rule store_typing_insert; auto iff:has_type_get_type)
+    apply (rule store_typing_insert; auto; simp)
     done
 next
   case (RedFieldAssign \<omega> e_r addr f e v ty \<Lambda>)
   then show ?case
     apply (simp del: fun_upd_apply add:total_state_typing_def)
-    apply (rule heap_typing_insert; auto iff:has_type_get_type)
+    apply (rule heap_typing_insert; auto; simp)
     done
 next
   case (RedLabel \<omega>' \<omega> lbl \<Lambda>)
@@ -726,7 +750,7 @@ lemma not_fail_If :
   apply (frule red_pure_exp_typed[where ?ctxt="ctxt", where ?R="R", where ?\<omega>_def="Some \<omega>"]; assumption?)
   apply (erule exE)
   apply (case_tac r; clarsimp)
-  apply (case_tac n; clarsimp; safe; auto?; drule red_pure_exp_det; assumption?; auto)
+  apply (case_tac b; clarsimp; safe; auto?; drule red_pure_exp_det; assumption?; auto)
   subgoal
     apply (safe; auto?; drule red_pure_exp_det; assumption?; auto)
     done
@@ -743,7 +767,7 @@ lemma not_fail_LocalAssign:
   assumes "total_state_typing ctxt \<Lambda> \<omega>"
   assumes "valid_a2t_stmt (stmt.LocalAssign x e)"
   shows "\<not> red_stmt_total ctxt R \<Lambda> (stmt.LocalAssign x e) \<omega> RFailure \<longleftrightarrow>
-    (\<exists> v ty. \<Lambda> x = Some ty \<and> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and> has_type (absval_interp_total ctxt) ty v)"
+    (\<exists> v ty. \<Lambda> x = Some ty \<and> ctxt, R, (Some \<omega>) \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and> v \<in> sem_vtyp (absval_interp_total ctxt) ty)"
   using assms
   apply (clarsimp simp add:red_stmt_total_simps)
   apply (erule stmt_typing_elim)
@@ -762,7 +786,7 @@ lemma not_fail_FieldAssign :
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef (Address a)) \<and>
      ctxt, R, (Some \<omega>) \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>]\<^sub>t Val v \<and>
      (a,f) \<in> get_writeable_locs \<omega> \<and>
-     has_type (absval_interp_total ctxt) ty v)"
+     v \<in> sem_vtyp (absval_interp_total ctxt) ty)"
   using assms
   apply (clarsimp simp add:red_stmt_total_simps)
   apply (erule stmt_typing_elim)
@@ -771,7 +795,7 @@ lemma not_fail_FieldAssign :
   apply (clarsimp)
   apply (case_tac r; clarsimp; (solves \<open>auto dest:red_pure_exp_det\<close>)?)
   apply (case_tac ra; clarsimp; (solves \<open>auto dest:red_pure_exp_det\<close>)?)
-  apply (case_tac n; clarsimp; (solves \<open>auto dest:red_pure_exp_det\<close>)?)
+  apply (case_tac rb; clarsimp; (solves \<open>auto dest:red_pure_exp_det\<close>)?)
   apply (safe; (solves \<open>auto dest:red_pure_exp_det\<close>)?)
   apply (rule exI, safe) apply (assumption)
   apply (rule exI, safe) apply (assumption)
@@ -817,25 +841,7 @@ lemma restrict_abs_state_struct [simp] :
   by (simp_all add:restrict_abs_state_def)
 
 
-subsection \<open>translation of ctxt and state\<close>
-
-definition t2a_ctxt :: "'a total_context \<Rightarrow> type_context \<Rightarrow> ('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context" where
-"t2a_ctxt ctxt \<Lambda> = \<lparr>
-   variables = \<lambda> v. map_option (\<lambda> ty. {v. has_type (absval_interp_total ctxt) ty v}) (\<Lambda> v),
-   custom_context = \<lambda> f. map_option (\<lambda> ty. {v. has_type (absval_interp_total ctxt) ty v})
-     (declared_fields (program_total ctxt) f) \<rparr>"
-
-lemma t2a_ctxt_variables [simp] :
-  assumes "\<Lambda> x = Some ty"
-  shows "variables (t2a_ctxt ctxt \<Lambda>) x = Some {v. has_type (absval_interp_total ctxt) ty v}"
-  using assms
-  by (simp add:t2a_ctxt_def)
-
-lemma t2a_ctxt_custom_context [simp] :
-  assumes "declared_fields (program_total ctxt) x = Some ty"
-  shows "custom_context (t2a_ctxt ctxt \<Lambda>) x = Some {v. has_type (absval_interp_total ctxt) ty v}"
-  using assms
-  by (simp add:t2a_ctxt_def)
+subsection \<open>translation of state\<close>
 
 lift_definition t2a_virtual_state :: "'a total_state \<Rightarrow> 'a virtual_state" is
 "\<lambda> st. (pmin 1 \<circ> get_mh_total st, (Some \<circ> get_hh_total st))"
@@ -908,7 +914,7 @@ fun well_typed_val :: "('a \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarr
 
 lemma well_typed_val_typed :
   assumes "abs_type_wf \<Delta>"
-  shows "has_type \<Delta> ty (well_typed_val \<Delta> ty)"
+  shows "well_typed_val \<Delta> ty \<in> sem_vtyp \<Delta> ty"
   apply (cases ty; simp)
   apply (rule someI_ex)
   using assms by (simp add:abs_type_wf_def)
@@ -934,7 +940,7 @@ definition a2t_extend_ok :: "'a total_context \<Rightarrow> 'a equi_state \<Righ
 lemma a2t_extend_heap_typed :
   assumes "abs_type_wf (absval_interp_total ctxt)"
   shows "heap_typing ctxt (a2t_extend_heap ctxt h) = partial_heap_typing ctxt h"
-  apply (simp add:a2t_extend_heap_def heap_typing_def ValueAndBasicState.well_typed_heap_def split:option.splits)
+  apply (auto simp add:a2t_extend_heap_def heap_typing_def heap_typed_def split:option.splits)
   using well_typed_val_typed assms by fastforce
 
 lemma a2t_extend_typed :
@@ -1171,7 +1177,7 @@ next
   qed
 next
   case (Havoc \<Delta> x ty \<omega> v)
-  then show ?case    
+  then show ?case
     by (metis ConcreteSemantics.stable_assign_var_state TypedEqui.assign_var_state_def get_trace_set_store)
 next
   case (LocalAssign \<Delta> e \<omega> v x)
@@ -2000,7 +2006,7 @@ lemma red_stmt_total_ok_LocalAssignE :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt (stmt.LocalAssign x e)"
-  shows  "\<exists> v ty. \<Lambda> x = Some ty \<and> (\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) \<and> has_type (absval_interp_total ctxt) ty v"
+  shows  "\<exists> v ty. \<Lambda> x = Some ty \<and> (\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) \<and> v \<in> sem_vtyp (absval_interp_total ctxt) ty"
 proof -
   note calc = assms a2t_state_in_a2t_states[of ctxt \<omega>]
   hence "\<not> red_stmt_total ctxt R \<Lambda> (stmt.LocalAssign x e) (a2t_state ctxt \<omega>) RFailure"
@@ -2014,14 +2020,14 @@ qed
 lemma red_stmt_total_set_LocalAssignI :
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] Val v"
   assumes "\<Lambda> x = Some ty"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   assumes "stable \<omega>"
   assumes "valid_a2t_stmt (stmt.LocalAssign x e)"
   assumes "\<Delta> = ctxt_to_interp ctxt"
   shows "red_stmt_total_set ctxt R \<Lambda> (stmt.LocalAssign x e) (a2t_states ctxt \<omega>) =
     {\<omega>\<^sub>t'. \<exists> \<omega>\<^sub>t. \<omega>\<^sub>t \<in> (a2t_states ctxt \<omega>) \<and> \<omega>\<^sub>t' = \<omega>\<^sub>t\<lparr>get_store_total := (get_store_total \<omega>\<^sub>t)(x \<mapsto> v)\<rparr>}"
   using assms by (auto simp add:red_stmt_total_set_def red_stmt_total_simps a2t_states_in_stable
-    red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"] has_type_get_type dest:red_pure_det)
+    red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"] sem_vtyp_to_get_type dest:red_pure_det)
 
 
 lemma red_stmt_total_ok_FieldAssignE :
@@ -2035,7 +2041,7 @@ lemma red_stmt_total_ok_FieldAssignE :
         (\<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val (VRef (Address a))) \<and>
         (\<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v) \<and>
         get_vm (get_state \<omega>) (a,f) = pwrite \<and>
-        has_type (absval_interp_total ctxt) ty v"
+        v \<in> sem_vtyp (absval_interp_total ctxt) ty"
 proof -
   note calc = assms a2t_state_in_a2t_states[of ctxt \<omega>]
   hence "\<not> red_stmt_total ctxt R \<Lambda> (stmt.FieldAssign e1 f e2) (a2t_state ctxt \<omega>) RFailure"
@@ -2051,7 +2057,7 @@ lemma red_stmt_total_set_FieldAssignI :
   assumes "\<Delta> \<turnstile> \<langle>e1; \<omega>\<rangle> [\<Down>] Val (VRef (Address a))"
   assumes "\<Delta> \<turnstile> \<langle>e2; \<omega>\<rangle> [\<Down>] Val v"
   assumes "get_vm (get_state \<omega>) (a,f) = pwrite"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   assumes "stable \<omega>"
   assumes "valid_a2t_stmt (stmt.FieldAssign e1 f e2)"
   assumes "\<And> f vals st. interp.funs \<Delta> f vals st = None"
@@ -2059,17 +2065,17 @@ lemma red_stmt_total_set_FieldAssignI :
     {\<omega>\<^sub>t'. \<exists> \<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and>
       \<omega>\<^sub>t' = \<omega>\<^sub>t\<lparr>get_total_full := get_total_full \<omega>\<^sub>t\<lparr>get_hh_total := (get_hh_total (get_total_full \<omega>\<^sub>t))((a, f) := v)\<rparr>\<rparr>}"
   using assms apply (auto simp add:red_stmt_total_set_def red_stmt_total_simps a2t_states_in_stable get_writeable_locs_def
-    t2a_state_get_state has_type_get_type
+    t2a_state_get_state sem_vtyp_to_get_type
     red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"])
   using red_pure_det by blast+
 
 lemma red_stmt_total_set_HavocI :
   assumes "\<Lambda> x = Some ty"
   shows "red_stmt_total_set ctxt R \<Lambda> (stmt.Havoc x) (a2t_states ctxt \<omega>) =
-    {\<omega>\<^sub>t'. \<exists> \<omega>\<^sub>t v. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> has_type (absval_interp_total ctxt) ty v \<and>
+    {\<omega>\<^sub>t'. \<exists> \<omega>\<^sub>t v. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> v \<in> sem_vtyp (absval_interp_total ctxt) ty \<and>
       \<omega>\<^sub>t' = \<omega>\<^sub>t\<lparr>get_store_total := (get_store_total \<omega>\<^sub>t)(x \<mapsto> v)\<rparr>}"
   using assms by (auto simp add:red_stmt_total_set_def red_stmt_total_simps
-     has_type_get_type red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"])
+     sem_vtyp_to_get_type red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"])
 
 (*
 lemma red_stmt_total_set_LabelI :
@@ -2349,7 +2355,7 @@ lemma inhale_refines :
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
   apply (simp add: make_semantic_assertion_gen_def)
-  using red_inhale_refines 
+  using red_inhale_refines
   by (smt (verit, ccfv_SIG) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subsetD)
 
 
@@ -2612,7 +2618,7 @@ lemma a2t_states_set_value :
   assumes "abs_state_typing ctxt \<Lambda> \<omega>"
   assumes "stable \<omega>"
   assumes "declared_fields (program_total ctxt) (snd hl) = Some ty"
-  assumes "has_type (absval_interp_total ctxt) ty v"
+  assumes "v \<in> sem_vtyp (absval_interp_total ctxt) ty"
   assumes "ppos (get_vm (get_state \<omega>) hl)"
   shows "x \<in> (\<lambda> \<omega>. \<omega>\<lparr>get_total_full := (get_total_full \<omega>)\<lparr>get_hh_total := (get_hh_total (get_total_full \<omega>))(hl := v) \<rparr> \<rparr>) `
           a2t_states ctxt \<omega>"
@@ -2659,7 +2665,7 @@ proof (rule subsetI)
   have "\<omega>\<^sub>t\<lparr>get_total_full := get_total_full \<omega>\<^sub>t\<lparr>get_hh_total :=
       (\<lambda> hl. (case get_vh (get_state \<omega>) hl of Some x \<Rightarrow> x | _ \<Rightarrow> get_hh_total (get_total_full \<omega>\<^sub>t) hl)) \<rparr>\<rparr> \<in> a2t_states ctxt \<omega>"
     apply (rule a2t_statesI[OF assms(1)])
-    subgoal using assms Hty apply (clarsimp simp add:heap_typing_def abs_state_typing_def ValueAndBasicState.well_typed_heap_def)
+    subgoal using assms Hty apply (clarsimp simp add:heap_typing_def abs_state_typing_def heap_typed_def)
       apply (case_tac "get_vh (get_state \<omega>) (a, b)"; simp)
       by fastforce
     subgoal using assms H\<omega>\<^sub>t by (simp add:abs_state_typing_def)
@@ -2817,7 +2823,7 @@ next
     (* apply (rule exI, rule conjI, assumption) *)
     (* apply (rule exI, rule conjI, assumption) *)
     (* apply (rule conjI, rule) *)
-    apply (auto simp add:a2t_states_in_stable has_type_get_type)
+    apply (auto simp add:a2t_states_in_stable)
     done
 next
   case (FieldAssign e1 f e2)
@@ -2897,7 +2903,7 @@ theorem abstract_refines_total_verifies :
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
      (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
-  using assms 
+  using assms
   apply (simp add:ConcreteSemantics.verifies_def)
   using abstract_refines_total
   by (metis concrete_red_stmt_post_def)
@@ -2907,11 +2913,12 @@ theorem abstract_refines_total_verifies_set :
   assumes "stmt_typing (program_total ctxt) \<Lambda> C"
   (* TODO: This should be provable *)
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> typed (t2a_ctxt ctxt \<Lambda>) \<omega> \<Longrightarrow> abs_state_typing ctxt \<Lambda> \<omega>"
+  (* TODO: This should follow from the fact that traces are empty in A. *)
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
      (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
-  using assms 
+  using assms
   apply (simp add:ConcreteSemantics.verifies_set_def)
   using abstract_refines_total_verifies
   by blast

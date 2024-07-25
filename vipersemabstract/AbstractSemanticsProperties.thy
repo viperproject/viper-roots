@@ -129,7 +129,7 @@ lemma typed_store_update:
     shows "typed_store \<Delta> (\<sigma>(x \<mapsto> v))"
   unfolding typed_store_def
   using assms(1) assms(2) assms(3)
-  by (smt (verit, ccfv_SIG) dom_fun_upd fun_upd_other fun_upd_same insert_dom option.discI option.inject typed_store_def)
+  by (smt (verit, ccfv_SIG) dom_fun_upd fun_upd_other fun_upd_same insert_dom option.discI option.inject typed_store_def store_typed_def)
 
 
 (*
@@ -177,7 +177,7 @@ proof clarify
     next
       case False
       then show ?thesis using asm0(1-2)
-        unfolding typed_def typed_store_def
+        unfolding typed_def typed_store_def store_typed_def
         by (metis agreement.sel domIff get_store_def prod.sel(1))
     qed
   qed
@@ -240,12 +240,12 @@ proof -
     show "dom (variables \<Delta>) = dom (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x)" (is "?A = ?B")
     proof
       show "?A \<subseteq> ?B"
-        by (smt (verit, best) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def)
+        by (smt (verit, best) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def store_typed_def)
       show "?B \<subseteq> ?A"
-        by (smt (verit) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def)
+        by (smt (verit) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def store_typed_def)
     qed
     show "\<And>x v ty. (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x) x = Some v \<Longrightarrow> variables \<Delta> x = Some ty \<Longrightarrow> v \<in> ty"
-      by (smt (verit, best) agreement.sel assms(2) assms(3) typed_store_def)
+      by (smt (verit, best) agreement.sel assms(2) assms(3) typed_store_def store_typed_def)
   qed
   ultimately show ?thesis by blast
 qed
@@ -499,15 +499,15 @@ next
   show ?case
   proof (rule typed_storeI)
     show "dom (variables \<Delta>) = dom (get_store (assign_var_state x (Some v) \<omega>))"
-      by (metis Havoc.hyps(1) Havoc.hyps(2) assign_var_state_def dom_fun_upd get_store_set_store insert_dom option.discI typed_store_def)
+      by (metis Havoc.hyps(1) Havoc.hyps(2) assign_var_state_def dom_fun_upd get_store_set_store insert_dom option.discI typed_store_def store_typed_def)
     fix x' v' ty' assume asm0: "get_store (assign_var_state x (Some v) \<omega>) x' = Some v'" "variables \<Delta> x' = Some ty'"
     then show "v' \<in> ty'"
-      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) assign_var_state_def fun_upd_other fun_upd_same get_store_set_store option.inject typed_store_def)
+      by (metis Havoc.hyps(1) Havoc.hyps(2) Havoc.hyps(3) assign_var_state_def fun_upd_other fun_upd_same get_store_set_store option.inject typed_store_def store_typed_def)
   qed
 next
   case (LocalAssign \<Delta> e \<omega> v x ty)
   then show "typed_store \<Delta> (get_store (assign_var_state x (Some v) \<omega>))"
-    unfolding typed_store_def assign_var_state_def by auto
+    unfolding typed_store_def store_typed_def assign_var_state_def by auto
 qed (auto)
 
 lemma red_stmt_induct_simple_wf [consumes 4, case_names Inhale Exhale Custom Havoc LocalAssign Label]:
@@ -749,7 +749,7 @@ lemma wf_state_then_value:
   assumes "variables \<Delta> x = Some ty"
       and "wf_state \<Delta> \<omega>"
     shows "\<exists>v \<in> ty. get_store \<omega> x = Some v"
-  by (metis assms(1) assms(2) domD domI typed_def typed_store_def wf_state_def)
+  by (metis assms(1) assms(2) domD domI typed_def typed_store_def wf_state_def store_typed_def)
 
 
 lemma self_framing_typed_Stabilize_typed_ext:
@@ -1623,9 +1623,9 @@ proof (rule free_vars_subset)
   then have "set_store (Ag \<sigma>2, \<gamma>) ((get_store (Ag \<sigma>2, \<gamma>))(x \<mapsto> v)) \<in> A"
     by (simp add: get_abs_state_def set_store_def)
   moreover obtain v0' where "get_store (Ag \<sigma>2, \<gamma>) x = Some v0'"
-    by (metis (no_types, opaque_lifting) DiffD2 asm0(1) dom_fun_upd fun_upd_triv insertI1 option.distinct(1) option.exhaust_sel r(3) typed_state.typed_def typed_state_axioms typed_store_def)
+    by (metis (no_types, opaque_lifting) DiffD2 asm0(1) dom_fun_upd fun_upd_triv insertI1 option.distinct(1) option.exhaust_sel r(3) typed_state.typed_def typed_state_axioms typed_store_def store_typed_def)
   then have "v0' \<in> ty"
-    by (meson asm0(1) r(3) typed_state.typed_def typed_state_axioms typed_store_def)
+    by (meson asm0(1) r(3) typed_state.typed_def typed_state_axioms typed_store_def store_typed_def)
   ultimately show "(Ag \<sigma>2, \<gamma>) \<in> exists_assert \<Delta> x A"
     unfolding exists_assert_def
     by (smt (verit) \<open>get_store (Ag \<sigma>2, \<gamma>) x = Some v0'\<close> asm0(1) asm0(2) assign_var_state_def get_store_Ag_simplifies mem_Collect_eq r(3) r(4) exists_assertE  set_store_Ag_simplies set_store_def snd_conv typed_def)
@@ -1644,7 +1644,7 @@ proof (rule entailsI)
   then have "typed \<Delta> \<omega>"
     using assms(1) typed_assertion_def by blast
   then obtain v0 ty v where "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty" "(set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
-    by (smt (verit, best) asm0 assms(2) domD domIff full_state_ext fun_upd_triv get_abs_state_set_store get_store_set_store typed_def typed_store_def)
+    by (smt (verit, best) asm0 assms(2) domD domIff full_state_ext fun_upd_triv get_abs_state_set_store get_store_set_store typed_def typed_store_def store_typed_def)
   then show "\<omega> \<in> exists_assert \<Delta> x A"
     by (metis \<open>typed \<Delta> \<omega>\<close> assign_var_state_def exists_assertI)
 qed
