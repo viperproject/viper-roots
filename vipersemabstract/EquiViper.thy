@@ -3,88 +3,84 @@ theory EquiViper
   ViperCommon.PosReal ViperCommon.SepAlgebra AbstractSemantics
 begin
 
-subsection \<open>Pre-virtual equi_states\<close>
+subsection \<open>Unbounded equi states\<close>
 
-type_synonym 'a pre_virtual_state = "preal mask \<times> 'a partial_heap"
+type_synonym 'a unbounded_state = "heap_loc \<Rightarrow> (preal, 'a val) PermValue"
 
-instantiation val :: (type) pcm
-begin
+definition empty_heap where
+  "empty_heap l = ZeroNone"
 
-definition plus_val :: "'a val \<Rightarrow> 'a val \<Rightarrow> 'a val option" where
-  "plus_val a b = (if a = b then Some a else None)"
-
-instance proof
-  fix a b c ab bc :: "'a val"
-  show "a \<oplus> b = b \<oplus> a"
-    using plus_val_def by presburger
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    by (metis option.sel plus_val_def)
-  show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
-    by (metis option.sel plus_val_def)
-  show "a \<oplus> b = Some c \<Longrightarrow> Some c = c \<oplus> c \<Longrightarrow> Some a = a \<oplus> a "
-    by (metis plus_val_def)
-qed
-
-end
-
-lemma plus_val_id :
-  "(v :: 'a val) \<oplus> v = Some v"
-  by (simp add: plus_val_def)
-
-lemma defined_val :
-  "(v :: 'a val) ## v' \<longleftrightarrow> v = v'"
-  by (simp add: defined_def plus_val_def)
+lemma empty_heap_unit[simp]:
+  "h \<oplus> empty_heap = Some h"
+  "empty_heap \<oplus> h = Some h"
+  by (metis commutative empty_heap_def plus_PermValue.simps(1) plus_funI)+
 
 
-instantiation val :: (type) pcm_mult
-begin
+definition get_unbounded_heap :: "'a unbounded_state \<Rightarrow> heap_loc \<rightharpoonup> 'a val" where
+  "get_unbounded_heap \<phi> l = (case \<phi> l of ZeroNone \<Rightarrow> None | Pair p v \<Rightarrow> Some v)"
 
-definition mult_val :: "preal \<Rightarrow> 'a val \<Rightarrow> 'a val" where
-  "mult_val \<alpha> x = x"
+definition get_unbounded_mask :: "'a unbounded_state \<Rightarrow> preal mask" where
+  "get_unbounded_mask \<phi> l = (case \<phi> l of ZeroNone \<Rightarrow> 0 | Pair p v \<Rightarrow> p)"
 
-instance proof
-  fix x a b :: "'a val"
-  fix \<alpha> \<beta> :: preal
-  show "pwrite \<odot> x = x"
-    by (simp add: mult_val_def)
-  show "\<alpha> \<odot> (\<beta> \<odot> x) = pmult \<alpha> \<beta> \<odot> x"
-    by (simp add: mult_val_def)
-  show "Some x = a \<oplus> b \<Longrightarrow> Some (\<alpha> \<odot> x) = \<alpha> \<odot> a \<oplus> \<alpha> \<odot> b"
-    by (simp add: mult_val_def)
-  show "Some (padd \<alpha> \<beta> \<odot> x) = \<alpha> \<odot> x \<oplus> \<beta> \<odot> x"
-    by (simp add: mult_val_def plus_val_def)
-qed
-
-end
+lemma pos_perm_implies_heap_value:
+  assumes "get_unbounded_mask \<phi> l > 0"
+  shows "get_unbounded_heap \<phi> l \<noteq> None"
+  using assms unfolding get_unbounded_mask_def get_unbounded_heap_def
+  by (cases "\<phi> l") simp_all
 
 
-(*
-text \<open>Heap permission mask\<close>
-type_synonym mask = "heap_loc \<Rightarrow> positive rational"
+lemma compatible_unbounded_heaps_iff:
+  "\<phi>1 ## \<phi>2 \<longleftrightarrow> compatible_maps (get_unbounded_heap \<phi>1) (get_unbounded_heap \<phi>2)"
+  sorry
 
-text \<open>Partial heap\<close>
-type_synonym 'a partial_heap = "heap_loc \<rightharpoonup> 'a val"
-*)
+lemma add_derive:
+  assumes "Some \<phi> = \<phi>1 \<oplus> \<phi>2"
+  shows "get_unbounded_heap \<phi> = get_unbounded_heap \<phi>1 ++ get_unbounded_heap \<phi>2"
+    and "get_unbounded_mask \<phi> = add_masks (get_unbounded_mask \<phi>1) (get_unbounded_mask \<phi>2)"
+    apply (rule ext)
+  sorry
 
-(*
-- mask (x, f) \<le> 1
-- If mask (x, f) > 0 \<Longrightarrow> heap (x, f) != None
-*)
-
-definition wf_pre_virtual_state :: "'a pre_virtual_state \<Rightarrow> bool" where
-  "wf_pre_virtual_state st \<longleftrightarrow> (\<forall>hl. ppos (fst st hl) \<longrightarrow> snd st hl \<noteq> None) \<and> wf_mask_simple (fst st)"
+subsection \<open>Unbounded equi states\<close>
 
 
-(*
-States are *unbounded*
-wf_mask_simple \<pi> \<and> 
-*)
+definition bounded :: "'a unbounded_state \<Rightarrow> bool" where
+  "bounded st \<longleftrightarrow> (\<forall>hl p v. st hl = Pair p v \<longrightarrow> p \<le> 1)"
 
-lemma wf_pre_virtual_stateI:
-  assumes "\<And>hl. ppos (\<pi> hl) \<Longrightarrow> h hl \<noteq> None"
-  assumes "wf_mask_simple \<pi>"
-    shows "wf_pre_virtual_state (\<pi>, h)"
-  using assms by (simp add:wf_pre_virtual_state_def)
+lemma boundedI:
+  assumes "\<And>hl p v. h hl = Pair p v \<Longrightarrow> p \<le> 1"
+  shows "bounded h"
+  using assms bounded_def by blast
+
+
+lemma bounded_empty[simp]:
+  "bounded empty_heap"
+  by (simp add: bounded_def empty_heap_def)
+
+typedef 'a bounded_state = "{ \<phi> :: 'a unbounded_state |\<phi>. bounded \<phi> }"
+  using bounded_empty by blast
+
+
+setup_lifting type_definition_bounded_state
+
+definition get_vh :: "'a bounded_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = snd (Rep_unbounded_state \<phi>)"
+definition get_vm :: "'a bounded_state \<Rightarrow> preal mask" where "get_vm \<phi> = fst (Rep_unbounded_state \<phi>)"
+
+lemma unbounded_state_ext:
+  assumes "get_vh a = get_vh b"
+      and "get_vm a = get_vm b"
+    shows "a = b"
+  by (metis Rep_unbounded_state_inject assms(1) assms(2) get_vh_def get_vm_def prod.expand)
+
+
+
+
+
+
+
+
+
+
+
 
 
 subsection \<open>Additions\<close>
@@ -104,59 +100,15 @@ lemma pre_wf_plus_def:
   "(\<pi>' :: preal mask, h') ## (\<pi>, h) \<longleftrightarrow> h' ## h"
   by (simp add: comp_prod masks_can_always_be_added)
 
-(*
-fun pre_wf_plus :: "'a pre_virtual_state \<Rightarrow> 'a pre_virtual_state \<Rightarrow> bool" where
-  "pre_wf_plus (\<pi>', h') (\<pi>, h) \<longleftrightarrow> h' ## h"
-
-
-lemma pre_wf_plusI:
-  assumes "\<And>hl. compatible_options (h' hl) (h hl)"
-    shows "pre_wf_plus (\<pi>', h') (\<pi>, h)"
-  by (simp add: assms(1) compatible_heaps_def)
-
-text \<open>The result of the addition: (\<pi>', h') + (\<pi>, h) =
-- Mask: \<pi>' + \<pi>
-- Heap: h' ++ h\<close>
-*)
-
-
-subsection \<open>Virtual equi_states\<close>
-
-definition empty_heap :: "'a partial_heap" where "empty_heap = Map.empty"
-definition uuu :: "'a pre_virtual_state" where "uuu = (zero_mask, empty_heap)"
-
-lemma wf_uuu:
-  "wf_pre_virtual_state (zero_mask, empty_heap)"
-proof (rule wf_pre_virtual_stateI)
-  show "\<And>hl. ppos (zero_mask hl) \<Longrightarrow> empty_heap hl \<noteq> None"
-    by (simp add: ppos.rep_eq zero_mask_def zero_preal.rep_eq)
-  show "wf_mask_simple (zero_mask)"
-    by (simp add: wf_zero_mask)
-qed
-
-typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_virtual_state \<phi> }"
-  using wf_uuu by blast
-
-setup_lifting type_definition_virtual_state
-
-definition get_vh :: "'a virtual_state \<Rightarrow> 'a partial_heap" where "get_vh \<phi> = snd (Rep_virtual_state \<phi>)"
-definition get_vm :: "'a virtual_state \<Rightarrow> preal mask" where "get_vm \<phi> = fst (Rep_virtual_state \<phi>)"
-
-lemma virtual_state_ext:
-  assumes "get_vh a = get_vh b"
-      and "get_vm a = get_vm b"
-    shows "a = b"
-  by (metis Rep_virtual_state_inject assms(1) assms(2) get_vh_def get_vm_def prod.expand)
-
 
 (*
 definition set_vh where
-  "set_vh \<phi> h = Abs_virtual_state (get_vm \<phi>, h)"
+  "set_vh \<phi> h = Abs_unbounded_state (get_vm \<phi>, h)"
 definition set_vm where
-  "set_vm \<phi> m = Abs_virtual_state (m, get_vh \<phi>)"
+  "set_vm \<phi> m = Abs_unbounded_state (m, get_vh \<phi>)"
 *)
 
-lift_definition uu :: "'a virtual_state" is "uuu"
+lift_definition uu :: "'a unbounded_state" is "uuu"
   using wf_uuu by (simp add: uuu_def)
 
 lemma uu_get :
@@ -165,18 +117,18 @@ lemma uu_get :
 
 (*
 lemma sum_wf_is_wf:
-  assumes "wf_pre_virtual_state a"
-      and "wf_pre_virtual_state b"
+  assumes "wf_pre_unbounded_state a"
+      and "wf_pre_unbounded_state b"
       and "Some x = a \<oplus> b"
-    shows "wf_pre_virtual_state x"
+    shows "wf_pre_unbounded_state x"
 *)
 
-fun read_field :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
+fun read_field :: "'a unbounded_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
   where "read_field \<phi> loc = get_vh \<phi> loc"
 
 lemma wf_mask_simple_get_vm [simp] :
   "wf_mask_simple (get_vm x)"
-  by (metis Rep_virtual_state get_vm_def mem_Collect_eq wf_pre_virtual_state_def)
+  by (metis Rep_unbounded_state get_vm_def mem_Collect_eq wf_pre_unbounded_state_def)
 
 lemma get_vm_bound :
   "get_vm x hl \<le> 1"
@@ -185,13 +137,13 @@ lemma get_vm_bound :
 subsection \<open>Addition of virtual equi_states\<close>
 
 
-instantiation virtual_state :: (type) pcm
+instantiation unbounded_state :: (type) pcm
 begin
 
 
-lift_definition plus_virtual_state :: "'a virtual_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a virtual_state option"
+lift_definition plus_unbounded_state :: "'a unbounded_state \<Rightarrow> 'a unbounded_state \<Rightarrow> 'a unbounded_state option"
   is "(\<lambda> st1 st2. Option.bind (st1 \<oplus> st2) (\<lambda> x. if wf_mask_simple (fst x) then Some x else None))"
-  apply (simp add: bind_split wf_pre_virtual_state_def del:Product_Type.split_paired_All)
+  apply (simp add: bind_split wf_pre_unbounded_state_def del:Product_Type.split_paired_All)
 proof clarify
   fix a b aa ba ab bb ac bc
   assume asm0: "\<forall>hl. PosReal.ppos (fst (a, b) hl) \<longrightarrow> (\<exists>y. snd (a, b) hl = Some y)"
@@ -208,40 +160,40 @@ proof clarify
     by (smt (verit) \<open>\<exists>y. b (ac, bc) = Some y \<or> ba (ac, bc) = Some y\<close> asm0(3) option.discI option.sel plus_funE plus_option.elims plus_prodE snd_conv)
 qed
 
-lemma compatible_virtual_state_implies_pre_virtual_state:
+lemma compatible_unbounded_state_implies_pre_unbounded_state:
   assumes "Some x = a \<oplus> b"
-  shows "Some (Rep_virtual_state x) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
+  shows "Some (Rep_unbounded_state x) = Rep_unbounded_state a \<oplus> Rep_unbounded_state b"
   using assms apply (transfer) by (clarsimp split:bind_splits if_splits)
 
-lemma compatible_virtual_state_implies_pre_virtual_state_rev:
-  assumes "Some (Rep_virtual_state x) = Rep_virtual_state a \<oplus> Rep_virtual_state b"
+lemma compatible_unbounded_state_implies_pre_unbounded_state_rev:
+  assumes "Some (Rep_unbounded_state x) = Rep_unbounded_state a \<oplus> Rep_unbounded_state b"
   shows "Some x = a \<oplus> b"
-  using assms apply (transfer) by (clarsimp simp add:wf_pre_virtual_state_def split:bind_splits if_splits)
+  using assms apply (transfer) by (clarsimp simp add:wf_pre_unbounded_state_def split:bind_splits if_splits)
 
-lemma virtual_state_plus_None :
-  "a \<oplus> b = None \<longleftrightarrow> Rep_virtual_state a \<oplus> Rep_virtual_state b = None \<or> \<not> wf_mask_simple (the (get_vm a \<oplus> get_vm b))"
-  by (smt (verit) EquiViper.plus_virtual_state.rep_eq bind.bind_lunit bind_eq_None_conv fst_conv get_vm_def option.map_disc_iff plus_prod_def)
+lemma unbounded_state_plus_None :
+  "a \<oplus> b = None \<longleftrightarrow> Rep_unbounded_state a \<oplus> Rep_unbounded_state b = None \<or> \<not> wf_mask_simple (the (get_vm a \<oplus> get_vm b))"
+  by (smt (verit) EquiViper.plus_unbounded_state.rep_eq bind.bind_lunit bind_eq_None_conv fst_conv get_vm_def option.map_disc_iff plus_prod_def)
 
 instance proof
-  fix a b c ab bc :: "'a virtual_state"
-  let ?a = "Rep_virtual_state a"
-  let ?b = "Rep_virtual_state b"
-  let ?c = "Rep_virtual_state c"
-  let ?ab = "Rep_virtual_state ab"
-  let ?bc = "Rep_virtual_state bc"
+  fix a b c ab bc :: "'a unbounded_state"
+  let ?a = "Rep_unbounded_state a"
+  let ?b = "Rep_unbounded_state b"
+  let ?c = "Rep_unbounded_state c"
+  let ?ab = "Rep_unbounded_state ab"
+  let ?bc = "Rep_unbounded_state bc"
 
   show "a \<oplus> b = b \<oplus> a"
-    by (simp add: commutative plus_virtual_state_def)
+    by (simp add: commutative plus_unbounded_state_def)
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = Some bc \<Longrightarrow> ab \<oplus> c = a \<oplus> bc"
-    by (smt (verit, del_insts) EquiViper.compatible_virtual_state_implies_pre_virtual_state asso1 map_fun_apply plus_virtual_state_def)
+    by (smt (verit, del_insts) EquiViper.compatible_unbounded_state_implies_pre_unbounded_state asso1 map_fun_apply plus_unbounded_state_def)
   show "a \<oplus> b = Some ab \<and> b \<oplus> c = None \<Longrightarrow> ab \<oplus> c = None"
-    apply (clarsimp simp add:virtual_state_plus_None)
+    apply (clarsimp simp add:unbounded_state_plus_None)
     apply (safe)
-     apply (metis EquiViper.compatible_virtual_state_implies_pre_virtual_state asso2 option.discI)
+     apply (metis EquiViper.compatible_unbounded_state_implies_pre_unbounded_state asso2 option.discI)
   proof -
     fix aa ba
     assume asm0: "a \<oplus> b = Some ab" "wf_mask_simple (the (get_vm ab \<oplus> get_vm c))"
-       "Rep_virtual_state ab \<oplus> Rep_virtual_state c = Some (aa, ba)" "\<not> wf_mask_simple (the (get_vm b \<oplus> get_vm c))"
+       "Rep_unbounded_state ab \<oplus> Rep_unbounded_state c = Some (aa, ba)" "\<not> wf_mask_simple (the (get_vm b \<oplus> get_vm c))"
     then obtain hl where "the (get_vm b \<oplus> get_vm c) hl > 1"
       by (meson not_less wf_mask_simple_def)
     then have "get_vm b hl + get_vm c hl > 1"
@@ -249,7 +201,7 @@ instance proof
     moreover have "the (get_vm ab \<oplus> get_vm c) hl \<ge> get_vm ab hl + get_vm c hl"
       by (metis (no_types, lifting) EquiViper.add_masks_def asm0(3) get_vm_def nle_le option.sel plus_prodE)
     moreover have "get_vm ab hl \<ge> get_vm b hl"
-      by (metis (no_types, lifting) EquiViper.add_masks_def EquiViper.compatible_virtual_state_implies_pre_virtual_state \<open>a \<oplus> b = b \<oplus> a\<close> asm0(1) get_vm_def plus_prodE pos_perm_class.sum_larger)      
+      by (metis (no_types, lifting) EquiViper.add_masks_def EquiViper.compatible_unbounded_state_implies_pre_unbounded_state \<open>a \<oplus> b = b \<oplus> a\<close> asm0(1) get_vm_def plus_prodE pos_perm_class.sum_larger)      
     moreover have "the (get_vm ab \<oplus> get_vm c) hl \<le> 1"
       using asm0(2) wf_mask_simple_def by blast
     ultimately show False
@@ -257,17 +209,31 @@ instance proof
   qed
   assume asm0: "a \<oplus> b = Some c" "Some c = c \<oplus> c"
   then have "Some ?c = ?a \<oplus> ?b \<and> Some ?c = ?c \<oplus> ?c"
-    by (metis compatible_virtual_state_implies_pre_virtual_state)
+    by (metis compatible_unbounded_state_implies_pre_unbounded_state)
   then show "Some a = a \<oplus> a"
-    by (metis compatible_virtual_state_implies_pre_virtual_state_rev positivity)
+    by (metis compatible_unbounded_state_implies_pre_unbounded_state_rev positivity)
 
 qed
 
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 subsection \<open>Normal equi_states\<close>
 
-type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement"
+type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a unbounded_state) agreement"
 
 (* Normal equi_state *)
 
@@ -275,12 +241,12 @@ type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement
 type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 *)
 (*
-type_synonym 'a trace = "label \<rightharpoonup> 'a virtual_state"
+type_synonym 'a trace = "label \<rightharpoonup> 'a unbounded_state"
 *)
-type_synonym 'a equi_state = "('a val, ('a ag_trace \<times> 'a virtual_state)) abs_state"
+type_synonym 'a equi_state = "('a val, ('a ag_trace \<times> 'a unbounded_state)) abs_state"
                                     
 (*
-= 'a val ag_store \<times> ('a virtual_state \<times> 'a trace)"
+= 'a val ag_store \<times> ('a unbounded_state \<times> 'a trace)"
 'a val ag_store = (var \<rightharpoonup> 'a val) agreement"
 *)
 
@@ -292,11 +258,11 @@ fun get_t :: "'a equi_state \<Rightarrow> 'a trace" where "get_t \<omega> = fst 
 definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
 
 *)
-definition get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
-definition get_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state)" where "get_trace \<omega> = the_ag (fst (snd \<omega>))"
-definition set_state :: "'a equi_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
+definition get_state :: "'a equi_state \<Rightarrow> 'a unbounded_state" where "get_state \<omega> = snd (snd \<omega>)"
+definition get_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a unbounded_state)" where "get_trace \<omega> = the_ag (fst (snd \<omega>))"
+definition set_state :: "'a equi_state \<Rightarrow> 'a unbounded_state \<Rightarrow> 'a equi_state" where
   "set_state \<omega> \<phi> = (Ag (get_store \<omega>), (Ag (get_trace \<omega>), \<phi>))"
-definition set_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state) \<Rightarrow> 'a equi_state" where
+definition set_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a unbounded_state) \<Rightarrow> 'a equi_state" where
   "set_trace \<omega> \<tau> = (Ag (get_store \<omega>), (Ag \<tau>, get_state \<omega>))"
 
 lemma get_store_set_trace [simp] :
@@ -345,16 +311,16 @@ abbreviation get_h where "get_h \<omega> \<equiv> get_vh (get_state \<omega>)"
 abbreviation get_m where "get_m \<omega> \<equiv> get_vm (get_state \<omega>)"
 
 
-fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_virtual_state" where "get_pv \<omega> = Rep_virtual_state (get_state \<omega>)"
+fun get_pv :: "'a equi_state \<Rightarrow> 'a pre_unbounded_state" where "get_pv \<omega> = Rep_unbounded_state (get_state \<omega>)"
 
 definition shift_and_add_equi_state where
   "shift_and_add_equi_state \<omega> x = set_store \<omega> (shift_and_add (get_store \<omega>) x)"
 
 subsection \<open>Assertions\<close>
 
-inductive red_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state \<Rightarrow> 'v extended_val \<Rightarrow> bool"
+inductive red_pure :: "('v, ('v unbounded_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state \<Rightarrow> 'v extended_val \<Rightarrow> bool"
   ("_ \<turnstile> ((\<langle>_;_\<rangle>) [\<Down>] _)" [51,0,0,0] 81)
-  and red_pure_exps :: "('v, ('v virtual_state)) interp \<Rightarrow> 'v equi_state \<Rightarrow> pure_exp list \<Rightarrow> 'v val list \<Rightarrow> bool"
+  and red_pure_exps :: "('v, ('v unbounded_state)) interp \<Rightarrow> 'v equi_state \<Rightarrow> pure_exp list \<Rightarrow> 'v val list \<Rightarrow> bool"
   where
   RedPureExps: "\<lbrakk> list_all2 (\<lambda>e v. c \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) exps vals \<rbrakk> \<Longrightarrow> red_pure_exps c \<omega> exps vals"
 
@@ -583,10 +549,10 @@ next
 qed
 
 
-definition wd_pure :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state \<Rightarrow> bool" where
+definition wd_pure :: "('v, ('v unbounded_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state \<Rightarrow> bool" where
   "wd_pure c e \<omega> \<longleftrightarrow> (\<exists>v. (c \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v))"
 
-definition wd_pure_set :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state set \<Rightarrow> bool" where
+definition wd_pure_set :: "('v, ('v unbounded_state)) interp \<Rightarrow> pure_exp \<Rightarrow> 'v equi_state set \<Rightarrow> bool" where
   "wd_pure_set c e A \<longleftrightarrow> (\<forall>\<omega> \<in> A. wd_pure c e \<omega>)"
 
 fun red_pure_bool where
@@ -594,7 +560,7 @@ fun red_pure_bool where
   if \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val (VBool True) then Some True else Some False
   else None)"
 
-inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where
+inductive red_atomic_assert :: "('v, ('v unbounded_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where
 
   RedAtomicPure: "\<lbrakk> red_pure \<Delta> e \<omega> (Val (VBool b)) \<rbrakk> \<Longrightarrow> red_atomic_assert \<Delta> (Pure e) \<omega> (Some b)"
 
@@ -639,10 +605,10 @@ lemma no_old_indep_trace:
 *)
 
 (*
-inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where
+inductive red_atomic_assert :: "('v, ('v unbounded_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where
 *)
 
-fun sat :: "('a, 'a virtual_state) interp
+fun sat :: "('a, 'a unbounded_state) interp
      \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state \<Rightarrow> bool"
 
 (* :: "'c \<Rightarrow> ('p, 'i) assert \<Rightarrow> 'a \<Rightarrow> bool" *) ("_ \<Turnstile> ((\<langle>_;_\<rangle>))" [52,0,0] 84) where
@@ -732,7 +698,7 @@ lemma abs_state_ext_iff :
   using full_state_ext by blast
 
 
-definition make_equi_state :: "(var \<rightharpoonup> 'a val) \<Rightarrow> (label \<rightharpoonup> 'a virtual_state) \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
+definition make_equi_state :: "(var \<rightharpoonup> 'a val) \<Rightarrow> (label \<rightharpoonup> 'a unbounded_state) \<Rightarrow> 'a unbounded_state \<Rightarrow> 'a equi_state" where
   "make_equi_state s t st = set_store (set_trace (set_state undefined st) t) s"
 
 lemma get_store_make_equi_state[simp] :

@@ -1067,15 +1067,15 @@ end
 
 section \<open>PermValue\<close>
 
-datatype ('p, 'v) PermValue = NoValue | Pair (the_perm: 'p) (the_value: 'v)
+datatype ('p, 'v) PermValue = ZeroNone | Pair (the_perm: 'p) (the_value: 'v)
 
 
 instantiation PermValue :: (pos_perm, type) pcm
 begin
 
 fun plus_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue option" where
-  "plus_PermValue NoValue pv = Some pv"
-| "plus_PermValue pv NoValue = Some pv"
+  "plus_PermValue ZeroNone pv = Some pv"
+| "plus_PermValue pv ZeroNone = Some pv"
 | "plus_PermValue (Pair p1 v1) (Pair p2 v2) = (if v1 = v2 then Some (Pair (p1 + p2) v1) else None)"
 (* the values must agree *)
 
@@ -1098,13 +1098,17 @@ instance proof
     by (metis PermValue.inject group_cancel.add1 option.discI option.inject order_antisym pos_perm_class.padd_cancellative pos_perm_class.sum_larger)
 qed
 
+lemma compatible_perm_value_iff:
+  "a ## b \<longleftrightarrow> (a = ZeroNone \<or> b = ZeroNone \<or> the_value a = the_value b)"
+  by (smt (verit, best) PermValue.exhaust PermValue.sel(2) SepAlgebra.plus_PermValue.simps(1) SepAlgebra.plus_PermValue.simps(3) commutative defined_def option.distinct(1))
+
 end
 
 instantiation PermValue :: (pos_perm, type) pcm_with_core
 begin
 
 fun core_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue" where
-  "core_PermValue NoValue = NoValue"
+  "core_PermValue ZeroNone = ZeroNone"
 | "core_PermValue (Pair p v) = Pair 0 v"
 
 instance proof
@@ -1135,12 +1139,12 @@ instantiation PermValue :: (pos_perm, type) sep_algebra
 begin
 
 fun stable_PermValue :: "('a, 'b) PermValue \<Rightarrow> bool" where
-  "stable_PermValue NoValue \<longleftrightarrow> True"
+  "stable_PermValue ZeroNone \<longleftrightarrow> True"
 | "stable_PermValue (Pair p v) \<longleftrightarrow> p > 0"
 
 fun stabilize_PermValue :: "('a, 'b) PermValue \<Rightarrow> ('a, 'b) PermValue" where
-  "stabilize_PermValue NoValue = NoValue"
-| "stabilize_PermValue (Pair p v) = (if p > 0 then Pair p v else NoValue)" \<comment> \<open>We erase the knowledge if p = 0\<close>
+  "stabilize_PermValue ZeroNone = ZeroNone"
+| "stabilize_PermValue (Pair p v) = (if p > 0 then Pair p v else ZeroNone)" \<comment> \<open>We erase the knowledge if p = 0\<close>
 
 instance proof
   fix x a b c :: "('a, 'b) PermValue"
