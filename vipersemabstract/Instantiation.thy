@@ -329,7 +329,8 @@ qed (simp_all add: remove_only_def)
 
 definition points_to where
   "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> owns_only \<omega> hl }"
-                                                 
+
+(*
 abbreviation well_typed_concrete_heap where
   "well_typed_concrete_heap \<Gamma> h \<equiv> (\<forall>hl v. h hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
 
@@ -346,38 +347,41 @@ lemma well_typed_concrete_heap_remove:
   using assms(1) by auto
 
 (* TODO: change this to "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (heap_typed \<Gamma> (get_vh \<phi>))" *)
-definition well_typed_heap where
-  "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (well_typed_concrete_heap \<Gamma> (get_vh \<phi>))"
+*)
+
+abbreviation well_typed_heap where
+  "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
 
 lemma well_typed_heapI[intro]:
-  assumes "\<And>hl v. get_vh \<phi> hl = Some v \<Longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty)"
+  assumes "\<And>hl v ty. get_vh \<phi> hl = Some v \<Longrightarrow> \<Gamma> (snd hl) = Some ty \<Longrightarrow> v \<in> ty"
   shows "well_typed_heap \<Gamma> \<phi>"
-  by (simp add: Instantiation.well_typed_heap_def assms)
+  by (simp add: assms heap_typed_def)
 
 lemma well_typed_heapE:
   assumes "well_typed_heap \<Gamma> \<phi>"
       and "get_vh \<phi> hl = Some v"
-    shows "\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty"
+      and "\<Gamma> (snd hl) = Some ty"
+    shows "v \<in> ty"
   using assms
-  unfolding well_typed_heap_def by blast
+  unfolding heap_typed_def by blast
 
 lemma well_typed_heap_sum:
   assumes "Some x = a \<oplus> b"
       and "well_typed_heap \<Gamma> a"
       and "well_typed_heap \<Gamma> b"
     shows "well_typed_heap \<Gamma> x"
-  using Instantiation.well_typed_heap_def assms(1) assms(2) assms(3) sum_val_defined
-  by blast
+  using assms(1) assms(2) assms(3) heap_typed_def sum_val_defined
+  by smt
 
 lemma well_typed_heap_smaller:
   assumes "a \<succeq> b"
       and "Instantiation.well_typed_heap \<Gamma> a"
     shows "Instantiation.well_typed_heap \<Gamma> b"
-  by (metis Instantiation.well_typed_heap_def assms(1) assms(2) read_field.elims read_field_mono)
+  by (metis heap_typed_def assms(1) assms(2) read_field.elims read_field_mono)
 
 lemma well_typed_heap_core:
   "Instantiation.well_typed_heap \<Gamma> x = Instantiation.well_typed_heap \<Gamma> |x|"
-  by (simp add: Instantiation.well_typed_heap_def core_structure(2))
+  by (simp add: heap_typed_def core_structure(2))
 
 lemma partial_heap_same_sum:
   fixes h :: "'r partial_heap"

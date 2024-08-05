@@ -12,26 +12,26 @@ lemma exists_assertI:
       and "variables \<Delta> x = Some ty"
       and "v \<in> ty"
       and "assign_var_state x (Some v) \<omega> \<in> A"
-      and "typed \<Delta> \<omega>"
     shows "\<omega> \<in> exists_assert \<Delta> x A"
-  using assms exists_assert_def assign_var_state_def by fast
+  using assms
+  unfolding exists_assert_def assign_var_state_def by fast
 
 lemma exists_assertE:
   assumes "\<omega> \<in> exists_assert \<Delta> x A"
-  shows "\<exists>v0 v ty. typed \<Delta> \<omega> \<and> v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (assign_var_state x (Some v) \<omega>) \<in> A"
-  using assms exists_assert_def assign_var_state_def by auto
+  shows "\<exists>v0 v ty. v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> (assign_var_state x (Some v) \<omega>) \<in> A"
+  using assms
+  unfolding exists_assert_def assign_var_state_def
+  by blast
 
 lemma stabilize_assign_var:
   "stabilize (assign_var_state x v \<omega>) = assign_var_state x v (stabilize \<omega>)"
   unfolding assign_var_state_def by auto
 
 lemma self_framing_exists_assert:
-  assumes "self_framing_typed \<Delta> A"
-      and "typed_assertion \<Delta> A"
-  shows "self_framing_typed \<Delta> (exists_assert \<Delta> x A)"
-proof (rule self_framing_typedI)
+  assumes "self_framing A"
+  shows "self_framing (exists_assert \<Delta> x A)"
+proof (rule self_framingI)
   fix \<omega>
-  assume asm0: "typed \<Delta> \<omega>"
   show "\<omega> \<in> exists_assert \<Delta> x A \<longleftrightarrow> stabilize \<omega> \<in> exists_assert \<Delta> x A" (is "?A \<longleftrightarrow> ?B")
   proof
     assume "\<omega> \<in> exists_assert \<Delta> x A"
@@ -40,87 +40,23 @@ proof (rule self_framing_typedI)
     then have "get_store (stabilize \<omega>) x = Some v0 \<and> set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x \<mapsto> v)) = stabilize (assign_var_state x (Some v) \<omega>)"
       by (simp add: assign_var_state_def)
     then show ?B
-      by (smt (verit, del_insts) asm0 assms(1) exists_assertI r self_framing_typed_def stabilize_assign_var typed_assign_var typed_then_stabilize_typed)
+      by (smt (verit, ccfv_SIG) \<open>\<omega> \<in> exists_assert \<Delta> x A\<close> assms exists_assertI r self_framing_def stabilize_assign_var typed_state.exists_assertE typed_state_axioms typed_then_stabilize_typed)
+
   next
     assume asm1: ?B
-    then obtain v v0 ty where r: "typed \<Delta> (stabilize \<omega>)" "v0 \<in> ty" "get_store (stabilize \<omega>) x = Some v0"
-      "variables \<Delta> x = Some ty" "v \<in> ty" "assign_var_state x (Some v) (stabilize \<omega>) \<in> A"      
+    then obtain v v0 ty where r: "v0 \<in> ty" "get_store (stabilize \<omega>) x = Some v0"
+      "variables \<Delta> x = Some ty" "v \<in> ty" "assign_var_state x (Some v) (stabilize \<omega>) \<in> A"
       by (metis exists_assertE)
     show ?A
-      using r(2)
+      using r(1)
     proof (rule exists_assertI)
       show "get_store \<omega> x = Some v0"
-        using r(3) by auto
+        using r(2) by auto
       show "assign_var_state x (Some v) \<omega> \<in> A"
-        using asm0 assms(1) r(4) r(5) r(6) self_framing_typed_altE stabilize_assign_var typed_assign_var by metis
-    qed (simp_all add: r asm0)
+        by (metis assms in_Stabilize r(5) self_framing_eq stabilize_assign_var)
+    qed (simp_all add: r)
   qed
 qed
-
-
-lemma typed_assertion_exists_assert:
-  assumes "typed_assertion \<Delta> A"
-  shows "typed_assertion \<Delta> (exists_assert \<Delta> x A)"
-proof (rule typed_assertionI)
-  fix \<omega> assume "\<omega> \<in> exists_assert \<Delta> x A"
-    then obtain v v0 ty where r: "typed \<Delta> \<omega>" "v0 \<in> ty" "get_store \<omega> x = Some v0"
-      "variables \<Delta> x = Some ty" "v \<in> ty" "assign_var_state x (Some v) \<omega> \<in> A"      
-      by (metis exists_assertE)
-  then show "typed \<Delta> \<omega>"
-    by auto
-qed
-
-
-lemma typed_union:
-  assumes "typed_assertion \<Delta> A"
-      and "typed_assertion \<Delta> B"
-    shows "typed_assertion \<Delta> (A \<union> B)"
-  using assms(1) assms(2) typed_assertion_def by blast
-
-lemma typed_intersection:
-  assumes "typed_assertion \<Delta> A"
-  shows "typed_assertion \<Delta> (A \<inter> B)"
-  by (meson assms inf.cobounded1 typed_subset)
-
-
-lemma self_framing_typed_star:
-  assumes "self_framing_typed \<Delta> A"
-      and "framed_by A P"
-    shows "self_framing_typed \<Delta> (A \<otimes> P)"
-proof (rule self_framing_typedI)
-  fix \<omega>
-  assume asm0: "typed \<Delta> \<omega>"
-  show "(\<omega> \<in> A \<otimes> P) = (stabilize \<omega> \<in> A \<otimes> P)"
-  proof
-    assume "\<omega> \<in> A \<otimes> P"
-    then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
-      using x_elem_set_product by blast
-    then obtain \<omega>' where "Some \<omega>' = stabilize a \<oplus> p"
-      by (metis asso3 commutative decompose_stabilize_pure option.exhaust_sel)
-    then have "rel_stable_assertion (stabilize a) P"
-      by (meson \<open>Some \<omega> = a \<oplus> p\<close> \<open>a \<in> A\<close> asm0 assms(1) assms(2) framed_by_def greater_def stabilize_is_stable typed_state.self_framing_typedE typed_state.typed_smaller typed_state_axioms)
-    then have "stabilize \<omega>' \<in> {stabilize a} \<otimes> P"
-      by (meson Stable_def \<open>Some \<omega>' = stabilize a \<oplus> p\<close> \<open>p \<in> P\<close> in_Stabilize is_in_set_sum rel_stable_assertion_def subsetD)
-    moreover have "stabilize \<omega>' = stabilize \<omega>"
-      by (metis (no_types, lifting) \<open>Some \<omega> = a \<oplus> p\<close> \<open>Some \<omega>' = stabilize a \<oplus> p\<close> already_stable option.inject stabilize_is_stable stabilize_sum)
-    ultimately show "stabilize \<omega> \<in> A \<otimes> P"
-      by (metis \<open>Some \<omega> = a \<oplus> p\<close> \<open>a \<in> A\<close> asm0 assms(1) greater_def star_to_singletonI typed_smaller typed_state.self_framing_typedE typed_state_axioms)
-  next
-    assume "stabilize \<omega> \<in> A \<otimes> P"
-    then obtain a p where "a \<in> A" "p \<in> P" "Some (stabilize \<omega>) = a \<oplus> p"
-      by (meson x_elem_set_product)
-    moreover obtain aa where "Some aa = a \<oplus> |\<omega>|"
-      by (metis (mono_tags, opaque_lifting) asso2 calculation(3) commutative decompose_stabilize_pure option.exhaust_sel)
-    then have "Some \<omega> = aa \<oplus> p"
-      by (metis (no_types, lifting) asso1 calculation(3) commutative decompose_stabilize_pure)
-    moreover have "aa \<in> A"
-      by (metis (no_types, lifting) \<open>Some aa = a \<oplus> |\<omega>|\<close> asm0 assms(1) calculation(1) calculation(4) in_set_sum plus_pure_stabilize_eq self_framing_typed_def singletonD singletonI sum_then_singleton typed_smaller)
-    ultimately show "\<omega> \<in> A \<otimes> P"
-      using x_elem_set_product by blast
-  qed
-qed
-
-
 
 lemma typed_store_update:
   assumes "typed_store \<Delta> \<sigma>"
@@ -142,49 +78,17 @@ definition overapprox_fv :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) ab
 
 
 definition free_vars where
-  "free_vars \<Delta> A = (\<Inter>S \<in> {S. overapprox_fv \<Delta> A S \<and> S \<subseteq> dom (variables \<Delta>)}. S)"
+  "free_vars A = (\<Inter>S \<in> {S. overapprox_fv \<Delta> A S \<and> S \<subseteq> dom (variables \<Delta>)}. S)"
 *)
 
-definition wf_context where
-  "wf_context \<Delta> \<longleftrightarrow> finite (dom (variables \<Delta>))"
-
 lemma fvaA_atrue_empty[simp]:
-  assumes "wf_context \<Delta>"
-  shows "free_vars \<Delta> (atrue \<Delta>) = {}"
+  "free_vars \<Delta> UNIV = {}"
 proof -
-  have "overapprox_fv \<Delta> (atrue \<Delta>) {}"
-    unfolding overapprox_fv_def atrue_def
-    by blast
-  then have "{} \<in> {S. overapprox_fv \<Delta> (atrue \<Delta>) S \<and> S \<subseteq> dom (variables \<Delta>)}"
+  have "overapprox_fv \<Delta> UNIV {}"
+    unfolding overapprox_fv_def
     by blast
   then show ?thesis unfolding free_vars_def by blast
 qed
-
-lemma typed_assertion_fv_max:
-  assumes "typed_assertion \<Delta> A"
-  shows "overapprox_fv \<Delta> A (dom (variables \<Delta>))"
-  unfolding overapprox_fv_def
-proof clarify
-  fix \<sigma>1 \<sigma>2 \<gamma>
-  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2"
-  have "\<sigma>1 = \<sigma>2"
-  proof (rule ext)
-    fix x show "\<sigma>1 x = \<sigma>2 x"
-    proof (cases "x \<in> dom (variables \<Delta>)")
-      case True
-      then show ?thesis
-        by (meson \<open>equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2\<close> equal_on_set_def)
-    next
-      case False
-      then show ?thesis using asm0(1-2)
-        unfolding typed_def typed_store_def store_typed_def
-        by (metis agreement.sel domIff get_store_def prod.sel(1))
-    qed
-  qed
-  then show "((Ag \<sigma>1, \<gamma>) \<in> A) = ((Ag \<sigma>2, \<gamma>) \<in> A)"
-    by simp
-qed
-
 
 
 
@@ -217,10 +121,10 @@ lemma overapprox_fvI:
 
 lemma overapprox_fvE:
   assumes "overapprox_fv \<Delta> A S"
-      and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
-      and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
       and "equal_on_set S \<sigma>1 \<sigma>2"
       and "(Ag \<sigma>1, \<gamma>) \<in> A"
+      and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+      and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
     shows "(Ag \<sigma>2, \<gamma>) \<in> A"
   using assms overapprox_fv_def by blast
 
@@ -228,7 +132,7 @@ lemma intermediate_equal_set:
   assumes "equal_on_set (S1 \<inter> S2) \<sigma>1 \<sigma>2"
       and "typed_store \<Delta> \<sigma>1"
       and "typed_store \<Delta> \<sigma>2"
-  shows "\<exists>\<sigma>3. typed_store \<Delta> \<sigma>3 \<and> equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2"
+  shows "\<exists>\<sigma>3. equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2 \<and> typed_store \<Delta> \<sigma>3"
 proof -
   let ?\<sigma>3 = "(\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x)"
   have "equal_on_set S1 \<sigma>1 ?\<sigma>3"
@@ -236,18 +140,13 @@ proof -
   moreover have "equal_on_set S2 ?\<sigma>3 \<sigma>2" (* Needs a case split on x *)
     by (smt (verit) IntI agreement.sel assms equal_on_set_def)
   moreover have "typed_store \<Delta> ?\<sigma>3"
-  proof (rule typed_storeI)
-    show "dom (variables \<Delta>) = dom (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x)" (is "?A = ?B")
-    proof
-      show "?A \<subseteq> ?B"
-        by (smt (verit, best) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def store_typed_def)
-      show "?B \<subseteq> ?A"
-        by (smt (verit) agreement.sel assms(2) assms(3) domIff subsetI typed_store_def store_typed_def)
-    qed
-    show "\<And>x v ty. (\<lambda>x. if x \<in> S1 then \<sigma>1 x else \<sigma>2 x) x = Some v \<Longrightarrow> variables \<Delta> x = Some ty \<Longrightarrow> v \<in> ty"
-      by (smt (verit, best) agreement.sel assms(2) assms(3) typed_store_def store_typed_def)
-  qed
-  ultimately show ?thesis by blast
+    apply (rule typed_storeI)
+     apply (smt (verit, del_insts) Collect_cong assms(2) assms(3) dom_def mem_Collect_eq store_typed_def typed_store_def)
+    apply (case_tac "x \<in> S1")
+     apply (meson assms(2) store_typed_def typed_store_def)
+    by (meson assms(3) store_typed_def typed_store_def)
+  ultimately show ?thesis
+    by blast
 qed
 
 
@@ -257,42 +156,16 @@ lemma stable_by_intersection_overapprox_fv:
     shows "overapprox_fv \<Delta> A (S1 \<inter> S2)"
 proof (rule overapprox_fvI)
   fix \<sigma>1 \<sigma>2 \<gamma>
-  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (S1 \<inter> S2) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> A"
+  assume asm0: "equal_on_set (S1 \<inter> S2) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> A" "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
   then obtain \<sigma>3 where "equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2" "typed_store \<Delta> \<sigma>3"
     unfolding typed_def
-    using intermediate_equal_set[of S1 S2 \<sigma>1 \<sigma>2 \<Delta>]
-    by (metis agreement.sel fst_eqD get_store_def)
-  then have "typed \<Delta> (Ag \<sigma>3, \<gamma>)"
-    using asm0(1) unfolding typed_def
-    by (simp add: get_abs_state_def get_store_def)
+    using intermediate_equal_set[of S1 S2 \<sigma>1 \<sigma>2]
+    by (metis agreement.sel fst_conv get_store_def)
   then have "(Ag \<sigma>3, \<gamma>) \<in> A"
-    using overapprox_fvE[of \<Delta> A S1 \<sigma>1 \<gamma> \<sigma>3]
-    using \<open>equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2\<close> asm0(1) asm0(4) assms(1) by blast
+    by (metis agreement.sel asm0(2) asm0(3) assms(1) fst_conv get_abs_state_def get_store_def overapprox_fvE snd_conv typed_state.typed_def typed_state_axioms)
   then show "(Ag \<sigma>2, \<gamma>) \<in> A"
-    using overapprox_fvE[of \<Delta> A S2]
-    using \<open>equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2\<close> \<open>typed \<Delta> (Ag \<sigma>3, \<gamma>)\<close> asm0(2) assms(2) by blast
+    by (metis \<open>equal_on_set S1 \<sigma>1 \<sigma>3 \<and> equal_on_set S2 \<sigma>3 \<sigma>2\<close> \<open>typed_store \<Delta> \<sigma>3\<close> agreement.sel asm0(4) assms(2) fst_conv get_abs_state_def get_store_def overapprox_fvE snd_conv typed_state.typed_def typed_state_axioms)
 qed
-
-lemma overapprox_fv_dom:
-  "overapprox_fv \<Delta> A (dom (variables \<Delta>))"
-proof (rule overapprox_fvI)
-  fix \<sigma>1 \<sigma>2 \<gamma>
-  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)" "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> A"
-  have "\<sigma>1 = \<sigma>2"
-  proof (rule ext)
-    fix x show "\<sigma>1 x = \<sigma>2 x"
-      apply (cases "x \<in> dom (variables \<Delta>)")
-      apply (meson asm0(3) equal_on_set_def)
-      by (smt (z3) Diff_iff agreement.sel asm0(1) asm0(2) asm0(3) insert_iff overapprox_fvE prod.sel(1) typed_assertionI typed_assertion_fv_max)
-  qed
-  then show "(Ag \<sigma>2, \<gamma>) \<in> A"
-    using agreement.expand asm0(4) by blast
-qed
-
-lemma typed_assertion_then_fv_in:
-  "free_vars \<Delta> A \<subseteq> dom (variables \<Delta>)"
-  unfolding free_vars_def
-  by (simp add: Inf_lower overapprox_fv_dom)
 
 lemma finite_family_property_aux:
   assumes "finite F"
@@ -359,27 +232,27 @@ proof -
 qed
 
 lemma free_vars_overapprox_wf_context:
-  assumes "wf_context \<Delta>"
-    shows "overapprox_fv \<Delta> A (free_vars \<Delta> A)"
-  by (meson assms free_vars_exists_finite overapprox_fv_dom wf_context_def)
+  assumes "wf_assertion \<Delta> A"
+  shows "overapprox_fv \<Delta> A (free_vars \<Delta> A)"
+  by (meson assms free_vars_exists_finite wf_assertion_def)
 
 lemma free_vars_agree:
-  assumes "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+  assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
+      and "wf_assertion \<Delta> A"
+      and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
       and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
-      and "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
-      and "wf_context \<Delta>"
     shows "((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A)"
-  using assms(1) assms(2) assms(3) assms(4) typed_state.free_vars_overapprox_wf_context typed_state.overapprox_fv_def typed_state_axioms by blast
+  using assms(1) assms(2) assms(3) assms(4) free_vars_overapprox_wf_context overapprox_fv_def by blast
 
 
 lemma free_varsE:
   assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
+      and "(Ag \<sigma>1, \<gamma>) \<in> A"
+      and "wf_assertion \<Delta> A"
       and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
       and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
-      and "(Ag \<sigma>1, \<gamma>) \<in> A"
-      and "wf_context \<Delta>"
     shows "(Ag \<sigma>2, \<gamma>) \<in> A"
-  using assms free_vars_agree[of \<Delta> \<sigma>1 \<gamma> \<sigma>2 A] by blast
+  using assms(1) assms(2) assms(3) assms(4) assms(5) free_vars_agree by blast
 
 end
 
@@ -516,7 +389,7 @@ lemma red_stmt_induct_simple_wf [consumes 4, case_names Inhale Exhale Custom Hav
       and "wf_abs_stmt \<Delta> C"
       and "\<omega>' \<in> S"
       and "\<And>(A :: ('v, 'a) abs_state assertion) \<omega>' \<omega> \<Delta> a.
-        rel_stable_assertion \<omega> A \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> a \<in> A \<Longrightarrow> Some \<omega>' = \<omega> \<oplus> a \<Longrightarrow> wf_assertion \<Delta> A \<Longrightarrow> P \<Delta> \<omega>'"
+        rel_stable_assertion \<omega> A \<Longrightarrow> stable \<omega>' \<Longrightarrow> typed \<Delta> \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> a \<in> A \<Longrightarrow> Some \<omega>' = \<omega> \<oplus> a \<Longrightarrow> wf_assertion \<Delta> A \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>a (A :: ('v, 'a) abs_state assertion) \<omega> \<omega>' \<Delta>. a \<in> A \<Longrightarrow> Some \<omega> = \<omega>' \<oplus> a \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> wf_assertion \<Delta> A \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>\<Delta> S \<omega> \<omega>' C. P \<Delta> \<omega> \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> red_custom_stmt \<Delta> C \<omega> S \<Longrightarrow> \<omega>' \<in> S \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
@@ -573,7 +446,7 @@ lemma red_typed_heap:
 proof (induct rule: red_stmt_induct_simple_wf)
   case (Inhale A \<omega>' \<omega> \<Delta> a)
   then show ?case
-    by (simp add: full_add_charact(2) typed_assertion_def typed_def wf_custom_state_sum wf_assertion_def)
+    by (simp add: full_add_charact(2) typed_def wf_custom_state_sum wf_assertion_def)
 next
   case (Exhale a A \<omega> \<omega>' \<Delta>)
   then show ?case using wf_custom_state_smaller
@@ -634,7 +507,6 @@ lemma stable_substitute_var:
 lemma wf_assertion_stabilize:
   assumes "wf_assertion \<Delta> A"
       and "stabilize \<omega> \<in> A"
-      and "typed \<Delta> \<omega>"
     shows "\<omega> \<in> A"
   using assms wf_assertion_def pure_larger_stabilize by blast
 
@@ -653,21 +525,19 @@ qed
 
 
 lemma self_framing_post_substitute_var_assert:
-  assumes "self_framing_typed \<Delta> A"
+  assumes "self_framing A"
       and "wf_exp e"
       and "framed_by_exp A e"
-      and "typed_assertion \<Delta> A"
-    shows "self_framing_typed \<Delta> (post_substitute_var_assert x e A)"
-proof (rule self_framing_typedI)
+    shows "self_framing (post_substitute_var_assert x e A)"
+proof (rule self_framingI)
   fix \<omega>
-  assume asm0: "typed \<Delta> \<omega>"
   show "\<omega> \<in> post_substitute_var_assert x e A \<longleftrightarrow> stabilize \<omega> \<in> post_substitute_var_assert x e A" (is "?P \<longleftrightarrow> ?Q")
   proof
     assume ?P
     then obtain a where "a \<in> A" "\<omega> = substitute_var_state x e a"
       using post_substitute_var_assert_def by blast
     then have "stabilize a \<in> A"
-      by (meson assms(1) assms(4) self_framing_typed_def typed_assertion_def)
+      by (meson assms(1) self_framing_def)
 
     then have "stabilize \<omega> = substitute_var_state x e (stabilize a)"
       by (metis \<open>\<omega> = substitute_var_state x e a\<close> assms(2) assms(3) framed_by_exp_def stabilize_substitute_var)
@@ -688,7 +558,7 @@ proof (rule self_framing_typedI)
     have "stabilize ?a = a"
       using \<open>a = set_store (stabilize \<omega>) ((get_store (stabilize \<omega>))(x := get_store a x))\<close> by fastforce
     then have "?a \<in> A"
-      by (metis \<open>a \<in> A\<close> asm0 assms(1) assms(4) get_abs_state_set_store get_store_stabilize self_framing_typed_def typed_assertion_def typed_def)
+      by (metis \<open>a \<in> A\<close> assms(1) self_framing_def)
     moreover have "\<omega> = set_store ?a ((get_store ?a)(x \<mapsto> v))"
       by (metis \<open>stabilize (set_store \<omega> ((get_store \<omega>)(x := get_store a x))) = a\<close> \<open>stabilize \<omega> = set_store a ((get_store a)(x \<mapsto> v))\<close> full_state_ext get_abs_state_set_store get_store_set_store get_store_stabilize)
     ultimately show ?P
@@ -696,42 +566,134 @@ proof (rule self_framing_typedI)
   qed
 qed
 
-lemma typed_assertion_post_substitute_var_assert:
-  assumes "typed_assertion \<Delta> A"
-      and "framed_by_exp A e"
-      and "variables \<Delta> x = Some ty"
-      and "typed_exp ty e"
-    shows "typed_assertion \<Delta> (post_substitute_var_assert x e A)"
-    by (smt (verit, ccfv_threshold) assms framed_by_expE image_iff post_substitute_var_assert_def substitute_var_state_def typed_assertion_def typed_assign_var typed_exp_def)
+definition semi_typed where
+  "semi_typed \<Delta> A \<longleftrightarrow> (\<forall>\<omega>\<in>A. typed \<Delta> (stabilize \<omega>))"
 
+lemma semi_typedE:
+  assumes "semi_typed \<Delta> A"
+      and "\<omega> \<in> A"
+    shows "typed \<Delta> (stabilize \<omega>)"
+  using assms(1) assms(2) semi_typed_def by blast
 
+lemma semi_typedI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> typed \<Delta> (stabilize \<omega>)"
+  shows "semi_typed \<Delta> A"
+  by (simp add: assms semi_typed_def)
 
-lemma proofs_are_self_framing_and_typed:
+lemma semi_typed_star:
+  assumes "semi_typed \<Delta> A"
+      and "semi_typed \<Delta> B"
+    shows "semi_typed \<Delta> (A \<otimes> B)"
+proof (rule semi_typedI)
+  fix \<omega> assume asm0: "\<omega> \<in> A \<otimes> B"
+  then show "typed \<Delta> (stabilize \<omega>)"
+    by (meson assms(1) assms(2) semi_typedE stabilize_sum typed_sum x_elem_set_product)
+qed
+
+lemma typed_set_stabilize_semi_typed:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> typed \<Delta> \<omega>"
+  shows "semi_typed \<Delta> (Stabilize A)"
+  apply (rule semi_typedI)
+  by (simp add: assms)
+
+(*
+
+lemma proofs_are_self_framing:
   assumes "\<Delta> \<turnstile> [P] C [Q]"
       and "wf_abs_stmt \<Delta> C"
-  shows "self_framing_and_typed \<Delta> P \<and> self_framing_and_typed \<Delta> Q"
+  shows "self_framing P \<and> self_framing Q \<and> semi_typed \<Delta> P \<and> semi_typed \<Delta> Q"
   using assms
 proof (induct rule: SL_proof.induct)
-  case (RuleInhale \<Delta> A P)
+  case (RuleInhale A P \<Delta>)
+  then have "self_framing (A \<otimes> P)"
+    using self_framing_star by auto
+  moreover have r: "framed_by A (Set.filter (typed \<Delta> \<circ> stabilize) P)"
+  proof (rule framed_byI)
+    fix \<omega> assume asm0: "\<omega> \<in> A" "sep_algebra_class.stable \<omega>"
+    then have r: "rel_stable_assertion \<omega> P"
+      using RuleInhale.hyps(2) framed_by_def by blast
+    show "rel_stable_assertion \<omega> (Set.filter (typed \<Delta> \<circ> stabilize) P)"
+      unfolding rel_stable_assertion_def
+    proof (rule stable_set_filter_stabilize)
+      show "{\<omega>} \<otimes> P \<subseteq> Stabilize ({\<omega>} \<otimes> P)"
+        using Stable_def r rel_stable_assertion_def by blast
+      show "Stabilize ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> P"
+      proof
+        fix x assume "x \<in> Stabilize ({\<omega>} \<otimes> P)"
+        then obtain p where "p \<in> P" "Some (stabilize x) = \<omega> \<oplus> p"
+          by (smt (verit, best) in_Stabilize singletonD x_elem_set_product)
+        then obtain p' where "Some p' = p \<oplus> |x|"
+          by (metis asso2 decompose_stabilize_pure option.exhaust_sel)
+        then have "p' \<in> P"
+          using wf_assertionE[of \<Delta> P p' p]
+          using RuleInhale.prems \<open>p \<in> P\<close> core_is_pure pure_def pure_larger_def semantics.wf_abs_stmt.simps(2) semantics_axioms by blast
+        then show "x \<in> {\<omega>} \<otimes> P"
+          by (metis (no_types, lifting) \<open>Some (stabilize x) = \<omega> \<oplus> p\<close> \<open>Some p' = p \<oplus> |x|\<close> asso1 decompose_stabilize_pure singletonI x_elem_set_product)
+      qed
+      show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P = Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)" (is "?A = ?B")
+      proof
+        show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P \<subseteq> Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)"
+        proof
+          fix x assume "x \<in> ?A"
+          then obtain p where "p \<in> P" "typed \<Delta> (stabilize p)" "Some x = \<omega> \<oplus> p"
+            using in_singleton_star by force
+          then have "typed \<Delta> (stabilize x)"
+            sorry
+          then show "x \<in> ?B"
+            by (simp add: \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum)
+        qed
+        show "Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+        proof
+          fix x assume "x \<in> ?B"
+          then obtain p where "p \<in> P" "Some x = \<omega> \<oplus> p" "typed \<Delta> (stabilize x)"
+            by (metis comp_apply in_singleton_star member_filter)
+          then have "typed \<Delta> (stabilize p)"
+            using greater_equiv stabilize_mono typed_smaller by blast
+          then show "x \<in> ?A"
+            using \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum by fastforce
+        qed
+      qed
+    qed
+  qed
+
+
+  then show ?case sorry
+(*
+  have "self_framing (A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
+  proof (rule self_framingI)
+    fix \<omega> show "(\<omega> \<in> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P) = (stabilize \<omega> \<in> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)" (is "?A = ?B")
+    proof
+      assume ?A then show ?B sorry
+    next
+      assume ?B then show ?A
+        sorry
+(*
+Set.filter (typed \<Delta> \<circ> stabilize) P
+*)
   then show ?case
-    by (simp add: self_framing_typed_star typed_star wf_assertion_def)
+    sorry
+
+    by (simp add: self_framing_star wf_assertion_def)
+*)
 next
   case (RuleIf A b \<Delta> C1 B1 C2 B2)
   then show ?case
-    by (simp add: self_framing_typed_def typed_union)
+    by (simp add: self_framing_def)
 next
   case (RuleHavoc A \<Delta> x)
   then show ?case
-    using self_framing_exists_assert typed_assertion_exists_assert by blast
+    using self_framing_exists_assert by blast
 next
   case (RuleLocalAssign A e \<Delta> x)
   then show ?case
-    by (meson self_framing_post_substitute_var_assert typed_assertion_post_substitute_var_assert wf_abs_stmt.simps(8) )
+    by (meson self_framing_post_substitute_var_assert wf_abs_stmt.simps(8) )
 next
   case (RuleAssume A P \<Delta>)
   then show ?case
-    by (smt (verit) Int_iff self_framing_on_def self_framing_typed_def typed_intersection)
+    by (smt (verit) Int_iff self_framing_on_def self_framing_def)
 qed (simp_all)
+
+*)
 
 lemma wf_set_after_union:
   assumes "\<And>\<omega>. \<omega> \<in> S \<Longrightarrow> wf_set \<Delta> (f \<omega>)"
@@ -752,67 +714,58 @@ lemma wf_state_then_value:
   by (metis assms(1) assms(2) domD domI typed_def typed_store_def wf_state_def store_typed_def)
 
 
-lemma self_framing_typed_Stabilize_typed_ext:
-    assumes "\<And>\<omega>. stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
-      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> typed \<Delta> \<omega>  \<Longrightarrow> \<omega> \<in> B \<Longrightarrow> \<omega> \<in> A"
-    shows "Stabilize_typed \<Delta> A = Stabilize_typed \<Delta> B"
-  by (smt (verit, ccfv_SIG) Stabilize_typed_def already_stable assms(1) assms(2) in_Stabilize member_filter self_framing_Stabilize_typed self_framing_typed_ext typed_Stabilize_typed)
+lemma Stabilize_ext:
+    assumes "\<And>\<omega>. stable \<omega> \<Longrightarrow> \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
+      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> \<omega> \<in> B \<Longrightarrow> \<omega> \<in> A"
+    shows "Stabilize A = Stabilize B"
+  using assms(1) assms(2) by force
 
 
 lemma wf_exp_framed_by_typed:
   assumes "wf_exp b"
       and "framed_by_exp A b"
-      and "self_framing_typed \<Delta> A"
-    shows "self_framing_typed \<Delta> (A \<otimes> pure_typed \<Delta> b)"
-proof (rule self_framing_typedI)
+      and "self_framing A"
+    shows "self_framing (A \<otimes> purify b)"
+proof (rule self_framingI)
   fix \<omega>
-  assume asm0: "typed \<Delta> \<omega>"
-  show "\<omega> \<in> A \<otimes> pure_typed \<Delta> b \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> pure_typed \<Delta> b" (is "?P \<longleftrightarrow> ?Q")
+  show "\<omega> \<in> A \<otimes> purify b \<longleftrightarrow> stabilize \<omega> \<in> A \<otimes> purify b" (is "?P \<longleftrightarrow> ?Q")
   proof
     assume ?P
-    then obtain a r where "Some \<omega> = a \<oplus> r" "a \<in> A" "b r = Some True" "pure r" "typed \<Delta> r"
-      by (smt (verit, ccfv_SIG) mem_Collect_eq pure_typed_def x_elem_set_product)
+    then obtain a r where "Some \<omega> = a \<oplus> r" "a \<in> A" "b r = Some True" "pure r"
+      by (smt (verit, ccfv_SIG) mem_Collect_eq purify_def x_elem_set_product)
     then obtain r' where "Some r' = stabilize r \<oplus> |stabilize a|"
       by (metis (no_types, opaque_lifting) asso3 commutative core_is_smaller option.exhaust_sel stabilize_sum)
     then have "Some (stabilize \<omega>) = stabilize a \<oplus> r'"
       by (smt (verit) \<open>Some \<omega> = a \<oplus> r\<close> asso1 commutative core_is_smaller stabilize_sum)
     moreover have "stabilize a \<in> A"
-      by (metis \<open>Some \<omega> = a \<oplus> r\<close> \<open>a \<in> A\<close> asm0 assms(3) commutative greater_equiv self_framing_typedE typed_smaller)
+      by (metis \<open>a \<in> A\<close> assms(3) self_framing_def)
     moreover have "pure r'"
       by (meson \<open>Some r' = stabilize r \<oplus> |stabilize a|\<close> \<open>pure r\<close> core_is_pure pure_def pure_stable stabilize_sum)
     then have "b r' \<noteq> None"
       by (metis (no_types, opaque_lifting) \<open>Some r' = stabilize r \<oplus> |stabilize a|\<close> assms(1) assms(2) calculation(2) framed_by_exp_def greater_equiv not_Some_eq wf_exp_def)
     then have "b r' = Some True"
       by (smt (verit, ccfv_SIG) \<open>Some \<omega> = a \<oplus> r\<close> \<open>b r = Some True\<close> assms(1) calculation(1) commutative greater_def option.exhaust wf_exp_def wf_exp_stabilize)
-    moreover have "typed \<Delta> r'"
-      by (metis asm0 calculation(1) commutative greater_def typed_smaller typed_then_stabilize_typed)
-    ultimately have "r' \<in> pure_typed \<Delta> b"
-      by (simp add: \<open>pure r'\<close> pure_typed_def)   
+    ultimately have "r' \<in> purify b"
+      by (simp add: \<open>pure r'\<close> purify_def)   
     then show ?Q
       using \<open>Some (stabilize \<omega>) = stabilize a \<oplus> r'\<close> \<open>stabilize a \<in> A\<close> x_elem_set_product by blast
   next
     assume ?Q
-    then obtain a p where "Some (stabilize \<omega>) = a \<oplus> p" "a \<in> A" "pure p" "b p = Some True" "typed \<Delta> p"
-      by (smt (verit, best) CollectD pure_typed_def x_elem_set_product)
+    then obtain a p where "Some (stabilize \<omega>) = a \<oplus> p" "a \<in> A" "pure p" "b p = Some True"
+      by (smt (verit, best) CollectD purify_def x_elem_set_product)
     then obtain p' where "Some p' = p \<oplus> |\<omega>|"
       by (metis asso2 decompose_stabilize_pure option.exhaust_sel)
     then have "Some \<omega> = a \<oplus> p'"
       by (metis (no_types, lifting) \<open>Some (stabilize \<omega>) = a \<oplus> p\<close> asso1 decompose_stabilize_pure)
     then have "b p' \<noteq> None"
       by (metis \<open>Some p' = p \<oplus> |\<omega>|\<close> \<open>b p = Some True\<close> assms(1) greater_def option.simps(3) wf_expE)
-    then have "p' \<in> pure_typed \<Delta> b"
+    then have "p' \<in> purify b"
       using wf_exp_combinedE[OF assms(1), of p True p']
-      by (smt (verit, ccfv_threshold) CollectI \<open>Some (stabilize \<omega>) = a \<oplus> p\<close> \<open>Some \<omega> = a \<oplus> p'\<close> \<open>Some p' = p \<oplus> |\<omega>|\<close> \<open>b p = Some True\<close> \<open>pure p\<close> asm0 asso1 commutative core_stabilize_mono(1) greater_equiv max_projection_prop_def max_projection_prop_pure_core minusI pure_typed_def  stabilize_is_stable stable_and_sum_pure_same typed_core)
+      by (smt (verit, ccfv_SIG) \<open>Some p' = p \<oplus> |\<omega>|\<close> \<open>b p = Some True\<close> \<open>pure p\<close> core_stabilize_mono(1) greater_def max_projection_prop_def max_projection_prop_pure_core mem_Collect_eq pure_stable purify_def)
     then show ?P
       by (meson \<open>Some \<omega> = a \<oplus> p'\<close> \<open>a \<in> A\<close> x_elem_set_product)
   qed
 qed
-
-lemma stabilize_typed_elem:
-  "\<omega> \<in> Stabilize_typed \<Delta> A \<longleftrightarrow> typed \<Delta> \<omega> \<and> stabilize \<omega> \<in> A"
-  using Stabilize_typed_def 
-  by fastforce
-
 
 text \<open>fst \<omega> is the past (list of all past states), it represents the real choice. Indeed, imagine
 1) {\<omega>1} --> {\<omega>'} --> {\<omega>1'}
@@ -825,13 +778,14 @@ lemma Viper_implies_SL_proof_aux:
   assumes "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> red_stmt \<Delta> C (snd \<omega>) (f \<omega>)"
       and "wf_abs_stmt \<Delta> C"
       and "wf_set \<Delta> (snd ` SA)"
-    shows "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] C [Stabilize_typed \<Delta> (\<Union>\<omega>\<in>SA. f \<omega>)]"
+      and "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+    shows "\<Delta> \<turnstile> [Stabilize (snd ` SA)] C [Stabilize (\<Union>\<omega>\<in>SA. f \<omega>)]"
   using assms
 proof (induct C arbitrary: SA f)
   case (Seq C1 C2)
-  let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (snd ` SA)"
   let ?SB = "\<Union>\<omega>\<in>SA. f \<omega>"
-  let ?B = "Stabilize_typed \<Delta> ?SB"
+  let ?B = "Stabilize ?SB"
 
   define f1 :: "(('v, 'a) abs_state list \<times> ('v, 'a) abs_state) \<Rightarrow> ('v, 'a) abs_state set"
     where "f1 = (\<lambda>\<omega>. SOME S1. red_stmt \<Delta> C1 (snd \<omega>) S1 \<and> sequential_composition \<Delta> S1 C2 (f \<omega>))"
@@ -847,7 +801,7 @@ proof (induct C arbitrary: SA f)
       by (smt (verit) someI_ex f1_def)
   qed
 
-  let ?R' = "Stabilize_typed \<Delta> (\<Union>\<omega>\<in>SA. f1 \<omega>)"
+  let ?R' = "Stabilize (\<Union>\<omega>\<in>SA. f1 \<omega>)"
 
   have "\<Delta> \<turnstile> [?A] C1 [?R']"
   proof (rule Seq(1))
@@ -860,10 +814,12 @@ proof (induct C arbitrary: SA f)
       using asm0(1) by auto
     ultimately show "red_stmt \<Delta> C1 (snd \<omega>) (f1 \<omega>)"
       by blast
+    show "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+      using Seq.prems(4) by auto
   qed (simp add: Seq)
 
   let ?SR = "\<Union>\<omega>\<in>SA. {snd \<omega> # fst \<omega>} \<times> f1 \<omega>"
-  let ?R = "Stabilize_typed \<Delta> (snd ` ?SR)"
+  let ?R = "Stabilize (snd ` ?SR)"
 
   define pre_f2 where
     "pre_f2 = (\<lambda>\<omega>. SOME f2. (\<forall>\<omega>' \<in> {snd \<omega> # fst \<omega>} \<times> f1 \<omega>. red_stmt \<Delta> C2 (snd \<omega>') (f2 \<omega>')) \<and> f \<omega> = (\<Union>\<omega>' \<in> {snd \<omega> # fst \<omega>} \<times> f1 \<omega>. f2 \<omega>'))"
@@ -908,7 +864,7 @@ proof (induct C arbitrary: SA f)
 
   define f2 where "f2 = (\<lambda>\<omega>'. pre_f2 (tl (fst \<omega>'), hd (fst \<omega>')) \<omega>')"
 
-  have "\<Delta> \<turnstile> [?R] C2 [Stabilize_typed \<Delta> (\<Union> (f2 ` ?SR))]"
+  have "\<Delta> \<turnstile> [?R] C2 [Stabilize (\<Union> (f2 ` ?SR))]"
   proof (rule Seq(2))
     fix \<omega>' assume "\<omega>' \<in> (\<Union>\<omega>\<in>SA. {snd \<omega> # fst \<omega>} \<times> f1 \<omega>)"
     then obtain \<omega> where "\<omega> \<in> SA" "fst \<omega>' = snd \<omega> # fst \<omega>" "snd \<omega>' \<in> f1 \<omega>"
@@ -937,6 +893,8 @@ proof (induct C arbitrary: SA f)
       then show "wf_state \<Delta> \<omega>'"
         using wf_set_def \<open>\<omega>' \<in> f1 \<omega>\<close> by blast
     qed
+    show "\<And>\<alpha>. \<alpha> \<in> (\<Union>\<omega>\<in>SA. {snd \<omega> # fst \<omega>} \<times> f1 \<omega>) \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+      by (metis (no_types, lifting) \<open>wf_set \<Delta> (snd ` (\<Union>\<omega>\<in>SA. {snd \<omega> # fst \<omega>} \<times> f1 \<omega>))\<close> image_eqI wf_set_def wf_state_def)
   qed
 
   moreover have "snd ` ?SR = (\<Union>\<omega>\<in>SA. f1 \<omega>)"
@@ -994,11 +952,11 @@ proof (induct C arbitrary: SA f)
         using \<open>\<omega> \<in> SA\<close> by blast
     qed
   qed
-  then have "?B = Stabilize_typed \<Delta> (\<Union> (f2 ` ?SR))"
+  then have "?B = Stabilize (\<Union> (f2 ` ?SR))"
     by presburger
 
   ultimately show "\<Delta> \<turnstile> [?A] C1 ;; C2 [?B]"
-    using RuleSeq \<open>\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] C1 [Stabilize_typed \<Delta> (\<Union> (f1 ` SA))]\<close> by force
+    using RuleSeq \<open>\<Delta> \<turnstile> [Stabilize (snd ` SA)] C1 [Stabilize (\<Union> (f1 ` SA))]\<close> by force
 next
   case (If b C1 C2)
   let ?S1 = "Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA"
@@ -1020,10 +978,10 @@ next
     qed
   qed
 
-  let ?A1 = "Stabilize_typed \<Delta> (snd ` ?S1)"
-  let ?B1 = "Stabilize_typed \<Delta> (\<Union> (f ` ?S1))"
+  let ?A1 = "Stabilize (snd ` ?S1)"
+  let ?B1 = "Stabilize (\<Union> (f ` ?S1))"
 
-  have "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` ?S1)] C1 [Stabilize_typed \<Delta> (\<Union> (f ` ?S1))]"
+  have "\<Delta> \<turnstile> [Stabilize (snd ` ?S1)] C1 [Stabilize (\<Union> (f ` ?S1))]"
   proof (rule If(1))
     show "\<And>\<omega>. \<omega> \<in> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<Longrightarrow> red_stmt \<Delta> C1 (snd \<omega>) (f \<omega>)"
       using If.prems(1) by fastforce
@@ -1031,98 +989,84 @@ next
       using If.prems(2) wf_abs_stmt.simps(6) by blast
     show "wf_set \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)"
       by (metis (no_types, lifting) If.prems(3) \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> image_mono inf_sup_ord(3) wf_set_subset)
+    show "\<And>\<alpha>. \<alpha> \<in> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+      by (simp add: If.prems(4))
   qed
 
-  have "framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) b"
+  have "framed_by_exp (Stabilize (snd ` SA)) b"
   proof (rule framed_by_expI)
-    fix \<omega> assume "\<omega> \<in> (Stabilize_typed \<Delta> (snd ` SA))"
+    fix \<omega> assume "\<omega> \<in> (Stabilize (snd ` SA))"
     then have "stabilize \<omega> \<in> snd ` SA"
-      using stabilize_typed_elem by blast
+      using in_Stabilize by blast
     then show "b \<omega> \<noteq> None"
       by (smt (verit, ccfv_SIG) If.prems(1) If.prems(2) imageE max_projection_prop_def max_projection_prop_stable_stabilize option.distinct(1) red_stmt_If_elim wf_abs_stmt.simps(6) wf_expE)
   qed
 
-  have "?A1 = Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b"
-  proof (rule self_framing_typed_ext)
-    show "self_framing_typed \<Delta> ?A1"
-      using self_framing_Stabilize_typed by blast
-    show "self_framing_typed \<Delta> (Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b)"
-      by (metis (mono_tags, lifting) If.prems(2) \<open>framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) b\<close> self_framing_Stabilize_typed wf_abs_stmt.simps(6) wf_exp_framed_by_typed)
-    show "typed_assertion \<Delta> (Stabilize_typed \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA))"
-      using typed_Stabilize_typed by blast
-    show "typed_assertion \<Delta> (Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b)"
-      by (simp add: typed_assertion_pure_typed typed_star)
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A1" "typed \<Delta> \<omega>"
+  have "?A1 = Stabilize (snd ` SA) \<otimes> purify b"
+  proof (rule self_framing_ext)
+
+    show "self_framing (Stabilize (snd ` SA) \<otimes> purify b)"
+      using If(4) Stabilize_self_framing \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> semantics.wf_exp_framed_by_typed semantics_axioms wf_abs_stmt.simps(6) by blast
+
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A1"
     then have "b (stabilize \<omega>) = Some True"
-      using stabilize_typed_elem[of \<omega> \<Delta> ] 
       by fastforce
-    show "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b"
+    show "\<omega> \<in> Stabilize (snd ` SA) \<otimes> purify b"
     proof -
-      have "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-        by (metis (no_types, lifting) UnI1 \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> asm0(2) image_Un in_Stabilize member_filter Stabilize_typed_def)
+      have "\<omega> \<in> Stabilize (snd ` SA)"
+        by (metis (no_types, lifting) UnI1 \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> asm0(2) image_Un in_Stabilize)
       moreover have "b |\<omega>| = Some True"
         using wf_exp_coreE[of b \<omega>]
         using If.prems(2) \<open>b (stabilize \<omega>) = Some True\<close> already_stable asm0(1) by fastforce
       moreover have "Some \<omega> = \<omega> \<oplus> |\<omega>|"
         by (simp add: core_is_smaller)
       ultimately show ?thesis
-        by (smt (verit) CollectI asm0(3) max_projection_prop_def max_projection_prop_pure_core pure_typed_def typed_smaller x_elem_set_product)
+        by (smt (verit) CollectI max_projection_prop_def max_projection_prop_pure_core purify_def typed_smaller x_elem_set_product)
     qed
   next
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b"
-    then have "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<and> b \<omega> = Some True"
-      by (smt (verit, best) CollectD If.prems(2) add_set_commm in_set_sum pure_typed_def wf_abs_stmt.simps(6)  stable_and_sum_pure_same wf_exp_def x_elem_set_product)
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (snd ` SA) \<otimes> purify b"
+    then have "\<omega> \<in> Stabilize (snd ` SA) \<and> b \<omega> = Some True"
+      by (smt (verit, best) CollectD If.prems(2) add_set_commm in_set_sum purify_def wf_abs_stmt.simps(6)  stable_and_sum_pure_same wf_exp_def x_elem_set_product)
     then show "\<omega> \<in> ?A1"
-      by (smt (verit, ccfv_threshold) already_stable asm0(1) image_iff member_filter stabilize_typed_elem)
-  qed
+      using already_stable asm0(1) by force
+  qed (simp_all)
 
-  let ?A2 = "Stabilize_typed \<Delta> (snd ` ?S2)"
-  let ?B2 = "Stabilize_typed \<Delta> (\<Union> (f ` ?S2))"
+  let ?A2 = "Stabilize (snd ` ?S2)"
+  let ?B2 = "Stabilize (\<Union> (f ` ?S2))"
 
 
-  have "?A2 = Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b)"
-  proof (rule self_framing_typed_ext)
-    show "self_framing_typed \<Delta> ?A2"
-      using self_framing_Stabilize_typed by blast
-    show "self_framing_typed \<Delta> (Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b))"
-      using If.prems(2) \<open>framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) b\<close> framed_by_negate self_framing_Stabilize_typed wf_exp_framed_by_typed  wf_abs_stmt.simps(6) wf_exp_negate by blast
-    
-    show "typed_assertion \<Delta> (Stabilize_typed \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA))"
-      using typed_Stabilize_typed by blast
-    show "typed_assertion \<Delta> (Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b))"
-      by (simp add: typed_assertion_pure_typed typed_star)
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A2" "typed \<Delta> \<omega>"
-    then have "b (stabilize \<omega>) = Some False"
-      using stabilize_typed_elem[of \<omega> \<Delta>] by fastforce
-    show "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b)"
+  have "?A2 = Stabilize (snd ` SA) \<otimes> purify (negate b)"
+  proof (rule self_framing_ext)
+    show "self_framing (Stabilize (snd ` SA) \<otimes> purify (negate b))"
+      using If.prems(2) Stabilize_self_framing \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> framed_by_negate semantics.wf_abs_stmt.simps(6) semantics_axioms wf_exp_framed_by_typed wf_exp_negate by blast
+
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> ?A2"
+    then have "b (stabilize \<omega>) = Some False" by fastforce
+    show "\<omega> \<in> Stabilize (snd ` SA) \<otimes> purify (negate b)"
     proof -
-      have "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-        using asm0(2) stabilize_typed_elem[of \<omega> \<Delta>]
-        by auto
+      have "\<omega> \<in> Stabilize (snd ` SA)"
+        using asm0(2) by auto
       moreover have "b |\<omega>| = Some False"
         using wf_exp_coreE[of b \<omega>]
         by (metis If.prems(2) \<open>b (stabilize \<omega>) = Some False\<close> already_stable asm0(1) wf_abs_stmt.simps(6) )
-      moreover have "typed \<Delta> |\<omega>|"
-        by (simp add: asm0(3) typed_core)
-      ultimately have "|\<omega>| \<in> pure_typed \<Delta> (negate b)"
+      ultimately have "|\<omega>| \<in> purify (negate b)"
         using negate_def[of b "|\<omega>|"]
-        by (smt (verit, ccfv_SIG) CollectI max_projection_prop_def max_projection_prop_pure_core option.discI option.sel pure_typed_def )
+        by (smt (verit, ccfv_SIG) CollectI max_projection_prop_def max_projection_prop_pure_core option.discI option.sel purify_def )
       moreover have "Some \<omega> = \<omega> \<oplus> |\<omega>|"
         by (simp add: core_is_smaller)
       ultimately show ?thesis
-        using \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)\<close> x_elem_set_product by blast
+        using \<open>\<omega> \<in> Stabilize (snd ` SA)\<close> x_elem_set_product by blast
     qed
   next
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b)"
-      "typed \<Delta> \<omega>"
-    then obtain a p where "pure p" "b p = Some False" "Some \<omega> = a \<oplus> p" "a \<in> Stabilize_typed \<Delta> (snd ` SA)"
-      by (smt (verit, best) CollectD negate_def option.discI option.exhaust_sel pure_typed_def x_elem_set_product)
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (snd ` SA) \<otimes> purify (negate b)"
+    then obtain a p where "pure p" "b p = Some False" "Some \<omega> = a \<oplus> p" "a \<in> Stabilize (snd ` SA)"
+      by (smt (verit, best) CollectD negate_def option.discI option.exhaust_sel purify_def x_elem_set_product)
 
-    then have "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<and> b \<omega> = Some False"
+    then have "\<omega> \<in> Stabilize (snd ` SA) \<and> b \<omega> = Some False"
       by (metis If.prems(2) asm0(1) greater_equiv stable_and_sum_pure_same wf_abs_stmt.simps(6) wf_expE)
     then show "\<omega> \<in> ?A2"
-      by (smt (verit, ccfv_threshold) already_stable asm0(1) image_iff member_filter stabilize_typed_elem)
-  qed
+      using already_stable asm0(1) by force
+  qed (simp_all)
 
   have "\<Delta> \<turnstile> [?A2] C2 [?B2]"
   proof (rule If(2))
@@ -1132,111 +1076,156 @@ next
       by (metis (no_types, lifting) If.prems(3) \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> image_mono inf_sup_ord(4) wf_set_subset)
     show "\<And>\<omega>. \<omega> \<in> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA \<Longrightarrow> red_stmt \<Delta> C2 (snd \<omega>) (f \<omega>)"
       using If.prems(1) by fastforce
+    show "\<And>\<alpha>. \<alpha> \<in> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+      by (simp add: If.prems(4))
   qed
 
-  moreover have "typed_assertion \<Delta> (Stabilize_typed \<Delta> (snd ` SA))"
-    using typed_Stabilize_typed by auto
-  moreover have "typed_assertion \<Delta> ?B1"
-    using typed_Stabilize_typed by auto
-  moreover have "typed_assertion \<Delta> ?B2"
-    using typed_Stabilize_typed by auto
 
-  moreover have "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] abs_stmt.If b C1 C2 [?B1 \<union> ?B2]"
-    by (metis \<open>Stabilize_typed \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA) = Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> (negate b)\<close> \<open>Stabilize_typed \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA) = Stabilize_typed \<Delta> (snd ` SA) \<otimes> pure_typed \<Delta> b\<close> \<open>\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)] C1 [Stabilize_typed \<Delta> (\<Union> (f ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA))]\<close> \<open>framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) b\<close> calculation(1) calculation(2) RuleIf self_framing_Stabilize_typed)
+  moreover have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.If b C1 C2 [?B1 \<union> ?B2]"
+    using RuleIf \<open>Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA) = Stabilize (snd ` SA) \<otimes> purify (negate b)\<close> \<open>Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA) = Stabilize (snd ` SA) \<otimes> purify b\<close> \<open>\<Delta> \<turnstile> [Stabilize (snd ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA)] C1 [Stabilize (\<Union> (f ` Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA))]\<close> \<open>framed_by_exp (Stabilize (snd ` SA)) b\<close> calculation by auto
 
-  moreover have "?B1 \<union> ?B2 = Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-  proof (rule self_framing_typed_ext)
-    show "self_framing_typed \<Delta> (?B1 \<union> ?B2)"
-      using If.prems(2) calculation(5) proofs_are_self_framing_and_typed by presburger
-    show "self_framing_typed \<Delta> (Stabilize_typed \<Delta> (\<Union> (f ` SA)))"
-      using self_framing_Stabilize_typed by blast
-    show "typed_assertion \<Delta> (Stabilize_typed \<Delta> (\<Union> (f ` SA)))"
-      using typed_Stabilize_typed by blast
-    show "typed_assertion \<Delta> (?B1 \<union> ?B2)"
-      using calculation(3) calculation(4) typed_union by blast
-
-    fix \<omega> :: "('v, 'a) abs_state" assume "stable \<omega>" "typed \<Delta> \<omega>"
-    show "\<omega> \<in> ?B1 \<union> ?B2 \<Longrightarrow>  \<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-      using stabilize_typed_elem[of \<omega> \<Delta>]
+  moreover have "?B1 \<union> ?B2 = Stabilize (\<Union> (f ` SA))"
+  proof (rule self_framing_ext)
+    show "self_framing (?B1 \<union> ?B2)"
+      using Stabilize_self_framing self_framing_union by blast
+    fix \<omega> :: "('v, 'a) abs_state" assume "stable \<omega>"
+    show "\<omega> \<in> ?B1 \<union> ?B2 \<Longrightarrow>  \<omega> \<in> Stabilize (\<Union> (f ` SA))"
       by force
-    show "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA)) \<Longrightarrow> \<omega> \<in> ?B1 \<union> ?B2"
-      using \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close> stabilize_typed_elem[of \<omega> \<Delta>]
+    show "\<omega> \<in> Stabilize (\<Union> (f ` SA)) \<Longrightarrow> \<omega> \<in> ?B1 \<union> ?B2"
+      using \<open>SA = Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some True) SA \<union> Set.filter (\<lambda>\<omega>. b (snd \<omega>) = Some False) SA\<close>
       by auto
-  qed
+  qed (simp_all)
   ultimately show ?case
     by argo
 next
   case (Inhale P)
 
-  let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (snd ` SA)"
 
   have "\<And>\<omega>. \<omega> \<in> ?A \<Longrightarrow> sep_algebra_class.stable \<omega> \<Longrightarrow> rel_stable_assertion \<omega> P"
   proof -
     fix \<omega> assume asm0: "\<omega> \<in> ?A" "stable \<omega>"
     then obtain x where "x \<in> SA" "snd x = \<omega>"
-      using already_stable stabilize_typed_elem[of \<omega> \<Delta>]
+      using already_stable
       by fastforce
     then have "red_stmt \<Delta> (Inhale P) \<omega> (f x)"
       by (metis Inhale.prems(1))
     then show "rel_stable_assertion \<omega> P"
       by force
   qed
-  then have r: "framed_by ?A P"
-    using framed_by_def by blast
-  have "\<Delta> \<turnstile> [?A] Inhale P [?A \<otimes> P]"
-  proof (rule RuleInhale)
-    show "self_framing_and_typed \<Delta> ?A"
-      using self_framing_Stabilize_typed typed_Stabilize_typed by blast
-  qed (simp add: r)
-  moreover have "self_framing_and_typed \<Delta> (?A \<otimes> P)"
-    using Inhale.prems(2) calculation proofs_are_self_framing_and_typed by presburger
-  moreover have "Set.filter sep_algebra_class.stable (snd ` SA) \<subseteq> ?A"
-    by (smt (verit) Inhale.prems(3) Stabilize_filter_stable member_filter Stabilize_typed_def wf_state_def  subsetD subsetI wf_set_def)
+  then have "self_framing (?A \<otimes> P)"
+    using Stabilize_self_framing framed_byI self_framing_star by blast
 
-  moreover have "Set.filter sep_algebra_class.stable (?A \<otimes> P) = \<Union> (f ` SA)"
+  moreover have r: "framed_by ?A (Set.filter (typed \<Delta> \<circ> stabilize) P)"
+  proof (rule framed_byI)
+    fix \<omega> assume asm0: "\<omega> \<in> ?A" "sep_algebra_class.stable \<omega>"
+    then have r: "rel_stable_assertion \<omega> P"
+      using \<open>\<And>\<omega>. \<lbrakk>\<omega> \<in> Stabilize (snd ` SA); sep_algebra_class.stable \<omega>\<rbrakk> \<Longrightarrow> rel_stable_assertion \<omega> P\<close> by blast
+    show "rel_stable_assertion \<omega> (Set.filter (typed \<Delta> \<circ> stabilize) P)"
+      unfolding rel_stable_assertion_def
+    proof (rule stable_set_filter_stabilize)
+      show "{\<omega>} \<otimes> P \<subseteq> Stabilize ({\<omega>} \<otimes> P)"
+        using Stable_def r rel_stable_assertion_def by blast
+      show "Stabilize ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> P"
+      proof
+        fix x assume "x \<in> Stabilize ({\<omega>} \<otimes> P)"
+        then obtain p where "p \<in> P" "Some (stabilize x) = \<omega> \<oplus> p"
+          by (smt (verit, best) in_Stabilize singletonD x_elem_set_product)
+        then obtain p' where "Some p' = p \<oplus> |x|"
+          by (metis asso2 decompose_stabilize_pure option.exhaust_sel)
+        then have "p' \<in> P"
+          using wf_assertionE[of \<Delta> P p' p]
+          using Inhale.prems(2) \<open>p \<in> P\<close> core_is_pure pure_def pure_larger_def semantics.wf_abs_stmt.simps(2) semantics_axioms by blast
+        then show "x \<in> {\<omega>} \<otimes> P"
+          by (metis (no_types, lifting) \<open>Some (stabilize x) = \<omega> \<oplus> p\<close> \<open>Some p' = p \<oplus> |x|\<close> asso1 decompose_stabilize_pure singletonI x_elem_set_product)
+      qed
+      show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P = Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)" (is "?A = ?B")
+      proof
+        show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P \<subseteq> Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)"
+        proof
+          fix x assume "x \<in> ?A"
+          then obtain p where "p \<in> P" "typed \<Delta> (stabilize p)" "Some x = \<omega> \<oplus> p"
+            using in_singleton_star by force
+          then have "typed \<Delta> (stabilize x)"
+            by (meson Inhale.prems(3) asm0(1) in_Stabilize stabilize_sum typed_sum wf_set_def wf_state_def)
+          then show "x \<in> ?B"
+            by (simp add: \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum)
+        qed
+        show "Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+        proof
+          fix x assume "x \<in> ?B"
+          then obtain p where "p \<in> P" "Some x = \<omega> \<oplus> p" "typed \<Delta> (stabilize x)"
+            by (metis comp_apply in_singleton_star member_filter)
+          then have "typed \<Delta> (stabilize p)"
+            using greater_equiv stabilize_mono typed_smaller by blast
+          then show "x \<in> ?A"
+            using \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum by fastforce
+        qed
+      qed
+    qed
+  qed
+
+
+  have "\<Delta> \<turnstile> [?A] Inhale P [?A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P]"
+    apply (rule RuleInhale)
+    apply auto[1]
+    using \<open>\<And>\<omega>. \<lbrakk>\<omega> \<in> Stabilize (snd ` SA); sep_algebra_class.stable \<omega>\<rbrakk> \<Longrightarrow> rel_stable_assertion \<omega> P\<close> framed_byI by blast
+  moreover have "self_framing (?A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
+    using Stabilize_self_framing r self_framing_star by blast
+  moreover have "Set.filter sep_algebra_class.stable (snd ` SA) \<subseteq> ?A"
+    using Stabilize_filter_stable by blast
+
+  moreover have "Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega>) (?A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P) = \<Union> (f ` SA)"
   proof
-    show "Set.filter sep_algebra_class.stable (?A \<otimes> P) \<subseteq> \<Union> (f ` SA)"
+    show "Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega>) (?A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P) \<subseteq> \<Union> (f ` SA)"
     proof
-      fix \<omega> assume "\<omega> \<in> Set.filter sep_algebra_class.stable (?A \<otimes> P)"
-      then obtain a p where asm0: "stable \<omega>" "Some \<omega> = a \<oplus> p" "a \<in> ?A" "p \<in> P" "a \<in> Stabilize_typed \<Delta> (snd ` SA)"
+      fix \<omega> assume "\<omega> \<in> Set.filter stable (?A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
+      then obtain a p where asm0: "stable \<omega>" "Some \<omega> = a \<oplus> p" "a \<in> ?A" "p \<in> Set.filter (typed \<Delta> \<circ> stabilize) P" "a \<in> Stabilize (snd ` SA)"
         by (smt (verit, ccfv_threshold) mem_Collect_eq member_filter add_set_def)
       then have "Some \<omega> = stabilize a \<oplus> p"
         using stabilize_sum_result_stable by blast
       moreover obtain l where "l \<in> SA" "snd l = stabilize a"
-        using asm0(3) stabilize_typed_elem[of _ \<Delta>] by auto
+        using asm0(3) by auto
       then have "red_stmt \<Delta> (Inhale P) (stabilize a) (f l)"
         by (metis Inhale.prems(1))
-      then have "f l = Set.filter sep_algebra_class.stable ({stabilize a} \<otimes> P) \<and> rel_stable_assertion (stabilize a) P"
+      then have "f l = Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>)  ({stabilize a} \<otimes> P) \<and> rel_stable_assertion (stabilize a) P"
         using red_stmt_Inhale_elim by blast
       then have "\<omega> \<in> f l"
-        by (simp add: asm0(1) asm0(4) asm0(5) calculation is_in_set_sum)
+        by (smt (verit, best) Inhale.prems(4) \<open>l \<in> SA\<close> \<open>snd l = stabilize a\<close> already_stable asm0(1) asm0(2) asm0(4) calculation comp_apply is_in_set_sum member_filter stabilize_sum typed_sum)
+(*
+        by (metis (no_types, lifting) Inhale.prems(3) asm0(1) asm0(3) asm0(4) calculation in_Stabilize is_in_set_sum member_filter typed_sum wf_set_def wf_state_def)
+*)
       then show "\<omega> \<in> \<Union> (f ` SA)"
         using \<open>l \<in> SA\<close> by blast
     qed
-    show "\<Union> (f ` SA) \<subseteq> Set.filter sep_algebra_class.stable (Stabilize_typed \<Delta> (snd ` SA) \<otimes> P)"
+    show "\<Union> (f ` SA) \<subseteq> Set.filter stable (Stabilize (snd ` SA) \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
     proof 
       fix \<omega> assume "\<omega> \<in> \<Union> (f ` SA)"
       then obtain x where "x \<in> SA" "\<omega> \<in> f x"
         by blast
       then have "red_stmt \<Delta> (Inhale P) (snd x) (f x)"
         using Inhale.prems(1) by blast
-      then show "\<omega> \<in> Set.filter sep_algebra_class.stable (Stabilize_typed \<Delta> (snd ` SA) \<otimes> P)"
+      then show "\<omega> \<in> Set.filter stable (Stabilize (snd ` SA) \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
       proof (rule red_stmt_Inhale_elim)
-        assume "f x = Set.filter sep_algebra_class.stable ({snd x} \<otimes> P)"
-        then obtain p where "p \<in> P" "Some \<omega> = snd x \<oplus> p" "stable \<omega>"
+        assume "f x = Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({snd x} \<otimes> P)"
+        then obtain p where "p \<in> P" "Some \<omega> = snd x \<oplus> p" "(\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) \<omega>"
           by (smt (verit, ccfv_SIG) \<open>\<omega> \<in> f x\<close> member_filter singletonD x_elem_set_product)
-        then show "\<omega> \<in> Set.filter sep_algebra_class.stable (Stabilize_typed \<Delta> (snd ` SA) \<otimes> P)"
-          by (metis (no_types, lifting) Inhale.prems(3) \<open>\<omega> \<in> f x\<close> \<open>f x = Set.filter sep_algebra_class.stable ({snd x} \<otimes> P)\<close> \<open>x \<in> SA\<close> calculation(3) insertCI insert_image member_filter wf_set_def star_to_singletonI subsetD wf_state_def)
+        then have "typed \<Delta> p"
+          using greater_equiv typed_smaller by blast
+        then have "\<omega> \<in> Stabilize (snd ` SA) \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+          by (smt (verit, ccfv_threshold) Inhale.prems(3) \<open>Some \<omega> = snd x \<oplus> p\<close> \<open>p \<in> P\<close> \<open>x \<in> SA\<close> already_stable comp_apply image_iff in_Stabilize member_filter typed_then_stabilize_typed wf_set_def wf_state_def x_elem_set_product)
+        then show "\<omega> \<in> Set.filter stable (Stabilize (snd ` SA) \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
+          by (simp add: \<open>sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>\<close>)
       qed
     qed
   qed
   ultimately show ?case
-    by (smt (verit, best) Stabilize_def already_stable mem_Collect_eq member_filter self_framing_typed_ext Stabilize_typed_def self_framing_Stabilize_typed  typed_Stabilize_typed)
+    by (metis (no_types, lifting) Stabilize_ext member_filter self_framing_eq)
 next
   case (Exhale P)
 
-  let ?A = "Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-  let ?B = "Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (\<Union> (f ` SA))"
+  let ?B = "Stabilize (snd ` SA)"
 
   have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (\<exists>a \<omega>'. f \<omega> = {\<omega>'} \<and> a \<in> P \<and> Some (snd \<omega>) = \<omega>' \<oplus> a \<and> sep_algebra_class.stable \<omega>')"
   proof -
@@ -1253,9 +1242,9 @@ next
 
   moreover have "entails ?B (?A \<otimes> P)"
   proof (rule entailsI)
-    fix \<omega> assume "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
+    fix \<omega> assume "\<omega> \<in> Stabilize (snd ` SA)"
     then have "stabilize \<omega> \<in> snd ` SA"
-      using stabilize_typed_elem by blast
+      using in_Stabilize by blast
     then obtain x where asm0: "x \<in> SA" "stabilize \<omega> = snd x"
       by blast
     then obtain a \<omega>' where "f x = {\<omega>'} \<and> a \<in> P \<and> Some (stabilize \<omega>) = \<omega>' \<oplus> a \<and> sep_algebra_class.stable \<omega>'"
@@ -1264,38 +1253,32 @@ next
       by (metis asso3 calculation commutative decompose_stabilize_pure not_Some_eq) (* long *)
     then have "stabilize \<omega>'' = stabilize \<omega>'" using pure_larger_stabilize_same[of \<omega>'' \<omega>']
       using core_is_pure pure_def pure_larger_def by blast
-    moreover have "typed \<Delta> \<omega>''"
-      by (meson \<open>Some \<omega>'' = \<omega>' \<oplus> |\<omega>|\<close> \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)\<close> calculation(1) greater_def stabilize_typed_elem typed_core typed_smaller typed_state_then_stabilize_typed  typed_sum)
-    then have "\<omega>'' \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-      by (metis UN_upper already_stable asm0(1) calculation(1) calculation(2) insert_subset stabilize_typed_elem )
+    then have "\<omega>'' \<in> Stabilize (\<Union> (f ` SA))"
+      using already_stable asm0(1) calculation by fastforce
     moreover have "Some \<omega> = \<omega>'' \<oplus> a"
       by (metis (no_types, lifting) \<open>Some \<omega>'' = \<omega>' \<oplus> |\<omega>|\<close> asso1 calculation(1) commutative decompose_stabilize_pure)
-    ultimately show "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA)) \<otimes> P"
+    ultimately show "\<omega> \<in> Stabilize (\<Union> (f ` SA)) \<otimes> P"
       using x_elem_set_product by blast
   qed
 
   moreover show "\<Delta> \<turnstile> [?B] Exhale P [?A]"
   proof (rule RuleExhale)
-    show "self_framing_and_typed \<Delta> (Stabilize_typed \<Delta> (\<Union> (f ` SA)))"      
-      using self_framing_Stabilize_typed typed_Stabilize_typed by blast
-    show "self_framing_and_typed \<Delta> (Stabilize_typed \<Delta> (snd ` SA))"
-      using self_framing_Stabilize_typed typed_Stabilize_typed by blast
-    show "entails (Stabilize_typed \<Delta> (snd ` SA)) (Stabilize_typed \<Delta> (\<Union> (f ` SA)) \<otimes> P)"
+    show "entails (Stabilize (snd ` SA)) (Stabilize (\<Union> (f ` SA)) \<otimes> P)"
       using calculation(2) by simp
-  qed
+  qed (simp_all)
 next
   case (Assert P)
   have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> f \<omega> = {snd \<omega>} \<and> snd \<omega> \<in> P"
     using Assert.prems(1) by blast
-  moreover have "entails (Stabilize_typed \<Delta> (snd ` SA)) P"
+  moreover have "entails (Stabilize (snd ` SA)) P"
   proof (rule entailsI)
-    fix \<omega> assume "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-    then have "stabilize \<omega> \<in> snd ` SA \<and> typed \<Delta> \<omega>"
-      using stabilize_typed_elem by blast
+    fix \<omega> assume "\<omega> \<in> Stabilize (snd ` SA)"
+    then have "stabilize \<omega> \<in> snd ` SA"
+      using in_Stabilize by blast
     then have "stabilize \<omega> \<in> P"
       using r by force
     then show "\<omega> \<in> P" using wf_assertion_stabilize Assert(2)
-      using \<open>stabilize \<omega> \<in> snd ` SA \<and> typed \<Delta> \<omega>\<close> wf_abs_stmt.simps(4) by blast
+      using \<open>stabilize \<omega> \<in> snd ` SA\<close> wf_abs_stmt.simps(4) by blast
   qed
   moreover have "\<Union> (f ` SA) = snd ` SA"
   proof
@@ -1310,19 +1293,19 @@ next
   case (LocalAssign x e)
 
   let ?ty = "the (variables \<Delta> x)"
-  let ?A = "post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA))"
+  let ?A = "post_substitute_var_assert x e (Stabilize (snd ` SA))"
 
   have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (\<exists>v. variables \<Delta> x = Some ?ty \<and> e (snd \<omega>) = Some v \<and> v \<in> ?ty
   \<and> f \<omega> = { assign_var_state x (Some v) (snd \<omega>) })"
     using LocalAssign.prems(1) by fastforce
 
-  have "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] abs_stmt.LocalAssign x e [?A]"
+  have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.LocalAssign x e [?A]"
   proof (rule RuleLocalAssign)
-    show "framed_by_exp (Stabilize_typed \<Delta> (snd ` SA)) e"
+    show "framed_by_exp (Stabilize (snd ` SA)) e"
     proof (rule framed_by_expI)
-      fix \<omega> assume "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
+      fix \<omega> assume "\<omega> \<in> Stabilize (snd ` SA)"
       then have "stabilize \<omega> \<in> snd ` SA"
-        using stabilize_typed_elem by blast
+        using in_Stabilize by blast
       then obtain v where "variables \<Delta> x = Some ?ty \<and> e (stabilize \<omega>) = Some v \<and> v \<in> ?ty"
         using r by fastforce
       moreover have "wf_exp e"
@@ -1332,29 +1315,28 @@ next
       then show "e \<omega> \<noteq> None" by simp
     qed
   qed (simp)
-  moreover have "?A = Stabilize_typed \<Delta> (\<Union> (f ` SA))" (is "?A = ?B")
-  proof (rule self_framing_typed_ext)
-    show "self_framing_typed \<Delta> (post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA)))"
-      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by presburger
-    show "typed_assertion \<Delta> (post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA)))"
-      using LocalAssign.prems(2) calculation proofs_are_self_framing_and_typed by presburger
+  moreover have "?A = Stabilize (\<Union> (f ` SA))" (is "?A = ?B")
+  proof (rule self_framing_ext)
+    show "self_framing (post_substitute_var_assert x e (Stabilize (snd ` SA)))"
+      using LocalAssign.prems(2) calculation self_framing_post_substitute_var_assert by auto
 
-    fix \<omega> assume asm0: "stable \<omega>" "typed \<Delta> \<omega>" "\<omega> \<in> post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA))"
-    then obtain \<omega>' where "\<omega>' \<in> Stabilize_typed \<Delta> (snd ` SA)" "\<omega> = assign_var_state x (e \<omega>') \<omega>'"
-      using post_substitute_var_assert_def substitute_var_state_def by fastforce
+    fix \<omega> assume asm0: "stable \<omega>" "\<omega> \<in> post_substitute_var_assert x e (Stabilize (snd ` SA))"
+    then obtain \<omega>' where "\<omega>' \<in> Stabilize (snd ` SA)" "\<omega> = assign_var_state x (e \<omega>') \<omega>'"
+      using post_substitute_var_assert_def substitute_var_state_def
+      using image_iff by fastforce
     then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' = snd \<alpha>"
-      by (meson image_iff stabilize_typed_elem)
+      by (meson image_iff in_Stabilize)
     then obtain v where "variables \<Delta> x = Some ?ty \<and> e (stabilize \<omega>') = Some v \<and> v \<in> ?ty
   \<and> f \<alpha> = {assign_var_state x (Some v) (stabilize \<omega>')}"
       using r by presburger
     moreover have "stable \<omega>'"
       using \<open>\<omega> = assign_var_state x (e \<omega>') \<omega>'\<close> asm0(1) stable_assign_var_state by blast
-    then show "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-      by (metis (no_types, lifting) UnI1 Union_image_insert \<open>\<alpha> \<in> SA\<close> \<open>\<omega> = assign_var_state x (e \<omega>') \<omega>'\<close> already_stable asm0(2) calculation image_insert insert_image stabilize_assign_var stabilize_typed_elem  singletonI)
+    then show "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+      by (metis (no_types, lifting) UnI1 Union_image_insert \<open>\<alpha> \<in> SA\<close> \<open>\<omega> = assign_var_state x (e \<omega>') \<omega>'\<close> already_stable calculation image_insert insert_image stabilize_assign_var in_Stabilize  singletonI)
   next
-    fix \<omega> assume "sep_algebra_class.stable \<omega>" "typed \<Delta> \<omega>" "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
+    fix \<omega> assume "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
     then obtain \<alpha> where "\<alpha> \<in> SA" "\<omega> \<in> f \<alpha>"
-      by (metis UN_E already_stable stabilize_typed_elem)
+      by (metis UN_E already_stable in_Stabilize)
     then obtain v where "variables \<Delta> x = Some ?ty \<and> e (snd \<alpha>) = Some v \<and> v \<in> ?ty
   \<and> f \<alpha> = {assign_var_state x (Some v) (snd \<alpha>) }"
       using r by blast
@@ -1363,17 +1345,17 @@ next
     then have "\<omega> = substitute_var_state x e (snd \<alpha>)"
       using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> e (snd \<alpha>) = Some v \<and> v \<in> the (variables \<Delta> x) \<and> f \<alpha> = {assign_var_state x (Some v) (snd \<alpha>)}\<close> substitute_var_state_def
       by metis
-    moreover have "snd \<alpha> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-      by (metis (no_types, lifting) LocalAssign.prems(3) \<open>\<alpha> \<in> SA\<close> already_stable image_insert insertI1 mk_disjoint_insert wf_state_def  stabilize_typed_elem wf_set_def)
-    ultimately show "\<omega> \<in> post_substitute_var_assert x e (Stabilize_typed \<Delta> (snd ` SA))"
+    moreover have "snd \<alpha> \<in> Stabilize (snd ` SA)"
+      by (metis (no_types, lifting) LocalAssign.prems(3) \<open>\<alpha> \<in> SA\<close> already_stable image_insert insertI1 mk_disjoint_insert wf_state_def  in_Stabilize wf_set_def)
+    ultimately show "\<omega> \<in> post_substitute_var_assert x e (Stabilize (snd ` SA))"
       using post_substitute_var_assert_def by fast
   qed (simp_all)
-  ultimately show "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] abs_stmt.LocalAssign x e [Stabilize_typed \<Delta> (\<Union> (f ` SA))]"
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.LocalAssign x e [Stabilize (\<Union> (f ` SA))]"
     by argo
 next
   case Skip
-  then have "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] Skip [Stabilize_typed \<Delta> (snd ` SA)]"
-    using RuleSkip self_framing_Stabilize_typed  typed_Stabilize_typed by blast
+  then have "\<Delta> \<turnstile> [Stabilize (snd ` SA)] Skip [Stabilize (snd ` SA)]"
+    using RuleSkip by simp
   moreover have "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> f \<omega> = {snd \<omega>}"
     using Skip.prems(1) by blast
   ultimately show ?case
@@ -1382,7 +1364,7 @@ next
   case (Havoc x)
 
   let ?ty = "the (variables \<Delta> x)"
-  let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (snd ` SA)"
   let ?B = "exists_assert \<Delta> x ?A"
 
   have r: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> (variables \<Delta> x = Some ?ty \<and> f \<alpha> = { assign_var_state x (Some v) (snd \<alpha>) |v. v \<in> ?ty})"
@@ -1393,99 +1375,101 @@ next
     wf_set \<Delta> (snd ` SA)
 *)
   have "\<Delta> \<turnstile> [?A] abs_stmt.Havoc x [?B]"
-  proof (rule RuleHavoc)
-    show "self_framing_and_typed \<Delta> (Stabilize_typed \<Delta> (snd ` SA))"
-      using self_framing_Stabilize_typed typed_Stabilize_typed by auto
-  qed
-  moreover have "?B = Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-  proof (rule self_framing_typed_ext)
-    show "self_framing_typed \<Delta> (exists_assert \<Delta> x (Stabilize_typed \<Delta> (snd ` SA)))"
-      using Havoc.prems(2) calculation proofs_are_self_framing_and_typed by presburger
-    show "typed_assertion \<Delta> (exists_assert \<Delta> x (Stabilize_typed \<Delta> (snd ` SA)))"
-      using Havoc.prems(2) calculation proofs_are_self_framing_and_typed by presburger
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "typed \<Delta> \<omega>" "\<omega> \<in> exists_assert \<Delta> x (Stabilize_typed \<Delta> (snd ` SA))"
+    by (rule RuleHavoc) simp
+  moreover have "?B = Stabilize (\<Union> (f ` SA))"
+  proof (rule self_framing_ext)
+    show "self_framing (exists_assert \<Delta> x (Stabilize (snd ` SA)))"
+      using Stabilize_self_framing self_framing_exists_assert by blast
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> exists_assert \<Delta> x (Stabilize (snd ` SA))"
     then obtain v0 v ty where asm1: "v0 \<in> ty" "get_store \<omega> x = Some v0" "variables \<Delta> x = Some ty"
       "v \<in> ty" "assign_var_state x (Some v) \<omega> \<in> ?A" using exists_assertE[of \<omega> \<Delta> x] by meson
     then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize (assign_var_state x (Some v) \<omega>) = snd \<alpha>"
-      using stabilize_typed_elem[of _ \<Delta>] by blast
+      using in_Stabilize[of _] by blast
     then have "assign_var_state x (Some v) \<omega> = snd \<alpha>"
       by (metis already_stable asm0(1) stable_assign_var_state)
     then have "\<omega> = assign_var_state x (Some v0) (snd \<alpha>)"
       by (metis asm1(2) assign_var_state_inverse)
     then have "stabilize \<omega> \<in> f \<alpha>"
       using \<open>\<alpha> \<in> SA\<close> already_stable asm0(1) asm1(1) asm1(3) r by auto
-    then show "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-      using \<open>\<alpha> \<in> SA\<close> asm0(2) stabilize_typed_elem[of _ \<Delta>] by blast
+    then show "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
+      using \<open>\<alpha> \<in> SA\<close> asm0(2) in_Stabilize[of _] by blast
   next
-    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "typed \<Delta> \<omega>" "\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))"
+    fix \<omega> assume asm0: "sep_algebra_class.stable \<omega>" "\<omega> \<in> Stabilize (\<Union> (f ` SA))"
     then obtain \<alpha> where "\<alpha> \<in> SA" "\<omega> \<in> f \<alpha>"
-      by (metis UN_E already_stable stabilize_typed_elem)
+      by (metis UN_E already_stable in_Stabilize)
     then obtain v where "variables \<Delta> x = Some ?ty \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)" "v \<in> ?ty"
       using r by blast
     then have "wf_state \<Delta> (snd \<alpha>)"
       using Havoc.prems(3) \<open>\<alpha> \<in> SA\<close> wf_set_def by blast
     then obtain v' where "get_store (snd \<alpha>) x = Some v'" "v' \<in> ?ty"
       using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> wf_state_then_value by blast
-    show "\<omega> \<in> exists_assert \<Delta> x (Stabilize_typed \<Delta> (snd ` SA))"
+    show "\<omega> \<in> exists_assert \<Delta> x (Stabilize (snd ` SA))"
       using \<open>v \<in> ?ty\<close>
     proof (rule exists_assertI)
-      show "typed \<Delta> \<omega>"
-        by (simp add: asm0(2))
       show "get_store \<omega> x = Some v"
         by (simp add: \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> assign_var_state_def)
       show "variables \<Delta> x = Some (the (variables \<Delta> x))"
         using \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> by blast
-      show "assign_var_state x (Some v') \<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-        by (metis (no_types, lifting) \<open>\<alpha> \<in> SA\<close> \<open>get_store (snd \<alpha>) x = Some v'\<close> \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> \<open>wf_state \<Delta> (snd \<alpha>)\<close> already_stable insertI1 insert_image assign_var_state_inverse stabilize_typed_elem wf_state_def )
+      show "assign_var_state x (Some v') \<omega> \<in> Stabilize (snd ` SA)"
+        by (metis (no_types, lifting) \<open>\<alpha> \<in> SA\<close> \<open>get_store (snd \<alpha>) x = Some v'\<close> \<open>variables \<Delta> x = Some (the (variables \<Delta> x)) \<and> \<omega> = assign_var_state x (Some v) (snd \<alpha>)\<close> \<open>wf_state \<Delta> (snd \<alpha>)\<close> already_stable insertI1 insert_image assign_var_state_inverse in_Stabilize wf_state_def )
     qed (simp_all add: \<open>v' \<in> ?ty\<close>)
   qed (simp_all)
-  ultimately show "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] abs_stmt.Havoc x [Stabilize_typed \<Delta> (\<Union> (f ` SA))]"
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.Havoc x [Stabilize (\<Union> (f ` SA))]"
     by argo
 next
   case (Assume P)
-  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (stable_on \<Delta> (snd \<omega>) P \<and> f \<omega> = {snd \<omega>} \<inter> P)"
+  then have r: "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> (stable_on (snd \<omega>) P \<and> f \<omega> = {snd \<omega>} \<inter> P)"
     by fastforce
 
-  let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (snd ` SA)"
 
   have "\<Delta> \<turnstile> [?A] Assume P [?A \<inter> P]"
   proof (rule RuleAssume)
-    show "self_framing_on (Stabilize_typed \<Delta> (snd ` SA)) P"
+    show "self_framing_on (Stabilize (snd ` SA)) P"
       unfolding self_framing_on_def
     proof
-      fix \<omega> assume asm0: "\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA)"
-      then show "(stabilize \<omega> \<in> P) = (\<omega> \<in> P)"
-        by (metis (no_types, lifting) RangeE prod.sel(2) pure_larger_stabilize r snd_eq_Range stabilize_typed_elem stable_on_def)
+      fix \<omega> assume asm0: "\<omega> \<in> Stabilize (snd ` SA)"
+      show "(stabilize \<omega> \<in> P) = (\<omega> \<in> P)"
+      proof
+        show "stabilize \<omega> \<in> P \<Longrightarrow> \<omega> \<in> P"
+          using wf_assertionE[of \<Delta> P \<omega> "stabilize \<omega>"] \<open>wf_abs_stmt \<Delta> (abs_stmt.Assume P)\<close>
+          using wf_abs_stmt.simps(5) wf_assertion_stabilize by blast
+        assume "\<omega> \<in> P"
+        then have "stable_on \<omega> P"
+          by (meson Assume(2) semantics.wf_abs_stmt.simps(5) semantics_axioms typed_state.stable_onI typed_state.wf_assertion_def typed_state_axioms)
+        then show "stabilize \<omega> \<in> P"
+          unfolding stable_on_def
+          by (metis (no_types, lifting) RangeE \<open>\<omega> \<in> P\<close> asm0 in_Stabilize prod.sel(2) pure_larger_stabilize r snd_eq_Range stable_on_def)
+      qed
     qed
   qed (simp_all)
-  moreover have "?A \<inter> P = Stabilize_typed \<Delta> (\<Union> (f ` SA))" (is "?A \<inter> P = ?B")
+  moreover have "?A \<inter> P = Stabilize (\<Union> (f ` SA))" (is "?A \<inter> P = ?B")
   proof
     show "?A \<inter> P \<subseteq> ?B"
     proof
       fix \<omega> assume "\<omega> \<in> ?A \<inter> P"
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
-        using stabilize_typed_elem[of \<omega> \<Delta>] by blast
-      then have "stable_on \<Delta> (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P" using r by blast
+        using in_Stabilize[of \<omega>] by auto
+      then have "stable_on (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P" using r by blast
       then have "f \<alpha> = {stabilize \<omega>}"
-        by (metis Assume.prems(1) IntD1 IntD2 \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> pure_larger_stabilize semantics.red_stmt_Assume_elim semantics_axioms typed_Stabilize_typed typed_state.stable_on_def typed_state.typed_assertionE typed_state_axioms)
+        by (metis Assume.prems(1) IntD2 \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize (snd ` SA) \<inter> P\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> pure_larger_stabilize semantics.red_stmt_Assume_elim semantics_axioms stable_on_def)
       then show "\<omega> \<in> ?B"
-        using \<open>\<omega> \<in> Stabilize_typed \<Delta> (snd ` SA) \<inter> P\<close> \<open>stable_on \<Delta> (snd \<alpha>) P \<and> f \<alpha> = {snd \<alpha>} \<inter> P\<close> r stabilize_typed_elem[of _ \<Delta>] by auto
+        using \<open>\<alpha> \<in> SA\<close> by auto
     qed
     show "?B \<subseteq> ?A \<inter> P"
     proof
       fix \<omega> assume "\<omega> \<in> ?B"
       then obtain \<alpha> where "stabilize \<omega> \<in> f \<alpha>" "\<alpha> \<in> SA"
-        using stabilize_typed_elem[of _ \<Delta>] by auto
+        by auto
       then show "\<omega> \<in> ?A \<inter> P"
-        using stabilize_typed_elem[of \<omega> \<Delta>] wf_assertion_stabilize[of \<Delta>]
-        by (metis (no_types, lifting) Assume.prems(2) Int_iff \<open>\<omega> \<in> Stabilize_typed \<Delta> (\<Union> (f ` SA))\<close> image_iff r singletonD wf_abs_stmt.simps(5))
+        by (metis (no_types, lifting) Int_iff image_eqI in_Stabilize pure_larger_stabilize r singletonD stable_on_def)
     qed
   qed
-  ultimately show "\<Delta> \<turnstile> [Stabilize_typed \<Delta> (snd ` SA)] abs_stmt.Assume P [Stabilize_typed \<Delta> (\<Union> (f ` SA))]" by argo
+  ultimately show "\<Delta> \<turnstile> [Stabilize (snd ` SA)] abs_stmt.Assume P [Stabilize (\<Union> (f ` SA))]" by argo
 next
   case (Custom C)
   then show ?case using SL_proof_custom[of SA \<Delta> C f]
-    by (meson RuleCustom red_stmt_Custom_elim self_framing_Stabilize_typed wf_state_def  typed_Stabilize_typed wf_abs_stmt.simps(10) wf_set_def)
+    by (meson RuleCustom Stabilize_self_framing red_stmt_Custom_elim wf_abs_stmt.simps(10))
 qed
 
 
@@ -1494,8 +1478,8 @@ qed
 theorem Viper_implies_SL_proof:
   assumes "verifies_set \<Delta> A C"
       and "wf_abs_stmt \<Delta> C"
-      and "self_framing_and_typed \<Delta> A"
-      and "typed_assertion \<Delta> A"
+      and "self_framing A"
+      and "semi_typed \<Delta> A"
     shows "\<exists>B. \<Delta> \<turnstile> [A] C [B]"
 proof -
   define SA :: "(('v, 'a) abs_state list \<times> ('v, 'a) abs_state) set" where "SA = { ([], \<omega>) |\<omega>. stable \<omega> \<and> typed \<Delta> \<omega> \<and> \<omega> \<in> A}"
@@ -1519,8 +1503,8 @@ proof -
       by metis
   qed
 
-  let ?A = "Stabilize_typed \<Delta> (snd ` SA)"
-  let ?B = "Stabilize_typed \<Delta> (\<Union>\<omega>\<in>SA. f \<omega>)"
+  let ?A = "Stabilize (snd ` SA)"
+  let ?B = "Stabilize (\<Union>\<omega>\<in>SA. f \<omega>)"
 
   have "\<Delta> \<turnstile> [?A] C [?B]"
   proof (rule Viper_implies_SL_proof_aux)
@@ -1528,28 +1512,28 @@ proof -
       using SA_def calculation by blast
     show "\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> red_stmt \<Delta> C (snd \<omega>) (f \<omega>)"
       by (simp add: \<open>\<And>\<omega>. \<omega> \<in> SA \<Longrightarrow> red_stmt \<Delta> C (snd \<omega>) (f \<omega>)\<close>)
+    show "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> typed \<Delta> (snd \<alpha>)"
+      by (metis Range.intros calculation prod.collapse snd_eq_Range wf_set_def wf_state_def)
   qed (simp add: assms(2))
 
   moreover have "?A = A"
-  proof (rule self_framing_typed_ext)
+  proof (rule self_framing_ext)
 
-    show "self_framing_typed \<Delta>  A"
+    show "self_framing A"
       by (simp add: assms(3))
-    show "typed_assertion \<Delta> A"
-      by (simp add: assms(4))
 
     fix \<omega> :: "('v, 'a) abs_state" assume asm0: "sep_algebra_class.stable \<omega>"
     show "\<omega> \<in> A \<Longrightarrow> \<omega> \<in> ?A"
     proof -
       assume asm1: "\<omega> \<in> A"
       then have "([], \<omega>) \<in> SA"
-        using SA_def asm0 assms(4) typed_assertion_def by force
+        by (metis (mono_tags, lifting) CollectI SA_def already_stable asm0 assms(4) semi_typedE)
       then show "\<omega> \<in> ?A"
-        by (metis Range.intros already_stable asm0 asm1 assms(4) typed_assertion_def  snd_eq_Range stabilize_typed_elem)
+        by (simp add: Range.intros already_stable asm0 snd_eq_Range)
     qed
     assume asm1: "\<omega> \<in> ?A"
     then have "\<omega> \<in> snd ` SA"
-      by (simp add: already_stable asm0 stabilize_typed_elem)
+      by (simp add: already_stable asm0)
     then show "\<omega> \<in> A"
       using SA_def by force
   qed (simp_all)
@@ -1562,17 +1546,20 @@ lemma entails_refl:
   "entails A A"
   by (simp add: entailsI)
 
-
+(*
 lemma free_vars_subset:
   assumes "\<And>\<sigma>1 \<sigma>2 \<tau> \<gamma>. typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set V \<sigma>1 \<sigma>2 \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
       and "V \<subseteq> dom (variables \<Delta>)"
-     shows "free_vars \<Delta> A \<subseteq> V"
+     shows "free_vars A \<subseteq> V"
 proof -
   have "overapprox_fv \<Delta> A V"
+    sledgehammer
+
     by (smt (verit, del_insts) assms equal_on_set_def overapprox_fv_def)
   then show ?thesis
     by (simp add: Inf_lower free_vars_def assms(2))
 qed
+*)
 
 lemma entails_trans:
   assumes "entails A B"
@@ -1593,17 +1580,32 @@ lemma set_store_Ag_simplies[simp]:
 
 
 
+lemma free_vars_subset:
+  assumes "\<And>\<sigma>1 \<sigma>2 \<tau> \<gamma>. equal_on_set V \<sigma>1 \<sigma>2 \<Longrightarrow> typed \<Delta> (Ag \<sigma>1, \<gamma>) \<Longrightarrow> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
+      and "finite V"
+     shows "free_vars \<Delta> A \<subseteq> V \<and> overapprox_fv \<Delta> A V"
+proof -
+  have "overapprox_fv \<Delta> A V"
+    by (simp add: assms(1) overapprox_fvI)
+  then show ?thesis
+    by (simp add: Inf_lower free_vars_def assms(2))
+qed
+
 
 lemma exists_assert_no_in_fv:
-  assumes "wf_context \<Delta>"
-      and "typed_assertion \<Delta> A"
-  shows "free_vars \<Delta> (exists_assert \<Delta> x A) \<subseteq> free_vars \<Delta> A - {x}"
+  assumes "wf_assertion \<Delta> A"
+  shows "free_vars \<Delta> (exists_assert \<Delta> x A) \<subseteq> free_vars \<Delta> A - {x} \<and> overapprox_fv \<Delta> (exists_assert \<Delta> x A) (free_vars \<Delta> A - {x})"
 proof (rule free_vars_subset)
+  have "finite (free_vars \<Delta> A)"
+    by (metis Inf_lower assms image_ident mem_Collect_eq rev_finite_subset free_vars_def wf_assertion_def)
+  then show "finite (free_vars \<Delta> A - {x})"
+    by simp
+
   fix \<sigma>1 \<sigma>2 \<gamma>
-  assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set (free_vars \<Delta> A - {x}) \<sigma>1 \<sigma>2"
-         "(Ag \<sigma>1, \<gamma>) \<in> exists_assert \<Delta> x A"
+  assume asm0: "equal_on_set (free_vars \<Delta> A - {x}) \<sigma>1 \<sigma>2"
+         "(Ag \<sigma>1, \<gamma>) \<in> exists_assert \<Delta> x A" "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
   then obtain v0 v ty where r: "v0 \<in> ty" "get_store (Ag \<sigma>1, \<gamma>) x = Some v0" "variables \<Delta> x = Some ty" "v \<in> ty"
-    "(set_store (Ag \<sigma>1, \<gamma>) ((get_store (Ag \<sigma>1, \<gamma>))(x \<mapsto> v))) \<in> A" "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
+    "(set_store (Ag \<sigma>1, \<gamma>) ((get_store (Ag \<sigma>1, \<gamma>))(x \<mapsto> v))) \<in> A"
     by (metis assign_var_state_def exists_assertE)
   then have "(Ag (\<sigma>1(x \<mapsto> v)), \<gamma>) \<in> A"
     by (smt (verit) assign_var_state_def assign_var_state_inverse get_abs_state_set_store get_store_set_store prod.inject set_store_def)
@@ -1613,28 +1615,24 @@ proof (rule free_vars_subset)
 
   then have "(Ag (\<sigma>2(x \<mapsto> v)), \<gamma>) \<in> A"
   proof (rule free_varsE)
-    show "typed \<Delta> (Ag (\<sigma>1(x \<mapsto> v)), \<gamma>)"
-      by (metis get_abs_state_set_store get_store_Ag_simplifies r(3) r(4) r(6) set_store_Ag_simplies typed_state.typed_def typed_state_axioms typed_store_update)
-    show "typed \<Delta> (Ag (\<sigma>2(x \<mapsto> v)), \<gamma>)"
-      by (metis asm0(1) get_abs_state_set_store get_store_Ag_simplifies r(3) r(4) set_store_Ag_simplies typed_state.typed_def typed_state_axioms typed_store_update)
     show "(Ag (\<sigma>1(x \<mapsto> v)), \<gamma>) \<in> A"
       using calculation by blast
-  qed (simp add: assms(1))
+    show "typed \<Delta> (Ag (\<sigma>1(x \<mapsto> v)), \<gamma>)"
+      by (metis asm0(3) get_abs_state_set_store get_store_Ag_simplifies r(3) r(4) set_store_Ag_simplies typed_state.typed_def typed_state_axioms typed_store_update)
+    show "typed \<Delta> (Ag (\<sigma>2(x \<mapsto> v)), \<gamma>)"
+      by (metis asm0(4) assign_var_state_def get_store_Ag_simplifies r(3) r(4) set_store_Ag_simplies typed_assign_var)
+  qed (simp_all add: assms(1))
   then have "set_store (Ag \<sigma>2, \<gamma>) ((get_store (Ag \<sigma>2, \<gamma>))(x \<mapsto> v)) \<in> A"
-    by (simp add: get_abs_state_def set_store_def)
+    by simp
   moreover obtain v0' where "get_store (Ag \<sigma>2, \<gamma>) x = Some v0'"
-    by (metis (no_types, opaque_lifting) DiffD2 asm0(1) dom_fun_upd fun_upd_triv insertI1 option.distinct(1) option.exhaust_sel r(3) typed_state.typed_def typed_state_axioms typed_store_def store_typed_def)
+    using asm0(4) r(3) store_typed_lookup typed_state.typed_def typed_state_axioms typed_store_def by blast
   then have "v0' \<in> ty"
-    by (meson asm0(1) r(3) typed_state.typed_def typed_state_axioms typed_store_def store_typed_def)
-  ultimately show "(Ag \<sigma>2, \<gamma>) \<in> exists_assert \<Delta> x A"
-    unfolding exists_assert_def
-    by (smt (verit) \<open>get_store (Ag \<sigma>2, \<gamma>) x = Some v0'\<close> asm0(1) asm0(2) assign_var_state_def get_store_Ag_simplifies mem_Collect_eq r(3) r(4) exists_assertE  set_store_Ag_simplies set_store_def snd_conv typed_def)
-next
-  show "free_vars \<Delta> A - {x} \<subseteq> dom (variables \<Delta>)"
-    using assms(2) typed_assertion_then_fv_in by fastforce
+    using asm0(4) r(3) store_typed_lookup typed_state.typed_def typed_state_axioms typed_store_def by fastforce
+  then show "(Ag \<sigma>2, \<gamma>) \<in> exists_assert \<Delta> x A"
+    by (metis \<open>get_store (Ag \<sigma>2, \<gamma>) x = Some v0'\<close> assign_var_state_def calculation(2) in_exists_assert r(3) r(4))
 qed
 
-
+(*
 lemma exists_assert_entails:
   assumes "typed_assertion \<Delta> A"
       and "variables \<Delta> x \<noteq> None"
@@ -1648,43 +1646,118 @@ proof (rule entailsI)
   then show "\<omega> \<in> exists_assert \<Delta> x A"
     by (metis \<open>typed \<Delta> \<omega>\<close> assign_var_state_def exists_assertI)
 qed
+*)
+
+definition entails_typed where
+  "entails_typed \<Delta> A B \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<and> typed \<Delta> \<omega> \<longrightarrow> \<omega> \<in> B)"
+
+lemma entails_typedI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> \<omega> \<in> B"
+  shows "entails_typed \<Delta> A B"
+  using assms entails_typed_def by blast
+
+lemma entails_typedE:
+  assumes "entails_typed \<Delta> A B"
+      and "\<omega> \<in> A"
+      and "typed \<Delta> \<omega>"
+    shows "\<omega> \<in> B"
+  using assms(1) assms(2) assms(3) entails_typed_def by blast
+
+lemma entails_typed_trans:
+  assumes "entails_typed \<Delta> A B"
+      and "entails_typed \<Delta> B C"
+    shows "entails_typed \<Delta> A C"
+  by (meson assms(1) assms(2) entails_typed_def)
+
+lemma entails_typed_refl:
+  "entails_typed \<Delta> A A"
+  unfolding entails_typed_def by simp
 
 lemma SL_proof_Havoc_elim_entails:
   assumes "\<Delta> \<turnstile> [A] Havoc x [B]"
-      and "typed_assertion \<Delta> A"
       and "variables \<Delta> x \<noteq> None"
-      and "wf_context \<Delta>"
-  shows "entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - {x}"
-  using assms exists_assert_entails exists_assert_no_in_fv by blast
+      and "wf_assertion \<Delta> A"
+    shows "entails_typed \<Delta> A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - {x}"
+proof -
+  have "entails_typed \<Delta> A (exists_assert \<Delta> x A)"
+  proof (rule entails_typedI)
+    fix \<omega> assume asm0: "\<omega> \<in> A" "typed \<Delta> \<omega>"
+    then obtain v0 ty v where "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty" "(set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
+    by (smt (verit, best) asm0 assms(2) domD domIff full_state_ext fun_upd_triv get_abs_state_set_store get_store_set_store typed_def typed_store_def store_typed_def)
+  then show "\<omega> \<in> exists_assert \<Delta> x A"
+    by (metis assign_var_state_def exists_assertI)
+  qed
+  then show ?thesis
+    using assms(1) assms(3) exists_assert_no_in_fv by blast
+qed
+
+lemma assign_var_state_sum:
+  assumes "Some a = b \<oplus> c"
+  shows "Some (assign_var_state x v a) = assign_var_state x v b \<oplus> assign_var_state x v c"
+  by (smt (verit) add_defined_lift assign_var_state_def assms commutative full_add_charact(1) full_add_charact(2) set_store_def)
 
 
+lemma exists_wf_assertion:
+  assumes "wf_assertion \<Delta> A"
+  shows "wf_assertion \<Delta> (exists_assert \<Delta> x A)"
+  unfolding wf_assertion_def
+proof
+  show "\<exists>V. finite V \<and> overapprox_fv \<Delta> (exists_assert \<Delta> x A) V"
+    using exists_assert_no_in_fv[OF assms(1), of x]
+    by (metis Inf_lower assms finite_Diff free_vars_def image_ident mem_Collect_eq rev_finite_subset wf_assertion_def)
+  show "\<forall>x' xa. pure_larger x' xa \<and> xa \<in> exists_assert \<Delta> x A \<longrightarrow> x' \<in> exists_assert \<Delta> x A"
+  proof (clarify)
+    fix a b aa ba assume asm0: "pure_larger (a, b) (aa, ba)" "(aa, ba) \<in> exists_assert \<Delta> x A"
+    then obtain v0 v ty where r: "v0 \<in> ty \<and> get_store (aa, ba) x = Some v0 \<and> variables \<Delta> x = Some ty"
+        "v \<in> ty \<and> assign_var_state x (Some v) (aa, ba) \<in> A"
+      using exists_assertE[of "(aa, ba)" \<Delta> x A] by blast
+    moreover have "pure_larger (assign_var_state x (Some v) (a, b)) (assign_var_state x (Some v) (aa, ba))"
+    proof -
+      obtain p where "pure p" "Some (a, b) = (aa, ba) \<oplus> p"
+        using asm0(1) pure_larger_def by blast
+      then have "Some (assign_var_state x (Some v) (a, b)) = assign_var_state x (Some v) (aa, ba) \<oplus> assign_var_state x (Some v) p"
+        using assign_var_state_sum by blast
+      then show ?thesis
+        using \<open>pure p\<close> assign_var_state_sum pure_def pure_larger_def by blast
+    qed
+    ultimately show "(a, b) \<in> exists_assert \<Delta> x A"
+      by (metis asm0(1) assms get_store_stabilize in_exists_assert pure_larger_stabilize_same wf_assertionE)
+  qed
+qed
+
+(*
+wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
+  " \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)
+  \<and> (\<exists>V. finite V \<and> overapprox_fv \<Delta> A V)"
+*)
 
 lemma SL_proof_Havoc_list_elim:
   assumes "\<Delta> \<turnstile> [A] havoc_list l [B]"
       and "wf_abs_stmt \<Delta> (havoc_list l)"
-      and "wf_context \<Delta>"
-  shows "self_framing_and_typed \<Delta> A \<and> self_framing_and_typed \<Delta> B \<and> entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - (set l)"
+      and "wf_assertion \<Delta> A"
+  shows "self_framing A \<and> self_framing B \<and> entails_typed \<Delta> A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - (set l)"
   using assms
 proof (induct l arbitrary: A B)
   case Nil
   then show ?case using SL_proof_Skip_elim
-    using entails_refl by force
+    using entails_typed_refl by force
 next
   case (Cons x l)
   then obtain R where r: "\<Delta> \<turnstile> [A] Havoc x [R]" "\<Delta> \<turnstile> [R] havoc_list l [B]"
     by (metis SL_proof_Seq_elim havoc_list.simps(2))
-  moreover have "self_framing_and_typed \<Delta> B \<and> entails R B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> R - set l"
-    using Cons calculation(2) by simp
-  moreover have "typed_assertion \<Delta> A"
-    using r(1) by force
+  then have "R = exists_assert \<Delta> x A"
+    by blast
+  then have "wf_assertion \<Delta> R"
+    by (simp add: Cons.prems(3) exists_wf_assertion)
+  then have "self_framing B \<and> entails_typed \<Delta> R B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> R - set l"
+    using Cons r by simp
   moreover have "variables \<Delta> x \<noteq> None"
     using Cons.prems(2) by force
 
-  then have "entails A R \<and> free_vars \<Delta> R \<subseteq> free_vars \<Delta> A - {x}"
-    by (meson assms(3) calculation(4) r(1) semantics.SL_proof_Havoc_elim_entails semantics_axioms)
-
-  ultimately show "self_framing_and_typed \<Delta> A \<and> self_framing_and_typed \<Delta> B \<and> entails A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - set (x # l)"
-    by (smt (verit, ccfv_SIG) Diff_iff SL_proof_Havoc_elim entails_trans set_ConsD subsetD subsetI subset_Diff_insert)
+  then have "entails_typed \<Delta> R B \<and> free_vars \<Delta> R \<subseteq> free_vars \<Delta> A - {x}"
+    by (simp add: Cons.prems(3) SL_proof_Havoc_elim_entails calculation r(1))
+  ultimately show "self_framing A \<and> self_framing B \<and> entails_typed \<Delta> A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - set (x # l)"
+    by (smt (verit, ccfv_SIG) Cons.prems(3) DiffD2 DiffI Diff_subset SL_proof_Havoc_elim_entails \<open>variables \<Delta> x \<noteq> None\<close> entails_typed_trans insert_iff list.simps(15) r(1) SL_proof_Havoc_elim subset_eq)
 qed
 
 
@@ -1698,17 +1771,17 @@ proof -
     by (smt (verit, ccfv_SIG) assms asso1 decompose_stabilize_pure greater_equiv plus_pure_stabilize_eq smaller_than_core stabilize_sum)
 qed
 
-lemma state_in_pure_typed_add:
+lemma state_in_purify_add:
   assumes "\<omega> \<in> A"
       and "Some True = b \<omega>"
       and "wf_exp b"
       and "typed \<Delta> \<omega>"
-    shows "\<omega> \<in> A \<otimes> pure_typed \<Delta> b"
+    shows "\<omega> \<in> A \<otimes> purify b"
 proof -
   have "Some \<omega> = \<omega> \<oplus> |\<omega>|"
     by (simp add: core_is_smaller)
-  moreover have "|\<omega>| \<in> pure_typed \<Delta> b"
-    by (smt (verit, ccfv_threshold) CollectI assms(2) assms(3) assms(4) max_projection_prop_def max_projection_prop_pure_core pure_typed_def  typed_core wf_exp_def)
+  moreover have "|\<omega>| \<in> purify b"
+    by (smt (verit, ccfv_threshold) CollectI assms(2) assms(3) assms(4) max_projection_prop_def max_projection_prop_pure_core purify_def  typed_core wf_exp_def)
   ultimately show ?thesis
     using assms(1) x_elem_set_product by blast
 qed
@@ -1723,6 +1796,7 @@ theorem SL_proof_implies_Viper:
       and "\<omega> \<in> A"
       and "wf_abs_stmt \<Delta> C"
       and "stable \<omega>"
+      and "typed \<Delta> \<omega>"
     shows "\<exists>S. red_stmt \<Delta> C \<omega> S \<and> S \<subseteq> B"
   using assms
 proof (induct arbitrary: \<omega> rule: SL_proof.induct)
@@ -1739,7 +1813,7 @@ next
     fix \<omega>'
     assume "\<omega>' \<in> S1"
     then obtain S2 where "red_stmt \<Delta> C2 \<omega>' S2 \<and> S2 \<subseteq> B"
-      by (meson RuleSeq.hyps(4) RuleSeq.prems(2) RuleSeq.prems(3) S1_def(1) S1_def(2) in_mono red_stable wf_abs_stmt.simps(7) )
+      by (metis RuleSeq.hyps(4) RuleSeq.prems(2) RuleSeq.prems(3) RuleSeq.prems(4) S1_def(1) S1_def(2) red_wf_state subsetD wf_abs_stmt.simps(7) wf_state_def)
     then show "red_stmt \<Delta> C2 \<omega>' (?f \<omega>') \<and> (?f \<omega>') \<subseteq> B"
       using someI by (metis (mono_tags))
   qed
@@ -1753,17 +1827,26 @@ next
     by (simp add: SUP_least r)
   ultimately show ?case by meson
 next
-  case (RuleInhale \<Delta> A P)
-  moreover have "red_stmt \<Delta> (abs_stmt.Inhale P) \<omega> (Set.filter sep_algebra_class.stable ({\<omega>} \<otimes> P))"
+  case (RuleInhale A P \<Delta>)
+  moreover have "red_stmt \<Delta> (abs_stmt.Inhale P) \<omega> (Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> P))"
   proof (rule RedInhale[of \<omega> P \<Delta>])
     show "rel_stable_assertion \<omega> P"
       using calculation(2) calculation(3) calculation(5) framed_by_def by blast
   qed
-  moreover have "Set.filter sep_algebra_class.stable ({\<omega>} \<otimes> P) \<subseteq> A \<otimes> P"
-    by (metis calculation(3) member_filter star_to_singletonI subsetI)
-  ultimately show "\<exists>S. red_stmt \<Delta> (abs_stmt.Inhale P) \<omega> S \<and> S \<subseteq> A \<otimes> P" by meson
+  moreover have "Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> P) \<subseteq> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+  proof
+    fix x assume asm0: "x \<in> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> P)"
+    then obtain p where "sep_algebra_class.stable x \<and> typed \<Delta> x" "p \<in> P" "Some x = \<omega> \<oplus> p"
+      using in_singleton_star by force
+    then have "typed \<Delta> (stabilize p)"
+      using greater_equiv stabilize_sum_of_stable typed_state.typed_smaller typed_state_axioms by blast
+    then show "x \<in> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+      using \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> calculation(3) x_elem_set_product by fastforce
+  qed
+  ultimately show "\<exists>S. red_stmt \<Delta> (abs_stmt.Inhale P) \<omega> S \<and> S \<subseteq> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
+    by meson
 next
-  case (RuleExhale \<Delta> B A P)
+  case (RuleExhale B A P \<Delta>)
   then obtain a p where "a \<in> A" "p \<in> P" "Some \<omega> = a \<oplus> p"
     by (meson entails_def subsetD x_elem_set_product)
   then obtain p' where "Some p' = p \<oplus> |\<omega>|" "Some \<omega> = stabilize a \<oplus> p'"
@@ -1772,25 +1855,25 @@ next
     using RedExhale[of p' P \<omega> "stabilize a" \<Delta>]
     by (meson RuleExhale.prems(3) \<open>Some \<omega> = a \<oplus> p\<close> \<open>p \<in> P\<close> RedExhale stabilize_is_stable stabilize_sum_result_stable)
   then show "\<exists>S. red_stmt \<Delta> (abs_stmt.Exhale P) \<omega> S \<and> S \<subseteq> A"
-    by (meson RuleExhale.hyps(3) \<open>a \<in> A\<close> empty_subsetI insert_subset self_framing_typed_def typed_assertion_def)
+    by (meson RuleExhale.hyps(3) \<open>a \<in> A\<close> bot.extremum insert_subsetI self_framing_def)
 next
-  case (RuleAssert \<Delta> A P)
+  case (RuleAssert A P \<Delta>)
   then have "red_stmt \<Delta> (abs_stmt.Assert P) \<omega> {\<omega>}"
     using RedAssertTrue[of \<omega> P \<Delta>] by (meson entails_def subset_iff)
   then show "\<exists>S. red_stmt \<Delta> (abs_stmt.Assert P) \<omega> S \<and> S \<subseteq> A"
     by (meson RuleAssert.prems(1) empty_subsetI insert_subsetI)
 next
-  case (RuleAssume \<Delta> A P)
+  case (RuleAssume A P \<Delta>)
   then have "(\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))"
     using self_framing_on_def by blast
 (*
   self_framing_on A P = (\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))
 *)
-  moreover have asm0: "stable_on \<Delta> \<omega> P"
+  moreover have asm0: "stable_on \<omega> P"
   proof (rule stable_onI)
-    fix x assume "pure_larger x \<omega>" "typed \<Delta> x"
+    fix x assume "pure_larger x \<omega>"
     then have "x \<in> A"
-      by (metis RuleAssume.hyps(1) RuleAssume.prems(1) pure_larger_stabilize_same self_framing_typed_altE typed_assertionE typed_state.self_framing_typedE typed_state_axioms)
+      by (metis RuleAssume.hyps(1) RuleAssume.prems(1) in_Stabilize pure_larger_stabilize_same self_framing_eq)
     then show "(\<omega> \<in> P) = (x \<in> P)"
       by (metis RuleAssume.prems(1) \<open>\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P)\<close> \<open>pure_larger x \<omega>\<close> pure_larger_stabilize_same)
   qed
@@ -1805,7 +1888,7 @@ next
       using RedAssumeFalse asm0 by blast
   qed
 next
-  case (RuleHavoc \<Delta> A x)
+  case (RuleHavoc A \<Delta> x)
   then obtain ty where ty_def: "variables \<Delta> x = Some ty"
     by auto
   then have "red_stmt \<Delta> (abs_stmt.Havoc x) \<omega> {assign_var_state x (Some v) \<omega> |v. v \<in> ty}"
@@ -1816,15 +1899,15 @@ next
     then obtain v where "v \<in> ty" "\<omega>' = assign_var_state x (Some v) \<omega>"
       by blast
     moreover obtain v0 where "v0 \<in> ty" "get_store \<omega> x = Some v0"
-      by (meson RuleHavoc.hyps RuleHavoc.prems(1) RuleHavoc.prems(3) wf_state_then_value  ty_def typed_assertion_def wf_state_def)
+      using RuleHavoc.prems(3) RuleHavoc.prems(4) semantics.wf_state_then_value semantics_axioms ty_def wf_state_def by blast
     ultimately show "\<omega>' \<in> exists_assert \<Delta> x A"
       using exists_assertI[of v ty \<omega>' x \<Delta> v0 A]
-      by (metis RuleHavoc.hyps RuleHavoc.prems(1) assign_var_state_def assign_var_state_inverse fun_upd_same get_store_set_store ty_def typed_assertion_def typed_assign_var)
+      by (metis RuleHavoc.prems(1) assign_var_state_def assign_var_state_inverse fun_upd_same get_store_set_store ty_def)
   qed
   ultimately show "\<exists>S. red_stmt \<Delta> (abs_stmt.Havoc x) \<omega> S \<and> S \<subseteq> exists_assert \<Delta> x A"
     by meson
 next
-  case (RuleLocalAssign \<Delta> A e x)
+  case (RuleLocalAssign A e \<Delta> x)
   then obtain ty where ty_def: "variables \<Delta> x = Some ty"
     by auto
   moreover obtain v where "e \<omega> = Some v"
@@ -1835,16 +1918,16 @@ next
   then show "\<exists>S. red_stmt \<Delta> (abs_stmt.LocalAssign x e) \<omega> S \<and> S \<subseteq> post_substitute_var_assert x e A"
     by (metis (no_types, lifting) RuleLocalAssign.prems(1) image_insert insert_iff mk_disjoint_insert post_substitute_var_assert_def red_stmt_Assign_elim singletonD subsetI substitute_var_state_def)
 next
-  case (RuleIf \<Delta> A b C1 B1 C2 B2)
+  case (RuleIf A b \<Delta> C1 B1 C2 B2)
   then have ty: "typed \<Delta> \<omega>"
-    by (meson typed_assertion_def)
+    by blast
   show "\<exists>S. red_stmt \<Delta> (abs_stmt.If b C1 C2) \<omega> S \<and> S \<subseteq> B1 \<union> B2"
   proof (cases "b \<omega> = Some True")
     case True
     moreover have "\<exists>S. red_stmt \<Delta> C1 \<omega> S \<and> S \<subseteq> B1"
     proof (rule RuleIf(4))
-      show "\<omega> \<in> A \<otimes> pure_typed \<Delta> b"
-        using RuleIf.prems(1) RuleIf.prems(2) ty calculation state_in_pure_typed_add[of \<omega> A b \<Delta>]
+      show "\<omega> \<in> A \<otimes> purify b"
+        using RuleIf.prems(1) RuleIf.prems(2) ty calculation state_in_purify_add[of \<omega> A b \<Delta>]
         by fastforce
       show "wf_abs_stmt \<Delta> C1"
         using RuleIf.prems(2) by auto
@@ -1857,8 +1940,8 @@ next
       by (metis (mono_tags, lifting) RuleIf.hyps(2) RuleIf.prems(1) framed_by_exp_def option.exhaust)
     moreover have "\<exists>S. red_stmt \<Delta> C2 \<omega> S \<and> S \<subseteq> B2"
     proof (rule RuleIf(6))
-      show "\<omega> \<in> A \<otimes> pure_typed \<Delta> (negate b)"
-        by (smt (verit, del_insts) RuleIf.hyps(2) RuleIf.prems(1) RuleIf.prems(2) ty calculation framed_by_exp_def negate_def option.sel state_in_pure_typed_add wf_abs_stmt.simps(6)  wf_exp_negate)
+      show "\<omega> \<in> A \<otimes> purify (negate b)"
+        by (smt (verit, del_insts) RuleIf.hyps(2) RuleIf.prems(1) RuleIf.prems(2) ty calculation framed_by_exp_def negate_def option.sel state_in_purify_add wf_abs_stmt.simps(6)  wf_exp_negate)
       show "wf_abs_stmt \<Delta> C2"
         using RuleIf.prems(2) by auto
     qed (simp_all add: RuleIf)
@@ -1866,11 +1949,9 @@ next
       using RedIfFalse[of b \<omega> \<Delta> C2 _ C1] by blast
   qed
 next
-  case (RuleCustom \<Delta> A B C)
-  then have "typed_store \<Delta> (get_store \<omega>)"
-    by (simp add: typed_assertion_def typed_def typed_store_def)
+  case (RuleCustom A B \<Delta> C)
   then show ?case using red_wf_complete[OF \<open>SL_Custom \<Delta> A C B\<close>]
-    by (meson RedCustom RuleCustom.hyps(1) RuleCustom.prems(1) RuleCustom.prems(2) RuleCustom.prems(3) typed_assertion_def typed_def wf_abs_stmt.simps(10))
+    by (meson RedCustom wf_abs_stmt.simps(10))
 qed
 
 end

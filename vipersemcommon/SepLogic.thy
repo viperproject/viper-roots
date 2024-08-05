@@ -839,6 +839,11 @@ qed
 definition framed_by where
   "framed_by A B \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<longrightarrow> rel_stable_assertion \<omega> B)"
 
+lemma framed_byI:
+  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> stable \<omega> \<Longrightarrow> rel_stable_assertion \<omega> B"
+  shows "framed_by A B"
+  using assms framed_by_def by blast
+
 definition framed_by_exp where
   "framed_by_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> \<noteq> None)"
 
@@ -970,11 +975,11 @@ proof -
   then show ?thesis by blast
 qed
 
-lemma Stabilize_self_framing:
+lemma Stabilize_self_framing[simp]:
   "self_framing (Stabilize S)"
 proof (rule self_framingI)
   fix \<omega> show "\<omega> \<in> Stabilize S \<longleftrightarrow> stabilize \<omega> \<in> Stabilize S"
-    by (simp add: already_stable Stabilize_def stabilize_is_stable)
+    by (simp add: already_stable Stabilize_def)
 qed
 
 lemma wf_exp_framed_by_stabilize:
@@ -1034,6 +1039,54 @@ lemma entailsI:
   shows "entails A B"
   by (simp add: assms entails_def subsetI)
 
+
+lemma test_self_framing:
+  assumes "self_framing P"
+  shows "self_framing (Set.filter (f \<circ> stabilize) P)"
+proof (rule self_framingI)
+  fix \<omega>
+  show "(\<omega> \<in> Set.filter (f \<circ> stabilize) P) = (stabilize \<omega> \<in> Set.filter (f \<circ> stabilize) P)"
+  proof
+    assume "\<omega> \<in> Set.filter (f \<circ> stabilize) P"
+    then show "stabilize \<omega> \<in> Set.filter (f \<circ> stabilize) P"
+      using assms local.already_stable self_framing_def by auto
+  next
+    show "stabilize \<omega> \<in> Set.filter (f \<circ> stabilize) P \<Longrightarrow> \<omega> \<in> Set.filter (f \<circ> stabilize) P"
+      using assms local.already_stable self_framing_eq by force
+  qed
+qed
+
+lemma stable_set_filter_stabilize:
+  assumes "{\<omega>} \<otimes> A \<subseteq> Stabilize ({\<omega>} \<otimes> A)"
+      and "Stabilize ({\<omega>} \<otimes> A) \<subseteq> {\<omega>} \<otimes> A"
+      and "{\<omega>} \<otimes> Set.filter (f \<circ> stabilize) A = Set.filter (f \<circ> stabilize) ({\<omega>} \<otimes> A)"
+  shows "Stable ({\<omega>} \<otimes> Set.filter (f \<circ> stabilize) A)"
+  unfolding Stable_def
+proof
+  fix x
+  assume asm1: "x \<in> {\<omega>} \<otimes> Set.filter (f \<circ> stabilize) A"
+  then show "x \<in> Stabilize ({\<omega>} \<otimes> Set.filter (f \<circ> stabilize) A)"
+    using assms(1) assms(2) assms(3) self_framing_eq test_self_framing by auto
+qed
+
+lemma Stabilize_mono:
+  assumes "A \<subseteq> B"
+  shows "Stabilize A \<subseteq> Stabilize B"
+proof
+  fix x assume "x \<in> Stabilize A"
+  then have "stabilize x \<in> A"
+    by simp
+  then have "stabilize x \<in> B"
+    using assms by auto
+  then show "x \<in> Stabilize B"
+    by simp
+qed
+
+
+lemma in_singleton_star:
+  assumes "x \<in> {\<omega>} \<otimes> P"
+  shows "\<exists>p \<in> P. Some x = \<omega> \<oplus> p"
+  using assms local.x_elem_set_product by auto
 
 end
 

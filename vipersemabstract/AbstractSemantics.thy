@@ -263,34 +263,13 @@ subsection \<open>States\<close>
 definition typed where
   "typed \<Delta> \<omega> \<longleftrightarrow> typed_store \<Delta> (get_store \<omega>) \<and> wf_custom_state (custom_context \<Delta>) (get_abs_state \<omega>)"
 
-definition self_framing_typed where
-  "self_framing_typed \<Delta> A \<longleftrightarrow> (\<forall>\<omega>. typed \<Delta> \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A))"
-
-lemma self_framing_typedI:
-  assumes "\<And>\<omega>. typed \<Delta> \<omega> \<Longrightarrow> (\<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"
-  shows "self_framing_typed \<Delta> A"
-  using assms self_framing_typed_def by blast
-
 definition wf_state where
   "wf_state \<Delta> \<omega> \<longleftrightarrow> (stable \<omega> \<and> typed \<Delta> \<omega>)"
-
-definition Stabilize_typed where
-  "Stabilize_typed \<Delta> A = Set.filter (typed \<Delta>) (Stabilize A)"
-
 
 lemma typed_then_stabilize_typed:
   assumes "typed \<Delta> \<omega>"
   shows "typed \<Delta> (stabilize \<omega>)"
   by (metis (no_types, lifting) assms greater_charact max_projection_prop_def max_projection_prop_stable_stabilize typed_def wf_custom_state_smaller)
-
-lemma self_framing_Stabilize_typed[simp]:
-  "self_framing_typed \<Delta> (Stabilize_typed \<Delta> A)"
-proof (rule self_framing_typedI)
-  fix \<omega>
-  assume asm0: "typed \<Delta> \<omega>"
-  then show "(\<omega> \<in> Stabilize_typed \<Delta> A) = (stabilize \<omega> \<in> Stabilize_typed \<Delta> A)"
-    by (simp add: Stabilize_typed_def already_stable typed_then_stabilize_typed)
-qed
 
 lemma typed_state_then_stabilize_typed:
   assumes "typed \<Delta> \<omega>"
@@ -316,44 +295,6 @@ lemma typed_smaller:
   by (metis assms(1) assms(2) greater_charact typed_def wf_custom_state_smaller)
 
 subsection \<open>Assertions\<close>
-
-definition typed_assertion where
-  "typed_assertion \<Delta> A \<longleftrightarrow> (\<forall>\<omega>\<in>A. typed \<Delta> \<omega>)"
-
-lemma typed_assertionI:
-  assumes "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> typed \<Delta> \<omega>"
-  shows "typed_assertion \<Delta> A"
-  using assms typed_assertion_def by blast
-
-lemma typed_assertionE:
-  assumes "typed_assertion \<Delta> A"
-      and "\<omega> \<in> A"
-    shows "typed \<Delta> \<omega>"
-  using assms typed_assertion_def by blast
-
-lemma typed_subset:
-  assumes "A \<subseteq> A'"
-      and "typed_assertion \<Delta> A'"
-    shows "typed_assertion \<Delta> A"
-  using assms(1) assms(2) typed_assertion_def by blast
-
-lemma typed_star:
-  assumes "typed_assertion \<Delta> A"
-      and "typed_assertion \<Delta> B"
-    shows "typed_assertion \<Delta> (A \<otimes> B)"
-  by (meson assms(1) assms(2) typed_assertion_def typed_sum x_elem_set_product)
-
-
-
-lemma typed_Stabilize_typed[simp]:
-  "typed_assertion \<Delta> (Stabilize_typed \<Delta> A)"
-  by (simp add: Stabilize_typed_def typed_assertion_def)
-
-lemma self_framing_typed_on_typed:
-  assumes "self_framing_typed \<Delta> P"
-      and "typed_assertion \<Delta> A"
-    shows "self_framing_on A P"
-by (meson assms(1) assms(2) self_framing_on_def self_framing_typed_def typed_assertion_def)
 
 definition wf_set where
   "wf_set \<Delta> S \<longleftrightarrow> (\<forall>x \<in> S. wf_state \<Delta> x)"
@@ -391,107 +332,47 @@ definition overapprox_fv :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) ab
 definition free_vars where
   "free_vars \<Delta> A = (\<Inter>S \<in> {S. overapprox_fv \<Delta> A S}. S)"
 
+
 text \<open>Works only if (dom \<Delta>) is finite.\<close>
 
 definition at_least_two_elems:
   "at_least_two_elems S \<longleftrightarrow> (\<exists>a b. a \<in> S \<and> b \<in> S \<and> a \<noteq> b)"
 
-subsection \<open>wf_assertion\<close>
+subsection \<open>wf_assertion \<Delta>\<close>
 
 definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> typed_assertion \<Delta> A \<and> (\<forall>x' x. pure_larger x' x \<and> typed \<Delta> x' \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+  "wf_assertion \<Delta> A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)
+  \<and> (\<exists>V. finite V \<and> overapprox_fv \<Delta> A V)"
 
 lemma wf_assertionE:
   assumes "wf_assertion \<Delta> A"
       and "pure_larger x' x"
-      and "typed \<Delta> x'"
       and "x \<in> A"
     shows "x' \<in> A"
-  using assms(1) assms(2) assms(3) assms(4) typed_state.wf_assertion_def typed_state_axioms by blast
+  using assms(1) assms(2) assms(3) wf_assertion_def by blast
 
-(*
-lemma self_framing_wfI:
-  assumes "wf_assertion \<Delta> A"
-      and "\<And>\<omega>. \<omega> \<in> A \<Longrightarrow> stabilize \<omega> \<in> A"
-    shows "self_framing A"
-  unfolding self_framing_def
-proof -
-  have "\<And>\<omega>. stabilize \<omega> \<in> A \<Longrightarrow> \<omega> \<in> A"
-  proof -
-    fix \<omega> assume "stabilize \<omega> \<in> A"
-    then have "pure_larger \<omega> (stabilize \<omega>)"
-      using core_is_pure decompose_stabilize_pure pure_def pure_larger_def by blast
-    then show "\<omega> \<in> A"
-      using \<open>stabilize \<omega> \<in> A\<close> assms(1) wf_assertion_def by blast
-  qed
-  then show "\<forall>\<omega>. (\<omega> \<in> A) = (stabilize \<omega> \<in> A)" using assms(2) by blast
-qed
-*)
 
 definition exists_assert :: "('v, 'c) abs_type_context \<Rightarrow> var \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
   "exists_assert \<Delta> x A =
-{ \<omega> |\<omega> v0 v ty. typed \<Delta> \<omega> \<and> v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> assign_var_state x (Some v) \<omega> \<in> A}"
+{ \<omega> |\<omega> v0 v ty. v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty \<and> assign_var_state x (Some v) \<omega> \<in> A}"
 
 
-
-lemma self_framing_typedE:
-  assumes "self_framing_typed \<Delta> A"
-      and "typed \<Delta> a"
-      and "a \<in> A"
-    shows "stabilize a \<in> A"
-  using assms(1) assms(2) assms(3) self_framing_typed_def by blast
-
-lemma self_framing_typed_altE:
-  assumes "self_framing_typed \<Delta> A"
-      and "typed \<Delta> a"
-      and "stabilize a \<in> A"
-    shows "a \<in> A"
-  using assms(1) assms(2) assms(3) self_framing_typed_def by blast
-
-
-lemma self_framing_typed_ext:
-  assumes "self_framing_typed \<Delta> A"
-      and "self_framing_typed \<Delta> B"
-      and "typed_assertion \<Delta> A"
-      and "typed_assertion \<Delta> B"
-      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> \<omega> \<in> A \<Longrightarrow> \<omega> \<in> B"
-      and "\<And>\<omega>. stable \<omega> \<Longrightarrow> typed \<Delta> \<omega>  \<Longrightarrow> \<omega> \<in> B \<Longrightarrow> \<omega> \<in> A"
-    shows "A = B"
-proof -
-  have "\<And>\<omega>. \<omega> \<in> A \<longleftrightarrow> \<omega> \<in> B"
-    by (meson assms(1) assms(2) assms(3) assms(4) assms(5) assms(6) self_framing_typedE self_framing_typed_altE typed_assertion_def stabilize_is_stable)
-  then show ?thesis by blast
-qed
-
-
-
-lemma wf_exp_framed_by_stabilize_typed:
-  assumes "wf_exp e"
-      and "framed_by_exp A e"
-      and "\<omega> \<in> A"
-      and "typed \<Delta> \<omega>"
-      and "self_framing_typed \<Delta> A"
-    shows "e \<omega> = Some b \<longleftrightarrow> e (stabilize \<omega>) = Some b"
-proof
-  show "e (stabilize \<omega>) = Some b \<Longrightarrow> e \<omega> = Some b"
-    by (metis (no_types, lifting) assms(1) max_projection_prop_def max_projection_prop_stable_stabilize wf_expE)
-  assume "e \<omega> = Some b"
-  moreover obtain v where "e (stabilize \<omega>) = Some v"
-    by (metis assms(2) assms(3) assms(4) assms(5) framed_by_expE self_framing_typedE)
-  ultimately show "e (stabilize \<omega>) = Some b"
-    by (metis (mono_tags, lifting) assms(1) max_projection_prop_def max_projection_prop_stable_stabilize wf_expE)
-qed
-
-definition atrue where
-  "atrue \<Delta> = {\<omega>. typed \<Delta> \<omega>}"
+lemma in_exists_assert:
+  assumes "v0 \<in> ty"
+      and "get_store \<omega> x = Some v0"
+      and "variables \<Delta> x = Some ty"
+      and "v \<in> ty"
+      and "assign_var_state x (Some v) \<omega> \<in> A"
+    shows "\<omega> \<in> exists_assert \<Delta> x A"  
+  using assms(1) assms(2) assms(3) assms(4) assms(5) exists_assert_def by fastforce
 
 
 definition stable_on where
-  "stable_on \<Delta> \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<and> typed \<Delta> x \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
+  "stable_on \<omega> A \<longleftrightarrow> (\<forall>x. pure_larger x \<omega> \<longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A))"
 
 lemma stable_onI:
-  assumes "\<And>x. pure_larger x \<omega> \<Longrightarrow> typed \<Delta> x \<Longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A)"
-  shows "stable_on \<Delta> \<omega> A"
+  assumes "\<And>x. pure_larger x \<omega> \<Longrightarrow> (\<omega> \<in> A \<longleftrightarrow> x \<in> A)"
+  shows "stable_on \<omega> A"
   using assms stable_on_def by blast
 
 end
@@ -513,7 +394,7 @@ locale semantics =
 
   assumes SL_proof_custom: "(\<forall>(\<omega> :: (('v, 'a) abs_state list \<times> ('v, 'a) abs_state)) \<in> SA.
   red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>)) \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> wf_set \<Delta> (snd ` SA)
-  \<Longrightarrow> SL_Custom \<Delta> (Stabilize_typed \<Delta> (snd ` SA)) C (Stabilize_typed \<Delta> (\<Union>\<omega>\<in>SA. f \<omega>))"
+  \<Longrightarrow> SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union>\<omega>\<in>SA. f \<omega>))"
 
       and red_custom_stable: "red_custom_stmt \<Delta> C \<omega> S \<Longrightarrow> stable \<omega> \<Longrightarrow> \<omega>' \<in> S \<Longrightarrow> stable \<omega>'"
       and red_custom_typed_store: "red_custom_stmt \<Delta> C \<omega> S \<Longrightarrow> typed_store \<Delta> (get_store \<omega>)
@@ -539,10 +420,11 @@ where
 | RedSkip: "red_stmt \<Delta> Skip \<omega> ({\<omega>})"
 
 | RedAssertTrue: "\<lbrakk> \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assert A) \<omega> ({\<omega>})"
-| RedAssumeTrue: "\<lbrakk> stable_on \<Delta> \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
-| RedAssumeFalse: "\<lbrakk> stable_on \<Delta> \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
+| RedAssumeTrue: "\<lbrakk> stable_on \<omega> A; \<omega> \<in> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({\<omega>})"
+| RedAssumeFalse: "\<lbrakk> stable_on \<omega> A; \<omega> \<notin> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Assume A) \<omega> ({})"
 
-| RedInhale: "\<lbrakk> rel_stable_assertion \<omega> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Inhale A) \<omega> (Set.filter stable ({\<omega>} \<otimes> A))"
+| RedInhale: "\<lbrakk> rel_stable_assertion \<omega> A \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Inhale A) \<omega> (Set.filter (\<lambda>\<omega>. stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A))"
+
 | RedExhale: "\<lbrakk> a \<in> A ; Some \<omega> = \<omega>' \<oplus> a ; stable \<omega>' \<rbrakk> \<Longrightarrow> red_stmt \<Delta> (Exhale A) \<omega> {\<omega>'}"
 \<comment>\<open>Both Inhale and Exhale could be defined equivalently with stabilize instead of stable\<close>
 
@@ -602,6 +484,8 @@ fun modif where
 | "modif (If _ C1 C2) = modif C1 \<union> modif C2"
 | "modif _ = {}"
 
+(* TODO:
+Remove well-typed requirements *)
 fun wf_abs_stmt where
   "wf_abs_stmt \<Delta> Skip \<longleftrightarrow> True"
 | "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
@@ -745,44 +629,35 @@ definition pure_post_field_assign where
   "pure_post_field_assign r e b = { \<omega> |\<omega> l v. let \<omega>' = set_abs_state \<omega> (set_value (get_abs_state \<omega>) l v) in
   (b \<omega>' = Some True \<and> has_write_perm_only (get_abs_state \<omega>) (the (r \<omega>')) \<and> has_value (get_abs_state \<omega>) (the (r \<omega>')) (the (e \<omega>')))}"
 *)
-abbreviation self_framing_and_typed where
-  "self_framing_and_typed \<Delta> A \<equiv> self_framing_typed \<Delta> A \<and> typed_assertion \<Delta> A"
 
-
-definition pure_typed where
-  "pure_typed \<Delta> b = { \<omega> |\<omega>. b \<omega> = Some True \<and> pure \<omega> \<and> typed \<Delta> \<omega> }"
-
-lemma typed_assertion_pure_typed:
-  "typed_assertion \<Delta> (pure_typed \<Delta> b)"
-  using pure_typed_def typed_assertionI
-  by (metis (no_types, lifting) CollectD)
-
+definition purify where
+  "purify b = { \<omega> |\<omega>. b \<omega> = Some True \<and> pure \<omega> }"
 
 inductive SL_proof :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool"
    ("_ \<turnstile> [_] _ [_]" [51,0,0] 81)
    where
 
-  RuleSkip: "self_framing_and_typed \<Delta> A \<Longrightarrow> \<Delta> \<turnstile> [A] Skip [A]"
+  RuleSkip: "self_framing A \<Longrightarrow> \<Delta> \<turnstile> [A] Skip [A]"
 \<comment>\<open>Because no frame rule, needs A on both sides.\<close>
 
-| RuleInhale: "self_framing_and_typed \<Delta> A \<Longrightarrow> framed_by A P \<Longrightarrow> \<Delta> \<turnstile> [A] Inhale P [A \<otimes> P]"
+| RuleInhale: "self_framing A \<Longrightarrow> framed_by A P \<Longrightarrow> \<Delta> \<turnstile> [A] Inhale P [A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P]"
 \<comment>\<open>P framed by A ensures that A && P is self-framing.\<close>
 
-| RuleExhale: "self_framing_and_typed \<Delta> B \<Longrightarrow> entails B (A \<otimes> P) \<Longrightarrow> self_framing_and_typed \<Delta> A \<Longrightarrow> \<Delta> \<turnstile> [B] Exhale P [A]"
+| RuleExhale: "self_framing B \<Longrightarrow> entails B (A \<otimes> P) \<Longrightarrow> self_framing A \<Longrightarrow> \<Delta> \<turnstile> [B] Exhale P [A]"
 
 \<comment>\<open>Exhale can lose information, because we're forced to factorize the set, which is why the entails is needed.
 Example:
 {a1 + p1, a2 + p2} \<longlonglongrightarrow> {a1, a2}
 <A * P> = {a1 + p1, a2 + p2, a1 + p2, a2 + p1} \<longlonglongrightarrow> {a1, a2}\<close>
 
-| RuleAssert: "self_framing_and_typed \<Delta> A \<Longrightarrow> entails A P \<Longrightarrow> \<Delta> \<turnstile> [A] Assert P [A]"
+| RuleAssert: "self_framing A \<Longrightarrow> entails A P \<Longrightarrow> \<Delta> \<turnstile> [A] Assert P [A]"
 \<comment>\<open>Assert does not behave like exhale: It forces the *whole* heap to satisfy P.
 Because there is not frame rule, it can be used to express leak checks, or absence of obligations.\<close>
 
-| RuleAssume: "self_framing_and_typed \<Delta> A \<Longrightarrow> self_framing_on A P \<Longrightarrow> \<Delta> \<turnstile> [A] Assume P [A \<inter> P]"
+| RuleAssume: "self_framing A \<Longrightarrow> self_framing_on A P \<Longrightarrow> \<Delta> \<turnstile> [A] Assume P [A \<inter> P]"
 
 
-| RuleHavoc: "self_framing_and_typed \<Delta> A \<Longrightarrow> \<Delta> \<turnstile> [A] Havoc x [exists_assert \<Delta> x A]"
+| RuleHavoc: "self_framing A \<Longrightarrow> \<Delta> \<turnstile> [A] Havoc x [exists_assert \<Delta> x A]"
 
 \<comment>\<open>Entails needed, because we lose information. The strongest post might be \<exists>x. A, but does not seem more useful.\<close>
 
@@ -837,7 +712,7 @@ Explanation of assumptions:
 This rule is sound because: for every state \<^term>\<open>\<omega>\<close> satisfying \<^term>\<open>A\<close>. \<^term>\<open>e \<omega>\<close> evaluates to \<^term>\<open>Some v\<close>, and for the post-state \<^term>\<open>\<omega>'\<close>, the existence of \<^term>\<open>\<omega>\<close> makes it satisfy \<^term>\<open>post_substitute_assert x e A\<close>.
 This rule should be complete (maybe not yet): as long as the LocalAssign statement reduces for pre-condition \<^term>\<open>A\<close>, \<^term>\<open>e\<close> must evaluate to not \<^const>\<open>None\<close> for every state in \<^term>\<open>A\<close>, thus \<^prop>\<open>framed_by_exp A e\<close>. \<^prop>\<open>assertion_frame_exp A e\<close> is a framing requirement, and a correct reduction should satisfy it.
 \<close>
-| RuleLocalAssign: "\<lbrakk> self_framing_and_typed \<Delta> A; framed_by_exp A e \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
+| RuleLocalAssign: "\<lbrakk> self_framing A; framed_by_exp A e \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
 
 \<comment>\<open>Like inhale and the if rule, needs to frame r and e.
 Interestingly, does not work if we only have
@@ -883,7 +758,7 @@ Might need an entailment...\<close>
 
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile> [A] C1 [R] ; \<Delta> \<turnstile> [R] C2 [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Seq C1 C2 [B]"
 
-| RuleIf: "\<lbrakk> self_framing_and_typed \<Delta> A; framed_by_exp A b; \<Delta> \<turnstile> [A \<otimes> pure_typed \<Delta> b] C1 [B1] ; \<Delta> \<turnstile> [A \<otimes> pure_typed \<Delta> (negate b)] C2 [B2] \<rbrakk>
+| RuleIf: "\<lbrakk> self_framing A; framed_by_exp A b; \<Delta> \<turnstile> [A \<otimes> purify b] C1 [B1] ; \<Delta> \<turnstile> [A \<otimes> purify (negate b)] C2 [B2] \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A] If b C1 C2 [B1 \<union> B2]"
 
 (*
@@ -898,7 +773,7 @@ Might need an entailment...\<close>
   framed_by_exp (A \<otimes> points_to r \<otimes> pure_Stabilize b) e \<rbrakk>
   \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r \<otimes> pure_Stabilize b] FieldAssign r e [A \<otimes> pure_post_field_assign r e b]"
 *)
-| RuleCustom: "\<lbrakk> self_framing_and_typed \<Delta> A; self_framing_and_typed \<Delta> B; SL_Custom \<Delta> A C B \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Custom C [B]"
+| RuleCustom: "\<lbrakk> self_framing A; self_framing B; SL_Custom \<Delta> A C B \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Custom C [B]"
 
 inductive_cases SL_proof_Skip_elim[elim!]: "\<Delta> \<turnstile> [A] Skip [B]"
 inductive_cases SL_proof_Inhale_elim[elim!]: "\<Delta> \<turnstile> [A] Inhale P [B]"
