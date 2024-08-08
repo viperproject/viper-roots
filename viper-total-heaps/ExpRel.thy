@@ -563,8 +563,84 @@ proof (rule exp_rel_oldexp)
     next
       (* This should hold because it held previously and we removed the one case where it didn't *)
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
-        unfolding label_hm_rel_def label_rel_def
-        sorry
+      proof -
+        from StateRel have HMRelPrev: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr (label_hm_translation Tr) (get_trace_total \<omega>) ns"
+          using state_rel_label_hm_rel by fast
+        (* First, prove that if a label is in the hm translation, then it must have an entry in the trace *)
+        hence AllLabelsHaveTrace: "\<forall> lbl h. (fst (label_hm_translation Tr)) lbl = Some h \<or> (snd (label_hm_translation Tr)) lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega> lbl) = Some \<phi>)"
+          using label_hm_rel_def label_rel_def by meson
+        show ?thesis
+          unfolding label_hm_rel_def label_rel_def
+        proof (intro conjI)
+          show "\<forall>lbla h. fst (label_hm_translation TrOld) lbla = Some h \<longrightarrow>
+                 (\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
+                 heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_hh_total \<phi>) ns)"
+          proof (intro allI, intro impI)
+            fix lbla h
+            assume LabelDefined: "fst (label_hm_translation TrOld) lbla = Some h"
+            hence "lbla \<noteq> lbl"
+              using \<open>TrOld = _\<close> \<open>lbls' = _\<close> by fastforce
+            have "(fst (label_hm_translation Tr)) lbla = Some h"
+              using LabelDefined \<open>lbla \<noteq> lbl\<close> \<open>lbls = _\<close> \<open>lbls' = _\<close> \<open>TrOld = _\<close>
+              by simp
+            from this obtain \<phi> where
+              "get_trace_total ?\<omega>_old lbla = Some \<phi>"
+              using AllLabelsHaveTrace by fastforce
+            show "\<exists>\<phi>. get_trace_total (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) lbla = Some \<phi> \<and>
+            heap_var_rel Pr ?\<Lambda> TyRep (field_translation TrOld) h (get_hh_total \<phi>) ns"
+            proof (intro exI, intro conjI)
+              show "get_trace_total ?\<omega>_old lbla = Some \<phi>"
+                using \<open>get_trace_total ?\<omega>_old lbla = _\<close> by simp
+              show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_hh_total \<phi>) ns"
+                unfolding heap_var_rel_def
+              proof (intro conjI)
+                show "\<exists>hb. lookup_var ?\<Lambda> ns h = Some (AbsV (AHeap hb)) \<and>
+                           lookup_var_ty ?\<Lambda> h = Some (TConSingle (THeapId TyRep)) \<and>
+                           vbpl_absval_ty_opt TyRep (AHeap hb) = Some (THeapId TyRep, []) \<and>
+                           heap_rel Pr ?FieldTrOld (get_hh_total \<phi>) hb"
+                  by (smt (verit) HMRelPrev \<open>fst (label_hm_translation Tr) lbla = Some h\<close> \<open>get_trace_total (\<omega> \<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) lbla = Some \<phi>\<close> assms(6) full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) heap_var_rel_def label_hm_rel_def label_rel_def option.sel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) tr_vpr_bpl.update_convs(3) tr_vpr_bpl.update_convs(4) tr_vpr_bpl.update_convs(9))
+                show "total_heap_well_typed Pr (domain_type TyRep) (get_hh_total \<phi>)"
+                  using HMRelPrev \<open>fst (label_hm_translation Tr) lbla = Some h\<close> \<open>get_trace_total ?\<omega>_old lbla = Some \<phi>\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) heap_var_rel_def label_hm_rel_def label_rel_def option.inject
+                  by (smt (verit, best))
+              qed
+            qed
+          qed
+        next
+          show "\<forall>lbla h. snd (label_hm_translation TrOld) lbla = Some h \<longrightarrow>
+                         (\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
+                         mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_mh_total \<phi>) ns)"
+          proof (intro allI, intro impI)
+            fix lbla h
+            assume LabelDefined: "snd (label_hm_translation TrOld) lbla = Some h"
+            hence "lbla \<noteq> lbl"
+              using \<open>TrOld = _\<close> \<open>lbls' = _\<close> by fastforce
+            have "(snd (label_hm_translation Tr)) lbla = Some h"
+              using LabelDefined \<open>lbla \<noteq> lbl\<close> \<open>lbls = _\<close> \<open>lbls' = _\<close> \<open>TrOld = _\<close>
+              by simp
+            from this obtain \<phi> where
+              "get_trace_total ?\<omega>_old lbla = Some \<phi>"
+              using AllLabelsHaveTrace by fastforce
+            show "\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
+                      mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_mh_total \<phi>) ns"
+            proof (intro exI, intro conjI)
+              show "get_trace_total ?\<omega>_old lbla = Some \<phi>"
+                using \<open>get_trace_total ?\<omega>_old lbla = _\<close> by simp
+              show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_mh_total \<phi>) ns"
+                unfolding mask_var_rel_def
+                by (smt (verit, ccfv_threshold) HMRelPrev \<open>get_trace_total ?\<omega>_old lbla = Some \<phi>\<close> \<open>snd (label_hm_translation Tr) lbla = Some h\<close> assms(6) full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def label_rel_def mask_var_rel_def option.sel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) tr_vpr_bpl.update_convs(3) tr_vpr_bpl.update_convs(4) tr_vpr_bpl.update_convs(9))
+            qed
+          qed
+        next
+          show " \<forall>lbla \<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+          proof (intro allI, intro impI)
+            fix lbla \<phi>
+            assume "get_trace_total ?\<omega>_old lbla = Some \<phi>"
+            thus "valid_heap_mask (get_mh_total \<phi>)"
+              using HMRelPrev full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def
+              by metis
+          qed
+        qed
+      qed
     qed
   qed
 
