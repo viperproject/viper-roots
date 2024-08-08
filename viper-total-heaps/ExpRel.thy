@@ -631,13 +631,19 @@ proof (rule exp_rel_oldexp)
             qed
           qed
         next
-          show " \<forall>lbla \<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+          show "\<forall>lbla \<phi>.
+                 lbla \<in> active_labels_hm_tr (label_hm_translation TrOld) \<and>
+                 get_trace_total ?\<omega>_old lbla = Some \<phi> \<longrightarrow>
+                   valid_heap_mask (get_mh_total \<phi>)"
           proof (intro allI, intro impI)
             fix lbla \<phi>
-            assume "get_trace_total ?\<omega>_old lbla = Some \<phi>"
-            thus "valid_heap_mask (get_mh_total \<phi>)"
-              using HMRelPrev full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def
-              by metis
+            assume LabelDefined: "lbla \<in> active_labels_hm_tr (label_hm_translation TrOld) \<and>
+                                  get_trace_total ?\<omega>_old lbla = Some \<phi>"
+            have LabelInActiveLabels: "lbla \<in> active_labels_hm_tr (label_hm_translation Tr)"
+              using LabelDefined active_labels_hm_tr_def \<open>lbls = _\<close> \<open>lbls' = _\<close> \<open>TrOld = _\<close> by auto
+            have LabelInTrace: "(get_trace_total \<omega>) lbla = Some \<phi>" using LabelDefined by simp
+            show "valid_heap_mask (get_mh_total \<phi>)"
+              using HMRelPrev LabelInActiveLabels LabelDefined label_hm_rel_def by fastforce
           qed
         qed
       qed
