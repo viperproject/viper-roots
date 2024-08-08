@@ -631,6 +631,15 @@ proof (intro conjI)
     using assms label_hm_rel_def by fast
 qed
 
+\<comment>\<open>If \<^const>\<open>label_hm_rel\<close> holds, a label is active, and that label refers to a total state,
+   then that total state has a well-formed mask\<close>
+lemma label_hm_rel_active_mask_well_formed:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "lbl \<in> active_labels_hm_tr LabelMap"
+      and "t lbl = Some \<phi>"
+    shows "wf_mask_simple (get_mh_total \<phi>)"
+  using label_hm_rel_def assms by fast
+
 abbreviation state_rel0_disj_list
   where "state_rel0_disj_list Tr AuxPred \<equiv> [{heap_var Tr, heap_var_def Tr},
                       {mask_var Tr, mask_var_def Tr},

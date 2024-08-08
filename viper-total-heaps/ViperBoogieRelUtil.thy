@@ -205,9 +205,11 @@ proof -
                      mask_var_rel Pr ?\<Lambda> TyRep (field_translation Tr') h (get_mh_total \<phi>) ?ns'"
             by (metis (no_types, lifting) DisjAux Sup_insert UnI1 Un_commute \<open>f = _\<close> \<open>Tr' = _\<close> list.simps(15) mask_var_rel_def premise prod.sel(2) ranI tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) update_var_other vars_label_hm_tr_def)
         qed
-        show " \<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-          using StateRel state_rel_label_hm_rel label_hm_rel_def
-          by blast
+        show "\<forall>lbl \<phi>.
+               lbl \<in> active_labels_hm_tr (label_hm_translation Tr') \<and>
+               get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow>
+                 valid_heap_mask (get_mh_total \<phi>)"
+          by (smt (verit, ccfv_threshold) StateRel Un_iff \<open>valid_heap_mask (get_mh_total_full \<omega>)\<close> active_labels_hm_tr_def assms(8) assms(9) domIff fun_upd_apply get_mh_total_full.simps label_hm_rel_def option.sel prod.sel(1) prod.sel(2) state_rel_label_hm_rel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) traceDefined)
       qed
     qed
   qed
@@ -659,8 +661,11 @@ proof -
           using label_rel_def
           by blast
       qed
-      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-        by (meson StateRel label_hm_rel_def state_rel_label_hm_rel)
+      show "\<forall>lbl \<phi>.
+             lbl \<in> active_labels_hm_tr (label_hm_translation Tr') \<and>
+             get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow>
+               valid_heap_mask (get_mh_total \<phi>)"
+        by (smt (verit, ccfv_SIG) StateRel Tr' Un_iff active_labels_hm_tr_def domIff f fun_upd_apply get_mh_total_full.simps label_hm_rel_def option.sel prod.sel(1) snd_conv state_rel_label_hm_rel state_rel_wf_mask_simple tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(9) trace_defined)
     qed
 
     show "valid_heap_mask (get_mh_total_full \<omega>def)"
@@ -772,26 +777,11 @@ proof (intro conjI)
         by (simp add: labelHMTranslationEmpty label_rel_def)
       show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr ?\<Lambda> TyRep ?FieldTr m (get_mh_total \<phi>)) (snd (label_hm_translation Tr)) (get_trace_total \<omega>') ns"
         by (simp add: labelHMTranslationEmpty label_rel_def)
-      show "\<forall>l \<phi>. get_trace_total \<omega>' l = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-      proof (intro allI, intro impI)
-        fix l \<phi>
-        assume premise: "get_trace_total \<omega>' l = Some \<phi>"
-        have "get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>]"
-          using \<open>\<omega>' = _\<close>
-          by simp
-        hence "l = lbl"
-          by (metis fun_upd_apply option.discI premise)
-        hence "\<phi> = get_total_full \<omega>"
-          using \<open>get_trace_total \<omega>' = _\<close> premise
-          by simp   
-        hence "get_mh_total \<phi> = get_mh_total_full \<omega>"
-          by simp
-        from StateRel state_rel_wf_mask_simple have "wf_mask_simple (get_mh_total_full \<omega>)"
-          by blast
-        thus "valid_heap_mask (get_mh_total \<phi>)" 
-          using \<open>get_mh_total \<phi> = _\<close>
-          by simp
-      qed
+      show "\<forall>lbl \<phi>.
+             lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and>
+             get_trace_total \<omega>' lbl = Some \<phi> \<longrightarrow>
+               valid_heap_mask (get_mh_total \<phi>)"
+        using active_labels_hm_tr_def labelHMTranslationEmpty by simp
     qed
   qed
   show "get_trace_total \<omega>' = [lbl \<mapsto> get_total_full \<omega>']"
@@ -1224,8 +1214,6 @@ lemma state_rel_upd_trace_subset:
           \<comment>\<open>the active (i.e., tracked by \<^const>\<open>label_hm_translation\<close>) labels tracked by the new trace 
              must match the previous trace\<close>
       and ActiveLabels: "\<And>lbl. lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<Longrightarrow> \<exists>\<phi>. t lbl = Some \<phi> \<and> get_trace_total \<omega> lbl = Some \<phi>"
-          \<comment>\<open>All untracked members of the trace must be valid\<close>
-      and UntrackedStatesValid: "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
     shows "state_rel Pr StateCons TyRep Tr AuxPred ctxt (update_trace_total \<omega>def t) (update_trace_total \<omega> t) ns"
 proof - 
   let ?\<Lambda> = "var_context ctxt"
@@ -1285,23 +1273,25 @@ proof -
           by fast
       qed
     qed
-
-    (* Show that all members of the trace are valid *)
-    show "\<forall>lbl \<phi>. get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    show "\<forall>lbl \<phi>.
+           lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and>
+           get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi> \<longrightarrow>
+             valid_heap_mask (get_mh_total \<phi>)"
     proof (intro allI, intro impI)
       fix lbl \<phi>
-      assume LabelInTrace: "get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi>"
-      show "valid_heap_mask (get_mh_total \<phi>)"
+      assume LabelDefined: "lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and>
+                            get_trace_total (update_trace_total \<omega> t) lbl = Some \<phi>"
+      thus "valid_heap_mask (get_mh_total \<phi>)"
       proof (cases "lbl \<in> active_labels_hm_tr (label_hm_translation Tr)")
         case False
         thus ?thesis
-          using LabelInTrace UntrackedStatesValid by simp
+          by (simp add: LabelDefined)
       next
         case True
-        hence "get_trace_total \<omega> lbl = Some \<phi>"
-          using ActiveLabels LabelInTrace by fastforce
+        hence "lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and> get_trace_total \<omega> lbl = Some \<phi>"
+          using ActiveLabels LabelDefined by fastforce
         thus ?thesis
-          using StateRel state_rel_label_hm_rel label_hm_rel_def by fast
+          using StateRel label_hm_rel_def state_rel_label_hm_rel by fast
       qed
     qed
   qed
@@ -1800,19 +1790,9 @@ proof -
       using DomLabelMap state_rel_active_label_exists[OF StateRel] OldStateSame
       by auto
 
-    have UntrackedStatesValid: "\<forall>lbl \<phi>. get_trace_total \<omega>1 lbl = Some \<phi> \<longrightarrow> lbl \<notin> active_labels_hm_tr (label_hm_translation Tr) \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-    proof (intro allI, intro impI)
-      fix lbl \<phi>
-      assume "get_trace_total \<omega>1 lbl = Some \<phi>"
-         and "lbl \<notin> active_labels_hm_tr (label_hm_translation Tr)"
-      show "valid_heap_mask (get_mh_total \<phi>)"
-        (* TODO how to prove this *)
-        sorry
-    qed
-
     show ?thesis
     apply (rule state_rel_upd_trace_subset[OF _ _ state_rel_heap_pred_independent[OF state_rel_mask_pred_independent[OF StateRel3]]])
-      by (simp_all add: * UntrackedStatesValid)
+      by (simp_all add: *)
   qed
 
   \<comment>\<open>Here, we reenable the state consistency using the consistency assumption on the final state.\<close>
@@ -2560,12 +2540,23 @@ proof -
           qed
         qed
       qed
-      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+      show "\<forall>lbl \<phi>.
+             lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and>
+             get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow>
+               valid_heap_mask (get_mh_total \<phi>)"
       proof (intro allI, intro impI)
         fix lbl \<phi>
-        assume "get_trace_total \<omega> lbl = Some \<phi>"
+        assume LabelDefined: "lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and> get_trace_total \<omega> lbl = Some \<phi>"
+        thm StateRel
         show "valid_heap_mask (get_mh_total \<phi>)"
-          by (metis StateRel \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> \<open>\<omega> = _\<close> full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def state_rel_label_hm_rel)
+        proof (rule label_hm_rel_active_mask_well_formed)
+          show "lbl \<in> active_labels_hm_tr (label_hm_translation Tr')"
+            using LabelDefined \<open>Tr = _\<close> by auto
+          show "get_trace_total \<omega>_old lbl = Some \<phi>"
+            using LabelDefined \<open>\<omega> = _\<close> by fastforce
+          show "label_hm_rel Pr ?\<Lambda> TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>_old) ns"
+            using StateRel state_rel_label_hm_rel by fastforce
+        qed
       qed
     qed
   qed
