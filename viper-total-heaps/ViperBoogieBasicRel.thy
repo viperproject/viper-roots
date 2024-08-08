@@ -582,7 +582,13 @@ lemma aux_vars_pred_sat_weaken:
       using AuxVarsPredSat WeakerPred
       unfolding aux_vars_pred_sat_def
       by (metis has_Some_iff)
-  qed  
+  qed
+
+definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
+  where "vars_label_hm_tr LabelMap \<equiv> (ran (fst LabelMap)) \<union> (ran (snd LabelMap))"
+
+definition active_labels_hm_tr :: "label_hm_repr_bpl \<Rightarrow> label set"
+  where "active_labels_hm_tr LabelMap = dom (fst LabelMap) \<union> dom (snd LabelMap)"
 
 definition label_rel :: "(vname \<Rightarrow> 'a total_state \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool)  \<Rightarrow> (label \<rightharpoonup> vname) \<Rightarrow> 'a total_trace \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "label_rel P LabelMap t ns \<equiv> 
@@ -592,28 +598,38 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
   where "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns \<equiv>
              label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst LabelMap) t ns
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
-          \<and>  (\<forall> lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
+          \<and>  (\<forall> lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
 
 lemma label_hm_rel_empty:
   \<comment>\<open>We need to assume that all members of the trace are well-formed\<close>
   assumes "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-    shows "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
-  by (simp add: assms label_hm_rel_def label_rel_def)
-  
-definition vars_label_hm_tr :: "label_hm_repr_bpl \<Rightarrow> vname set"
-  where "vars_label_hm_tr LabelMap \<equiv> (ran (fst LabelMap)) \<union> (ran (snd LabelMap))"
-
-definition active_labels_hm_tr :: "label_hm_repr_bpl \<Rightarrow> label set"
-  where "active_labels_hm_tr LabelMap = dom (fst LabelMap) \<union> dom (snd LabelMap)"
+  shows "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
+  unfolding label_hm_rel_def
+proof (intro conjI)
+  show "label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst (Map.empty, Map.empty)) t ns"
+    by (simp add: label_rel_def)
+  show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd (Map.empty, Map.empty)) t ns"
+    by (simp add: label_rel_def)
+  show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr (Map.empty, Map.empty) \<and> t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    using assms by fast
+qed
 
 lemma label_hm_rel_stable:
   assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
       and "t = t'"
       and "\<And> x. x \<in> vars_label_hm_tr LabelMap \<Longrightarrow> lookup_var \<Lambda> ns x = lookup_var \<Lambda> ns' x"
     shows  "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t' ns'"
-  using assms heap_var_rel_stable mask_var_rel_stable
-  unfolding label_hm_rel_def vars_label_hm_tr_def label_rel_def
-  by (metis (no_types, lifting) UnCI ranI)
+  unfolding label_hm_rel_def
+proof (intro conjI)
+  show "label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst LabelMap) t' ns'"
+    unfolding label_rel_def
+    by (metis (mono_tags, lifting) UnCI assms heap_var_rel_stable label_hm_rel_def label_rel_def ranI vars_label_hm_tr_def)
+  show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t' ns'"
+    unfolding label_rel_def
+    by (metis (mono_tags, lifting) UnI2 assms label_hm_rel_def label_rel_def mask_var_rel_stable ranI vars_label_hm_tr_def)
+  show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t' lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
+    using assms label_hm_rel_def by fast
+qed
 
 abbreviation state_rel0_disj_list
   where "state_rel0_disj_list Tr AuxPred \<equiv> [{heap_var Tr, heap_var_def Tr},
@@ -3110,8 +3126,11 @@ next
         using MaskVarRel StateRelLabel \<open>label_tr = _\<close>
         by fastforce
     qed
-    show "\<forall>lbla \<phi>. (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) lbla = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-      by (metis StateRel StateRelLabel get_mh_total_full.simps map_upd_Some_unfold state_rel_wf_mask_def_simple)
+    show "\<forall>lbla \<phi>.
+       lbla \<in> active_labels_hm_tr (fst label_tr, snd label_tr(lbl \<mapsto> m)) \<and>
+       (get_trace_total \<omega>(lbl \<mapsto> get_total_full \<omega>)) lbla = Some \<phi> \<longrightarrow>
+       valid_heap_mask (get_mh_total \<phi>) "
+      by (metis StateRel StateRelLabel UnE UnI1 UnI2 active_labels_hm_tr_def \<open>label_tr = _\<close> domIff fst_conv fun_upd_apply get_mh_total_full.simps option.sel snd_conv state_rel_wf_mask_def_simple)
   qed    
 qed(insert StateRel[simplified state_rel_def state_rel0_def], auto)              
 
