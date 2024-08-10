@@ -1679,9 +1679,10 @@ proof -
      (\<lambda>m \<phi>. mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) m (get_mh_total \<phi>))
      (snd (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
         by (simp add: NoTrackedLabeledStates label_rel_def)
-      show "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-        using WfTrace
-        by simp
+      show "\<forall>lbl \<phi>.
+       lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and> get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow>
+       valid_heap_mask (get_mh_total \<phi>)"
+        using WfTrace by blast
     qed
   qed (insert assms Disj, auto)
 qed
