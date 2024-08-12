@@ -1907,6 +1907,17 @@ proof -
     by simp
 qed
 
+lemma disjoint_list_helper_lemma_7_to_4:
+  assumes "disjoint_list [A',B',N1,C',D',N2,N3]"
+      and "A \<subseteq> A' \<and> B \<subseteq> B' \<and> C \<subseteq> C' \<and> D \<subseteq> D'"
+    shows "disjoint_list [A, B, C, D]"
+  apply (insert assms)
+  apply (drule disjoint_list_drop_last, simp)
+  apply (drule disjoint_list_drop_last, simp)
+  apply (drule disjoint_list_drop_i[where ?i=2], simp, simp)
+  apply (rule disjoint_list_subset_list_all2)
+  by auto
+
 lemma disj_vars_state_relation_initialI:
   assumes "heap_var Tr = heap_var_def Tr"
       and "mask_var Tr = mask_var_def Tr"
