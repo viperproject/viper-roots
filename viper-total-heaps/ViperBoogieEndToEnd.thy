@@ -1476,8 +1476,6 @@ lemma init_state_in_state_relation:
                   local_state = initial_local_state T (snd (var_context ctxt)) Tr \<omega>,
                   binder_state = Map.empty \<rparr>" and
           InjVarTr: "inj_on (var_translation Tr) (dom (var_translation Tr))" and
-          WfTrace: "\<forall>lbl \<phi>. get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)" and
-
           ClosedGlobals: "list_all (closed \<circ> (fst \<circ> snd)) (fst (var_context ctxt))" and
           ClosedLocals: "list_all (closed \<circ> (fst \<circ> snd)) (snd (var_context ctxt))" and
           GlobalsLocalsDisj: "set (map fst (fst (var_context ctxt))) \<inter> set (map fst (snd (var_context ctxt))) = {}" and
@@ -1679,10 +1677,17 @@ proof -
      (\<lambda>m \<phi>. mask_var_rel (program_total ctxt_vpr) (var_context ctxt) T (field_translation Tr) m (get_mh_total \<phi>))
      (snd (label_hm_translation Tr)) (get_trace_total \<omega>) ns"
         by (simp add: NoTrackedLabeledStates label_rel_def)
+      \<comment>\<open>This states that all labeled states have a valid mask\<close>
       show "\<forall>lbl \<phi>.
        lbl \<in> active_labels_hm_tr (label_hm_translation Tr) \<and> get_trace_total \<omega> lbl = Some \<phi> \<longrightarrow>
        valid_heap_mask (get_mh_total \<phi>)"
-        using WfTrace by blast
+      proof -
+        \<comment>\<open>But initially there are no labeled states\<close>
+        have "\<forall>lbl. lbl \<notin> active_labels_hm_tr (label_hm_translation Tr)"
+          using NoTrackedLabeledStates active_labels_hm_tr_def by simp
+        \<comment>\<open>So the statement is vacuously true\<close>
+        thus ?thesis by simp
+      qed
     qed
   qed (insert assms Disj, auto)
 qed
