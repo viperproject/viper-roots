@@ -600,9 +600,11 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
           \<and>  (\<forall> lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
 
+lemma vars_label_hm_tr_empty: "vars_label_hm_tr (Map.empty, Map.empty ) = {}"
+  by (simp add: vars_label_hm_tr_def)
+
 lemma label_hm_rel_empty:
   \<comment>\<open>We need to assume that all members of the trace are well-formed\<close>
-  assumes "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
   shows "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
   unfolding label_hm_rel_def
 proof (intro conjI)
@@ -611,7 +613,8 @@ proof (intro conjI)
   show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd (Map.empty, Map.empty)) t ns"
     by (simp add: label_rel_def)
   show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr (Map.empty, Map.empty) \<and> t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-    using assms by fast
+    unfolding active_labels_hm_tr_def
+    by simp
 qed
 
 lemma label_hm_rel_stable:
@@ -630,6 +633,22 @@ proof (intro conjI)
   show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t' lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
     using assms label_hm_rel_def by fast
 qed
+
+lemma label_hm_rel_heapD:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "(fst LabelMap) lbl = Some x"
+    shows "\<exists>\<phi>. t lbl = Some \<phi> \<and> heap_var_rel Pr \<Lambda> TyRep FieldTr x (get_hh_total \<phi>) ns"
+  using assms
+  unfolding label_hm_rel_def label_rel_def
+  by auto
+
+lemma label_hm_rel_maskD:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "(snd LabelMap) lbl = Some x"
+    shows "\<exists>\<phi>. t lbl = Some \<phi> \<and> mask_var_rel Pr \<Lambda> TyRep FieldTr x (get_mh_total \<phi>) ns"
+  using assms
+  unfolding label_hm_rel_def label_rel_def
+  by auto  
 
 \<comment>\<open>If \<^const>\<open>label_hm_rel\<close> holds, a label is active, and that label refers to a total state,
    then that total state has a well-formed mask\<close>
@@ -2107,7 +2126,6 @@ proof (intro conjI)
   thus "disjoint_list (state_rel0_disj_list Tr AuxPred')"
     by simp
 qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto)
-
 
 subsubsection \<open>Heap update\<close>
 
