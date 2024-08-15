@@ -369,6 +369,7 @@ ML \<open>
         (Rmsg' "MethodCall Distinct Rets" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "MethodCall LookupDeclRetsBpl" (assm_full_simp_solved_with_thms_tac ([#method_rets_thm callee_data, @{thm ty_repr_basic_def}, @{thm shift_and_add_def}]@rets_lookup_decl_thms)  ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Var Translation Pre Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
+        (Rmsg' "MethodCall Label Vars Bpl Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
         (Rmsg' "MethodCall Exhale Pre" ( simp_only_tac [#method_pre_thm callee_data] ctxt THEN'
                                          atomic_rel_inst_tac ctxt inhale_info_call exhale_info_call basic_info (ExhaleHint exh_pre_complete_hint)) ctxt) THEN'
         (Rmsg' "MethodCall Havoc Rets Eq" (assm_full_simp_solved_tac ctxt) ctxt) THEN'
