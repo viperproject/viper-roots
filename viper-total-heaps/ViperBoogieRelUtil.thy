@@ -698,7 +698,7 @@ proof -
     by blast
 qed
 
-\<comment>\<open>Using a \<^const>\<open>label_hm_rel assumption\<close>, show \<^const>\<open>heap_var_rel\<close>\<close>
+\<comment>\<open>Using a \<^const>\<open>label_hm_rel\<close>, show \<^const>\<open>heap_var_rel\<close>\<close>
 lemma label_tracked_implies_heap_rel:
   \<comment>\<open>If the label_hm_rel relation holds for a given translation record and viper state\<close>
   assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
@@ -711,7 +711,7 @@ lemma label_tracked_implies_heap_rel:
   using assms label_hm_rel_def label_rel_def
   by (metis (mono_tags, lifting) option.sel)
 
-\<comment>\<open>Using a \<^const>\<open>label_hm_rel assumption\<close>, show \<^const>\<open>mask_var_rel\<close>\<close>
+\<comment>\<open>Using a \<^const>\<open>label_hm_rel\<close>, show \<^const>\<open>mask_var_rel\<close>\<close>
 lemma label_tracked_implies_mask_rel:
   assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
   \<comment>\<open>And the total state is defined at some label\<close>
@@ -1226,7 +1226,6 @@ proof -
 
   have LabelRel: 
     "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr (label_hm_translation Tr) (get_trace_total (update_trace_total \<omega> t)) ns"
-    (* This should be true because the trace meets the definitions we need, see assumptions *)
   proof (subst label_hm_rel_def, (subst label_rel_def)+, intro conjI)
     show "\<forall>lbl h.
        fst (label_hm_translation Tr) lbl = Some h \<longrightarrow>
@@ -2143,12 +2142,9 @@ lemma state_rel_capture_total_state_change_eval_and_def_state:
                             (h \<mapsto> pred_eq_heap Pr TyRep FieldTr ctxt h \<omega>)"
       and ValidHeapMask: "valid_heap_mask (get_mh_total_full \<omega>def) \<and> valid_heap_mask (get_mh_total_full \<omega>)"
       and Consistent: "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
-      (* Added these two assumptions so that we can know that these only differ on the total state *)
-      (* Should we re-frame this by defining \<omega>def in terms of \<omega>def_old? *)
       and "\<omega>def = \<omega>def_old \<lparr> get_total_full := \<phi>def_old \<rparr>"
       and "\<omega>   = \<omega>_old     \<lparr> get_total_full := \<phi>_old \<rparr>"
       and SameHeap: "get_h_total_full \<omega>def = get_h_total_full \<omega>"
-      (* Do we need additional assumptions about the "current" state? e.g. that it is well-formed *)
       and StateRel: "state_rel Pr StateCons TyRep Tr' AuxPred' ctxt \<omega>def_old \<omega>_old ns"
       (* May not actually need these two *)
       and MaskRelEquiv: "mdef = m \<Longrightarrow> (\<And>mb :: 'a bpl_mask_ty.  
@@ -2226,20 +2222,14 @@ proof -
       by blast
   qed
 
-  (* mask_rel \<omega> m and mask_rel \<omega>def mdef and m = mdef should imply
-     get_mh_total \<omega> and get_mh_total \<omega>def are the same on the relevant locations *)
   show "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
   proof (subst state_rel_def, subst state_rel0_def, intro conjI)
-    (* Need an assumption that says that the current state is well formed *)
     show "valid_heap_mask (get_mh_total_full \<omega>def)"
       using ValidHeapMask by simp
   next
     show "valid_heap_mask (get_mh_total_full \<omega>)"
       using ValidHeapMask by simp
   next
-      (* Do we need an assumption
-         WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      ? *)
     show "consistent_state_rel_opt (state_rel_opt Tr) \<longrightarrow> StateCons \<omega>def \<and> StateCons \<omega>"
       using Consistent by simp
   next
@@ -2375,7 +2365,6 @@ proof -
       using \<open>\<omega>def = _\<close> \<open>\<omega> = _\<close> StateRel state_rel_eval_welldef_eq
       by fastforce
   next
-    (* Need an assumption that says that the total states are the same *)
     show "get_h_total_full \<omega>def = get_h_total_full \<omega>"
       using SameHeap by simp
   next
