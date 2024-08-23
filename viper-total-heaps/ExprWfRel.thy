@@ -628,7 +628,8 @@ proof (rule expr_wf_rel_intro)
   qed
 qed
 
-\<comment>\<open>The instantiated version of the above lemma.\<close>
+\<comment>\<open>The instantiated version of the above lemma. It certifies the translation of the well-formedness
+   check of an old expression, concretely given the state relation \<^const>\<open>state_rel\<close>\<close>
 lemma old_expr_wf_rel_inst:
   assumes WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
       \<comment>\<open>R is \<^const>\<open>state_rel\<close> plus an additional potential predicate \<^term>\<open>Q\<close>\<close>
@@ -1223,6 +1224,7 @@ proof -
                      A = range (const_repr Tr') \<or>
                      A = vars_label_hm_tr (label_hm_translation Tr')"
                 by simp
+              \<comment>\<open>Consider all possibilities of which set \<^term>\<open>A\<close> could be\<close>
               then consider (HeapVars)      "A = {heap_var Tr', heap_var_def Tr'}"
                           | (MaskVars)      "A = {mask_var Tr', mask_var_def Tr'}"
                           | (VarTrans)      "A = ran (var_translation Tr')"
@@ -1230,6 +1232,8 @@ proof -
                           | (ConstRepr)     "A = range (const_repr Tr')"
                           | (HMTranslation) "A = vars_label_hm_tr (label_hm_translation Tr')"
                 by fast
+              \<comment>\<open>Pairwise disjointness is either proven trivially or via the helper lemma
+                 \<const>\<open>disjoint_list_set_vs_collected_members\<close>\<close>
               thus "disjnt ?M' A"
               proof (cases)
                 case HeapVars
@@ -1258,11 +1262,11 @@ proof -
                     fix x
                     assume "x \<in> {mdef, m, hdef, h}"
                     then consider (MDef) "x = mdef"
-                                | (M) "x = m"
+                                | (M)    "x = m"
                                 | (HDef) "x = hdef"
-                                | (H) "x = h"
+                                | (H)    "x = h"
                       by fast
-                    thus "\<exists>S. x \<in> S \<and> ListMem S (ViperBoogieRelUtil.state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> ran (var_translation Tr)"
+                    thus "\<exists>S. x \<in> S \<and> ListMem S (state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> ran (var_translation Tr)"
                     proof (cases)
                       case MDef
                       show ?thesis
@@ -1330,9 +1334,9 @@ proof -
                     fix x
                     assume "x \<in> {mdef, m, hdef, h}"
                     then consider (MDef) "x = mdef"
-                                | (M) "x = m"
+                                | (M)    "x = m"
                                 | (HDef) "x = hdef"
-                                | (H) "x = h"
+                                | (H)    "x = h"
                       by fast
                     thus "\<exists>S. x \<in> S \<and> ListMem S (state_rel0_disj_list Tr AuxPred) \<and> S \<noteq> ran (field_translation Tr)"
                     proof (cases)
@@ -1552,19 +1556,24 @@ proof -
           assume PredicateDefined: "?AuxPredFun \<omega>def \<omega> x = Some P"
           let ?xVar = "lookup_var ?\<Lambda> ns x"
 
+          \<comment>\<open>Here, we need to prove the predicates for all the baseline values, plus our four special cases\<close>
           show "has_Some P (lookup_var ?\<Lambda> ns x)"
           proof (cases)
+            \<comment>\<open>The baseline values come easily, as we get that from the previous state relation\<close>
             assume "x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h"
             thus ?thesis
               by (metis (no_types, lifting) RInst aux_vars_pred_sat_def fun_upd_other PredicateDefined state_rel_aux_vars_pred_sat)
           next
             assume "\<not>(x \<noteq> mdef \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x \<noteq> h)"
+            \<comment>\<open>Here, we consider the four distinct possible special cases\<close>
             then consider
                   (H)    "x = h"
                 | (M)    "x \<noteq> h \<and> x = m"
                 | (HDef) "x \<noteq> h \<and> x \<noteq> m \<and> x = hdef"
                 | (MDef) "x \<noteq> h \<and> x \<noteq> m \<and> x \<noteq> hdef \<and> x = mdef"
               by fast
+            \<comment>\<open>In each case, we pull out the corresponding predicate defined in \<^term>\<open>?AuxPredFun\<close>
+               and show that it is true\<close>
             thus ?thesis
             proof cases
               case H

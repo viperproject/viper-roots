@@ -504,13 +504,13 @@ proof (rule disjoint_list_members_disjoint)
 qed
 
 lemma disjoint_list_set_vs_collected_members:
-  (* If xs is some list of mutually-disjoint sets *)
+  \<comment>\<open>If xs is some list of mutually-disjoint sets\<close>
   assumes "disjoint_list xs"
-  (* And A is a set within this list *)
+  \<comment>\<open>And A is a set within this list\<close>
       and "ListMem A xs"
-  (* And for some set B, if every member is a member of S that is not A *)
+  \<comment>\<open>And for some set B, if every member is a member of S that is not A\<close>
       and BinS: "\<forall>x \<in> B. \<exists>S. x \<in> S \<and> ListMem S xs \<and> S \<noteq> A"
-  (* Then A and B are disjoint *)
+  \<comment>\<open>Then A and B are disjoint\<close>
     shows "disjnt A B"
 proof -
   have "\<And>x. x \<in> B \<Longrightarrow> x \<notin> A"
