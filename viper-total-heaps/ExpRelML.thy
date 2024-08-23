@@ -139,7 +139,7 @@ and
     assm_full_simp_solved_tac ctxt THEN'
     resolve_tac ctxt [#consistency_wf_thm (#basic_stmt_rel_info info)] THEN'
     (#aux_var_disj_tac (#basic_stmt_rel_info info) ctxt) THEN'
-    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED')
+    ((fn i => fn st => exp_rel_tac info ctxt i st) |> SOLVED') (* Inner expression *)
 and 
   (* the reason for abstraction over the state st in multiple places is to avoid infinite recursion due
      to eager evaluation of arguments in a function call *)
