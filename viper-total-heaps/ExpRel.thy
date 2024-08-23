@@ -300,6 +300,9 @@ proof (rule exp_rel_vpr_bpl_intro_2)
   qed
 qed
 
+\<comment>\<open>Certify the translation of a Viper old expression into Boogie.
+   This is the non-instantiated version of the old-expression rule, meaning that
+   The state relations \<^term>\<open>R\<close> and \<^term>\<open>ROld\<close> are left as free variables.\<close>
 lemma exp_rel_oldexp:
   assumes R_implies_ROld: "\<forall> \<omega>def \<omega> ns.
                              R \<omega>def \<omega> ns \<longrightarrow>
@@ -338,6 +341,11 @@ proof (rule exp_rel_vpr_bpl_intro)
     by simp
 qed
 
+\<comment>\<open>The instantiated version of the old expression translation lemma. This lemma is proved using the
+   above lemma and shows that if \<^const>\<open>exp_rel_vpr_bpl\<close> for the inner expression holds with a
+   \<const>\<open>state_rel\<close> with a translation record \<^term>\<open>TrOld\<close> that is modified to point to the saved
+   Boogie variables oldMask and oldHeap as its mask and heap, then \<^const>\<open>exp_rel_vpr_bpl\<close> holds with
+   an unchanged state relation, with the inner expression wrapped inside an old() expression\<close>
 lemma exp_rel_oldexp_inst:
   assumes RImpliesStateRel: "\<And>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<Longrightarrow> state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and "fst (label_hm_translation Tr) lbl = Some OldH"
@@ -346,34 +354,32 @@ lemma exp_rel_oldexp_inst:
       and "lbls' = (((fst lbls)(lbl := None)), ((snd lbls)(lbl := None)))"
       and "TrOld = Tr \<lparr> mask_var := OldM, mask_var_def := OldM, heap_var := OldH, heap_var_def := OldH, label_hm_translation := lbls' \<rparr>"
       and WfTotalConsistency: "wf_total_consistency ctxt_vpr StateCons StateCons_t"
-      (* How to frame this assumption? *)
-      (* Should be able to get this from the state relation *)
-      (* Will probably need "OldH neq OldM *)
       and DisjAux: "OldH \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldM \<notin> (state_rel0_disj_vars (Tr \<lparr> label_hm_translation := lbls' \<rparr>) AuxPred) \<and>
                     OldH \<noteq> OldM"
       and InnerExpRel: "exp_rel_vpr_bpl (state_rel Pr StateCons TyRep TrOld AuxPred ctxt) ctxt_vpr ctxt e e_bpl"
                    (is "exp_rel_vpr_bpl ?ROld ctxt_vpr ctxt e e_bpl")
-                 shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
+    shows "exp_rel_vpr_bpl R ctxt_vpr ctxt (ViperLang.Old lbl e) e_bpl"
 proof (rule exp_rel_oldexp)
 
   show "\<forall> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<longrightarrow> ?ROld (\<omega>def\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) ns"
   proof (intro allI, intro impI)
     fix \<omega>def \<omega> ns
     assume R: "R \<omega>def \<omega> ns"
+    \<comment>\<open>We define \<^term>\<open>R\<close> as _implying_ \<^const>\<open>state_rel\<close> above to permit flexibility in what it is\<close>
     hence StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
-      using RImpliesStateRel
-      by simp
-    (* Define some common abbreviations *)
+      using RImpliesStateRel by simp
+
+    \<comment>\<open>Useful shorthand for common values\<close>
     let ?\<Lambda> = "var_context ctxt"
     let ?FieldTr = "field_translation Tr"
     let ?FieldTrOld = "field_translation TrOld"
     let ?LabelMap = "label_hm_translation Tr"
     let ?\<omega>_trace = "get_trace_total \<omega>"
 
-    (* Define the old states as the current states, with the state set to the trace value *)
-    let ?\<omega>def_old = "\<omega>def \<lparr>get_total_full := the (?\<omega>_trace lbl)\<rparr>"
-    let ?\<omega>_old =    "\<omega>    \<lparr>get_total_full := the (?\<omega>_trace lbl)\<rparr>"
+    \<comment>\<open>Define the old states as the current states, with the state set to the trace value\<close>
+    let ?\<omega>def_old = "\<omega>def \<lparr> get_total_full := the (?\<omega>_trace lbl) \<rparr>"
+    let ?\<omega>_old =    "\<omega>    \<lparr> get_total_full := the (?\<omega>_trace lbl) \<rparr>"
 
     show "?ROld ?\<omega>def_old ?\<omega>_old ns"
     proof (subst state_rel_def, subst state_rel0_def, intro conjI)
@@ -401,7 +407,6 @@ proof (rule exp_rel_oldexp)
           using \<open>fst (label_hm_translation Tr) lbl = _\<close> label_hm_rel_def label_rel_def
           by meson
         have "valid_heap_mask (get_mh_total \<phi>)"
-          sledgehammer
           by (metis LabelHMRel UnI1 \<open>get_trace_total \<omega> lbl = Some \<phi>\<close> active_labels_hm_tr_def \<open>fst (label_hm_translation Tr) lbl = _\<close> domI label_hm_rel_def)
         thus "valid_heap_mask (get_mh_total_full ?\<omega>_old)"
           using \<open>?\<omega>_trace lbl = _\<close>
@@ -431,6 +436,7 @@ proof (rule exp_rel_oldexp)
     next
       show "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
       proof -
+        \<comment>\<open>First, remove \<^term>\<open>lbl\<close> from the active set and show that we preserve disjointness\<close>
         let ?TrNoLabels = "Tr \<lparr> label_hm_translation := lbls' \<rparr>"
 
         have "disjoint_list (state_rel0_disj_list ?TrNoLabels AuxPred)"
@@ -439,6 +445,8 @@ proof (rule exp_rel_oldexp)
             using StateRel state_rel_disjoint by fast
         qed (simp add: \<open>lbls' = _\<close> \<open>lbls = _\<close>, simp)
 
+        \<comment>\<open>Next, set the heap variables to \<^term>\<open>OldH\<close>. This is possible because \<^term>\<open>OldH\<close> is no
+           longer referred to inside the \<^const>\<open>label_hm_translation\<close>.\<close>
         let ?TrOldHeap = "?TrNoLabels \<lparr> heap_var := OldH, heap_var_def := OldH \<rparr>"
         have "disjoint_list (state_rel0_disj_list ?TrOldHeap AuxPred)"
         proof (rule disjoint_list_change_heap_same[where ?h' = "OldH"])
@@ -449,6 +457,7 @@ proof (rule exp_rel_oldexp)
             using DisjAux \<open>lbls' = _\<close> by simp
         qed (simp)
 
+        \<comment>\<open>Finally, set the mask variables as well\<close>
         thus "disjoint_list (state_rel0_disj_list TrOld AuxPred)"
         proof (rule disjoint_list_change_mask_same)
           show "OldM \<notin> state_rel0_disj_vars ?TrOldHeap AuxPred"
@@ -560,22 +569,22 @@ proof (rule exp_rel_oldexp)
         using StateRel state_rel_aux_vars_pred_sat
         by fast
     next
-      (* This should hold because it held previously and we removed the one case where it didn't *)
       show "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTrOld (label_hm_translation TrOld) (get_trace_total ?\<omega>_old) ns"
       proof -
         from StateRel have HMRelPrev: "label_hm_rel Pr ?\<Lambda> TyRep ?FieldTr (label_hm_translation Tr) (get_trace_total \<omega>) ns"
           using state_rel_label_hm_rel by fast
-        (* First, prove that if a label is in the hm translation, then it must have an entry in the trace *)
         hence AllLabelsHaveTrace: "\<forall> lbl h. (fst (label_hm_translation Tr)) lbl = Some h \<or> (snd (label_hm_translation Tr)) lbl = Some h \<longrightarrow> (\<exists>\<phi>. (get_trace_total \<omega> lbl) = Some \<phi>)"
           using label_hm_rel_def label_rel_def by meson
         show ?thesis
           unfolding label_hm_rel_def label_rel_def
         proof (intro conjI)
+          \<comment>\<open>Prove the heap relation for tracked states\<close>
           show "\<forall>lbla h. fst (label_hm_translation TrOld) lbla = Some h \<longrightarrow>
                  (\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
                  heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_hh_total \<phi>) ns)"
           proof (intro allI, intro impI)
             fix lbla h
+            \<comment>\<open>Because \<^term>\<open>lbl\<close> was removed in \<^term>\<open>TrOld\<close>, it cannot be a possible value of \<^term>\<open>lbla\<close>\<close>
             assume LabelDefined: "fst (label_hm_translation TrOld) lbla = Some h"
             hence "lbla \<noteq> lbl"
               using \<open>TrOld = _\<close> \<open>lbls' = _\<close> by fastforce
@@ -585,11 +594,13 @@ proof (rule exp_rel_oldexp)
             from this obtain \<phi> where
               "get_trace_total ?\<omega>_old lbla = Some \<phi>"
               using AllLabelsHaveTrace by fastforce
-            show "\<exists>\<phi>. get_trace_total (\<omega>\<lparr>get_total_full := the (get_trace_total \<omega> lbl)\<rparr>) lbla = Some \<phi> \<and>
-            heap_var_rel Pr ?\<Lambda> TyRep (field_translation TrOld) h (get_hh_total \<phi>) ns"
+            show "\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
+                      heap_var_rel Pr ?\<Lambda> TyRep (field_translation TrOld) h (get_hh_total \<phi>) ns"
             proof (intro exI, intro conjI)
               show "get_trace_total ?\<omega>_old lbla = Some \<phi>"
                 using \<open>get_trace_total ?\<omega>_old lbla = _\<close> by simp
+              \<comment>\<open>This must be true, because \<^term>\<open>lbla\<close> must be one of the labels covered in the previous
+                 state relation\<close>
               show "heap_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_hh_total \<phi>) ns"
                 unfolding heap_var_rel_def
               proof (intro conjI)
@@ -605,11 +616,13 @@ proof (rule exp_rel_oldexp)
             qed
           qed
         next
+          \<comment>\<open>Prove the mask relation for tracked states\<close>
           show "\<forall>lbla h. snd (label_hm_translation TrOld) lbla = Some h \<longrightarrow>
                          (\<exists>\<phi>. get_trace_total ?\<omega>_old lbla = Some \<phi> \<and>
                          mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_mh_total \<phi>) ns)"
           proof (intro allI, intro impI)
             fix lbla h
+            \<comment>\<open>Because \<^term>\<open>lbl\<close> was removed in \<^term>\<open>TrOld\<close>, it cannot be a possible value of \<^term>\<open>lbla\<close>\<close>
             assume LabelDefined: "snd (label_hm_translation TrOld) lbla = Some h"
             hence "lbla \<noteq> lbl"
               using \<open>TrOld = _\<close> \<open>lbls' = _\<close> by fastforce
@@ -624,6 +637,8 @@ proof (rule exp_rel_oldexp)
             proof (intro exI, intro conjI)
               show "get_trace_total ?\<omega>_old lbla = Some \<phi>"
                 using \<open>get_trace_total ?\<omega>_old lbla = _\<close> by simp
+              \<comment>\<open>This must be true, because \<^term>\<open>lbla\<close> must be one of the labels covered in the previous
+                 state relation\<close>
               show "mask_var_rel Pr ?\<Lambda> TyRep ?FieldTrOld h (get_mh_total \<phi>) ns"
                 unfolding mask_var_rel_def
                 by (smt (verit, ccfv_threshold) HMRelPrev \<open>get_trace_total ?\<omega>_old lbla = Some \<phi>\<close> \<open>snd (label_hm_translation Tr) lbla = Some h\<close> assms(6) full_total_state.ext_inject full_total_state.surjective full_total_state.update_convs(3) label_hm_rel_def label_rel_def mask_var_rel_def option.sel tr_vpr_bpl.ext_inject tr_vpr_bpl.surjective tr_vpr_bpl.update_convs(1) tr_vpr_bpl.update_convs(2) tr_vpr_bpl.update_convs(3) tr_vpr_bpl.update_convs(4) tr_vpr_bpl.update_convs(9))

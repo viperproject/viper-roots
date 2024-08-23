@@ -612,10 +612,17 @@ definition label_rel :: "(vname \<Rightarrow> 'a total_state \<Rightarrow> ('a v
   where "label_rel P LabelMap t ns \<equiv> 
              (\<forall> lbl h. LabelMap lbl = Some h \<longrightarrow> (\<exists>\<phi>. t lbl = Some \<phi> \<and> P h \<phi> ns))"
 
+\<comment>\<open>This part of the state relation says that the tracked states in the trace are well-formed and
+   satisfy the heap and mask relations\<close>
 definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Rightarrow> 'a ty_repr_bpl \<Rightarrow> (field_ident \<rightharpoonup> vname) \<Rightarrow> label_hm_repr_bpl \<Rightarrow> 'a total_trace \<Rightarrow> ('a vbpl_absval) nstate \<Rightarrow> bool"
   where "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns \<equiv>
+             \<comment>\<open>For each label, the \<^const>\<open>label_hm_translation\<close> contains a corresponding Boogie heap
+                variable, the trace contains a total state, and the boogie variable and total state
+                satisfy \<^const>\<open>heap_var_rel\<close>.\<close>
              label_rel (\<lambda>h \<phi>. heap_var_rel Pr \<Lambda> TyRep FieldTr h (get_hh_total \<phi>)) (fst LabelMap) t ns
+             \<comment>\<open>As above, but for \<^const>\<open>mask_var_rel\<close>.\<close>
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
+             \<comment>\<open>All active labels with a corresponding total state in the trace have a well-formed mask.\<close>
           \<and>  (\<forall> lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
 
 lemma vars_label_hm_tr_empty: "vars_label_hm_tr (Map.empty, Map.empty ) = {}"
@@ -914,7 +921,7 @@ proof (rule disjoint_list_change_mask[where ?m' = "m'" and ?mdef' = "m'" ], tact
   show "Tr' = Tr\<lparr> mask_var := m', mask_var_def := m'\<rparr> " using \<open>Tr' = _\<close> by simp
 qed
 
-(* Disjointness is preserved when removing one label from the label_hm_translation *)
+\<comment>\<open>Disjointness is preserved when removing one label from the label_hm_translation\<close>
 lemma disjoint_list_remove_label:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and "lbls' = (((fst (label_hm_translation Tr))(lbl := None)), ((snd (label_hm_translation Tr))(lbl := None)))"
