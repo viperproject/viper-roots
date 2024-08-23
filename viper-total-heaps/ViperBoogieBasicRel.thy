@@ -565,6 +565,24 @@ proof (rule allI | rule impI)+
   qed
 qed
 
+lemma aux_vars_pred_sat_update_2:
+  assumes AuxPred1: "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
+      and "AuxPred' = AuxPred ++ f"
+      and AuxPred2: "aux_vars_pred_sat (var_context ctxt) f ns"
+    shows "aux_vars_pred_sat (var_context ctxt) AuxPred' ns"
+  unfolding aux_vars_pred_sat_def
+proof (rule allI | rule impI)+
+  fix x P
+  assume "AuxPred' x = Some P"
+  from this consider "AuxPred x = Some P" | "f x = Some P"
+    unfolding \<open>AuxPred' = _\<close>
+    by blast
+  thus "has_Some P (lookup_var (var_context ctxt) ns x)"
+    using AuxPred1 AuxPred2
+      unfolding aux_vars_pred_sat_def
+      by metis
+qed
+
 lemma aux_vars_pred_sat_weaken:
   assumes AuxVarsPredSat: "aux_vars_pred_sat (var_context ctxt) AuxPred ns"
       and "dom AuxPred' \<subseteq> dom AuxPred"
@@ -600,9 +618,11 @@ definition label_hm_rel :: "ViperLang.program \<Rightarrow>  var_context \<Right
           \<and>  label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd LabelMap) t ns
           \<and>  (\<forall> lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t lbl = Some \<phi> \<longrightarrow> wf_mask_simple (get_mh_total \<phi>))"
 
+lemma vars_label_hm_tr_empty: "vars_label_hm_tr (Map.empty, Map.empty ) = {}"
+  by (simp add: vars_label_hm_tr_def)
+
 lemma label_hm_rel_empty:
   \<comment>\<open>We need to assume that all members of the trace are well-formed\<close>
-  assumes "\<forall>lbl \<phi>. t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
   shows "label_hm_rel Pr \<Lambda> TyRep FieldTr (Map.empty, Map.empty) t ns"
   unfolding label_hm_rel_def
 proof (intro conjI)
@@ -611,7 +631,8 @@ proof (intro conjI)
   show "label_rel (\<lambda>m \<phi>. mask_var_rel Pr \<Lambda> TyRep FieldTr m (get_mh_total \<phi>)) (snd (Map.empty, Map.empty)) t ns"
     by (simp add: label_rel_def)
   show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr (Map.empty, Map.empty) \<and> t lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
-    using assms by fast
+    unfolding active_labels_hm_tr_def
+    by simp
 qed
 
 lemma label_hm_rel_stable:
@@ -629,6 +650,35 @@ proof (intro conjI)
     by (metis (mono_tags, lifting) UnI2 assms label_hm_rel_def label_rel_def mask_var_rel_stable ranI vars_label_hm_tr_def)
   show "\<forall>lbl \<phi>. lbl \<in> active_labels_hm_tr LabelMap \<and> t' lbl = Some \<phi> \<longrightarrow> valid_heap_mask (get_mh_total \<phi>)"
     using assms label_hm_rel_def by fast
+qed
+
+lemma label_hm_rel_heapD:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "(fst LabelMap) lbl = Some x"
+    shows "\<exists>\<phi>. t lbl = Some \<phi> \<and> heap_var_rel Pr \<Lambda> TyRep FieldTr x (get_hh_total \<phi>) ns"
+  using assms
+  unfolding label_hm_rel_def label_rel_def
+  by auto
+
+lemma label_hm_rel_maskD:
+  assumes "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "(snd LabelMap) lbl = Some x"
+    shows "\<exists>\<phi>. t lbl = Some \<phi> \<and> mask_var_rel Pr \<Lambda> TyRep FieldTr x (get_mh_total \<phi>) ns"
+  using assms
+  unfolding label_hm_rel_def label_rel_def
+  by auto  
+
+lemma label_hm_rel_Some_var:
+  assumes LabelRel: "label_hm_rel Pr \<Lambda> TyRep FieldTr LabelMap t ns"
+      and "x \<in> vars_label_hm_tr LabelMap"
+    shows "\<exists>v. lookup_var \<Lambda> ns x = Some v"
+proof -
+  from \<open>x \<in> _\<close> consider lbl where "(fst LabelMap) lbl = Some x" | lbl where "(snd LabelMap) lbl = Some x"
+    unfolding vars_label_hm_tr_def ran_def
+    by blast
+  thus ?thesis
+    using label_hm_rel_heapD[OF LabelRel, simplified heap_var_rel_def] label_hm_rel_maskD[OF LabelRel, simplified mask_var_rel_def]
+    by metis
 qed
 
 \<comment>\<open>If \<^const>\<open>label_hm_rel\<close> holds, a label is active, and that label refers to a total state,
@@ -1982,6 +2032,84 @@ lemma state_rel_store_update_2:
   apply (simp add: update_var_binder_same)
   done
 
+lemma state_rel_trace_update:
+  assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
+      and WellDefSame: "\<omega>def = \<omega> \<and> \<omega>def' = \<omega>'"
+      and "Tr' = Tr\<lparr>label_hm_translation := lbls'\<rparr>"
+      and OnlyTraceAffectedVpr: "\<omega>' = \<omega>\<lparr> get_trace_total := t \<rparr>"
+      and "consistent_state_rel_opt (state_rel_opt Tr) \<Longrightarrow> StateCons \<omega>'"
+      and OnlyTraceAffectedBpl: "\<And>x. x \<notin> vars_label_hm_tr lbls' \<Longrightarrow> lookup_var (var_context ctxt) ns x = lookup_var (var_context ctxt) ns' x"      
+      and LabelHmRel: "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) lbls' t ns'"
+      and Disj: "vars_label_hm_tr lbls' \<inter> ({heap_var Tr, heap_var_def Tr, mask_var Tr, mask_var_def Tr} \<union> ran (var_translation Tr)
+                       \<union> ran (field_translation Tr) \<union> range (const_repr Tr) \<union> dom AuxPred) = {}"
+      and "state_well_typed (type_interp ctxt) (var_context ctxt) [] ns'"
+    shows "state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def' \<omega>' ns'"
+  unfolding state_rel_def state_rel0_def
+proof (intro conjI)
+  show "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr') (label_hm_translation Tr') (get_trace_total \<omega>') ns'"
+    using LabelHmRel 
+    by (simp add: \<open>\<omega>' =_\<close> \<open>Tr' = _\<close>)
+
+  show "disjoint_list (state_rel0_disj_list Tr' AuxPred)"
+  proof -
+    from state_rel_disjoint[OF StateRel]
+    have "disjoint_list
+          ([{heap_var Tr, heap_var_def Tr}, {mask_var Tr, mask_var_def Tr}, ran (var_translation Tr),
+             ran (field_translation Tr), range (const_repr Tr), dom AuxPred]@
+             [vars_label_hm_tr (label_hm_translation Tr)])" (is "disjoint_list (?xs@(?M#?ys))")
+      by simp
+    hence "disjoint_list (?xs@(vars_label_hm_tr lbls')#?ys)"
+      apply (rule disjoint_list_replace_set)
+      using Disj
+      unfolding disjnt_def
+      by fastforce
+    thus ?thesis
+      by (simp add: \<open>Tr' = _\<close>)
+  qed
+
+  note StableThms = OnlyTraceAffectedBpl Disj \<open>\<omega>' = _\<close> \<open>Tr' = _\<close> WellDefSame
+
+  show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var Tr') (get_hh_total_full \<omega>') ns'"
+  using StableThms heap_var_rel_stable[OF state_rel_heap_var_rel[OF StateRel]]
+  by auto
+
+  show "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (heap_var_def Tr') (get_hh_total_full \<omega>def') ns'"
+  using StableThms heap_var_rel_stable[OF state_rel_heap_var_def_rel[OF StateRel]]
+  by auto
+
+  show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (mask_var Tr') (get_mh_total_full \<omega>') ns'"
+    using StableThms mask_var_rel_stable[OF state_rel_mask_var_rel[OF StateRel]]
+    by auto
+
+  show "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr') (mask_var_def Tr') (get_mh_total_full \<omega>def') ns'"
+    using StableThms mask_var_rel_stable[OF state_rel_mask_var_def_rel[OF StateRel]]
+    by auto
+
+  show "store_rel (type_interp ctxt) (var_context ctxt) (var_translation Tr') (get_store_total \<omega>') ns'"
+    using StableThms store_rel_stable[OF state_rel_store_rel[OF StateRel], OF HOL.refl]
+    by auto
+    
+  show "boogie_const_rel (const_repr Tr') (var_context ctxt) ns'"
+  proof (simp add: \<open>Tr' = _\<close>, rule boogie_const_rel_stable[OF state_rel_boogie_const_rel[OF StateRel]])
+    fix x
+    assume ConstElem: "x \<in> range (const_repr Tr)"
+    from Disj have
+      "vars_label_hm_tr lbls' \<inter> range (const_repr Tr) = {}"
+      by blast
+    thus "lookup_var (var_context ctxt) ns x = lookup_var (var_context ctxt) ns' x"
+      using StableThms ConstElem 
+      by blast
+  qed
+    
+  show "field_rel Pr (var_context ctxt) (field_translation Tr') ns'"
+    using StableThms field_rel_stable[OF state_rel_field_rel[OF StateRel]]
+    by auto
+
+  show "aux_vars_pred_sat (var_context ctxt) AuxPred ns'"
+    using StableThms aux_vars_pred_sat_stable[OF state_rel_aux_vars_pred_sat[OF StateRel]]
+    by auto
+qed (insert StateRel[simplified state_rel_def state_rel0_def] assms, simp_all)
+
 lemma state_rel_new_auxvar:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns"
       and AuxVarFresh: "aux_var \<notin> state_rel0_disj_vars Tr AuxPred"
@@ -2107,7 +2235,6 @@ proof (intro conjI)
   thus "disjoint_list (state_rel0_disj_list Tr AuxPred')"
     by simp
 qed (insert assms state_rel_state_rel0[OF StateRel], unfold state_rel0_def, auto)
-
 
 subsubsection \<open>Heap update\<close>
 
