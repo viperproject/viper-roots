@@ -34,7 +34,9 @@ proof (rule exI, rule conjI)
     by blast
 qed
 
-lemma setup_oldh:
+\<comment>\<open>After inhaling the precondition, the old state is recorded. This lemma certifies the translation
+   of saving the old heap\<close>
+lemma setup_old_heap:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns")
       and TyInterp: "ty_interp ctxt = vbpl_absval_ty TyRep"
       and EmptyRType: "rtype_interp ctxt = []"
@@ -50,7 +52,7 @@ lemma setup_oldh:
                   ((BigBlock name cs s tr, cont), Normal ns') \<and>
                     (state_rel Pr StateCons TyRep Tr' AuxPred ctxt \<omega>def \<omega> ns')"
 proof -
-  (* Define some shorthand *)
+  \<comment>\<open>Define some shorthand\<close>
   let ?\<Lambda> = "var_context ctxt"
   let ?A = "type_interp ctxt"
   let ?FieldTr = "field_translation Tr"
@@ -62,7 +64,7 @@ proof -
   let ?Tr_mask_labels = "snd (label_hm_translation Tr)"
   let ?Tr'_heap_labels = "fst (label_hm_translation Tr')"
   let ?Tr'_mask_labels = "snd (label_hm_translation Tr')"
-  (* Extract the heap value from the existing StateRel *)
+  \<comment>\<open>Extract the heap value from the existing StateRel\<close>
   from StateRel obtain heapValue where
     heapVarValue: "lookup_var ?\<Lambda> ns ?heapVar = Some (AbsV (AHeap heapValue))" and
     heapVarType: "lookup_var_ty ?\<Lambda> ?heapVar = Some (TConSingle (THeapId TyRep))"
@@ -74,7 +76,7 @@ proof -
     unfolding state_rel_def state_rel0_def mask_var_rel_def
     by fast
 
-  (* The new state is the existing state, with oldHeap set to the heap value *)
+  \<comment>\<open>The new state is the existing state, with oldHeap set to the heap value\<close>
   let ?ns' = "update_var ?\<Lambda> ns oldH (AbsV (AHeap heapValue))"
 
   show ?thesis
@@ -215,17 +217,16 @@ proof -
   qed
 qed
 
-lemma setup_oldm:
+\<comment>\<open>After inhaling the precondition, the old state is recorded. This lemma certifies the translation
+   of saving the old mask\<close>
+lemma setup_old_mask:
   assumes StateRel: "state_rel Pr StateCons TyRep Tr AuxPred ctxt \<omega>def \<omega> ns" (is "?R \<omega> ns") and
           TyInterp: "type_interp ctxt = vbpl_absval_ty TyRep" and
           EmptyRType: "rtype_interp ctxt = []" and
           DisjAux: "old_m \<notin> state_rel0_disj_vars Tr AuxPred" and
           trace_defined: "get_trace_total \<omega> lbl = Some \<phi> \<and> get_total_full \<omega> = \<phi>" and
-          (* This assumption states that lbl was not previously defined in the mask map. Verify this assumption *)
           lbl_not_previously_defined: "snd (label_hm_translation Tr) lbl = None" and
-          (* Here we assume that old_m has the mask type-- make sure this is the proper assumption about old_m later *)
           old_m_type: "lookup_var_ty (var_context ctxt) old_m = Some (TConSingle (TMaskId TyRep))" and
-          (* This includes only the mask update in the label_hm_translation, should the heap be included as well? *)
           f: "f = (fst (label_hm_translation Tr), (snd (label_hm_translation Tr)) (lbl \<mapsto> old_m))" and
           Tr': "Tr' = Tr \<lparr> label_hm_translation := f \<rparr>" and
           "m = mask_var Tr"
@@ -252,7 +253,7 @@ proof -
     lookup_var_type: "lookup_var_ty ?\<Lambda> ?m = Some (TConSingle (TMaskId TyRep))"
     unfolding state_rel_def state_rel0_def mask_var_rel_def
     by fast
-  (* The new state is the existing state, with old_m set to the mask value *)
+  \<comment>\<open>The new state is the existing state, with old_m set to the mask value\<close>
   let ?ns' = "update_var ?\<Lambda> ns old_m (AbsV (AMask mask_value))"
   have normal_execution: "red_ast_bpl P ctxt ((BigBlock name (Lang.Assign old_m (Var ?m)#cs) s tr, cont), Normal ns) ((BigBlock name cs s tr, cont), Normal ?ns')"
   proof (rule red_ast_bpl_one_assign)
@@ -697,26 +698,27 @@ proof -
     by blast
 qed
 
-(* if tracked then heap_rel holds for all labels *)
+\<comment>\<open>Using a \<^const>\<open>label_hm_rel assumption\<close>, show \<^const>\<open>heap_var_rel\<close>\<close>
 lemma label_tracked_implies_heap_rel:
-  (* If the label_hm_rel relation holds for a given translation record and viper state *)
+  \<comment>\<open>If the label_hm_rel relation holds for a given translation record and viper state\<close>
   assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
-  (* And the total state is defined at some label *)
+  \<comment>\<open>And the total state is defined at some label\<close>
       and "get_trace_total \<omega> lbl = Some \<phi>"
-  (* And the heap variable is hvar *)
+  \<comment>\<open>And the heap variable is hvar\<close>
       and "(fst (label_hm_translation Tr)) lbl = Some hvar"
-  (* Then heap_var_rel holds between Tr and hvar *)
+  \<comment>\<open>Then heap_var_rel holds between Tr and hvar\<close>
     shows "heap_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) hvar (get_hh_total \<phi>) ns"
   using assms label_hm_rel_def label_rel_def
   by (metis (mono_tags, lifting) option.sel)
 
+\<comment>\<open>Using a \<^const>\<open>label_hm_rel assumption\<close>, show \<^const>\<open>mask_var_rel\<close>\<close>
 lemma label_tracked_implies_mask_rel:
   assumes "label_hm_rel Pr (var_context ctxt) TyRep (field_translation Tr) (label_hm_translation Tr) (get_trace_total \<omega>) ns"
-  (* And the total state is defined at some label *)
+  \<comment>\<open>And the total state is defined at some label\<close>
       and "get_trace_total \<omega> lbl = Some \<phi>"
-  (* And the heap variable is mvar *)
+  \<comment>\<open>And the heap variable is mvar\<close>
       and "(snd (label_hm_translation Tr)) lbl = Some mvar"
-  (* Then heap_var_rel holds between Tr and mvar *)
+  \<comment>\<open>Then heap_var_rel holds between Tr and mvar\<close>
     shows "mask_var_rel Pr (var_context ctxt) TyRep (field_translation Tr) mvar (get_mh_total \<phi>) ns"
   using assms label_hm_rel_def label_rel_def
   by (metis (mono_tags, lifting) option.sel)

@@ -836,6 +836,7 @@ qed (insert assms, auto)
 
 subsection \<open>Disjointness\<close>
 
+\<comment>\<open>Disjointness is preserved when changing heap variables to new values\<close>
 lemma disjoint_list_change_heap:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and "Tr' = Tr \<lparr> heap_var := h', heap_var_def := hdef' \<rparr>"
@@ -868,6 +869,7 @@ proof -
     by simp
 qed
 
+\<comment>\<open>Disjointness is preserved when changing heap variables to the same new value\<close>
 lemma disjoint_list_change_heap_same:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and hPrimeNew: "h' \<notin> state_rel0_disj_vars Tr AuxPred"
@@ -879,6 +881,7 @@ proof (rule disjoint_list_change_heap[where ?Tr = "Tr" and ?h' = "h'" and ?hdef'
   show "Tr' = Tr\<lparr>heap_var := h', heap_var_def := h'\<rparr> " using \<open>Tr' = _\<close> by simp
 qed
 
+\<comment>\<open>Disjointness is preserved when changing mask variables to new values\<close>
 lemma disjoint_list_change_mask:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and "Tr' = Tr \<lparr> mask_var := m', mask_var_def := mdef' \<rparr>"
@@ -910,6 +913,7 @@ proof -
     by simp
 qed
 
+\<comment>\<open>Disjointness is preserved when changing mask variables to the same new value\<close>
 lemma disjoint_list_change_mask_same:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and mPrimeNew: "m' \<notin> state_rel0_disj_vars Tr AuxPred"
@@ -960,6 +964,7 @@ proof -
     using \<open>Tr' = _\<close> by simp
 qed
 
+\<comment>\<open>Disjointness is preserved when changing AuxPred to a function with fewer mappings\<close>
 lemma disjoint_list_restrict_auxpred:
   assumes disjointList: "disjoint_list (state_rel0_disj_list Tr AuxPred)"
       and "dom AuxPred' \<subseteq> dom AuxPred"
