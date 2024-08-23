@@ -121,6 +121,7 @@ fun rewrite_rel_general_tac ctxt =
       ctxt_wf_thm: thm,
       consistency_wf_thm: thm,
       consistency_down_mono_thm: thm,
+      (* Require multiple tr_def theorems to acommodate translation records with and without saved old state *)
       tr_def_thms: thm list,
       method_data_table: method_data Symtab.table,
       vpr_program_ctxt_eq_thm: thm,
