@@ -798,6 +798,18 @@ lemma self_framingI:
   shows "self_framing A"
   using self_framing_def assms by blast
 
+lemma self_framingE:
+  assumes "self_framing A"
+      and "\<omega> \<in> A"
+    shows "stabilize \<omega> \<in> A"
+  using assms(1) assms(2) self_framing_def by auto
+
+lemma self_framing_invE:
+  assumes "self_framing A"
+      and "stabilize \<omega> \<in> A"
+    shows "\<omega> \<in> A"
+  using assms(1) assms(2) self_framing_def by auto
+
 lemma self_framing_eq:
   "self_framing A \<longleftrightarrow> A = Stabilize A"
   unfolding self_framing_def Stabilize_def by blast
