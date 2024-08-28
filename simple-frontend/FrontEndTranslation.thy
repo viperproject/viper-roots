@@ -19,6 +19,13 @@ lemma semantify_addr_equiv:
   "semantify_addr x \<omega> = Some l \<longleftrightarrow> get_store \<omega> x = Some (VRef (Address l))"
   using semantify_addr_def by auto
 
+lemma RuleCons:
+  assumes "\<Delta> \<turnstile>CSL [P] C [Q]"
+      and "P' \<subseteq> P"
+      and "Q \<subseteq> Q'"
+    shows "\<Delta> \<turnstile>CSL [P'] C [Q']"
+  using RuleConsTyped assms(1) assms(2) assms(3) subset_entails by blast
+
 lemma convert_proof_assign:
   assumes "ConcreteSemantics.SL_proof tcfe A (abs_stmt.LocalAssign x (semantify_exp e)) B"
   shows "tcfe \<turnstile>CSL [A] Cassign x e [B]"
@@ -51,15 +58,12 @@ lemma convert_proof_skip:
   using RuleSkip assms by blast
 
 lemma conjunct_with_true_entails:
-  assumes "TypedEqui.typed_assertion tcfe P"
-  shows "P \<subseteq> atrue tcfe \<otimes> P"
+  "(P :: ('a :: pcm_with_core) set) \<subseteq> UNIV \<otimes> P"
 proof
   fix \<omega> assume "\<omega> \<in> P"
   then have "Some \<omega> = |\<omega>| \<oplus> \<omega>"
     by (simp add: commutative core_is_smaller)
-  moreover have "|\<omega>| \<in> atrue tcfe"
-    by (metis CollectI TypedEqui.typed_core TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> assms TypedEqui.atrue_def typed_state.typed_assertionE)
-  ultimately show "\<omega> \<in> atrue tcfe \<otimes> P"
+  then show "\<omega> \<in> UNIV \<otimes> P"
     using \<open>\<omega> \<in> P\<close> x_elem_set_product by blast
 qed
 
@@ -72,34 +76,30 @@ definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarro
 abbreviation tcfe :: "(int val, char list \<Rightarrow> int val set option) abs_type_context" where
   "tcfe \<equiv> type_ctxt_front_end"
 
-
-
 fun wf_stmt where
   "wf_stmt \<Gamma> F (Cseq C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
 | "wf_stmt \<Gamma> F (Calloc r e) \<longleftrightarrow> r \<notin> fvE e"
 
 | "wf_stmt \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
-  disjoint (fvC C1 \<union> fvA tcfe ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1) \<otimes> atrue tcfe)) (wrC C2) \<and> disjoint (fvC C2 \<union> fvA tcfe ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2) \<otimes> atrue tcfe)) (wrC C1) \<and>
-  TypedEqui.self_framing_typed tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1) \<and> TypedEqui.typed_assertion tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1) \<and>
-  TypedEqui.self_framing_typed tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2) \<and> TypedEqui.typed_assertion tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2) \<and>
+  disjoint
+  (fvC C1 \<union> fvA tcfe ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1) \<otimes> UNIV)) (wrC C2)
+  \<and> disjoint (fvC C2 \<union> fvA tcfe ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2) \<otimes> UNIV)) (wrC C1) \<and>
+  self_framing (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1)
+  \<and> self_framing (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2) \<and>
   wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
 
 | "wf_stmt \<Gamma> F (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
 
-| "wf_stmt \<Gamma> F (Cwhile b I C) \<longleftrightarrow> TypedEqui.self_framing_typed tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I)
-                              \<and> TypedEqui.typed_assertion tcfe (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I) \<and> wf_stmt \<Gamma> F C"
+| "wf_stmt \<Gamma> F (Cwhile b I C) \<longleftrightarrow> self_framing (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I)
+                              \<and> wf_stmt \<Gamma> F C"
 
 | "wf_stmt \<Gamma> F _ \<longleftrightarrow> True"
 
 lemma atrue_self_framing_and_typed[simp]:
-  "TypedEqui.typed_assertion tcfe (atrue tcfe)"
-  "TypedEqui.self_framing_typed tcfe (atrue tcfe)"
-  using TypedEqui.typed_assertionI TypedEqui.atrue_def apply blast
-  by (simp add: TypedEqui.self_framing_typedI TypedEqui.typed_state_then_stabilize_typed TypedEqui.atrue_def)
+  "self_framing UNIV"
+  by (simp add: self_framing_def)
 
-abbreviation typed_stabilize where
-  "typed_stabilize \<equiv> TypedEqui.Stabilize_typed tcfe"
-
+(*
 lemma wf_context_type_context[simp]:
   "TypedEqui.wf_context tcfe"
   unfolding TypedEqui.wf_context_def
@@ -109,115 +109,114 @@ proof -
   then show "finite (dom (variables tcfe))"
     by (simp add: finite_subset)
 qed
+*)
 
-lemma typed_stabi_atrue[simp]:
-  "typed_stabilize (atrue tcfe) = atrue tcfe"
-  by (metis (no_types, opaque_lifting) ConcreteSemantics.stabilize_typed_elem TypedEqui.self_framing_Stabilize_typed TypedEqui.self_framing_typed_ext TypedEqui.typed_Stabilize_typed already_stable atrue_self_framing_and_typed(1) atrue_self_framing_and_typed(2))
+(*
+Set.filter (typed \<Delta> \<circ> stabilize) P
+*)
+
+lemma tcfe_is_finite:
+  "TypedEqui.finite_context tcfe"
+  unfolding TypedEqui.finite_context_def type_ctxt_front_end_def type_ctxt_store_def
+  by (metis (mono_tags, lifting) abs_type_context.select_convs(1) domIff finite_nat_set_iff_bounded)
+
+
+
+abbreviation inhalify where
+  "inhalify P \<equiv> Set.filter (typed tcfe \<circ> stabilize) P"
+
+abbreviation stab_inhalify where
+  "stab_inhalify P \<equiv> inhalify (Stabilize P)"
+
+abbreviation t_entails where
+  "t_entails \<equiv> ConcreteSemantics.entails_typed tcfe"
+
+lemma conjunct_with_true_t_entails:
+  "t_entails P (UNIV \<otimes> P)"
+  by (simp add: conjunct_with_true_entails subset_entails)
+
+
+(*
+| RuleStabilizeTyped: "\<Delta> \<turnstile>CSL [P] C [Q] \<Longrightarrow> \<Delta> \<turnstile>CSL [Stabilize P] C [Stabilize Q]"
+*)
 
 lemma convert_proof_alloc:
-  assumes "ConcreteSemantics.SL_proof tcfe P (Havoc r;; Inhale (typed_stabilize (full_ownership_with_val r e))) Q"
+  assumes "ConcreteSemantics.SL_proof tcfe P (Havoc r;; Inhale (Stabilize (full_ownership_with_val r e))) Q"
       and "well_typed_cmd tcfe (Calloc r e)"
       and "wf_stmt \<Gamma> type_ctxt_front_end_syntactic (Calloc r e)"
   shows "tcfe \<turnstile>CSL [P] Calloc r e [Q]"
-proof (rule RuleCons)
+proof (rule RuleConsTyped)
 
   have asm0: "ConcreteSemantics.SL_proof tcfe P (Havoc r) (TypedEqui.exists_assert tcfe r P)
-  \<and> ConcreteSemantics.SL_proof tcfe (TypedEqui.exists_assert tcfe r P) (Inhale (typed_stabilize (full_ownership_with_val r e))) Q
-  \<and> TypedEqui.self_framing_typed tcfe P"
+  \<and> ConcreteSemantics.SL_proof tcfe (TypedEqui.exists_assert tcfe r P) (Inhale (Stabilize (full_ownership_with_val r e))) Q
+  \<and> self_framing P"
     by (metis ConcreteSemantics.SL_proof_Havoc_elim ConcreteSemantics.SL_proof_Seq_elim assms(1))
-  then have "Q = TypedEqui.exists_assert tcfe r P \<otimes> typed_stabilize (full_ownership_with_val r e)"
+  then have "Q = TypedEqui.exists_assert tcfe r P \<otimes> inhalify (Stabilize (full_ownership_with_val r e))"
     by blast
 
-  show "tcfe \<turnstile>CSL [atrue tcfe \<otimes> TypedEqui.exists_assert tcfe r P] Calloc r e [typed_stabilize (full_ownership_with_val r e) \<otimes> TypedEqui.exists_assert tcfe r P]"
+  show "tcfe \<turnstile>CSL [UNIV \<otimes> TypedEqui.exists_assert tcfe r P] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e)) \<otimes> TypedEqui.exists_assert tcfe r P]"
   proof (rule RuleFrame)
     have "r \<notin> fvE e"
       using assms(3) by auto
-    then have "tcfe \<turnstile>CSL [atrue tcfe] Calloc r e [full_ownership_with_val r e]"
+    then have "tcfe \<turnstile>CSL [UNIV] Calloc r e [full_ownership_with_val r e]"
       using RuleAlloc[of r e] by simp
-    then show "tcfe \<turnstile>CSL [atrue tcfe] Calloc r e [typed_stabilize (full_ownership_with_val r e)]"
-      using RuleStabilizeTyped by fastforce
+    then show "tcfe \<turnstile>CSL [UNIV] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e))]"
+      using RuleStabilizeTyped by (metis RuleInhalify Stabilize_UNIV)
 
     show "disjoint (fvA tcfe (TypedEqui.exists_assert tcfe r P)) (wrC (Calloc r e))"
-      by (metis (no_types, lifting) ConcreteSemantics.SL_proof_Havoc_elim ConcreteSemantics.exists_assert_no_in_fv asm0 disjoint_def disjoint_iff singletonD subset_Diff_insert wf_context_type_context wrC.simps(5))
+      using ConcreteSemantics.exists_assert_no_in_fv disjoint_def
+      using tcfe_is_finite by fastforce
 
-    show "TypedEqui.self_framing_typed tcfe (atrue tcfe)"
-      using TypedEqui.self_framing_typed_def TypedEqui.atrue_def
-      using TypedEqui.typed_state_then_stabilize_typed by blast
-    show "TypedEqui.self_framing_typed tcfe (TypedEqui.exists_assert tcfe r P)"
+    show "self_framing (TypedEqui.exists_assert tcfe r P)"
       using asm0 by fastforce
-    show "TypedEqui.typed_assertion tcfe (TypedEqui.exists_assert tcfe r P)"
-      using asm0 by fastforce
-    show "TypedEqui.typed_assertion tcfe (atrue tcfe)"
-      using TypedEqui.typed_assertion_def TypedEqui.atrue_def by blast
-  qed
+  qed (simp)
+  then have "t_entails P (TypedEqui.exists_assert tcfe r P)"
+    by (metis ConcreteSemantics.SL_proof_Havoc_elim_entails asm0 assms(2) option.simps(3) tcfe_is_finite well_typed_cmd_aux.simps(6))
 
-  moreover have "TypedEqui.typed_assertion tcfe P \<and> variables tcfe r \<noteq> None"
-  proof
-    show "TypedEqui.typed_assertion tcfe P"
-      using asm0 by blast
-    show "variables tcfe r \<noteq> None"
-      by (metis assms(2) option.distinct(1) well_typed_cmd_aux.simps(6))
-  qed
-  then have "entails P (TypedEqui.exists_assert tcfe r P)"
-    using ConcreteSemantics.SL_proof_Havoc_elim_entails[of tcfe P r "TypedEqui.exists_assert tcfe r P"]    
-    using ConcreteSemantics.exists_assert_entails by blast
-
-  then show "P \<subseteq> atrue tcfe \<otimes> TypedEqui.exists_assert tcfe r P"
-    by (meson TypedEqui.typed_assertion_exists_assert \<open>TypedEqui.typed_assertion tcfe P \<and> variables tcfe r \<noteq> None\<close> conjunct_with_true_entails dual_order.trans entails_def)
+  then show "t_entails P (UNIV \<otimes> TypedEqui.exists_assert tcfe r P)"
+    using ConcreteSemantics.entails_typed_trans conjunct_with_true_t_entails by blast
   
-  show "typed_stabilize (full_ownership_with_val r e) \<otimes> TypedEqui.exists_assert tcfe r P \<subseteq> Q"
-    by (simp add: \<open>Q = TypedEqui.exists_assert tcfe r P \<otimes> typed_stabilize (full_ownership_with_val r e)\<close> add_set_commm)
+  show "t_entails (inhalify (Stabilize (full_ownership_with_val r e)) \<otimes> TypedEqui.exists_assert tcfe r P) Q"
+    by (simp add: ConcreteSemantics.entails_typed_refl \<open>Q = TypedEqui.exists_assert tcfe r P \<otimes> inhalify (Stabilize (full_ownership_with_val r e))\<close> add_set_commm)
 qed
 
 lemma helper_exhale_encoding:
-  assumes "ConcreteSemantics.SL_proof tcfe P (Exhale (typed_stabilize A)) Q"
-  shows "P \<subseteq> typed_stabilize A \<otimes> Q"
+  assumes "ConcreteSemantics.SL_proof tcfe P (Exhale (Stabilize A)) Q"
+  shows "P \<subseteq> Stabilize A \<otimes> Q"
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_Exhale_elim)
-  assume asm0: "entails P (Q \<otimes> typed_stabilize A)" "TypedEqui.self_framing_typed tcfe P"
-    "TypedEqui.typed_assertion tcfe P" "TypedEqui.self_framing_typed tcfe Q"
-    "TypedEqui.typed_assertion tcfe Q"
-  show "P \<subseteq> typed_stabilize A \<otimes> Q"
+  assume asm0: "entails P (Q \<otimes> Stabilize A)" "self_framing P" "self_framing Q"
+  show "P \<subseteq> Stabilize A \<otimes> Q"
   proof
     fix \<omega> assume asm1: "\<omega> \<in> P"
-    then obtain q a where "q \<in> Q" "a \<in> typed_stabilize A" "Some \<omega> = q \<oplus> a"
+    then obtain q a where "q \<in> Q" "a \<in> Stabilize A" "Some \<omega> = q \<oplus> a"
       by (meson asm0(1) entails_def subsetD x_elem_set_product)
-    moreover have "TypedEqui.typed tcfe a"
-      using TypedEqui.typed_state_axioms asm0(3) asm1 calculation(3) greater_equiv typed_state.typed_assertionE typed_state.typed_smaller by blast
     then have "stabilize a \<in> A"
-      using ConcreteSemantics.stabilize_typed_elem calculation(2) by blast
-    then show "\<omega> \<in> TypedEqui.Stabilize_typed tcfe A \<otimes> Q"
-      by (metis (no_types, lifting) ConcreteSemantics.stabilize_typed_elem \<open>TypedEqui.typed tcfe a\<close> calculation(1) calculation(3) commutative x_elem_set_product)
-  qed
+      by force
+    then show "\<omega> \<in> Stabilize A \<otimes> Q"
+      by (metis (no_types, lifting) \<open>\<And>thesis. (\<And>q a. \<lbrakk>q \<in> Q; a \<in> Stabilize A; Some \<omega> = q \<oplus> a\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> add_set_commm x_elem_set_product)
+  qed  
 qed
 
 lemma convert_proof_free:
-  assumes "ConcreteSemantics.SL_proof tcfe P (Exhale (typed_stabilize (full_ownership r))) Q"
-  shows "tcfe \<turnstile>CSL [P] Cfree r [Q \<otimes> atrue tcfe]"
+  assumes "ConcreteSemantics.SL_proof tcfe P (Exhale (Stabilize (full_ownership r))) Q"
+  shows "tcfe \<turnstile>CSL [P] Cfree r [Q \<otimes> UNIV]"
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_Exhale_elim)
-  assume asm0: "entails P (Q \<otimes> typed_stabilize (full_ownership r))" "TypedEqui.self_framing_typed tcfe P"
-    "TypedEqui.typed_assertion tcfe P" "TypedEqui.self_framing_typed tcfe Q" "TypedEqui.typed_assertion tcfe Q"
-  show "tcfe \<turnstile>CSL [P] Cfree r [Q \<otimes> atrue tcfe]"
+  assume asm0: "entails P (Q \<otimes> Stabilize (full_ownership r))" "self_framing P" "self_framing Q"
+  show "tcfe \<turnstile>CSL [P] Cfree r [Q \<otimes> UNIV]"
   proof (rule RuleCons)
-    show "tcfe \<turnstile>CSL [TypedEqui.Stabilize_typed tcfe (full_ownership r) \<otimes> Q] Cfree r [TypedEqui.Stabilize_typed tcfe (atrue tcfe) \<otimes> Q]"
+    show "tcfe \<turnstile>CSL [Stabilize (full_ownership r) \<otimes> Q] Cfree r [Stabilize (UNIV) \<otimes> Q]"
     proof (rule RuleFrame)
-      show "tcfe \<turnstile>CSL [TypedEqui.Stabilize_typed tcfe (full_ownership r)] Cfree r [TypedEqui.Stabilize_typed tcfe (atrue tcfe)]"
+      show "tcfe \<turnstile>CSL [Stabilize (full_ownership r)] Cfree r [Stabilize (UNIV)]"
         using RuleFree RuleStabilizeTyped by blast
     qed (simp_all add: asm0)
-    show "P \<subseteq> TypedEqui.Stabilize_typed tcfe (full_ownership r) \<otimes> Q"
+    show "P \<subseteq> Stabilize (full_ownership r) \<otimes> Q"
       by (simp add: assms helper_exhale_encoding)
-    show "TypedEqui.Stabilize_typed tcfe (atrue tcfe) \<otimes> Q \<subseteq> Q \<otimes> atrue tcfe"
-      by (metis TypedEqui.typed_Stabilize_typed TypedEqui.typed_assertion_def add_set_commm add_set_mono TypedEqui.atrue_def mem_Collect_eq subsetI)
+    show "Stabilize (UNIV) \<otimes> Q \<subseteq> Q \<otimes> UNIV"
+      by (simp add: add_set_commm)
   qed
 qed
-
-lemma in_Stabilize_typed:
-  assumes "stabilize \<omega> \<in> A"
-      and "TypedEqui.typed tcfe \<omega>"
-    shows "\<omega> \<in> TypedEqui.Stabilize_typed tcfe A"
-  using ConcreteSemantics.stabilize_typed_elem assms(1) assms(2) by blast
-
 
 lemma larger_mask_full:
   assumes "\<omega>' \<succeq> \<omega>"
@@ -248,84 +247,84 @@ lemma in_times_atrue:
   assumes "TypedEqui.typed tcfe \<omega>'"
       and "\<omega>' \<succeq> \<omega>"
       and "\<omega> \<in> A"
-    shows "\<omega>' \<in> A \<otimes> atrue tcfe"
+    shows "\<omega>' \<in> A \<otimes> UNIV"
 proof -
   obtain r where "Some \<omega>' = \<omega> \<oplus> r"
     using assms(2) greater_def by blast
-  then have "r \<in> atrue tcfe"
-    using TypedEqui.typed_smaller assms(1) TypedEqui.atrue_def greater_equiv by blast
+  then have "r \<in> UNIV"
+    using TypedEqui.typed_smaller assms(1) greater_equiv by blast
   then show ?thesis
     using \<open>Some \<omega>' = \<omega> \<oplus> r\<close> assms(3) x_elem_set_product by blast
 qed
 
+lemma in_StabilizeI:
+  assumes "stabilize \<omega> \<in> A"
+  shows "\<omega> \<in> Stabilize A"
+  by (simp add: assms)
+
 lemma convert_proof_write:
   assumes "ConcreteSemantics.SL_proof tcfe P (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e))) Q"
-  shows "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> atrue tcfe]"
+  shows "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_Custom_elim)
   assume asm0: "SL_Custom tcfe P (custom.FieldAssign (semantify_addr r) field_val (semantify_exp e)) Q"
-  "TypedEqui.self_framing_typed tcfe P" "TypedEqui.typed_assertion tcfe P" "TypedEqui.self_framing_typed tcfe Q"
-  "TypedEqui.typed_assertion tcfe Q"
-  show "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> atrue tcfe]"
+  "self_framing P" "self_framing Q"
+  show "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
     using asm0(1)
   proof (rule SL_custom_FieldAssign)
     assume asm1: "Q = update_value tcfe P (semantify_addr r) field_val (semantify_exp e)"
-      "TypedEqui.self_framing_typed tcfe P" "entails P {\<omega>. \<exists>l. get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l}"
+      "self_framing P" "entails P {\<omega>. \<exists>l. get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l}"
       "framed_by_exp P (semantify_addr r)" "framed_by_exp P (semantify_exp e)"
-    show "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> atrue tcfe]"
+    show "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
     proof (rule RuleCons)
-      let ?F = "TypedEqui.Stabilize_typed tcfe { remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}"
-      show "tcfe \<turnstile>CSL [TypedEqui.Stabilize_typed tcfe (full_ownership r) \<otimes> ?F] Cwrite r e [TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e) \<otimes> ?F]"
+      let ?F = "Stabilize { remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}"
+      show "tcfe \<turnstile>CSL [Stabilize (full_ownership r) \<otimes> ?F] Cwrite r e [Stabilize (full_ownership_with_val r e) \<otimes> ?F]"
       proof (rule RuleFrame)
-        show "tcfe \<turnstile>CSL [TypedEqui.Stabilize_typed tcfe (full_ownership r)] Cwrite r e [TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e)]"
+        show "tcfe \<turnstile>CSL [Stabilize (full_ownership r)] Cwrite r e [Stabilize (full_ownership_with_val r e)]"
           by (simp add: RuleStabilizeTyped RuleWrite)
       qed (simp_all)
-      show "P \<subseteq> TypedEqui.Stabilize_typed tcfe (full_ownership r) \<otimes> ?F"
+      show "P \<subseteq> Stabilize (full_ownership r) \<otimes> ?F"
       proof
         fix \<omega> assume "\<omega> \<in> P"
         then obtain l where "get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l"          
           by (smt (verit) CollectD asm1(3) entails_def subsetD)
         then have "Some \<omega> = remove_only \<omega> (l, field_val) \<oplus> set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>)))"
           using split_remove_only_owns_only by blast
-        moreover have "set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))) \<in> TypedEqui.Stabilize_typed tcfe (full_ownership r)"
-        proof (rule in_Stabilize_typed)
-          show "TypedEqui.typed tcfe (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))))"
-            using TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> asm0(3) calculation greater_equiv typed_state.typed_assertionE typed_state.typed_smaller by blast
+        moreover have "set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))) \<in> Stabilize (full_ownership r)"        
+        proof (rule in_StabilizeI)
           show "stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>)))) \<in> full_ownership r"
             apply (rule in_full_ownership[of _ _ l])
             using \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> semantify_addr_equiv apply auto[1]
             by (smt (verit, best) \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> add.commute add.right_neutral calculation fun_upd_apply get_m_additive get_m_stabilize remove_only_charact(2))
         qed
         moreover have "remove_only \<omega> (l, field_val) \<in> ?F"
-        proof (rule in_Stabilize_typed)
+        proof (rule in_StabilizeI)
           have "stabilize (remove_only \<omega> (l, field_val)) = remove_only (stabilize \<omega>) (l, field_val)"
             by (simp add: remove_only_stabilize)
           then show "stabilize (remove_only \<omega> (l, field_val)) \<in> {remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}"
-            by (smt (verit, ccfv_threshold) AbstractSemantics.get_store_stabilize CollectI TypedEqui.self_framing_typedE TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> asm0(3) asm1(2) semantify_addr_equiv typed_state.typed_assertionE)
-          show "TypedEqui.typed tcfe (remove_only \<omega> (l, field_val))"
-            by (meson TypedEqui.typed_assertion_def TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> asm0(3) calculation(1) greater_def typed_state.typed_smaller)
+            by (smt (verit, best) AbstractSemantics.get_store_stabilize CollectI \<open>\<omega> \<in> P\<close> \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> asm1(2) self_framing_def semantify_addr_equiv)
         qed
-        ultimately show "\<omega> \<in> TypedEqui.Stabilize_typed tcfe (full_ownership r) \<otimes> ?F"
+        ultimately show "\<omega> \<in> Stabilize (full_ownership r) \<otimes> ?F"
           using commutative x_elem_set_product by fastforce
       qed
-      show "TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e) \<otimes> ?F \<subseteq> Q \<otimes> atrue tcfe"
+      show "Stabilize (full_ownership_with_val r e) \<otimes> ?F \<subseteq> Q \<otimes> UNIV"
       proof
-        fix \<omega>' assume "\<omega>' \<in> TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e) \<otimes> ?F"
-        then obtain ptr f where r: "Some \<omega>' = ptr \<oplus> f" "ptr \<in> TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e)" "f \<in> ?F"
+        fix \<omega>' assume "\<omega>' \<in> Stabilize (full_ownership_with_val r e) \<otimes> ?F"
+        then obtain ptr f where r: "Some \<omega>' = ptr \<oplus> f" "ptr \<in> Stabilize (full_ownership_with_val r e)" "f \<in> ?F"
           by (meson x_elem_set_product)
         then obtain l where "get_store (stabilize ptr) r = Some (VRef (Address l)) \<and> get_m (stabilize ptr) (l, field_val) = 1
   \<and> get_h (stabilize ptr) (l, field_val) = Some (VInt (edenot e (get_store (stabilize ptr))))"
-          by (smt (verit, ccfv_SIG) CollectD ConcreteSemantics.stabilize_typed_elem full_ownership_with_val_def)
+          using full_ownership_with_val_def by auto
         then have "get_store ptr r = Some (VRef (Address l)) \<and> get_m ptr (l, field_val) = 1
   \<and> get_h ptr (l, field_val) = Some (VInt (edenot e (get_store ptr)))"
           by (simp add: stabilize_value_persists)
         then have "get_store \<omega>' r = Some (VRef (Address l)) \<and> get_m \<omega>' (l, field_val) = 1
   \<and> get_h \<omega>' (l, field_val) = Some (VInt (edenot e (get_store \<omega>')))"
-          using r(1) greater_charact larger_mask_full
+          using r(1) larger_mask_full
           by (metis (no_types, lifting) in_set_sum is_in_set_sum r(3) read_helper singletonD state_add_iff)
 
         moreover obtain \<omega> l' where "stabilize f = remove_only \<omega> (l', field_val)" "\<omega> \<in> P" "semantify_addr r \<omega> = Some l'"
-          by (smt (verit) CollectD ConcreteSemantics.stabilize_typed_elem r(3))
+          using r(3) by auto
         then have "l = l'"
           by (metis (no_types, lifting) AbstractSemantics.get_store_stabilize \<open>get_store (stabilize ptr) r = Some (VRef (Address l)) \<and> get_m (stabilize ptr) (l, field_val) = 1 \<and> get_h (stabilize ptr) (l, field_val) = Some (VInt (edenot e (get_store (stabilize ptr))))\<close> full_add_defined get_address_simp get_store_set_state option.distinct(1) r(1) remove_only_def semantify_addr_equiv)
 
@@ -352,14 +351,25 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
           show "get_trace \<omega>' = get_trace (update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))))"
             by (metis \<open>stabilize f = remove_only \<omega> (l', field_val)\<close> get_trace_set_state get_trace_stabilize greater_equiv greater_state_has_greater_parts(2) r(1) remove_only_def)
         qed
-        moreover have "update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))) \<in> Q"
-          using \<open>l = l'\<close> AbstractSemantics.get_store_stabilize ConcreteSemantics.stabilize_typed_elem \<open>\<omega> \<in> P\<close>
+
+        moreover have "update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))) \<in> update_value tcfe P (semantify_addr r) field_val (semantify_exp e)"
+          using \<open>\<omega> \<in> P\<close> \<open>semantify_addr r \<omega> = Some l'\<close> semantify_exp_def
+        proof (rule in_update_value)
+          show "update_heap_val \<omega> (l, field_val) (VInt (edenot e (get_store \<omega>'))) = update_heap_val \<omega> (l', field_val) (VInt (edenot e (get_store \<omega>)))"
+            by (metis calculation(2) calculation(3) get_store_set_state greater_charact)
+          show "typed_value tcfe field_val (VInt (edenot e (get_store \<omega>)))"
+          proof (rule typed_valueI)
+            fix ty assume "custom_context tcfe field_val = Some ty"
+            then show "VInt (edenot e (get_store \<omega>)) \<in> ty"
+              using \<open>l = l'\<close> AbstractSemantics.get_store_stabilize 
             \<open>get_store ptr r = Some (VRef (Address l)) \<and> get_m ptr (l, field_val) = 1 \<and> get_h ptr (l, field_val) = Some (VInt (edenot e (get_store ptr)))\<close>
-            \<open>semantify_addr r \<omega> = Some l'\<close> \<open>stabilize f = remove_only \<omega> (l', field_val)\<close> asm1(1) full_add_charact(1)
-            full_add_defined get_store_set_state in_update_value r(1) r(2) remove_only_def semantify_exp_def snd_conv typed_get_vh
-          by (smt (verit, ccfv_SIG))
-        ultimately show "\<omega>' \<in> Q \<otimes> atrue tcfe"
-          by (meson TypedEqui.typed_assertionE TypedEqui.typed_state_axioms \<open>\<omega>' \<in> TypedEqui.Stabilize_typed tcfe (full_ownership_with_val r e) \<otimes> TypedEqui.Stabilize_typed tcfe {remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}\<close> in_times_atrue typed_state.typed_Stabilize_typed typed_state.typed_star)
+             \<open>stabilize f = remove_only \<omega> (l', field_val)\<close>  full_add_charact(1)
+            full_add_defined get_store_set_state in_update_value r(1) r(2) remove_only_def  snd_conv typed_get_vh
+              by (smt (verit) CollectI abs_type_context.select_convs(2) option.sel type_ctxt_front_end_def type_ctxt_heap_def vints_def)
+          qed
+        qed
+        ultimately show "\<omega>' \<in> Q \<otimes> UNIV"
+          using asm1(1) greater_def x_elem_set_product by blast
       qed
     qed
   qed
@@ -379,28 +389,31 @@ lemma convert_proof_read:
 proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
   assume asm0: "Q = ConcreteSemantics.post_substitute_var_assert x (semantify_heap_loc r) P"
     "framed_by_exp P (semantify_heap_loc r)"
-    "TypedEqui.self_framing_typed tcfe P" "TypedEqui.typed_assertion tcfe P"
+    "self_framing P"
 
   have r: "\<And>\<omega>. \<omega> \<in> P \<Longrightarrow> (\<exists>l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0
-  \<and> (\<exists>v. get_h \<omega> (l, field_val) = Some (VInt v)))"
+  \<and> (\<exists>v0. get_h \<omega> (l, field_val) = Some v0))"
   proof -
     fix \<omega>
     assume asm1: "\<omega> \<in> P"
     then obtain l v0 where "get_store \<omega> r = Some (VRef (Address l))" "get_h \<omega> (l, field_val) = Some v0"
       by (metis asm0(2) framed_by_exp_def semantify_heap_loc_def)
+(*
     then obtain v where "v0 = VInt v"
+      sorry
       using TypedEqui.typed_assertionE[OF asm0(4) asm1] TypedEqui.typed_def[of tcfe \<omega>] well_typedE(1)[of "custom_context tcfe" "get_abs_state \<omega>"]
       Instantiation.well_typed_heapE[of "custom_context tcfe" "get_state \<omega>" "(l, field_val)" v0]
       by (smt (verit, del_insts) CollectD abs_type_context.select_convs(2) option.sel snd_conv snd_get_abs_state type_ctxt_front_end_def type_ctxt_heap_def vints_def)
-    moreover have "stabilize \<omega> \<in> P"
-      using TypedEqui.self_framing_typedE TypedEqui.typed_state_axioms \<open>\<omega> \<in> P\<close> asm0(3) asm0(4) typed_state.typed_assertionE by blast
-    then have "get_h (stabilize \<omega>) (l, field_val) = Some (VInt v)"
-      by (metis (no_types, lifting) AbstractSemantics.get_store_stabilize \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> asm0(2) calculation framed_by_exp_def get_address_simp semantify_heap_loc_def stabilize_value_persists)
+*)
+    then have "stabilize \<omega> \<in> P"
+      using asm0(3) asm1 self_framingE by blast
+    then have "get_h (stabilize \<omega>) (l, field_val) = Some v0"
+      by (metis (no_types, lifting) AbstractSemantics.get_store_stabilize \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> asm0(2) framed_by_exp_def get_address_simp semantify_heap_loc_def stabilize_value_persists)
     then have "get_m \<omega> (l, field_val) > 0"
       using EquiSemAuxLemma.gr_0_is_ppos stable_virtual_state_def by fastforce
     then show "(\<exists>l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) > 0
-  \<and> (\<exists>v. get_h \<omega> (l, field_val) = Some (VInt v)))"
-      by (simp add: \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> calculation)
+  \<and> (\<exists>v0. get_h \<omega> (l, field_val) = Some v0))"
+      using \<open>get_h \<omega> (l, field_val) = Some v0\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> by blast
   qed
 
   show "tcfe \<turnstile>CSL [P] Cread x r [Q]"
@@ -409,7 +422,9 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
     proof (rule RuleRead)
       show "P \<subseteq> read_perm r" (* Should come from framed_by_exp *)
         using r
-        unfolding read_perm_def by (simp add: subsetI)
+        unfolding read_perm_def 
+        sorry
+        by (simp add: subsetI)
     qed
     show "read_result P x r \<subseteq> Q"
     proof
@@ -429,14 +444,14 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
 qed
 
 abbreviation make_semantic_wf where
-  "make_semantic_wf \<Gamma> P \<equiv> typed_stabilize (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P)"
+  "make_semantic_wf \<Gamma> P \<equiv> Stabilize (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P)"
 
 fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
   "translate \<Gamma> Cskip = (Skip, {})"
 | "translate \<Gamma> (Cassign x e) = (LocalAssign x (semantify_exp e), {})"
 
-| "translate \<Gamma> (Calloc r e) = ((Havoc r;; Inhale (typed_stabilize (full_ownership_with_val r e))), {})"
-| "translate \<Gamma> (Cfree r) = (Exhale (typed_stabilize (full_ownership r)), {})"
+| "translate \<Gamma> (Calloc r e) = ((Havoc r;; Inhale (Stabilize (full_ownership_with_val r e))), {})"
+| "translate \<Gamma> (Cfree r) = (Exhale (Stabilize (full_ownership r)), {})"
 | "translate \<Gamma> (Cwrite r e) = (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e)), {})"
 | "translate \<Gamma> (Cread x r) = (LocalAssign x (semantify_heap_loc r), {})"
 
@@ -459,25 +474,25 @@ fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
 
 lemma CSL_weaken_post_atrue:
   assumes "tcfe \<turnstile>CSL [P] C [Q]"
-      and "TypedEqui.typed_assertion tcfe Q"
-  shows "tcfe \<turnstile>CSL [P] C [Q \<otimes> atrue tcfe]"
+      and 
+  shows "tcfe \<turnstile>CSL [P] C [Q \<otimes> UNIV]"
   using assms(1)
 proof (rule RuleCons)
-  show "Q \<subseteq> Q \<otimes> atrue tcfe"
+  show "Q \<subseteq> Q \<otimes> UNIV"
     using add_set_commm assms(2) conjunct_with_true_entails by blast
 qed (simp)
 
 lemma CSL_add_atrue:
   assumes "tcfe \<turnstile>CSL [P] C [Q]"
-      and "TypedEqui.self_framing_typed tcfe P"
+      and "self_framing P"
       and "TypedEqui.typed_assertion tcfe P"
       and "TypedEqui.wf_context tcfe"
-    shows "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
+    shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
   by (rule RuleFrame) (simp_all add: assms)
 
 
 definition proof_obligations_valid where
-  "proof_obligations_valid S \<longleftrightarrow> (\<forall>Cv \<in> S. \<exists>B. ConcreteSemantics.SL_proof tcfe (atrue tcfe) Cv B)"
+  "proof_obligations_valid S \<longleftrightarrow> (\<forall>Cv \<in> S. \<exists>B. ConcreteSemantics.SL_proof tcfe (UNIV) Cv B)"
 
 lemma proof_obligations_valid_union:
   "proof_obligations_valid (S1 \<union> S2) \<longleftrightarrow> proof_obligations_valid S1 \<and> proof_obligations_valid S2"
@@ -485,19 +500,19 @@ lemma proof_obligations_valid_union:
 
 definition invariant_translate where
   "invariant_translate \<Gamma> P C Q \<longleftrightarrow>
-  ((proof_obligations_valid (snd (translate \<Gamma> C)) \<and> ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> C)) Q) \<longrightarrow> tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe])"
+  ((proof_obligations_valid (snd (translate \<Gamma> C)) \<and> ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> C)) Q) \<longrightarrow> tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV])"
 
 lemma invariant_translateE:
   assumes "invariant_translate \<Gamma> P C Q"
       and "proof_obligations_valid (snd (translate \<Gamma> C))"
       and "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> C)) Q"
-    shows "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
+    shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
   using assms(1) assms(2) assms(3) invariant_translate_def by blast
 
 
 lemma invariant_translateI:
   assumes "proof_obligations_valid (snd (translate \<Gamma> C)) \<Longrightarrow> ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> C)) Q
-    \<Longrightarrow> tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
+    \<Longrightarrow> tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
   shows "invariant_translate \<Gamma> P C Q"
   using assms invariant_translate_def proof_obligations_valid_def by blast
 
@@ -531,22 +546,22 @@ corollary invariant_translate_alloc:
   by (metis fst_eqD translate.simps(3) wf_context_type_context)
 
 lemma atrue_twice_same:
-  "atrue tcfe \<otimes> atrue tcfe \<subseteq> atrue tcfe"
-  unfolding TypedEqui.atrue_def add_set_def
+  "UNIV \<otimes> UNIV \<subseteq> UNIV"
+  unfolding add_set_def
   by (smt (z3) Collect_mono_iff TypedEqui.typed_sum mem_Collect_eq)
 
 lemma atrue_twice_equal:
-  "atrue tcfe \<otimes> atrue tcfe = atrue tcfe"
+  "UNIV \<otimes> UNIV = UNIV"
 proof
-  show "atrue tcfe \<subseteq> atrue tcfe \<otimes> atrue tcfe"
+  show "UNIV \<subseteq> UNIV \<otimes> UNIV"
   proof
-    fix x assume "x \<in> atrue tcfe"
+    fix x assume "x \<in> UNIV"
     then have "Some x = x \<oplus> |x|"
       using core_is_smaller by blast
-    then have "|x| \<in> atrue tcfe"
-      using TypedEqui.typed_core \<open>x \<in> atrue tcfe\<close> TypedEqui.atrue_def by blast
-    then show "x \<in> atrue tcfe \<otimes> atrue tcfe"
-      using \<open>Some x = x \<oplus> |x|\<close> \<open>x \<in> atrue tcfe\<close> x_elem_set_product by blast
+    then have "|x| \<in> UNIV"
+      using TypedEqui.typed_core \<open>x \<in> UNIV\<close> by blast
+    then show "x \<in> UNIV \<otimes> UNIV"
+      using \<open>Some x = x \<oplus> |x|\<close> \<open>x \<in> UNIV\<close> x_elem_set_product by blast
   qed
 qed (simp add: atrue_twice_same)
 
@@ -557,10 +572,10 @@ corollary invariant_translate_free:
     shows "invariant_translate \<Gamma> P (Cfree r) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> (Cfree r))) Q"
-  then have "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cfree r [(Q \<otimes> atrue tcfe) \<otimes> atrue tcfe]"
+  then have "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cfree r [(Q \<otimes> UNIV) \<otimes> UNIV]"
     using RuleFrame[OF convert_proof_free]
     by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_free fst_eqD translate.simps(4))
-  then show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cfree r [Q \<otimes> atrue tcfe]"
+  then show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cfree r [Q \<otimes> UNIV]"
     by (simp add: add_set_asso atrue_twice_equal)
 qed
 
@@ -570,10 +585,10 @@ corollary invariant_translate_write:
     shows "invariant_translate \<Gamma> P (Cwrite r e) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> (Cwrite r e))) Q"
-  then have "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cwrite r e [(Q \<otimes> atrue tcfe) \<otimes> atrue tcfe]"
+  then have "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cwrite r e [(Q \<otimes> UNIV) \<otimes> UNIV]"
     using RuleFrame[OF convert_proof_write]
     by (metis CSL_add_atrue ConcreteSemantics.proofs_are_self_framing_and_typed assms convert_proof_write fst_eqD translate.simps(5))
-  then show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cwrite r e [Q \<otimes> atrue tcfe]"
+  then show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cwrite r e [Q \<otimes> UNIV]"
     by (simp add: add_set_asso atrue_twice_equal)
 qed
 
@@ -596,19 +611,19 @@ proof (rule invariant_translateI)
   then obtain R where r: "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> C1)) R"
       "ConcreteSemantics.SL_proof tcfe R (fst (translate \<Gamma> C2)) Q"
     by (metis ConcreteSemantics.SL_proof_Seq_elim fst_eqD translate.simps(7))
-  show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cseq C1 C2 [Q \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cseq C1 C2 [Q \<otimes> UNIV]"
   proof (rule RuleSeq)
-    show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C1 [R \<otimes> atrue tcfe]"
+    show "tcfe \<turnstile>CSL [P \<otimes> UNIV] C1 [R \<otimes> UNIV]"
       using assms(1)[of R] r
       unfolding invariant_translate_def
       by (metis asm0(1) proof_obligations_valid_union snd_conv translate.simps(7))
-    show "tcfe \<turnstile>CSL [R \<otimes> atrue tcfe] C2 [Q \<otimes> atrue tcfe]"
+    show "tcfe \<turnstile>CSL [R \<otimes> UNIV] C2 [Q \<otimes> UNIV]"
     proof (rule RuleCons)
-      show "tcfe \<turnstile>CSL [R \<otimes> atrue tcfe] C2 [(Q \<otimes> atrue tcfe) \<otimes> atrue tcfe]"
+      show "tcfe \<turnstile>CSL [R \<otimes> UNIV] C2 [(Q \<otimes> UNIV) \<otimes> UNIV]"
           using assms(2)[of R] asm0
           unfolding invariant_translate_def proof_obligations_valid_def
           by (metis (no_types, lifting) Un_iff add_set_asso atrue_twice_equal r(2) snd_conv translate.simps(7))
-      show "Q \<otimes> atrue tcfe \<otimes> atrue tcfe \<subseteq> Q \<otimes> atrue tcfe"
+      show "Q \<otimes> UNIV \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
         by (simp add: add_set_asso add_set_mono atrue_twice_same)
     qed (simp)
   qed
@@ -619,23 +634,23 @@ lemma invariant_translate_inhale_exhale_get_proof:
   assumes "\<And>P Q. invariant_translate \<Gamma> P C Q"
       and "ConcreteSemantics.SL_proof tcfe P (Inhale A;; fst (translate \<Gamma> C);; Exhale B) Q"
       and "proof_obligations_valid (snd (translate \<Gamma> C))"
-    shows "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> atrue tcfe] C [Q \<otimes> B \<otimes> atrue tcfe]"
+    shows "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
   using assms(2)
 proof (rule ConcreteSemantics.SL_proof_Seq_elim)
   fix R1 assume asm0: "ConcreteSemantics.SL_proof tcfe P (abs_stmt.Inhale A ;; fst (translate \<Gamma> C)) R1"
     "ConcreteSemantics.SL_proof tcfe R1 (abs_stmt.Exhale B) Q"
   then have "entails R1 (Q \<otimes> B)" by auto
-  show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> atrue tcfe] C [Q \<otimes> B \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
   proof (rule ConcreteSemantics.SL_proof_Seq_elim[OF asm0(1)])
     fix R0 assume asm1: "ConcreteSemantics.SL_proof tcfe P (abs_stmt.Inhale A) R0"
           "ConcreteSemantics.SL_proof tcfe R0 (fst (translate \<Gamma> C)) R1"
     then have "ConcreteSemantics.SL_proof tcfe (P \<otimes> A) (fst (translate \<Gamma> C)) R1"
       by auto
-    show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> atrue tcfe] C [Q \<otimes> B \<otimes> atrue tcfe]"
+    show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
     proof (rule RuleCons)
-      show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> atrue tcfe] C [R1 \<otimes> atrue tcfe]"
+      show "tcfe \<turnstile>CSL [P \<otimes> A \<otimes> UNIV] C [R1 \<otimes> UNIV]"
         using \<open>ConcreteSemantics.SL_proof tcfe (P \<otimes> A) (fst (translate \<Gamma> C)) R1\<close> assms(1) assms(3) invariant_translate_def by blast
-      show "R1 \<otimes> atrue tcfe \<subseteq> Q \<otimes> B \<otimes> atrue tcfe"
+      show "R1 \<otimes> UNIV \<subseteq> Q \<otimes> B \<otimes> UNIV"
         by (meson \<open>entails R1 (Q \<otimes> B)\<close> add_set_mono entails_def order_refl)
     qed (simp)
   qed
@@ -644,8 +659,8 @@ qed
 
 lemma drop_conjunct_entails:
   assumes "TypedEqui.typed_assertion tcfe A"
-  shows "A \<otimes> B \<otimes> atrue tcfe \<subseteq> B \<otimes> atrue tcfe"
-  by (smt (verit) TypedEqui.typed_assertion_def add_set_asso add_set_commm add_set_def assms TypedEqui.atrue_def atrue_twice_equal mem_Collect_eq subsetI)
+  shows "A \<otimes> B \<otimes> UNIV \<subseteq> B \<otimes> UNIV"
+  by (smt (verit) add_set_asso add_set_commm add_set_def assms atrue_twice_equal mem_Collect_eq subsetI)
 
 
 (*
@@ -657,9 +672,9 @@ lemma drop_conjunct_entails:
 
 
 lemma typed_self_framing_star:
-  assumes "TypedEqui.self_framing_typed tcfe A"
-      and "TypedEqui.self_framing_typed tcfe B"
-    shows "TypedEqui.self_framing_typed tcfe (A \<otimes> B)"
+  assumes "self_framing A"
+      and "self_framing B"
+    shows "self_framing (A \<otimes> B)"
 proof (rule TypedEqui.self_framing_typedI)
   fix \<omega>
   assume asm0: "typed tcfe \<omega>"
@@ -690,13 +705,13 @@ qed
 
 
 lemma self_framing_typed_star_atrue:
-  assumes "TypedEqui.self_framing_typed tcfe P"
-  shows "TypedEqui.self_framing_typed tcfe (P \<otimes> atrue tcfe)"
+  assumes "self_framing P"
+  shows "self_framing (P \<otimes> UNIV)"
   by (simp add: assms typed_self_framing_star)
 
 lemma typed_assertion_star_atrue:
   assumes "TypedEqui.typed_assertion tcfe P"
-  shows "TypedEqui.typed_assertion tcfe (P \<otimes> atrue tcfe)"
+  shows "TypedEqui.typed_assertion tcfe (P \<otimes> UNIV)"
   by (simp add: TypedEqui.typed_star assms)
 
 
@@ -720,11 +735,11 @@ proof (rule invariant_translateI)
   then have r0: "proof_obligations_valid (snd (translate \<Gamma> C1)) \<and> proof_obligations_valid (snd (translate \<Gamma> C2))"
     using proof_obligations_valid_union
     unfolding translate.simps by (metis sndI)
-  moreover obtain B1 where B1_def: "ConcreteSemantics.SL_proof tcfe (atrue tcfe)
+  moreover obtain B1 where B1_def: "ConcreteSemantics.SL_proof tcfe (UNIV)
     (Inhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1);; fst (translate \<Gamma> C1);; Exhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1)) B1"
     using asm0 unfolding translate.simps proof_obligations_valid_def
     by (metis Un_iff insertCI snd_eqD)
-  moreover obtain B2 where B2_def: "ConcreteSemantics.SL_proof tcfe (atrue tcfe)
+  moreover obtain B2 where B2_def: "ConcreteSemantics.SL_proof tcfe (UNIV)
   (Inhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2);; fst (translate \<Gamma> C2);; Exhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2)) B2"
     using asm0 unfolding translate.simps proof_obligations_valid_def
     by (metis Un_iff insertCI snd_eqD)
@@ -746,69 +761,69 @@ proof (rule invariant_translateI)
 
 (* R1 is the frame! *)
 
-  show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> UNIV] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> UNIV]"
   proof (rule RuleCons)
-    show "tcfe \<turnstile>CSL [((?P1 \<otimes> atrue tcfe) \<otimes> (?P2 \<otimes> atrue tcfe)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((?Q1 \<otimes> atrue tcfe) \<otimes> (?Q2 \<otimes> atrue tcfe)) \<otimes> R1]"
+    show "tcfe \<turnstile>CSL [((?P1 \<otimes> UNIV) \<otimes> (?P2 \<otimes> UNIV)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((?Q1 \<otimes> UNIV) \<otimes> (?Q2 \<otimes> UNIV)) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "tcfe \<turnstile>CSL [?P1 \<otimes> atrue tcfe \<otimes> (?P2 \<otimes> atrue tcfe)] {P1} C1 {Q1} || {P2} C2 {Q2} [?Q1 \<otimes> atrue tcfe \<otimes> (?Q2 \<otimes> atrue tcfe)]"
+      show "tcfe \<turnstile>CSL [?P1 \<otimes> UNIV \<otimes> (?P2 \<otimes> UNIV)] {P1} C1 {Q1} || {P2} C2 {Q2} [?Q1 \<otimes> UNIV \<otimes> (?Q2 \<otimes> UNIV)]"
       proof (rule RulePar)
-        show "tcfe \<turnstile>CSL [?P1 \<otimes> atrue tcfe] C1 [?Q1 \<otimes> atrue tcfe]"
+        show "tcfe \<turnstile>CSL [?P1 \<otimes> UNIV] C1 [?Q1 \<otimes> UNIV]"
         proof (rule RuleCons)
-          show "tcfe \<turnstile>CSL [atrue tcfe \<otimes> ?P1 \<otimes> atrue tcfe] C1 [B1 \<otimes> ?Q1 \<otimes> atrue tcfe]"
+          show "tcfe \<turnstile>CSL [UNIV \<otimes> ?P1 \<otimes> UNIV] C1 [B1 \<otimes> ?Q1 \<otimes> UNIV]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(1) B1_def]
             using r0 by blast
-          show "B1 \<otimes> ?Q1 \<otimes> atrue tcfe \<subseteq> ?Q1 \<otimes> atrue tcfe"
+          show "B1 \<otimes> ?Q1 \<otimes> UNIV \<subseteq> ?Q1 \<otimes> UNIV"
             using B1_def drop_conjunct_entails by blast
-          show "?P1 \<otimes> atrue tcfe \<subseteq> atrue tcfe \<otimes> ?P1 \<otimes> atrue tcfe"
+          show "?P1 \<otimes> UNIV \<subseteq> UNIV \<otimes> ?P1 \<otimes> UNIV"
             by (metis (no_types, lifting) add_set_asso add_set_commm atrue_twice_equal order_refl)
         qed
-        show "tcfe \<turnstile>CSL [?P2 \<otimes> atrue tcfe] C2 [?Q2 \<otimes> atrue tcfe]"
+        show "tcfe \<turnstile>CSL [?P2 \<otimes> UNIV] C2 [?Q2 \<otimes> UNIV]"
         proof (rule RuleCons)
-          show "tcfe \<turnstile>CSL [atrue tcfe \<otimes> ?P2 \<otimes> atrue tcfe] C2 [B2 \<otimes> ?Q2 \<otimes> atrue tcfe]"
+          show "tcfe \<turnstile>CSL [UNIV \<otimes> ?P2 \<otimes> UNIV] C2 [B2 \<otimes> ?Q2 \<otimes> UNIV]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(2) B2_def]
             using r0 by blast
-          show "B2 \<otimes> ?Q2 \<otimes> atrue tcfe \<subseteq> ?Q2 \<otimes> atrue tcfe"
+          show "B2 \<otimes> ?Q2 \<otimes> UNIV \<subseteq> ?Q2 \<otimes> UNIV"
             using B2_def drop_conjunct_entails by blast
-          show "?P2 \<otimes> atrue tcfe \<subseteq> atrue tcfe \<otimes> ?P2 \<otimes> atrue tcfe"
+          show "?P2 \<otimes> UNIV \<subseteq> UNIV \<otimes> ?P2 \<otimes> UNIV"
             using add_set_asso add_set_left_comm atrue_twice_equal
             by (metis (no_types, opaque_lifting) order_refl)
         qed
-        show "disjoint (fvC C1 \<union> fvA tcfe (?Q1 \<otimes> atrue tcfe)) (wrC C2)"
+        show "disjoint (fvC C1 \<union> fvA tcfe (?Q1 \<otimes> UNIV)) (wrC C2)"
           using assms(4) by auto
-        show "disjoint (fvC C2 \<union> fvA tcfe (?Q2 \<otimes> atrue tcfe)) (wrC C1)"
+        show "disjoint (fvC C2 \<union> fvA tcfe (?Q2 \<otimes> UNIV)) (wrC C1)"
           using assms(4) by auto
-        show "TypedEqui.self_framing_typed tcfe (?P1 \<otimes> atrue tcfe)"
+        show "self_framing (?P1 \<otimes> UNIV)"
           using assms(4) typed_self_framing_star by fastforce
-        show "TypedEqui.self_framing_typed tcfe (?P2 \<otimes> atrue tcfe)"
+        show "self_framing (?P2 \<otimes> UNIV)"
           using assms(4) self_framing_typed_star_atrue by auto
-        show "TypedEqui.typed_assertion tcfe (?P1 \<otimes> atrue tcfe)"
+        show "TypedEqui.typed_assertion tcfe (?P1 \<otimes> UNIV)"
           using assms(4) typed_assertion_star_atrue by auto
-        show "TypedEqui.typed_assertion tcfe (?P2 \<otimes> atrue tcfe)"
+        show "TypedEqui.typed_assertion tcfe (?P2 \<otimes> UNIV)"
           using assms(4) typed_assertion_star_atrue by auto
       qed
       show "disjoint (fvA tcfe R1) (wrC {P1} C1 {Q1} || {P2} C2 {Q2})"
         by (metis (mono_tags, opaque_lifting) Diff_subset_conv Orderings.order_eq_iff r bot.extremum disjoint_minus disjoint_simps(2) disjoint_simps(3) sup.order_iff wrC.simps(7) wrC.simps(8) wrL.simps(7) wrL_wrC_same)
-      show "TypedEqui.self_framing_typed tcfe (?P1 \<otimes> atrue tcfe \<otimes> (?P2 \<otimes> atrue tcfe))"
+      show "self_framing (?P1 \<otimes> UNIV \<otimes> (?P2 \<otimes> UNIV))"
         by (meson assms(4) self_framing_typed_star_atrue typed_self_framing_star wf_stmt.simps(3))
-      show "TypedEqui.typed_assertion tcfe (?P1 \<otimes> atrue tcfe \<otimes> (?P2 \<otimes> atrue tcfe))"
+      show "TypedEqui.typed_assertion tcfe (?P1 \<otimes> UNIV \<otimes> (?P2 \<otimes> UNIV))"
         using TypedEqui.typed_star assms(4) typed_assertion_star_atrue by auto
-      show "TypedEqui.self_framing_typed tcfe R1"
+      show "self_framing R1"
         using R_defs(3) by blast
       show "TypedEqui.typed_assertion tcfe R1"
         using R_defs(3) by force
     qed
-    show "P \<otimes> atrue tcfe \<subseteq> ?P1 \<otimes> atrue tcfe \<otimes> (?P2 \<otimes> atrue tcfe) \<otimes> R1"
+    show "P \<otimes> UNIV \<subseteq> ?P1 \<otimes> UNIV \<otimes> (?P2 \<otimes> UNIV) \<otimes> R1"
     proof -
-      have "P \<otimes> atrue tcfe \<subseteq> (R0 \<otimes> (?P1 \<otimes> ?P2)) \<otimes> atrue tcfe"
+      have "P \<otimes> UNIV \<subseteq> (R0 \<otimes> (?P1 \<otimes> ?P2)) \<otimes> UNIV"
         by (metis P_Q_R_rels add_set_mono atrue_twice_equal atrue_twice_same entails_def)
-      also have "... \<subseteq> R1 \<otimes> ((?P1 \<otimes> ?P2) \<otimes> atrue tcfe)"
+      also have "... \<subseteq> R1 \<otimes> ((?P1 \<otimes> ?P2) \<otimes> UNIV)"
         using r add_set_asso add_set_mono entails_def by blast
-      also have "... \<subseteq> ?P1 \<otimes> atrue tcfe \<otimes> (?P2 \<otimes> atrue tcfe) \<otimes> R1"
+      also have "... \<subseteq> ?P1 \<otimes> UNIV \<otimes> (?P2 \<otimes> UNIV) \<otimes> R1"
         using add_set_commm add_set_left_comm atrue_twice_equal
         by (smt (verit, del_insts) dual_order.refl)
       finally show ?thesis by simp
     qed
-    show "?Q1 \<otimes> atrue tcfe \<otimes> (?Q2 \<otimes> atrue tcfe) \<otimes> R1 \<subseteq> Q \<otimes> atrue tcfe"
+    show "?Q1 \<otimes> UNIV \<otimes> (?Q2 \<otimes> UNIV) \<otimes> R1 \<subseteq> Q \<otimes> UNIV"
       by (metis (no_types, lifting) Orderings.order_eq_iff P_Q_R_rels add_set_asso add_set_commm atrue_twice_equal)
   qed
 qed
@@ -837,49 +852,49 @@ proof (rule invariant_translateI)
   assume asm0: "proof_obligations_valid (snd (translate \<Gamma> (Cif b C1 C2)))"
     "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> (Cif b C1 C2))) Q"
 
-  show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cif b C1 C2 [Q \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cif b C1 C2 [Q \<otimes> UNIV]"
   proof (rule ConcreteSemantics.SL_proof_If_elim)
     show "ConcreteSemantics.SL_proof tcfe P (abs_stmt.If (semantify_bexp b) (fst (translate \<Gamma> C1)) (fst (translate \<Gamma> C2))) Q"
       by (metis asm0(2) fst_eqD translate.simps(8))
     fix B1 B2 assume asm1: "Q = B1 \<union> B2" "framed_by_exp P (semantify_bexp b)"
        "ConcreteSemantics.SL_proof tcfe (P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) (fst (translate \<Gamma> C1)) B1"
        "ConcreteSemantics.SL_proof tcfe (P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))) (fst (translate \<Gamma> C2)) B2"
-       "TypedEqui.self_framing_typed tcfe P" "TypedEqui.typed_assertion tcfe P"
-    show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cif b C1 C2 [Q \<otimes> atrue tcfe]"
+       "self_framing P" "TypedEqui.typed_assertion tcfe P"
+    show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cif b C1 C2 [Q \<otimes> UNIV]"
     proof (rule RuleIf)
-      show "tcfe \<turnstile>CSL [(P \<otimes> atrue tcfe) \<inter> assertify_bexp b] C1 [Q \<otimes> atrue tcfe]"
+      show "tcfe \<turnstile>CSL [(P \<otimes> UNIV) \<inter> assertify_bexp b] C1 [Q \<otimes> UNIV]"
       proof (rule RuleCons)
-        show "tcfe \<turnstile>CSL [(P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> atrue tcfe] C1 [B1 \<otimes> atrue tcfe]"
+        show "tcfe \<turnstile>CSL [(P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> UNIV] C1 [B1 \<otimes> UNIV]"
           by (metis asm0(1) asm1(3) assms(1) invariant_translateE proof_obligations_valid_union snd_conv translate.simps(8))
-        show "B1 \<otimes> atrue tcfe \<subseteq> Q \<otimes> atrue tcfe"
+        show "B1 \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
           by (simp add: add_set_mono asm1(1))
-        show "(P \<otimes> atrue tcfe) \<inter> assertify_bexp b \<subseteq> (P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> atrue tcfe"
+        show "(P \<otimes> UNIV) \<inter> assertify_bexp b \<subseteq> (P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> UNIV"
         proof
-          fix \<omega> assume "\<omega> \<in> (P \<otimes> atrue tcfe) \<inter> assertify_bexp b"
+          fix \<omega> assume "\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp b"
           then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot b (get_store \<omega>)"
-            using in_set_sum[of \<omega> P "atrue tcfe"] assertify_bexp_def
+            using in_set_sum[of \<omega> P "UNIV"] assertify_bexp_def
             by (smt (verit) Int_iff commutative greater_equiv mem_Collect_eq)
           then have "|p| \<in> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)"
             unfolding ConcreteSemantics.pure_typed_def semantify_bexp_def
             by (smt (verit, ccfv_SIG) ConcreteSemantics.get_store_Ag_simplifies TypedEqui.typed_assertionE TypedEqui.typed_core asm1(6) full_add_charact(1) full_core_def max_projection_prop_pure_core mem_Collect_eq mpp_prop)
           then have "p \<in> P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)"
             using \<open>p \<in> P\<close> core_is_smaller x_elem_set_product by blast
-          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> atrue tcfe"
-            using TypedEqui.typed_state_axioms \<open>Some \<omega> = p \<oplus> r\<close> \<open>\<omega> \<in> (P \<otimes> atrue tcfe) \<inter> assertify_bexp b\<close> asm1(6) greater_def in_times_atrue typed_assertion_star_atrue typed_state.typed_assertionE by blast
+          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.pure_typed tcfe (semantify_bexp b)) \<otimes> UNIV"
+            using TypedEqui.typed_state_axioms \<open>Some \<omega> = p \<oplus> r\<close> \<open>\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp b\<close> asm1(6) greater_def in_times_atrue typed_assertion_star_atrue typed_state.typed_assertionE by blast
         qed
       qed
 
-      show "tcfe \<turnstile>CSL [(P \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b)] C2 [Q \<otimes> atrue tcfe]"
+      show "tcfe \<turnstile>CSL [(P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)] C2 [Q \<otimes> UNIV]"
       proof (rule RuleCons)
-        show "tcfe \<turnstile>CSL [(P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))) \<otimes> atrue tcfe] C2 [B2 \<otimes> atrue tcfe]"
+        show "tcfe \<turnstile>CSL [(P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))) \<otimes> UNIV] C2 [B2 \<otimes> UNIV]"
           by (metis asm0(1) asm1(4) assms(2) invariant_translateE proof_obligations_valid_union snd_conv translate.simps(8))
-        show "B2 \<otimes> atrue tcfe \<subseteq> Q \<otimes> atrue tcfe"
+        show "B2 \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
           by (simp add: add_set_mono asm1(1))
-        show "(P \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b) \<subseteq> P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b)) \<otimes> atrue tcfe"
+        show "(P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b) \<subseteq> P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b)) \<otimes> UNIV"
         proof
-          fix \<omega> assume "\<omega> \<in> (P \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b)"
+          fix \<omega> assume "\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)"
           then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot (Bnot b) (get_store \<omega>)"
-            using in_set_sum[of \<omega> P "atrue tcfe"] assertify_bexp_def
+            using in_set_sum[of \<omega> P "UNIV"] assertify_bexp_def
             by (smt (verit) Int_iff commutative greater_equiv mem_Collect_eq)
           then have "\<not> bdenot b (get_store |p| )"
             by (simp add: core_charact(1) full_add_charact(1))
@@ -888,8 +903,8 @@ proof (rule invariant_translateI)
             by (smt (verit, del_insts) CollectD CollectI TypedEqui.typed_assertionE TypedEqui.typed_core \<open>p \<in> P\<close> asm1(2) asm1(6) core_charact(1) core_in_emp_core emp_core_def framed_by_exp_def option.collapse semantify_bexp_def)
           then have "p \<in> P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))"
             using \<open>p \<in> P\<close> core_is_smaller x_elem_set_product by blast
-          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))) \<otimes> atrue tcfe"
-            by (meson TypedEqui.typed_intersection TypedEqui.typed_state_axioms \<open>Some \<omega> = p \<oplus> r\<close> \<open>\<omega> \<in> (P \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b)\<close> asm1(6) atrue_self_framing_and_typed(1) greater_def in_times_atrue typed_state.typed_assertionE typed_state.typed_star)
+          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.pure_typed tcfe (negate (semantify_bexp b))) \<otimes> UNIV"
+            by (meson TypedEqui.typed_intersection TypedEqui.typed_state_axioms \<open>Some \<omega> = p \<oplus> r\<close> \<open>\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)\<close> asm1(6) atrue_self_framing_and_typed(1) greater_def in_times_atrue typed_state.typed_assertionE typed_state.typed_star)
         qed
       qed
     qed
@@ -921,7 +936,7 @@ proof (rule invariant_translateI)
     "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> (Cwhile b I C))) Q"
   then have r1: "proof_obligations_valid (snd (translate \<Gamma> C))"
     using proof_obligations_valid_union by fastforce
-  moreover obtain B where B_def: "ConcreteSemantics.SL_proof tcfe (atrue tcfe) (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Gamma> C);; Exhale ?I) B"
+  moreover obtain B where B_def: "ConcreteSemantics.SL_proof tcfe (UNIV) (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Gamma> C);; Exhale ?I) B"
     by (metis (no_types, lifting) asm0(1) insertCI proof_obligations_valid_def proof_obligations_valid_union snd_eqD translate.simps(10))
   moreover obtain R0 R1 where R_defs: "entails P (R0 \<otimes> ?I)" "Q = R1 \<otimes> (?I \<inter> assertify_bexp (Bnot b))"
     "ConcreteSemantics.SL_proof tcfe R0 (ConcreteSemantics.havoc_list (wrL C)) R1"
@@ -931,39 +946,39 @@ proof (rule invariant_translateI)
 
   (* R1 is the frame *)
 
-  show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] Cwhile b I C [Q \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> UNIV] Cwhile b I C [Q \<otimes> UNIV]"
   proof (rule RuleCons)
-    show "tcfe \<turnstile>CSL [(?I \<otimes> atrue tcfe) \<otimes> R1] Cwhile b I C [((?I \<otimes> atrue tcfe) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
+    show "tcfe \<turnstile>CSL [(?I \<otimes> UNIV) \<otimes> R1] Cwhile b I C [((?I \<otimes> UNIV) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "tcfe \<turnstile>CSL [?I \<otimes> atrue tcfe] Cwhile b I C [(?I \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b)]"
+      show "tcfe \<turnstile>CSL [?I \<otimes> UNIV] Cwhile b I C [(?I \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)]"
       proof (rule RuleWhile)
-        show "tcfe \<turnstile>CSL [(?I \<otimes> atrue tcfe) \<inter> assertify_bexp b] C [?I \<otimes> atrue tcfe]"
+        show "tcfe \<turnstile>CSL [(?I \<otimes> UNIV) \<inter> assertify_bexp b] C [?I \<otimes> UNIV]"
         proof (rule RuleCons)
-          show "tcfe \<turnstile>CSL [atrue tcfe \<otimes> ?I \<inter> assertify_bexp b \<otimes> atrue tcfe] C [B \<otimes> ?I \<otimes> atrue tcfe]"
+          show "tcfe \<turnstile>CSL [UNIV \<otimes> ?I \<inter> assertify_bexp b \<otimes> UNIV] C [B \<otimes> ?I \<otimes> UNIV]"
             using invariant_translate_inhale_exhale_get_proof[OF _ B_def]
             using assms(1) r1 by blast
-          show "B \<otimes> ?I \<otimes> atrue tcfe \<subseteq> ?I \<otimes> atrue tcfe"
+          show "B \<otimes> ?I \<otimes> UNIV \<subseteq> ?I \<otimes> UNIV"
             using B_def drop_conjunct_entails by blast
-          show "(?I \<otimes> atrue tcfe) \<inter> assertify_bexp b \<subseteq> atrue tcfe \<otimes> (?I \<inter> assertify_bexp b) \<otimes> atrue tcfe"
+          show "(?I \<otimes> UNIV) \<inter> assertify_bexp b \<subseteq> UNIV \<otimes> (?I \<inter> assertify_bexp b) \<otimes> UNIV"
             by (metis (no_types, lifting) add_set_asso add_set_commm atrue_twice_equal intersect_and_star)
         qed
       qed
       show "disjoint (fvA tcfe R1) (wrC (Cwhile b I C))"
         using \<open>entails R0 R1 \<and> fvA tcfe R1 \<subseteq> fvA tcfe R0 - set (wrL C)\<close> disjoint_def wrL_wrC_same by fastforce
-      show "TypedEqui.self_framing_typed tcfe (?I \<otimes> atrue tcfe)"
+      show "self_framing (?I \<otimes> UNIV)"
         using assms(3) self_framing_typed_star_atrue by auto
-      show "TypedEqui.self_framing_typed tcfe R1"
+      show "self_framing R1"
         using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
-      show "TypedEqui.typed_assertion tcfe (?I \<otimes> atrue tcfe)"
+      show "TypedEqui.typed_assertion tcfe (?I \<otimes> UNIV)"
         using assms(3) typed_assertion_star_atrue by auto
       show "TypedEqui.typed_assertion tcfe R1"
         using ConcreteSemantics.proofs_are_self_framing_and_typed assms(2) calculation(5) by blast
     qed
     have "P \<subseteq> R1 \<otimes> ?I"
       by (meson \<open>entails R0 R1 \<and> fvA tcfe R1 \<subseteq> fvA tcfe R0 - set (wrL C)\<close> add_set_mono calculation(3) entails_def equalityD1 subset_trans)
-    then show "P \<otimes> atrue tcfe \<subseteq> ?I \<otimes> atrue tcfe \<otimes> R1"
+    then show "P \<otimes> UNIV \<subseteq> ?I \<otimes> UNIV \<otimes> R1"
       by (smt (verit, best) add_set_asso add_set_commm add_set_mono atrue_twice_equal atrue_twice_same)
-    show "(?I \<otimes> atrue tcfe) \<inter> assertify_bexp (Bnot b) \<otimes> R1 \<subseteq> Q \<otimes> atrue tcfe"
+    show "(?I \<otimes> UNIV) \<inter> assertify_bexp (Bnot b) \<otimes> R1 \<subseteq> Q \<otimes> UNIV"
       by (smt (verit, del_insts) add_set_asso add_set_commm add_set_mono calculation(4) intersect_and_star subsetI)
   qed
 qed
@@ -1081,37 +1096,37 @@ theorem sound_translation:
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Gamma> C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
       and "TypedEqui.wf_assertion tcfe P \<and> TypedEqui.wf_assertion tcfe Q"
-      and "ConcreteSemantics.verifies_set tcfe (atrue tcfe) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q)"
-      and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.verifies_set tcfe (atrue tcfe) Cv"
+      and "ConcreteSemantics.verifies_set tcfe (UNIV) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q)"
+      and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.verifies_set tcfe (UNIV) Cv"
 
-    shows "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
+    shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
 proof -
-  obtain B where "ConcreteSemantics.SL_proof tcfe (atrue tcfe) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q) B"
+  obtain B where "ConcreteSemantics.SL_proof tcfe (UNIV) (Inhale P;; fst (translate \<Gamma> C);; Exhale Q) B"
     by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(3) ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) assms(6) atrue_self_framing_and_typed(1) atrue_self_framing_and_typed(2))
-  then obtain B' where "ConcreteSemantics.SL_proof tcfe (atrue tcfe \<otimes> P) (fst (translate \<Gamma> C)) B'" "entails B' (B \<otimes> Q)"
+  then obtain B' where "ConcreteSemantics.SL_proof tcfe (UNIV \<otimes> P) (fst (translate \<Gamma> C)) B'" "entails B' (B \<otimes> Q)"
     by blast
 
 
-  show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe] C [Q \<otimes> atrue tcfe]"
+  show "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
   proof (rule RuleCons)
-    show "tcfe \<turnstile>CSL [P \<otimes> atrue tcfe \<otimes> atrue tcfe] C [B' \<otimes> atrue tcfe]"
-    proof (rule invariant_translateE[of _ "P \<otimes> atrue tcfe" C])
-      show "ConcreteSemantics.SL_proof tcfe (P \<otimes> atrue tcfe) (fst (translate \<Gamma> C)) B'"
-        by (metis \<open>ConcreteSemantics.SL_proof tcfe (atrue tcfe \<otimes> P) (fst (translate \<Gamma> C)) B'\<close> add_set_commm)
-      show "invariant_translate \<Gamma> (P \<otimes> atrue tcfe) C B'"
+    show "tcfe \<turnstile>CSL [P \<otimes> UNIV \<otimes> UNIV] C [B' \<otimes> UNIV]"
+    proof (rule invariant_translateE[of _ "P \<otimes> UNIV" C])
+      show "ConcreteSemantics.SL_proof tcfe (P \<otimes> UNIV) (fst (translate \<Gamma> C)) B'"
+        by (metis \<open>ConcreteSemantics.SL_proof tcfe (UNIV \<otimes> P) (fst (translate \<Gamma> C)) B'\<close> add_set_commm)
+      show "invariant_translate \<Gamma> (P \<otimes> UNIV) C B'"
         by (meson assms(1) assms(2) assms(3) assms(4) invariant_translate_induct wf_context_type_context)
       show "proof_obligations_valid (snd (translate \<Gamma> C))"
         unfolding proof_obligations_valid_def
       proof clarify
         fix Cv assume "Cv \<in> snd (translate \<Gamma> C)"
-        then show "\<exists>B. ConcreteSemantics.SL_proof tcfe (atrue tcfe) Cv B"
+        then show "\<exists>B. ConcreteSemantics.SL_proof tcfe (UNIV) Cv B"
           by (simp add: ConcreteSemantics.Viper_implies_SL_proof assms(4) assms(7))
       qed
     qed
-    show "P \<otimes> atrue tcfe \<subseteq> P \<otimes> atrue tcfe \<otimes> atrue tcfe"
+    show "P \<otimes> UNIV \<subseteq> P \<otimes> UNIV \<otimes> UNIV"
       by (simp add: add_set_asso atrue_twice_equal)
-    show "B' \<otimes> atrue tcfe \<subseteq> Q \<otimes> atrue tcfe"
-      by (smt (verit, ccfv_SIG) ConcreteSemantics.proofs_are_self_framing_and_typed ConcreteSemantics.semantics_axioms \<open>ConcreteSemantics.SL_proof tcfe (atrue tcfe) (abs_stmt.Inhale P ;; fst (translate \<Gamma> C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono assms(3) assms(5) atrue_twice_equal drop_conjunct_entails entails_def order.trans semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) semantics.wf_abs_stmt.simps(7))
+    show "B' \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
+      by (smt (verit, ccfv_SIG) ConcreteSemantics.proofs_are_self_framing_and_typed ConcreteSemantics.semantics_axioms \<open>ConcreteSemantics.SL_proof tcfe (UNIV) (abs_stmt.Inhale P ;; fst (translate \<Gamma> C) ;; abs_stmt.Exhale Q) B\<close> \<open>entails B' (B \<otimes> Q)\<close> add_set_mono assms(3) assms(5) atrue_twice_equal drop_conjunct_entails entails_def order.trans semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) semantics.wf_abs_stmt.simps(7))
   qed
 qed
 

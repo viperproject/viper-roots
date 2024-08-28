@@ -341,8 +341,12 @@ definition at_least_two_elems:
 subsection \<open>wf_assertion \<Delta>\<close>
 
 definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)
-  \<and> (\<exists>V. finite V \<and> overapprox_fv \<Delta> A V)"
+  "wf_assertion \<Delta> A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+
+lemma wf_assertionI:
+  assumes "\<And>x' x. pure_larger x' x \<Longrightarrow> x \<in> A \<Longrightarrow> x' \<in> A"
+  shows "wf_assertion \<Delta> A"
+  using assms wf_assertion_def by blast
 
 lemma wf_assertionE:
   assumes "wf_assertion \<Delta> A"

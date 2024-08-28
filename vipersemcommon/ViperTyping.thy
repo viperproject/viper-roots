@@ -33,6 +33,12 @@ lemma heap_typed_remove :
   shows "heap_typed F (h(hl := None))"
   using assms by (auto simp add:heap_typed_def)
 
+lemma heap_typed_update:
+  assumes "heap_typed \<Gamma> h"
+      and "\<And>ty. \<Gamma> (snd hl) = Some ty \<Longrightarrow> v \<in> ty"
+    shows "heap_typed \<Gamma> (h(hl \<mapsto> v))"
+  by (smt (verit) assms(1) assms(2) heap_typed_def map_upd_Some_unfold)
+
 section \<open>store typing\<close>
 
 definition store_typed :: "(var \<rightharpoonup> 'v set) \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> bool" where

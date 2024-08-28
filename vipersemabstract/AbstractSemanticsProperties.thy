@@ -97,6 +97,9 @@ qed
 
 section \<open>Free variables\<close>
 
+definition finite_context where
+  "finite_context \<Delta> \<longleftrightarrow> (finite (dom (variables \<Delta>)))"
+
 lemma equal_on_setI:
   assumes "\<And>x. x \<in> S \<Longrightarrow> \<sigma>1 x = \<sigma>2 x"
   shows "equal_on_set S \<sigma>1 \<sigma>2"
@@ -231,24 +234,51 @@ proof -
     by (smt (verit, best) INT_greatest Inf_lower free_vars_def image_ident mem_Collect_eq subset_antisym)
 qed
 
+lemma typed_and_equal_store:
+  assumes "typed_store \<Delta> \<sigma>1"
+      and "typed_store \<Delta> \<sigma>2"
+      and "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2"
+    shows "\<sigma>1 = \<sigma>2"
+  apply (rule ext)
+  apply (case_tac "x \<in> dom (variables \<Delta>)")
+   apply (meson assms(3) equal_on_set_def)
+  by (metis assms(1) assms(2) domIff store_typed_def typed_store_def)
+
+lemma finite_context_then_fv_works:
+  assumes "finite_context \<Delta>"
+  shows "\<exists>V. finite V \<and> overapprox_fv \<Delta> S V"
+proof -
+  have "overapprox_fv \<Delta> S (dom (variables \<Delta>))"
+  proof (rule overapprox_fvI)
+    fix \<sigma>1 \<sigma>2 \<gamma>
+    assume asm0: "typed \<Delta> (Ag \<sigma>1, \<gamma>)" "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
+      "equal_on_set (dom (variables \<Delta>)) \<sigma>1 \<sigma>2" "(Ag \<sigma>1, \<gamma>) \<in> S"
+    then have "\<sigma>1 = \<sigma>2"
+      by (metis agreement.sel fst_conv get_store_def typed_and_equal_store typed_def)
+    then show "(Ag \<sigma>2, \<gamma>) \<in> S"
+      using asm0(4) by blast
+  qed
+  then show ?thesis
+    using assms finite_context_def by blast
+qed
+
 lemma free_vars_overapprox_wf_context:
-  assumes "wf_assertion \<Delta> A"
+  assumes "finite_context \<Delta>"
   shows "overapprox_fv \<Delta> A (free_vars \<Delta> A)"
-  by (meson assms free_vars_exists_finite wf_assertion_def)
+  by (meson assms free_vars_exists_finite finite_context_then_fv_works)
 
 lemma free_vars_agree:
   assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
-      and "wf_assertion \<Delta> A"
+      and "finite_context \<Delta>"
       and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
       and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
     shows "((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A)"
   using assms(1) assms(2) assms(3) assms(4) free_vars_overapprox_wf_context overapprox_fv_def by blast
 
-
 lemma free_varsE:
   assumes "equal_on_set (free_vars \<Delta> A) \<sigma>1 \<sigma>2"
       and "(Ag \<sigma>1, \<gamma>) \<in> A"
-      and "wf_assertion \<Delta> A"
+      and "finite_context \<Delta>"
       and "typed \<Delta> (Ag \<sigma>1, \<gamma>)"
       and "typed \<Delta> (Ag \<sigma>2, \<gamma>)"
     shows "(Ag \<sigma>2, \<gamma>) \<in> A"
@@ -766,6 +796,7 @@ proof (rule self_framingI)
       by (meson \<open>Some \<omega> = a \<oplus> p'\<close> \<open>a \<in> A\<close> x_elem_set_product)
   qed
 qed
+
 
 text \<open>fst \<omega> is the past (list of all past states), it represents the real choice. Indeed, imagine
 1) {\<omega>1} --> {\<omega>'} --> {\<omega>1'}
@@ -1593,11 +1624,11 @@ qed
 
 
 lemma exists_assert_no_in_fv:
-  assumes "wf_assertion \<Delta> A"
+  assumes "finite_context \<Delta>"
   shows "free_vars \<Delta> (exists_assert \<Delta> x A) \<subseteq> free_vars \<Delta> A - {x} \<and> overapprox_fv \<Delta> (exists_assert \<Delta> x A) (free_vars \<Delta> A - {x})"
 proof (rule free_vars_subset)
   have "finite (free_vars \<Delta> A)"
-    by (metis Inf_lower assms image_ident mem_Collect_eq rev_finite_subset free_vars_def wf_assertion_def)
+    by (metis Inf_lower assms finite_context_then_fv_works free_vars_def image_ident mem_Collect_eq rev_finite_subset)
   then show "finite (free_vars \<Delta> A - {x})"
     by simp
 
@@ -1676,7 +1707,7 @@ lemma entails_typed_refl:
 lemma SL_proof_Havoc_elim_entails:
   assumes "\<Delta> \<turnstile> [A] Havoc x [B]"
       and "variables \<Delta> x \<noteq> None"
-      and "wf_assertion \<Delta> A"
+      and "finite_context \<Delta>"
     shows "entails_typed \<Delta> A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - {x}"
 proof -
   have "entails_typed \<Delta> A (exists_assert \<Delta> x A)"
@@ -1697,44 +1728,35 @@ lemma assign_var_state_sum:
   by (smt (verit) add_defined_lift assign_var_state_def assms commutative full_add_charact(1) full_add_charact(2) set_store_def)
 
 
-lemma exists_wf_assertion:
+lemma exists_wf_assertion: (* Useless? *)
   assumes "wf_assertion \<Delta> A"
   shows "wf_assertion \<Delta> (exists_assert \<Delta> x A)"
-  unfolding wf_assertion_def
-proof
-  show "\<exists>V. finite V \<and> overapprox_fv \<Delta> (exists_assert \<Delta> x A) V"
-    using exists_assert_no_in_fv[OF assms(1), of x]
-    by (metis Inf_lower assms finite_Diff free_vars_def image_ident mem_Collect_eq rev_finite_subset wf_assertion_def)
-  show "\<forall>x' xa. pure_larger x' xa \<and> xa \<in> exists_assert \<Delta> x A \<longrightarrow> x' \<in> exists_assert \<Delta> x A"
-  proof (clarify)
-    fix a b aa ba assume asm0: "pure_larger (a, b) (aa, ba)" "(aa, ba) \<in> exists_assert \<Delta> x A"
-    then obtain v0 v ty where r: "v0 \<in> ty \<and> get_store (aa, ba) x = Some v0 \<and> variables \<Delta> x = Some ty"
-        "v \<in> ty \<and> assign_var_state x (Some v) (aa, ba) \<in> A"
-      using exists_assertE[of "(aa, ba)" \<Delta> x A] by blast
-    moreover have "pure_larger (assign_var_state x (Some v) (a, b)) (assign_var_state x (Some v) (aa, ba))"
-    proof -
-      obtain p where "pure p" "Some (a, b) = (aa, ba) \<oplus> p"
-        using asm0(1) pure_larger_def by blast
-      then have "Some (assign_var_state x (Some v) (a, b)) = assign_var_state x (Some v) (aa, ba) \<oplus> assign_var_state x (Some v) p"
-        using assign_var_state_sum by blast
-      then show ?thesis
-        using \<open>pure p\<close> assign_var_state_sum pure_def pure_larger_def by blast
-    qed
-    ultimately show "(a, b) \<in> exists_assert \<Delta> x A"
-      by (metis asm0(1) assms get_store_stabilize in_exists_assert pure_larger_stabilize_same wf_assertionE)
+proof (rule wf_assertionI)
+  fix x' xa
+  assume asm0: "pure_larger x' xa" "xa \<in> exists_assert \<Delta> x A" 
+  then obtain v0 v ty where r: "v0 \<in> ty \<and> get_store xa x = Some v0 \<and> variables \<Delta> x = Some ty"
+      "v \<in> ty \<and> assign_var_state x (Some v) xa \<in> A"
+    using exists_assertE[of xa \<Delta> x A] by blast
+  moreover have "pure_larger (assign_var_state x (Some v) x') (assign_var_state x (Some v) xa)"
+  proof -
+    obtain p where "pure p" "Some x' = xa \<oplus> p"
+      using asm0(1) pure_larger_def by blast
+    then have "Some (assign_var_state x (Some v) x') = assign_var_state x (Some v) xa \<oplus> assign_var_state x (Some v) p"
+      using assign_var_state_sum by blast
+    then show ?thesis
+      using \<open>pure p\<close> assign_var_state_sum pure_def pure_larger_def by blast
   qed
+  then have "assign_var_state x (Some v) x' \<in> A"
+    using wf_assertionE[OF assms(1)] r(2) by blast
+  then show "x' \<in> exists_assert \<Delta> x A"
+    by (metis (no_types, lifting) asm0(1) full_add_charact(1) in_exists_assert pure_larger_def r(1) r(2))
 qed
 
-(*
-wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  " \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)
-  \<and> (\<exists>V. finite V \<and> overapprox_fv \<Delta> A V)"
-*)
 
 lemma SL_proof_Havoc_list_elim:
   assumes "\<Delta> \<turnstile> [A] havoc_list l [B]"
       and "wf_abs_stmt \<Delta> (havoc_list l)"
-      and "wf_assertion \<Delta> A"
+      and "finite_context \<Delta>"
   shows "self_framing A \<and> self_framing B \<and> entails_typed \<Delta> A B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> A - (set l)"
   using assms
 proof (induct l arbitrary: A B)
@@ -1747,8 +1769,6 @@ next
     by (metis SL_proof_Seq_elim havoc_list.simps(2))
   then have "R = exists_assert \<Delta> x A"
     by blast
-  then have "wf_assertion \<Delta> R"
-    by (simp add: Cons.prems(3) exists_wf_assertion)
   then have "self_framing B \<and> entails_typed \<Delta> R B \<and> free_vars \<Delta> B \<subseteq> free_vars \<Delta> R - set l"
     using Cons r by simp
   moreover have "variables \<Delta> x \<noteq> None"
