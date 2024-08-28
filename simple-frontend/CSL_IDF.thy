@@ -1712,7 +1712,7 @@ proposition rule_read:
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> A" "sep_algebra_class.stable \<omega>"
-  then obtain l v where lv_def: "s r = Some (VRef (Address l))" "get_vm \<omega> (l, field_val) > 0" "get_vh \<omega> (l, field_val) = Some (VInt v)"
+  then obtain l v where lv_def: "s r = Some (VRef (Address l))" "get_vm \<omega> (l, field_val) > 0" "get_vh \<omega> (l, field_val) = Some v"
     using assms(1) unfolding read_perm_def by force
   show "safe \<Delta> (Suc n) (Cread x r) s \<tau> \<omega> (read_result A x r)"
   proof (rule safeI_alt)
@@ -1720,7 +1720,7 @@ proof (rule CSL_I)
       by (simp add: lv_def(1) lv_def(2) read_dom_def)
     fix \<omega>0' \<omega>f
     assume asm1: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'"
-    then have "get_vh \<omega>0' (l, field_val) = Some (VInt v)"
+    then have "get_vh \<omega>0' (l, field_val) = Some v"
       using lv_def(3) read_helper by blast
     then show "aborts (Cread x r) (concretize s \<omega>0') \<Longrightarrow> False"
       using lv_def(1) by auto
@@ -1732,9 +1732,9 @@ proof (rule CSL_I)
       fix sa h l' v'
       assume asm2: "concretize s \<omega>0' = (sa, h)" "C' = Cskip" "\<sigma>' = (sa(x \<mapsto> VInt v'), h)" "sa r = Some (VRef (Address l'))"
       "h (l', field_val) = Some (VInt v')"
-      then have "l = l' \<and> v = v'"
-        using \<open>get_vh \<omega>0' (l, field_val) = Some (VInt v)\<close> lv_def(1) by auto
-      moreover have "(Ag (s(x := Some (VInt v))), \<tau>, \<omega>) \<in> read_result A x r"
+      then have "l = l' \<and> v = VInt v'"
+        using \<open>get_vh \<omega>0' (l, field_val) = Some v\<close> lv_def(1) by auto
+      moreover have "(Ag (s(x := Some v)), \<tau>, \<omega>) \<in> read_result A x r"
         unfolding read_result_def TypedEqui.assign_var_state_def
         using asm0(1) lv_def(1) lv_def(3) by force
       ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1'
