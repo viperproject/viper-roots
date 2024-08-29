@@ -496,7 +496,8 @@ definition type_ctxt_store where
 definition type_ctxt_front_end where
   "type_ctxt_front_end = \<lparr> variables = type_ctxt_store, custom_context = type_ctxt_heap \<rparr>"
 
-definition type_ctxt_front_end_syntactic where
+definition type_ctxt_front_end_syntactic :: "(var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+  where
   "type_ctxt_front_end_syntactic = ( (\<lambda>x. if x < undefined then if x mod 2 = 0 then Some TInt else Some TRef else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
 
 (*

@@ -787,7 +787,10 @@ qed
 definition rel_stable_assertion where
   "rel_stable_assertion \<omega> A \<longleftrightarrow> Stable ({\<omega>} \<otimes> A)"
 
-
+lemma rel_stable_assertionI:
+  assumes "\<And>\<omega>' a. a \<in> A \<Longrightarrow> Some \<omega>' = \<omega> \<oplus> a \<Longrightarrow> (\<exists>a' \<in> A. Some (stabilize \<omega>') = \<omega> \<oplus> a')"
+  shows "rel_stable_assertion \<omega> A"
+by (smt (verit, best) StableI assms local.x_elem_set_product rel_stable_assertion_def singletonD)
 
 definition self_framing where
   "self_framing A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> stabilize \<omega> \<in> A)"

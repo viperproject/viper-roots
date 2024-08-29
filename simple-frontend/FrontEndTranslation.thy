@@ -68,8 +68,8 @@ proof
 qed
 
 (*
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion tcfe F A = well_typedly tcfe F (\<langle>type_ctxt_front_end, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
+definition make_semantic_assertion_untyped :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
+  "make_semantic_assertion_untyped tcfe F A = well_typedly tcfe F (\<langle>type_ctxt_front_end, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 *)
 
 
@@ -79,6 +79,14 @@ abbreviation tcfe :: "(int val, char list \<Rightarrow> int val set option) abs_
 abbreviation inhalify where
   "inhalify P \<equiv> Set.filter (typed tcfe \<circ> stabilize) P"
 
+lemma self_framing_then_self_framing_inhalify:
+  assumes "self_framing P"
+  shows "self_framing (inhalify P)"
+proof (rule self_framingI)
+  fix \<omega> show "(\<omega> \<in> inhalify P) = (stabilize \<omega> \<in> inhalify P)"
+    using assms self_framingE self_framing_invE test_self_framing by blast
+qed
+
 
 fun wf_stmt where
   "wf_stmt \<Gamma> F (Cseq C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
@@ -86,15 +94,17 @@ fun wf_stmt where
 
 | "wf_stmt \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
   disjoint
-  (fvC C1 \<union> fvA tcfe (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1) \<otimes> UNIV)) (wrC C2)
-  \<and> disjoint (fvC C2 \<union> fvA tcfe (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2) \<otimes> UNIV)) (wrC C1) \<and>
-  self_framing (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1))
-  \<and> self_framing (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2)) \<and>
+  (fvC C1 \<union> fvA tcfe (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1) \<otimes> UNIV)) (wrC C2)
+  \<and> disjoint (fvC C2 \<union> fvA tcfe (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2) \<otimes> UNIV)) (wrC C1) \<and>
+  self_framing (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P1) \<and>
+  self_framing (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P2) \<and>
+  self_framing (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1) \<and>
+  self_framing (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2) \<and>
   wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
 
 | "wf_stmt \<Gamma> F (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Gamma> F C1 \<and> wf_stmt \<Gamma> F C2"
 
-| "wf_stmt \<Gamma> F (Cwhile b I C) \<longleftrightarrow> self_framing (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I))
+| "wf_stmt \<Gamma> F (Cwhile b I C) \<longleftrightarrow> self_framing (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I)
                               \<and> wf_stmt \<Gamma> F C"
 
 | "wf_stmt \<Gamma> F _ \<longleftrightarrow> True"
@@ -447,7 +457,7 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
 qed
 
 abbreviation make_semantic_wf where
-  "make_semantic_wf \<Gamma> P \<equiv> Stabilize (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P)"
+  "make_semantic_wf \<Gamma> P \<equiv> Stabilize (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P)"
 
 fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
   "translate \<Gamma> Cskip = (Skip, {})"
@@ -464,16 +474,16 @@ fun translate (* :: "cmd \<Rightarrow> (v_stmt \<times> v_stmt set)" *) where
 | "translate \<Gamma> (Cif b C1 C2) = (If (semantify_bexp b) (fst (translate \<Gamma> C1)) (fst (translate \<Gamma> C2)), snd (translate \<Gamma> C1) \<union> snd (translate \<Gamma> C2))"
 
 | "translate \<Gamma> ({P1} C1 {Q1} || {P2} C2 {Q2}) =
-  ((Exhale (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2));;
+  ((Exhale (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P2));;
   ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);;
-  Inhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2)),
+  Inhale (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2)),
   let r1 = translate \<Gamma> C1 in let r2 = translate \<Gamma> C2 in
-  { (Inhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1);; fst r1;; Exhale (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1))),
-  (Inhale (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2);; fst r2;; Exhale (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2))) } \<union> snd r1 \<union> snd r2)"
+  { (Inhale (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P1);; fst r1;; Exhale (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1))),
+  (Inhale (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P2);; fst r2;; Exhale (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2))) } \<union> snd r1 \<union> snd r2)"
 
-| "translate \<Gamma> (Cwhile b I C) = (Exhale (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I));;
-  ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I) \<inter> assertify_bexp (Bnot b)),
-  { Inhale ((make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I) \<inter> assertify_bexp b);; fst (translate \<Gamma> C);; Exhale (inhalify (make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I)) } \<union> snd (translate \<Gamma> C))"
+| "translate \<Gamma> (Cwhile b I C) = (Exhale (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I));;
+  ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I) \<inter> assertify_bexp (Bnot b)),
+  { Inhale ((make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I) \<inter> assertify_bexp b);; fst (translate \<Gamma> C);; Exhale (inhalify (make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I)) } \<union> snd (translate \<Gamma> C))"
 
 (*
 lemma CSL_weaken_post_atrue:
@@ -756,10 +766,10 @@ lemma invariant_translate_parallel:
       and "wf_stmt \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2})"
     shows "invariant_translate \<Gamma> P ({P1} C1 {Q1} || {P2} C2 {Q2}) Q"
 proof (rule invariant_translateI)
-  let ?P1 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1"
-  let ?P2 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2"
-  let ?Q1 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1"
-  let ?Q2 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2"
+  let ?P1 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P1"
+  let ?P2 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P2"
+  let ?Q1 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1"
+  let ?Q2 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2"
 
   assume asm0: "proof_obligations_valid (snd (translate \<Gamma> {P1} C1 {Q1} || {P2} C2 {Q2}))"
     "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> {P1} C1 {Q1} || {P2} C2 {Q2})) Q"
@@ -823,14 +833,14 @@ proof (rule invariant_translateI)
         show "disjoint (fvC C2 \<union> fvA tcfe (inhalify ?Q2 \<otimes> UNIV)) (wrC C1)"
           using assms(4) by auto
         show "self_framing (inhalify ?P1 \<otimes> UNIV)"
-          using assms(4) typed_self_framing_star by fastforce
+          using assms(4) typed_self_framing_star self_framing_then_self_framing_inhalify by fastforce
         show "self_framing (inhalify ?P2 \<otimes> UNIV)"
-          using assms(4) self_framing_typed_star_atrue by auto
+          using assms(4) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify by auto
       qed
       show "disjoint (fvA tcfe R1) (wrC {P1} C1 {Q1} || {P2} C2 {Q2})"
         by (metis (mono_tags, opaque_lifting) Diff_subset_conv Orderings.order_eq_iff r bot.extremum disjoint_minus disjoint_simps(2) disjoint_simps(3) sup.order_iff wrC.simps(7) wrC.simps(8) wrL.simps(7) wrL_wrC_same)
       show "self_framing (inhalify ?P1 \<otimes> UNIV \<otimes> (inhalify ?P2 \<otimes> UNIV))"
-        by (meson assms(4) self_framing_typed_star_atrue typed_self_framing_star wf_stmt.simps(3))
+        by (meson assms(4) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(3))
       show "self_framing R1"
         using R_defs(3) by blast
     qed
@@ -963,7 +973,7 @@ lemma invariant_translate_while:
       and "wf_stmt \<Gamma> F (Cwhile b I C)"
     shows "invariant_translate \<Gamma> P (Cwhile b I C) Q"
 proof (rule invariant_translateI)
-  let ?I = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I"
+  let ?I = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I"
   assume asm0: "proof_obligations_valid (snd (translate \<Gamma> (Cwhile b I C)))"
     "ConcreteSemantics.SL_proof tcfe P (fst (translate \<Gamma> (Cwhile b I C))) Q"
   then have r1: "proof_obligations_valid (snd (translate \<Gamma> C))"
@@ -999,7 +1009,7 @@ proof (rule invariant_translateI)
       show "disjoint (fvA tcfe R1) (wrC (Cwhile b I C))"
         using \<open>ConcreteSemantics.entails_typed tcfe R0 R1 \<and> fvA tcfe R1 \<subseteq> fvA tcfe R0 - set (wrL C)\<close> disjoint_def wrL_wrC_same by fastforce
       show "self_framing (inhalify ?I \<otimes> UNIV)"
-        using assms(3) self_framing_typed_star_atrue by auto
+        using assms(3) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify by auto
       show "self_framing R1"
         using ConcreteSemantics.SL_proof_Havoc_list_elim assms(2) calculation(5) tcfe_is_finite by blast
     qed
@@ -1037,10 +1047,10 @@ proof (induct C arbitrary: P Q)
     by (metis (no_types, lifting) ConcreteSemantics.wf_abs_stmt.simps(7) Un_iff fst_eqD invariant_translate_seq snd_conv translate.simps(7) well_typed_cmd_aux.simps(2) wf_stmt.simps(1))
 next
   case (Cpar P1 C1 Q1 P2 C2 Q2)
-  let ?P1 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P1"
-  let ?P2 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic P2"
-  let ?Q1 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q1"
-  let ?Q2 = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic Q2"
+  let ?P1 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P1"
+  let ?P2 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic P2"
+  let ?Q1 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q1"
+  let ?Q2 = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic Q2"
   show ?case
   proof (rule invariant_translate_parallel)
     show "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
@@ -1105,7 +1115,7 @@ next
   qed
 next
   case (Cwhile b I C)
-  let ?I = "make_semantic_assertion \<Gamma> type_ctxt_front_end_syntactic I"
+  let ?I = "make_semantic_assertion_untyped \<Gamma> type_ctxt_front_end_syntactic I"
   show ?case
   proof (rule invariant_translate_while)
     show "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C))"
