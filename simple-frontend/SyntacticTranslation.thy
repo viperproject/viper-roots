@@ -563,7 +563,7 @@ lemma verifies_more_free:
   unfolding full_ownership_def
   apply simp
 proof -
-  show "\<exists>l. get_store a r = Some (VRef (Address l)) \<and> get_m a (l, field_val) = 1"
+  show "\<exists>l. get_store a r = Some (VRef (Address l)) \<and> (\<exists>v. stabilize (get_state a) = acc_virt (l, field_val) (Abs_preal 1) (VInt v))"
     using assms(1) unfolding make_semantic_assertion_gen_def
     apply simp
     apply (erule exE)+
@@ -579,6 +579,11 @@ proof -
     apply (erule red_pure_litE)
     apply simp
     apply (erule elim_in_acc_one[elim_format])
+    apply (rule exI)
+    apply (rule conjI)
+    
+
+
     by (metis (no_types, lifting) full_add_charact(1) greater_equiv larger_mask_full ref.sel)
 qed
 
@@ -602,11 +607,27 @@ proof -
     using add_set_commm assms(2) core_is_smaller x_elem_set_product by blast
 qed
 
+(*
+lemma in_red_pure_assertI:
+  assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
+  shows "\<omega> \<in> \<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r"
+  sorry
+*)
+
+
 lemma in_red_pure_assert_star_smthI:
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
       and "\<omega> \<in> A"
     shows "\<omega> \<in> A \<otimes> (\<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r)"
   using add_set_commm assms(1) assms(2) in_smth_star_red_pure_assertI by blast
+
+lemma in_starI:
+  assumes "Some x = a \<oplus> b"
+      and "a \<in> A"
+      and "b \<in> B"
+    shows "x \<in> A \<otimes> B"
+  using assms(1) assms(2) assms(3) x_elem_set_product by blast
+
 
 
 lemma get_vh_stabilize_implies_normal:
@@ -614,11 +635,82 @@ lemma get_vh_stabilize_implies_normal:
   shows "get_h a hl = Some v"
   by (simp add: assms stabilize_value_persists)
 
+
+
+definition eval_pure_exp where
+  "eval_pure_exp \<Delta> e \<omega> = (SOME v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v)"
+
+lemma eval_pure_exp_works:
+  assumes "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v"
+  shows "eval_pure_exp \<Delta> e \<omega> = v"
+  by (simp add: assms eval_pure_exp_def red_pure_val_unique(1) some_equality)
+
+lemma equality_edenot:
+  assumes "typed_exp e"
+      and "typed tcfe a"
+    shows "\<Delta> \<turnstile> \<langle>translate_exp e; a\<rangle> [\<Down>] Val (VInt (edenot e (get_store a)))"
+  using assms
+proof (induct e)
+  case (Evar x)
+  then have "x < undefined \<and> x mod 2 = 0" by simp
+  moreover have "store_typed (variables tcfe) (get_store a)"
+    using Evar.prems(2) TypedEqui.typed_def TypedEqui.typed_store_def by blast
+  ultimately obtain v where "get_store a x = Some (VInt v)"
+    by (smt (verit, ccfv_threshold) abs_type_context.select_convs(1) mem_Collect_eq store_typed_lookup type_ctxt_front_end_def type_ctxt_store_def vints_def)
+  then show ?case
+    by (simp add: RedVar)
+next
+  case (Elit x)
+  then show ?case using RedLit 
+    by (metis edenot.simps(2) translate_exp.simps(2) val_of_lit.simps(2))
+next
+  case (Ebinop e1 op e2)
+  then show ?case
+    apply simp
+    apply (rule RedBinop)
+      apply blast+
+    by (cases op) simp_all
+qed
+
+
+lemma typed_exp_then_int_value:
+  assumes "typed_exp e"
+      and "typed tcfe a"
+    shows "\<exists>v. \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val (VInt v)"
+  using assms(1) assms(2) equality_edenot by blast
+
+
 lemma typed_exp_then_value:
   assumes "typed_exp e"
       and "typed tcfe a"
     shows "\<exists>v. \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val v"
-  sorry
+  using assms(1) assms(2) typed_exp_then_int_value by blast
+
+lemma sum_empty_and_same:
+  "Some x = stabilize |x| \<oplus> x"
+  by (simp add: commutative stabilize_core_right_id)
+
+
+lemma empty_satisfies_star:
+  assumes "stabilize |x| \<in> A"
+      and "stabilize |x| \<in> B"
+    shows "stabilize |x| \<in> A \<otimes> B"
+  by (simp add: assms(1) assms(2) core_is_pure in_starI stabilize_sum)
+
+lemma simp_get_store_core[simp]:
+  "get_store |a| = get_store a"
+  by (simp add: core_charact(1))
+
+abbreviation tcfes where
+  "tcfes \<equiv> type_ctxt_front_end_syntactic"
+
+
+lemma in_bool_to_assertion_emp:
+  assumes "P"
+  shows "stabilize |x| \<in> \<llangle>P\<rrangle>"
+  by (metis Stabilize_up_close_core Stable_def Stable_emp_core assms bool_to_assertion_true core_in_emp_core emp_star_left_id in_Stabilize in_mono up_close_core_def)
+
+
 
 lemma verifies_more_alloc:
   assumes "typed_exp e"
@@ -627,7 +719,7 @@ lemma verifies_more_alloc:
       and "typed tcfe a"
       and "a \<in> Stabilize (full_ownership_with_val r e)"
 (* This translation is wrong... *)
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> tcfes (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
   using assms(5)
   unfolding make_semantic_assertion_gen_def
   apply simp unfolding full_ownership_with_val_def
@@ -641,7 +733,54 @@ lemma verifies_more_alloc:
       apply simp_all
      apply (erule get_vh_stabilize_implies_normal)
     apply (rule exE[OF typed_exp_then_value[OF assms(1) assms(4), of \<Delta>]])
-  
+  using eval_pure_exp_works[of \<Delta> "translate_exp e" a] apply blast
+  using eval_pure_exp_works[OF equality_edenot[OF assms(1) assms(4), of \<Delta>]] apply simp
+  apply (rule exI)+
+  apply (rule in_starI)
+    apply (rule sum_empty_and_same)
+   apply (rule empty_satisfies_star)
+  apply (rule in_smth_star_red_pure_assertI)
+     apply (rule RedVar)
+     apply simp_all
+    apply (rule conjI)
+  unfolding type_ctxt_front_end_syntactic_def
+     apply simp
+  unfolding emp_def apply blast
+   apply (rule exI)
+   apply (rule in_smth_star_red_pure_assertI)
+  using RedLit[of \<Delta> WritePerm "stabilize |a|" ] apply simp
+   apply (rule in_bool_to_assertion_emp)
+   apply simp
+  apply (simp add: acc_def)
+  apply (rule exI)
+  apply (rule bool_to_assertion_intro)
+   apply simp
+  unfolding acc_heap_loc_def
+  apply simp
+  apply (rule exI)
+  apply (rule conjI)
+
+
+  apply (rule RedLit)
+  sorry
+
+
+
+  apply (rule in_smth_star_red_pure_assertI)
+
+  apply (rule in_red_pure_assert_star_smthI)
+
+
+
+  sorry
+
+
+proof -
+  show "\<And>l x. get_store a r = Some (VRef (Address l)) \<Longrightarrow>
+           get_m a (l, field_val) = 1 \<Longrightarrow>
+           get_vh (stabilize (get_state a)) (l, field_val) = Some (VInt (edenot e (get_store a))) \<Longrightarrow>
+           \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val x \<Longrightarrow> \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val (?v2.25 l)"
+
 
   apply (rule exI)
 
@@ -895,8 +1034,6 @@ lemma simplified_snd_if[simp]:
   by simp
 
 
-abbreviation tcfes where
-  "tcfes \<equiv> type_ctxt_front_end_syntactic"
 
 
 

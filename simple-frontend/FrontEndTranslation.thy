@@ -149,10 +149,11 @@ lemma conjunct_with_true_t_entails:
   "t_entails P (UNIV \<otimes> P)"
   by (simp add: conjunct_with_true_entails subset_entails)
 
+lemma conjunct_with_stabilize_emp_t_entails:
+  "t_entails P (Stabilize emp \<otimes> P)"
+  unfolding ConcreteSemantics.entails_typed_def
+  by (metis (no_types, opaque_lifting) Stable_def Stable_emp add_set_commm add_set_mono emp_star_right_id subset_iff)
 
-(*
-| RuleStabilizeTyped: "\<Delta> \<turnstile>CSL [P] C [Q] \<Longrightarrow> \<Delta> \<turnstile>CSL [Stabilize P] C [Stabilize Q]"
-*)
 
 lemma convert_proof_alloc:
   assumes "ConcreteSemantics.SL_proof tcfe P (Havoc r;; Inhale (Stabilize (full_ownership_with_val r e))) Q"
@@ -168,14 +169,14 @@ proof (rule RuleConsTyped)
   then have "Q = TypedEqui.exists_assert tcfe r P \<otimes> inhalify (Stabilize (full_ownership_with_val r e))"
     by blast
 
-  show "tcfe \<turnstile>CSL [UNIV \<otimes> TypedEqui.exists_assert tcfe r P] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e)) \<otimes> TypedEqui.exists_assert tcfe r P]"
+  show "tcfe \<turnstile>CSL [Stabilize emp \<otimes> TypedEqui.exists_assert tcfe r P] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e)) \<otimes> TypedEqui.exists_assert tcfe r P]"
   proof (rule RuleFrame)
     have "r \<notin> fvE e"
       using assms(3) by auto
-    then have "tcfe \<turnstile>CSL [UNIV] Calloc r e [full_ownership_with_val r e]"
+    then have "tcfe \<turnstile>CSL [emp] Calloc r e [full_ownership_with_val r e]"
       using RuleAlloc[of r e] by simp
-    then show "tcfe \<turnstile>CSL [UNIV] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e))]"
-      using RuleStabilizeTyped by (metis RuleInhalify Stabilize_UNIV)
+    then show "tcfe \<turnstile>CSL [Stabilize emp] Calloc r e [inhalify (Stabilize (full_ownership_with_val r e))]"
+      using RuleStabilizeTyped by (metis RuleInhalify)
 
     show "disjoint (fvA tcfe (TypedEqui.exists_assert tcfe r P)) (wrC (Calloc r e))"
       using ConcreteSemantics.exists_assert_no_in_fv disjoint_def
@@ -187,8 +188,8 @@ proof (rule RuleConsTyped)
   then have "t_entails P (TypedEqui.exists_assert tcfe r P)"
     by (metis ConcreteSemantics.SL_proof_Havoc_elim_entails asm0 assms(2) option.simps(3) tcfe_is_finite well_typed_cmd_aux.simps(6))
 
-  then show "t_entails P (UNIV \<otimes> TypedEqui.exists_assert tcfe r P)"
-    using ConcreteSemantics.entails_typed_trans conjunct_with_true_t_entails by blast
+  then show "t_entails P (Stabilize emp \<otimes> TypedEqui.exists_assert tcfe r P)"
+    using ConcreteSemantics.entails_typed_trans conjunct_with_stabilize_emp_t_entails by blast
   
   show "t_entails (inhalify (Stabilize (full_ownership_with_val r e)) \<otimes> TypedEqui.exists_assert tcfe r P) Q"
     by (simp add: ConcreteSemantics.entails_typed_refl \<open>Q = TypedEqui.exists_assert tcfe r P \<otimes> inhalify (Stabilize (full_ownership_with_val r e))\<close> add_set_commm)
@@ -279,6 +280,8 @@ lemma in_StabilizeI:
 lemma convert_proof_write:
   assumes "ConcreteSemantics.SL_proof tcfe P (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e))) Q"
   shows "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
+  sorry
+(*
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_Custom_elim)
   assume asm0: "SL_Custom tcfe P (custom.FieldAssign (semantify_addr r) field_val (semantify_exp e)) Q"
@@ -309,6 +312,8 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
           show "stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>)))) \<in> full_ownership r"
             apply (rule in_full_ownership[of _ _ l])
             using \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> semantify_addr_equiv apply auto[1]
+            sorry
+            
             by (smt (verit, best) \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> add.commute add.right_neutral calculation fun_upd_apply get_m_additive get_m_stabilize remove_only_charact(2))
         qed
         moreover have "remove_only \<omega> (l, field_val) \<in> ?F"
@@ -388,6 +393,7 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
     qed
   qed
 qed
+*)
 
 
 definition semantify_heap_loc :: "var \<Rightarrow> (int equi_state, int val) AbstractSemantics.exp" where

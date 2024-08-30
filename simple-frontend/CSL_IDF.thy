@@ -1240,19 +1240,32 @@ lemma force_typing_is_typed[simp]:
 *)
 definition full_ownership :: "var \<Rightarrow> int equi_state set"
   where
-  "full_ownership r = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1}"
+  "full_ownership r = { \<omega> |\<omega> l v. get_store \<omega> r = Some (VRef (Address l)) \<and> 
+get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt v) }"
 
 lemma in_full_ownership:
   assumes "get_store \<omega> r = Some (VRef (Address l))"
-      and "get_m \<omega> (l, field_val) = 1"
+      and "get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt v)"
     shows "\<omega> \<in> full_ownership r"
   using assms full_ownership_def by blast
 
 
+(*
+Use:
+get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) v
+*)
+
+definition full_ownership_with_val where
+  "full_ownership_with_val r e = { \<omega> |\<omega> l.
+  get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e (get_store \<omega>)))
+  \<and> get_store \<omega> r = Some (VRef (Address l)) }"
+
+(*
 definition full_ownership_with_val where
   "full_ownership_with_val r e = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1
   \<and> get_h \<omega> (l, field_val) = Some (VInt (edenot e (get_store \<omega>)))  }"
-
+*)
+(*
 lemma in_full_ownership_with_val:
   assumes "get_store \<omega> r = Some (VRef (Address l))"
       and "get_m \<omega> (l, field_val) = 1"
@@ -1260,12 +1273,11 @@ lemma in_full_ownership_with_val:
     shows "\<omega> \<in> full_ownership_with_val r e"
   using assms full_ownership_with_val_def by blast
 
+*)
 
-
-lemma in_full_ownership_with_val_alt:
+lemma in_full_ownership_with_val:
   assumes "s r = Some (VRef (Address l))"
-      and "get_vm \<omega> (l, field_val) = 1"
-      and "get_vh \<omega> (l, field_val) = Some (VInt (edenot e s))"
+      and "\<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e s))"
     shows "(Ag s, \<tau>, \<omega>) \<in> full_ownership_with_val r e"
   unfolding full_ownership_with_val_def
   using assms by auto
@@ -1285,26 +1297,45 @@ lemma stable_before_then_update_stable:
   by (metis assms(1) assms(2) fun_upd_apply get_vh_vm_set_value(1) get_vh_vm_set_value(2) stable_virtual_state_def)
 
 
+
+lemma acc_virt_set_value:
+  "set_value (acc_virt hl p v) hl v' = acc_virt hl p v'"
+proof (rule virtual_state_ext)
+  show "get_vm (set_value (acc_virt hl p v) hl v') = get_vm (acc_virt hl p v')"
+    by auto
+  show "get_vh (set_value (acc_virt hl p v) hl v') = get_vh (acc_virt hl p v')"
+    by simp
+qed
+
+
+
 proposition rule_write:
   "CSL \<Delta> (full_ownership r) (Cwrite r e) (full_ownership_with_val r e)"
 proof (rule CSL_I)
   fix n s \<tau> \<omega> assume "(Ag s, \<tau>, \<omega>) \<in> full_ownership r" "sep_algebra_class.stable \<omega>" "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
-  then obtain l where asm0: "s r = Some (VRef (Address l)) \<and> get_vm \<omega> (l, field_val) = 1"
-    using full_ownership_def by fastforce
+  then obtain l v where asm0: "s r = Some (VRef (Address l))" "\<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt v)"
+    unfolding full_ownership_def by fastforce
+  then have "get_vm \<omega> (l, field_val) = 1"
+    by (simp add: one_preal.abs_eq)
+
   show "safe \<Delta> n (Cwrite r e) s \<tau> \<omega> (full_ownership_with_val r e)"
   proof (cases n)
     case (Suc m)
     moreover have "safe \<Delta> (Suc m) (Cwrite r e) s \<tau> \<omega> (full_ownership_with_val r e)"
     proof (rule safeI_alt)
       have "accesses (Cwrite r e) s = {l}" using get_address_simp asm0 by auto
-      then show "accesses (Cwrite r e) s \<subseteq> read_dom \<omega>" using asm0
-        by (simp add: in_read_dom_write_dom(1))
+      then show "accesses (Cwrite r e) s \<subseteq> read_dom \<omega>"
+
+        by (simp add: \<open>get_vm \<omega> (l, field_val) = 1\<close> in_read_dom_write_dom(1))
+
       show "writes (Cwrite r e) s \<subseteq> write_dom \<omega>"
-        by (simp add: asm0 in_read_dom_write_dom(2))
+        by (simp add: \<open>get_vm \<omega> (l, field_val) = 1\<close> asm0(1) in_read_dom_write_dom(2))
+
       fix \<omega>0' \<omega>f
       assume asm1: "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'" "sep_algebra_class.stable \<omega>f"
       then have "s r = Some (VRef (Address l)) \<and> get_vm \<omega>0' (l, field_val) = 1"
-        by (metis EquiViper.add_masks_def asm0 binary_mask_def get_vm_additive padd_pos)
+        by (metis EquiViper.add_masks_def \<open>get_vm \<omega> (l, field_val) = 1\<close> asm0(1) binary_mask_def get_vm_additive padd_pos)
+
       then have "get_vh \<omega>0' (l, field_val) \<noteq> None"
         by (simp add: pperm_pnone_pgt vstate_wf_imp)
 
@@ -1319,17 +1350,22 @@ proof (rule CSL_I)
       let ?v = "VInt (edenot e s)"
 
       have "Some (set_value \<omega>0' (l, field_val) ?v) = set_value \<omega> (l, field_val) ?v \<oplus> \<omega>f"
-        using asm0 asm1 asm2 write_helper by blast
+        by (simp add: \<open>get_vm \<omega> (l, field_val) = 1\<close> asm1(1) asm2(1) write_helper)
       moreover have "\<sigma>' = concretize s (set_value \<omega>0' (l, field_val) ?v) \<and> C' = Cskip"
         using red_write_cases[OF asm2(2)]
         using \<open>s r = Some (VRef (Address l)) \<and> get_vm \<omega>0' (l, field_val) = PosReal.pwrite\<close> old.prod.inject option.inject ref.inject get_vh_vm_set_value(1) val.inject(4) by fastforce
       moreover have "safe \<Delta> m Cskip s \<tau> (set_value \<omega> (l, field_val) ?v) (full_ownership_with_val r e)"
       proof (rule safe_skip)
         show "(Ag s, \<tau>, set_value \<omega> (l, field_val) (VInt (edenot e s))) \<in> full_ownership_with_val r e"
-          by (simp add: asm0 asm1 full_add_charact(1) full_ownership_with_val_def)
+        proof (rule in_full_ownership_with_val)
+          show "s r = Some (VRef (Address l))"
+            by (simp add: asm0(1))
+          show "set_value \<omega> (l, field_val) (VInt (edenot e s)) = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e s))"
+            by (simp add: acc_virt_set_value asm0(2))
+        qed
       qed
-      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> m C' (fst \<sigma>') \<tau> \<omega>1 (full_ownership_with_val r e)"
-        by (metis \<open>sep_algebra_class.stable \<omega>\<close> asm0 asm1(2) binary_mask_def fst_conv not_gr_0 one_neq_zero get_vh_vm_set_value(2) snd_conv stable_before_then_update_stable vstate_wf_imp)
+      ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> m C' (fst \<sigma>') \<tau> \<omega>1 (full_ownership_with_val r e)"        
+        by (metis \<open>get_vm \<omega> (l, field_val) = 1\<close> \<open>sep_algebra_class.stable \<omega>\<close> asm1(2) binary_mask_def fst_conv get_vh_vm_set_value(2) not_gr_0 one_neq_zero snd_conv stable_before_then_update_stable vstate_wf_imp)
     qed (simp)
     ultimately show ?thesis by blast
   qed (simp)
@@ -1413,15 +1449,69 @@ proof (rule plus_virtual_stateI)
     by (smt (verit, ccfv_threshold) SepAlgebra.plus_preal_def add.right_neutral assms fun_upd_apply get_vm_additive not_gr_0 plus_funE update_perm_simps(2) vstate_wf_imp)
 qed
 
+lemma in_emp_then_zero_mask:
+  assumes "\<omega> \<in> emp"
+  shows "get_m \<omega> l = 0"
+  using assms unfolding emp_def apply simp
+  by (metis core_charact_equi(2) core_structure(1) get_m_stabilize zero_mask_def)
+
+lemma in_emp_then_zero_vmask:
+  assumes "\<omega> \<in> emp"
+  shows "get_vm \<omega> l = 0"
+  using assms unfolding emp_def apply simp
+  by (metis core_structure(1) vstate_stabilize_structure(1) zero_mask_def)
+
+
+lemma in_emp_then_empty_heap:
+  assumes "\<omega> \<in> emp"
+  shows "get_h \<omega> l = None"
+  using assms unfolding emp_def apply simp
+  by (metis assms in_emp_then_zero_mask norm_preal(1) norm_preal(4) stabilize_is_stable stable_get_state stable_virtual_state_def)
+
+lemma in_emp_then_empty_vheap:
+  assumes "\<omega> \<in> emp"
+  shows "get_vh \<omega> l = None"
+  using assms unfolding emp_def apply simp
+  by (metis core_structure(1) core_structure(2) empty_heap_def get_vm_stabilize stabilize_is_stable stable_virtual_state_def uu_get(2) vstate_wf_ppos)
+
+
+lemma p_between_0_and_1_then_min:
+  assumes "p \<le> 1"
+  shows "p = PosReal.pmin 1 p"
+  by (simp add: assms inf_absorb2)
+
+
+lemma in_emp_set_perm_value_acc_virt:
+  assumes "\<omega> \<in> emp"
+      and "0 < p \<and> p \<le> 1"
+  shows "set_perm_and_value \<omega> hl p (Some v) = acc_virt hl p v"
+proof (rule virtual_state_ext)
+  show "get_vm (set_perm_and_value \<omega> hl p (Some v)) = get_vm (acc_virt hl p v)"
+    apply (simp add: assms)
+    apply (rule ext)
+    apply simp
+    apply (rule conjI)
+    using p_between_0_and_1_then_min assms apply simp
+    using assms(1) in_emp_then_zero_vmask by blast
+  show "get_vh (set_perm_and_value \<omega> hl p (Some v)) = get_vh (acc_virt hl p v)"
+    using assms(1) assms(2) in_emp_then_empty_vheap by fastforce
+qed
+
+lemma in_emp_smaller:
+  assumes "\<omega> \<in> emp"
+  shows "get_state \<omega> \<in> emp"
+  using assms unfolding emp_def apply simp
+  by (metis core_charact_equi(2) get_state_stabilize)
+
 proposition rule_alloc:
   assumes "r \<notin> fvE e"
-  shows "CSL \<Delta> UNIV (Calloc r e) (full_ownership_with_val r e)"
+  shows "CSL \<Delta> emp (Calloc r e) (full_ownership_with_val r e)"
 proof (rule CSL_I)
   fix n :: nat
   fix s :: stack
   fix \<tau> :: "int ag_trace"
   fix \<omega> :: "int virtual_state"
-  assume "sep_algebra_class.stable \<omega>"
+  assume asm: "sep_algebra_class.stable \<omega>" "(Ag s, \<tau>, \<omega>) \<in> emp"
 
 
   show "safe \<Delta> (Suc n) (Calloc r e) s \<tau> \<omega> (full_ownership_with_val r e)"
@@ -1452,16 +1542,14 @@ proof (rule CSL_I)
       moreover have "\<sigma>' = concretize (fst \<sigma>') ?\<omega>1'"
         using asm1(1) asm1(4) by auto
       moreover have "(Ag (fst \<sigma>'), \<tau>, ?\<omega>1) \<in> full_ownership_with_val r e"
-      proof (rule in_full_ownership_with_val_alt[of "(fst \<sigma>')" r l])
+      proof (rule in_full_ownership_with_val[of "(fst \<sigma>')" r l])
         show "fst \<sigma>' r = Some (VRef (Address l))"
           by (simp add: asm1(4))
-        show "get_vm (set_perm_and_value \<omega> (l, field_val) PosReal.pwrite (Some (VInt (edenot e s)))) (l, field_val) = PosReal.pwrite"
-          by auto
         have "edenot e (fst \<sigma>') = edenot e s"
           using asm1(1) asm1(4) assms by auto
-        then show "get_vh (set_perm_and_value \<omega> (l, field_val) PosReal.pwrite (Some (VInt (edenot e s)))) (l, field_val)
-          = Some (VInt (edenot e (fst \<sigma>')))"
-          by simp
+        then show "set_perm_and_value \<omega> (l, field_val) 1 (Some (VInt (edenot e s))) = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e (fst \<sigma>')))"
+          using in_emp_set_perm_value_acc_virt[of \<omega> 1 "(l, field_val)" "VInt (edenot e s)"] in_emp_smaller[OF asm(2)]
+          using one_preal.abs_eq preal_not_0_gt_0 by force
       qed
       ultimately show "\<exists>\<omega>1 \<omega>1'. Some \<omega>1' = \<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1' \<and> snd \<sigma>' = get_vh \<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> \<omega>1 (full_ownership_with_val r e)"
         using r asm1(2)
@@ -1526,14 +1614,16 @@ proposition rule_free:
 proof (rule CSL_I)
   fix n s \<tau> \<omega>
   assume asm0: "(Ag s, \<tau>, \<omega>) \<in> full_ownership r" "sep_algebra_class.stable \<omega>" "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
-  then obtain l where r: "s r = Some (VRef (Address l)) \<and> get_vm \<omega> (l, field_val) = 1"
-    using full_ownership_def by fastforce
+  then obtain l v where r0: "s r = Some (VRef (Address l))" "\<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt v)"
+    unfolding full_ownership_def by fastforce
+  then have r: "get_vm \<omega> (l, field_val) = 1"
+    by (simp add: one_preal.abs_eq)
   show "safe \<Delta> (Suc n) (Cfree r) s \<tau> \<omega> UNIV"
   proof (rule safeI_alt)
     show "accesses (Cfree r) s \<subseteq> read_dom \<omega>"
-      by (simp add: in_read_dom_write_dom(1) r)
+      by (simp add: in_read_dom_write_dom(1) r r0(1))
     show "writes (Cfree r) s \<subseteq> write_dom \<omega>"
-      by (simp add: in_read_dom_write_dom(2) r)
+      by (simp add: in_read_dom_write_dom(2) r r0(1))
     fix \<omega>0' \<omega>f
     assume asm1: "sep_algebra_class.stable \<omega>f" "Some \<omega>0' = \<omega> \<oplus> \<omega>f" "binary_mask \<omega>0'"
     show "aborts (Cfree r) (concretize s \<omega>0') \<Longrightarrow> False"
@@ -1542,10 +1632,10 @@ proof (rule CSL_I)
       then show False
       proof (rule aborts_free_elim)
         show "fst (concretize s \<omega>0') r = Some (VRef Null) \<Longrightarrow> False"
-          by (simp add: r)
+          by (simp add: r0(1))
         fix hl assume "fst (concretize s \<omega>0') r = Some (VRef (Address hl))"
         then have "hl = l"
-          by (simp add: r)
+          by (simp add: r0(1))
         moreover have "get_vm \<omega>0' (l, field_val) \<ge> 1"
           by (simp add: EquiViper.add_masks_def asm1(2) get_vm_additive pos_perm_class.sum_larger r)
         moreover assume "(hl, field_val) \<notin> dom (snd (concretize s \<omega>0'))"
@@ -1579,7 +1669,7 @@ proof (rule CSL_I)
       then have "snd \<sigma>' = get_vh ?\<omega>1' \<and> safe \<Delta> n C' (fst \<sigma>') \<tau> ?\<omega>1 (UNIV)"
         using asm2(1) asm2(2) asm2(3) by auto
       moreover have "Some ?\<omega>1' = ?\<omega>1 \<oplus> \<omega>f \<and> sep_algebra_class.stable ?\<omega>1"
-        using asm0(2) asm1(1) asm1(2) asm2(1) asm2(4) free_helper r stable_erase_perm_value by fastforce
+        using asm0(2) asm1(1) asm1(2) asm2(1) asm2(4) free_helper r r0(1) stable_erase_perm_value by fastforce
       moreover have "binary_mask ?\<omega>1'"
         by (simp add: asm1(3) binary_mask_erase_perm_value)        
       ultimately show
@@ -1879,7 +1969,7 @@ inductive CSL_syn :: "concrete_type_context \<Rightarrow> int equi_state set \<R
 | RuleWhile: "\<lbrakk> \<Delta> \<turnstile>CSL [I \<inter> assertify_bexp b] C [I] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [I] (Cwhile b I' C) [I \<inter> assertify_bexp (Bnot b)]"
 | RuleWrite: "\<Delta> \<turnstile>CSL [full_ownership r] Cwrite r e [full_ownership_with_val r e]"
 | RuleAssign: "\<Delta> \<turnstile>CSL [sub_pre x e P] Cassign x e [P]"
-| RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<Delta> \<turnstile>CSL [UNIV] Calloc r e [full_ownership_with_val r e]"
+| RuleAlloc: "r \<notin> fvE e \<Longrightarrow> \<Delta> \<turnstile>CSL [emp] Calloc r e [full_ownership_with_val r e]"
 | RuleFree: "\<Delta> \<turnstile>CSL [full_ownership r] Cfree r [UNIV]"
 | RuleRead: "\<lbrakk> A \<subseteq> read_perm r\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [A] Cread x r [read_result A x r]"
 
