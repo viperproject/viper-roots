@@ -566,10 +566,61 @@ lemma addition_same_store:
 abbreviation tcfes where
   "tcfes \<equiv> type_ctxt_front_end_syntactic"
 
+lemma corely_false [simp] :
+  "corely {} = {}"
+  by (simp add: corely_def)
+
+lemma corely_addE : 
+  assumes "a \<in> corely A \<otimes> B"
+  assumes "up_closed A"
+  assumes "|a| \<in> A \<Longrightarrow> a \<in> up_close_core B \<Longrightarrow> P"
+  shows "P"
+  apply (rule assms(3))
+  subgoal
+    using assms apply (auto simp add:corely_def add_set_def emp_core_def)
+    by (metis commutative greater_equiv max_projection_propE(3) max_projection_prop_pure_core up_closed_def)
+  subgoal
+    using assms apply (auto simp add:corely_def add_set_def emp_core_def)
+    by (metis commutative prove_in_up_close_core)
+  done
+
+lemma up_close_core_add_r :
+ "up_close_core (A \<otimes> B) = A \<otimes> up_close_core B"
+  by (simp add: add_set_asso up_close_core_def)
+
+lemma up_close_core_id [simp] :
+ "up_close_core (up_close_core A) = up_close_core A"
+  unfolding up_close_core_def emp_core_def apply (auto simp add:add_set_def)
+   apply (smt (verit, ccfv_SIG) asso1 core_is_pure core_is_smaller core_max core_sum pure_def)
+  by (metis asso1 pure_def)
+
+lemma in_up_close_core_stabilize :
+  assumes "Stable A"
+  shows "a \<in> up_close_core A \<longleftrightarrow> stabilize a \<in> A"
+  apply (simp add:up_close_core_def emp_core_def add_set_def)
+  apply (rule iffI)
+   apply (meson Stable_up_close_core SyntacticTranslation.up_close_core_id assms prove_in_up_close_core self_framing_def stabilize_in_up_close_core up_closed_core_stable_self_framing)
+  using core_in_emp_core decompose_stabilize_pure emp_core_def by blast
+
 
 lemma verifies_more_free:
   assumes "a \<in> make_semantic_assertion_untyped \<Delta> tcfes (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
-    shows "a \<in> Stabilize (full_ownership r)"
+  shows "a \<in> Stabilize (full_ownership r)"
+  using assms
+  apply (clarsimp simp add:full_ownership_def make_semantic_assertion_gen_def)
+  apply (clarsimp simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
+  apply (clarsimp simp add: red_pure_assert_def red_pure_simps)
+  apply (simp add:acc_def add_set_ex_comm_r split:bool_to_assertion_splits if_splits)
+  apply (simp add:add_set_asso)
+  apply (erule corely_addE)
+  subgoal by (clarsimp simp add: up_closed_def greater_cover_store)
+  apply (simp add:up_close_core_add_r core_charact)
+  apply (erule corely_addE)
+  subgoal by (clarsimp simp add: up_closed_def)
+  apply (simp add:the_address_def split:ref.splits)
+  apply (simp add:in_up_close_core_stabilize)
+  by (auto simp add:acc_heap_loc_def type_ctxt_front_end_syntactic_def)
+(*
   apply (rule in_StabilizeI)
   unfolding full_ownership_def
   apply simp
@@ -595,7 +646,7 @@ proof -
      apply (erule conjE)+
      apply (erule exE)+
      apply (erule addition_same_store[elim_format])+
-     apply simp
+     apply simp *)
 (*
 
   proof -
@@ -644,9 +695,9 @@ proof -
   qed
 qed
 *)
-    sorry
-qed
-
+(*    sorry
+qed *)
+(*
 lemma in_smth_star_red_pure_assertI:
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
       and "\<omega> \<in> A"
@@ -664,13 +715,14 @@ proof -
   then show ?thesis
     using add_set_commm assms(2) core_is_smaller x_elem_set_product by blast
 qed
-
+*)
+(*
 lemma in_red_pure_assert_star_smthI:
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
       and "\<omega> \<in> A"
     shows "\<omega> \<in> A \<otimes> (\<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r)"
   using add_set_commm assms(1) assms(2) in_smth_star_red_pure_assertI by blast
-
+*)
 lemma in_starI:
   assumes "Some x = a \<oplus> b"
       and "a \<in> A"
@@ -736,6 +788,35 @@ lemma typed_exp_then_value:
     shows "\<exists>v. \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val v"
   using assms(1) assms(2) typed_exp_then_int_value by blast
 
+
+lemma equality_bdenot:
+  assumes "typed_bexp b"
+      and "typed tcfe a"
+    shows "\<Delta> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool (bdenot b (get_store a)))"
+  using assms
+proof (induct b)
+  case (Beq e1 e2)
+  then show ?case
+    apply (auto simp add:red_pure_simps)
+    using equality_edenot by (metis eval_binop.simps(1) eval_int_int.simps(1))
+next
+  case (Band b1 b2)
+  then show ?case
+    apply (auto simp add:red_pure_simps) by fastforce
+next
+  case (Bnot b)
+  then show ?case
+    by (auto simp add:red_pure_simps)
+qed
+
+
+lemma equality_bdenot_2:
+  assumes "typed_bexp b"
+      and "typed tcfe a"
+      and "x = (bdenot b (get_store a))" 
+    shows "\<Delta> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool x)"
+  using assms equality_bdenot by blast
+
 lemma sum_empty_and_same:
   "Some x = stabilize |x| \<oplus> x"
   by (simp add: commutative stabilize_core_right_id)
@@ -757,16 +838,54 @@ lemma in_bool_to_assertion_emp:
   shows "stabilize |x| \<in> \<llangle>P\<rrangle>"
   by (metis Stabilize_up_close_core Stable_def Stable_emp_core assms bool_to_assertion_true core_in_emp_core emp_star_left_id in_Stabilize in_mono up_close_core_def)
 
+lemma add_setI_core_l :
+  assumes "|a| \<in> A"
+  assumes "a \<in> B"
+  shows "a \<in> A \<otimes> B"
+  using add_set_commm assms(1) assms(2) core_is_smaller in_starI by blast
 
+lemma add_setI_core_r :
+  assumes "a \<in> A"
+  assumes "|a| \<in> B"
+  shows "a \<in> A \<otimes> B"
+  using add_set_commm assms(1) assms(2) core_is_smaller in_starI by blast
+
+lemma core_in_corely [simp] :
+  "|a| \<in> corely A \<longleftrightarrow> |a| \<in> A"
+  by (simp add: core_in_emp_core corely_def)
 
 lemma verifies_more_alloc:
   assumes "typed_exp e"
       and "r \<in> dom (variables tcfe)"
-      and "TypedEqui.wf_assertion tcfe (Stabilize (full_ownership_with_val r e))"
+      (*and "TypedEqui.wf_assertion tcfe (Stabilize (full_ownership_with_val r e))"*)
       and "typed tcfe a"
       and "a \<in> Stabilize (full_ownership_with_val r e)"
 (* This translation is wrong... *)
     shows "a \<in> make_semantic_assertion_untyped \<Delta> tcfes (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
+  using assms
+  apply (clarsimp simp add:make_semantic_assertion_gen_def full_ownership_with_val_def)
+  apply (simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
+  apply (simp add:red_pure_assert_def red_pure_simps)
+  apply ((rule exI)+)
+  apply (simp add:add_set_asso)
+  apply (rule add_setI_core_l) apply (solves \<open>simp\<close>)
+  apply (rule bool_to_assertion_intro)
+   apply (auto simp add:type_ctxt_front_end_syntactic_def emp_def simp del: Product_Type.split_paired_Ex)
+  apply (rule add_setI_core_l) apply (auto; metis prod.collapse)
+  apply (rule bool_to_assertion_intro) apply (simp)
+  apply (rule in_starI[where a="stabilize a" and b="|a|"])
+  using decompose_stabilize_pure apply blast
+  subgoal
+    apply (simp add:acc_def acc_heap_loc_def)
+    apply (rule exI)
+    by (rule bool_to_assertion_intro; auto)
+  subgoal
+    apply (simp add:core_charact_equi core_structure)
+    apply (rule exI, rule conjI, rule stabilize_value_persists)
+     apply (simp)
+    by (rule exI, rule conjI, rule equality_edenot; simp add:TypedEqui.typed_core)
+  done
+(*
   using assms(5)
   unfolding make_semantic_assertion_gen_def
   apply simp unfolding full_ownership_with_val_def
@@ -861,7 +980,7 @@ qed
 
 *)
 
-
+*)
 
 
 (* TODO: Remove useless assumptions *)
@@ -874,16 +993,21 @@ lemma verifies_more_translation_while_exhale:
 
 lemma verifies_more_inter_star_pure:
   assumes "typed tcfe a"
+      and "typed_bexp b"
       and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (I && Atomic (Pure (translate_bexp b)))"
-  sorry
-
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (I && Atomic (Pure (translate_bexp b)))"
+  using assms apply (clarsimp simp add:make_semantic_assertion_gen_def assertify_bexp_def)
+  apply (rule add_setI_core_r; simp?)
+  apply (simp add:red_pure_assert_def)
+  by (rule equality_bdenot_2; simp add:TypedEqui.typed_core)
 
 lemma verifies_more_translation_while_inhale:
   assumes "typed tcfe a"
+      and "typed_bexp b"
       and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp (Bnot b)"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
-  using assms verifies_more_inter_star_pure by fastforce
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
+  using assms verifies_more_inter_star_pure
+  by (metis translate_bexp.simps(3) typed_bexp.simps(3))
 
 
 lemma verifies_more_translation_parallel_exhale:
@@ -904,6 +1028,7 @@ lemma verifies_more_translation_parallel_inhale:
 
 lemma verifies_more_while_snd_exhale:
   assumes "typed tcfe a"
+      and "typed_bexp b"
       and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b"
     shows "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (I && Atomic (Pure (translate_bexp b)))"
   using assms verifies_more_inter_star_pure by fastforce
@@ -1187,7 +1312,7 @@ next
           apply (rule verifies_more_inhale)
       using asm0(2) apply auto[1]
       using verifies_more_while_snd_exhale
-      apply (metis)
+      using asm0(1) typed_stmt.simps(9) apply blast
          apply (rule translation_refinement_main)      
       using asm0(1) apply auto[1]
       using ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) r apply blast
