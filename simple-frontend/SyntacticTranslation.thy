@@ -531,7 +531,7 @@ thm acc_heap_loc_starE
 
 lemma elim_in_acc_one:
   assumes "b \<in> acc \<Delta> xb x field_val (Some 1)"
-  shows "get_m b (the_address x, field_val) = 1 \<and> (\<exists>v. x = Address v)"
+  shows "get_m b (the_address x, field_val) = 1 \<and> (\<exists>v. x = Address v) \<and> (\<exists>v. get_state b = acc_virt (the_address x, field_val) (Abs_preal 1) v)"
   using assms unfolding acc_def
 proof -
   have "b \<in> (\<Union>pp. \<llangle>Some 1 = None \<or> pp = the (Some 1)\<rrangle> \<otimes> acc_heap_loc \<Delta> xb (the_address x, field_val) pp)"
@@ -546,7 +546,8 @@ proof -
     using one_preal.abs_eq by auto
   moreover have "\<exists>v. x = Address v"
     by (smt (verit, best) Instantiation.acc_def assms bool_to_assertion_false empty_iff option.sel ref.exhaust_sel)
-  ultimately show ?thesis by blast
+  ultimately show ?thesis
+    by (smt (verit, best) CollectD \<open>pp = 1 \<and> b \<in> acc_heap_loc \<Delta> xb (the_address x, field_val) pp\<close> acc_heap_loc_def)
 qed
 
 
@@ -556,8 +557,18 @@ lemma sum_with_emp_simplifies:
     shows "x = a"
   using assms(1) assms(2) is_in_set_sum by fastforce
 
+lemma addition_same_store:
+  assumes "Some x = a \<oplus> b"
+  shows "get_store x = get_store a \<and> get_store x = get_store b"
+  by (metis assms full_add_charact(1) full_add_defined)
+
+
+abbreviation tcfes where
+  "tcfes \<equiv> type_ctxt_front_end_syntactic"
+
+
 lemma verifies_more_free:
-  assumes "a \<in> make_semantic_assertion_untyped \<Delta> F (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
+  assumes "a \<in> make_semantic_assertion_untyped \<Delta> tcfes (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
     shows "a \<in> Stabilize (full_ownership r)"
   apply (rule in_StabilizeI)
   unfolding full_ownership_def
@@ -581,39 +592,78 @@ proof -
     apply (erule elim_in_acc_one[elim_format])
     apply (rule exI)
     apply (rule conjI)
-    
+     apply (erule conjE)+
+     apply (erule exE)+
+     apply (erule addition_same_store[elim_format])+
+     apply simp
+(*
 
-
-    by (metis (no_types, lifting) full_add_charact(1) greater_equiv larger_mask_full ref.sel)
+  proof -
+    show "\<And>x xb aa b aaa ba xc v va.
+       snd tcfes field_val = Some xb \<Longrightarrow>
+       pure ba \<Longrightarrow>
+       pure aaa \<Longrightarrow>
+       get_store aaa r = Some (VRef (Address v)) \<Longrightarrow>
+       xc = 1 \<Longrightarrow>
+       PosReal.pmin 1 (Abs_preal 1) = 1 \<Longrightarrow>
+       x = Address v \<Longrightarrow>
+       get_state b = acc_virt (v, field_val) (Abs_preal 1) va \<Longrightarrow>
+       get_store a = get_store aaa \<and> get_store a = get_store b \<Longrightarrow> get_store aa = get_store aaa \<and> get_store aa = get_store ba
+      \<Longrightarrow> v = the_address (Address v)"
+      by simp
+    show "\<And>x xb aa b aaa ba xc.
+       Some a = aa \<oplus> b \<Longrightarrow>
+       Some aa = aaa \<oplus> ba \<Longrightarrow>
+       snd F field_val = Some xb \<Longrightarrow>
+       pure ba \<Longrightarrow>
+       pure aaa \<Longrightarrow>
+       get_store aaa r = Some (VRef x) \<Longrightarrow>
+       xc = 1 \<Longrightarrow>
+       get_m b (the_address x, field_val) = 1 \<and> (\<exists>v. x = Address v) \<and> (\<exists>v. get_state b = acc_virt (the_address x, field_val) (Abs_preal 1) v) \<Longrightarrow>
+       \<exists>v. stabilize (get_state a) = acc_virt (the_address x, field_val) (Abs_preal 1) (VInt v)"
+      apply (erule conjE)+
+      apply (erule exE)+
+      apply (rule exI)
+    proof -
+      fix x xb aa b aaa ba v va
+      fix xc :: preal
+      assume asm0: "Some a = aa \<oplus> b" "Some aa = aaa \<oplus> ba" "snd F field_val = Some xb" "pure ba"
+       "pure aaa" "get_store aaa r = Some (VRef x)" "xc = 1"
+       "get_m b (the_address x, field_val) = 1"
+       "x = Address v" "get_state b = acc_virt (the_address x, field_val) (Abs_preal 1) va"
+       
+      show "stabilize (get_state a) = acc_virt (the_address x, field_val) (Abs_preal 1) (VInt (the_int (the (get_h a (the_address x, field_val)))))"
+        apply (rule virtual_state_ext)
+         apply (rule ext)
+         apply (case_tac "(the_address x, field_val) = xa")
+        apply (metis acc_virt_get_vm asm0(1) asm0(8) commutative greater_def inf.idem larger_mask_full one_preal.abs_eq vstate_stabilize_structure(1))
+        apply (smt (verit, ccfv_SIG) PosReal.padd_cancellative ab_semigroup_add_class.add_ac(1) acc_virt_get_vm add.commute asm0(1) asm0(10) asm0(2) asm0(4) asm0(5) get_m_additive pure_def vstate_stabilize_structure(1))
+         apply (rule ext)
+        apply (case_tac "(the_address x, field_val) \<noteq> xa")
+    qed
+  qed
 qed
-
-(* as long as no red_perm *)
-lemma red_pure_core_same:
-  assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
-  shows "\<Delta> \<turnstile> \<langle>e; |\<omega>| \<rangle> [\<Down>] r"
-  sorry
-
+*)
+    sorry
+qed
 
 lemma in_smth_star_red_pure_assertI:
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
       and "\<omega> \<in> A"
+(*
+TODO: Propagate
+      and "\<And> f vals st. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals |st|"
+*)
     shows "\<omega> \<in> (\<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r) \<otimes> A"
 proof -
   have "|\<omega>| \<in> \<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r"
     unfolding red_pure_assert_def corely_def emp_core_def
     apply simp
-    by (simp add: assms(1) core_is_pure pure_def red_pure_core_same)
+    using assms core_is_pure pure_def red_pure_core
+    sorry
   then show ?thesis
     using add_set_commm assms(2) core_is_smaller x_elem_set_product by blast
 qed
-
-(*
-lemma in_red_pure_assertI:
-  assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
-  shows "\<omega> \<in> \<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r"
-  sorry
-*)
-
 
 lemma in_red_pure_assert_star_smthI:
   assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
@@ -701,9 +751,6 @@ lemma simp_get_store_core[simp]:
   "get_store |a| = get_store a"
   by (simp add: core_charact(1))
 
-abbreviation tcfes where
-  "tcfes \<equiv> type_ctxt_front_end_syntactic"
-
 
 lemma in_bool_to_assertion_emp:
   assumes "P"
@@ -731,9 +778,15 @@ lemma verifies_more_alloc:
   apply (rule RedField)
       apply (rule RedVar)
       apply simp_all
+  sorry
+(*
+
+(*
      apply (erule get_vh_stabilize_implies_normal)
-    apply (rule exE[OF typed_exp_then_value[OF assms(1) assms(4), of \<Delta>]])
-  using eval_pure_exp_works[of \<Delta> "translate_exp e" a] apply blast
+*)
+     apply (rule exE[OF typed_exp_then_value[OF assms(1) assms(4), of \<Delta>]])
+
+  using eval_pure_exp_works[of \<Delta> "translate_exp e" a]
   using eval_pure_exp_works[OF equality_edenot[OF assms(1) assms(4), of \<Delta>]] apply simp
   apply (rule exI)+
   apply (rule in_starI)
@@ -762,7 +815,6 @@ lemma verifies_more_alloc:
 
 
   apply (rule RedLit)
-  sorry
 
 
 
@@ -770,9 +822,6 @@ lemma verifies_more_alloc:
 
   apply (rule in_red_pure_assert_star_smthI)
 
-
-
-  sorry
 
 
 proof -
@@ -783,9 +832,6 @@ proof -
 
 
   apply (rule exI)
-
-  sorry
-
 
 (*
   apply (rule in_StabilizeI)
@@ -813,96 +859,61 @@ qed
 
 *)
 
-
+*)
 
 
 
 
 (* TODO: Remove useless assumptions *)
 lemma verifies_more_translation_while_exhale:
-  assumes "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C))))"
-      and "typed_bexp b"
-      and "typed_stmt C"
-      and "TypedEqui.wf_assertion tcfe (inhalify (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I))"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C))"
-      and "TypedEqui.wf_assertion tcfe (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp (Bnot b))"
-      and "typed tcfe a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> F I"
+  assumes "typed tcfe a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I"
     shows "a \<in> inhalify (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I)"
-  sorry
+  using assms unfolding make_semantic_assertion_gen_def apply simp
+  using TypedEqui.typed_state_then_stabilize_typed by blast
 
-
-lemma verifies_more_translation_while_inhale:
-  assumes "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C))))"
-      and "typed_bexp b"
-      and "typed_stmt C"
-      and "TypedEqui.wf_assertion tcfe (inhalify (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I))"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C))"
-      and "TypedEqui.wf_assertion tcfe (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp (Bnot b))"
-      and "typed tcfe a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp (Bnot b)"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
-  sorry
-
-
-lemma verifies_more_translation_parallel_exhale:
-  assumes "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C1)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C1)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C1))))"
-      and "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C2)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C2)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C2))))"
-      and "typed_stmt C1"
-      and "typed_stmt C2"
-      and "TypedEqui.wf_assertion tcfe
-          (inhalify
-            (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P2))"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
-      and "TypedEqui.wf_assertion tcfe
-          (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q2)"
-      and "typed tcfe a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> F (P1 && P2)"
-    shows "a \<in> inhalify
-               (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P2)"
-  sorry
-
-lemma verifies_more_translation_parallel_inhale:
-  assumes "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C1)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C1)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C1))))"
-      and "(ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C2)) \<Longrightarrow>
-          verifies_more tcfe (fst (translate \<Delta> C2)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C2))))"
-      and "typed_stmt C1"
-      and "typed_stmt C2"
-      and "TypedEqui.wf_assertion tcfe
-          (inhalify
-            (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P2))"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
-      and "TypedEqui.wf_assertion tcfe
-          (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q2)"
-      and "typed tcfe a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q2"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (Q1 && Q2)"
-  sorry
-
-lemma verifies_more_while_snd_exhale:
-  assumes "typed_stmt (Cwhile b I C)"
-      and "wf_stmt \<Delta> F (Cwhile b I C)"
-      and "TypedEqui.wf_assertion tcfe (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b)"
-      and "typed tcfe a"
+lemma verifies_more_inter_star_pure:
+  assumes "typed tcfe a"
       and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b"
     shows "a \<in> make_semantic_assertion_untyped \<Delta> F (I && Atomic (Pure (translate_bexp b)))"
   sorry
 
+
+lemma verifies_more_translation_while_inhale:
+  assumes "typed tcfe a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp (Bnot b)"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> F (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
+  using assms verifies_more_inter_star_pure by fastforce
+
+
+lemma verifies_more_translation_parallel_exhale:
+  assumes "typed tcfe a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (P1 && P2)"
+    shows "a \<in> inhalify
+               (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic P2)"
+  using assms unfolding make_semantic_assertion_gen_def apply simp
+  using TypedEqui.typed_state_then_stabilize_typed by blast
+
+
+
+lemma verifies_more_translation_parallel_inhale:
+  assumes "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q1 \<otimes> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic Q2"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (Q1 && Q2)"
+  using assms unfolding make_semantic_assertion_gen_def by simp
+
+
+lemma verifies_more_while_snd_exhale:
+  assumes "typed tcfe a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic (I && Atomic (Pure (translate_bexp b)))"
+  using assms verifies_more_inter_star_pure by fastforce
+
 lemma verifies_more_while_snd_exhale_bis:
-  assumes "typed_stmt (Cwhile b I C)"
-      and "wf_stmt \<Delta> F (Cwhile b I C)"
-      and "TypedEqui.wf_assertion tcfe (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I \<inter> assertify_bexp b)"
-      and "typed tcfe a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> F I"
-    shows "a \<in> inhalify (make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I)"
-  sorry
-
-
+  assumes "typed tcfe a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> tcfes I"
+    shows "a \<in> inhalify (make_semantic_assertion_untyped \<Delta> tcfes I)"
+  using assms apply simp
+  using TypedEqui.typed_state_then_stabilize_typed by blast
 
 lemma n_havoc_same:
   "ConcreteSemantics.havoc_list l = compile False \<Delta> F (n_havoc l)"
@@ -929,9 +940,9 @@ qed
 lemma translation_refinement_main:
   assumes "typed_stmt C"
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C))"
-      and "wf_stmt \<Delta> F C"
+      and "wf_stmt \<Delta> tcfes C"
 (* TODO: Understand the type contexts of verifies_more, translate, compile, translate_syn *)
-  shows "verifies_more tcfe (fst (translate \<Delta> C)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C)))"
+  shows "verifies_more tcfe (fst (translate \<Delta> C)) (compile False \<Delta> tcfes (fst (translate_syn \<Delta> tcfes C)))"
   using assms
 proof (induct C)
   case Cskip
@@ -974,18 +985,18 @@ next
   then show ?case
     apply simp
   proof -
-    assume asm0: "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C1)) \<Longrightarrow> verifies_more tcfe (fst (translate \<Delta> C1)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C1)))"
-      "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C2)) \<Longrightarrow> verifies_more tcfe (fst (translate \<Delta> C2)) (compile False \<Delta> F (fst (translate_syn \<Delta> F C2)))"
+    assume asm0: "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C1)) \<Longrightarrow> verifies_more tcfe (fst (translate \<Delta> C1)) (compile False \<Delta> tcfes (fst (translate_syn \<Delta> tcfes C1)))"
+      "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C2)) \<Longrightarrow> verifies_more tcfe (fst (translate \<Delta> C2)) (compile False \<Delta> tcfes (fst (translate_syn \<Delta> tcfes C2)))"
       "typed_stmt C1 \<and> typed_stmt C2"
     have "verifies_more tcfe (fst (translate \<Delta> C1) ;; fst (translate \<Delta> C2))
-     (Seq (compile False \<Delta> F (fst (translate_syn \<Delta> F C1))) (compile False \<Delta> F (fst (translate_syn \<Delta> F C2))))"
+     (Seq (compile False \<Delta> tcfes (fst (translate_syn \<Delta> tcfes C1))) (compile False \<Delta> tcfes (fst (translate_syn \<Delta> tcfes C2))))"
       apply (rule verifies_more_seq)
       using asm0
       apply (metis ConcreteSemantics.wf_abs_stmt.simps(7) Cseq.prems(2) fst_eqD translate.simps(7))
        apply (metis ConcreteSemantics.wf_abs_stmt.simps(7) Cseq.prems(2) asm0(2) fst_eqD translate.simps(7))
       by (metis ConcreteSemantics.wf_abs_stmt.simps(7) Cseq.prems(2) fst_eqD translate.simps(7))
     then show "verifies_more tcfe (fst (let r1 = translate \<Delta> C1; r2 = translate \<Delta> C2 in (fst r1 ;; fst r2, snd r1 \<union> snd r2)))
-     (compile False \<Delta> F (fst (let r1 = translate_syn \<Delta> F C1; r2 = translate_syn \<Delta> F C2 in (stmt.Seq (fst r1) (fst r2), snd r1 \<union> snd r2))))"
+     (compile False \<Delta> tcfes (fst (let r1 = translate_syn \<Delta> tcfes C1; r2 = translate_syn \<Delta> tcfes C2 in (stmt.Seq (fst r1) (fst r2), snd r1 \<union> snd r2))))"
       by (metis compile.simps(3) fst_eqD)
   qed
 next
@@ -1175,15 +1186,15 @@ next
       apply (rule verifies_more_seq)
           apply (rule verifies_more_inhale)
       using asm0(2) apply auto[1]
-      using verifies_more_while_snd_exhale[of b I C \<Delta> tcfes]
-      apply (metis ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(7) asm0(1) asm0(2) asm0(3) asm0(4) r)
+      using verifies_more_while_snd_exhale
+      apply (metis)
          apply (rule translation_refinement_main)      
       using asm0(1) apply auto[1]
       using ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) r apply blast
       using asm0(2) apply force
       using ConcreteSemantics.wf_abs_stmt.simps(7) asm0(3) asm0(4) r apply blast
        apply (rule verifies_more_exhale)
-      apply (metis ConcreteSemantics.wf_abs_stmt.simps(7) asm0(1) asm0(2) asm0(3) asm0(4) r ConcreteSemantics.wf_abs_stmt.simps(2) verifies_more_while_snd_exhale_bis)
+      apply (metis verifies_more_while_snd_exhale_bis)
       using ConcreteSemantics.wf_abs_stmt.simps(7) asm0(3) asm0(4) r
       by blast
     then show "\<exists>Csyn\<in>snd (translate_syn \<Delta> tcfes (Cwhile b I C)). verifies_more tcfe Csem (compile False \<Delta> tcfes Csyn)"
