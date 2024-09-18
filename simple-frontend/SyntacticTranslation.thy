@@ -317,11 +317,13 @@ proof (rule exp_refined_byI)
   then show "make_semantic_exp \<Delta> (translate_exp e) \<omega> = Some v \<Longrightarrow> semantify_exp e \<omega> = Some v" using assms by blast
 qed
 
-lemma semantify_bexp_band:
-  assumes "make_semantic_bexp \<Delta> (Binop b1 And b2)  \<omega> = Some v"
-  shows "\<exists>v1 v2. v = (v1 \<and> v2) \<and> make_semantic_bexp \<Delta> b1 \<omega> = Some v1 \<and> make_semantic_bexp \<Delta> b2 \<omega> = Some v2"
-  sorry (* TODO: Do on the same model as semantify_bexp_bnot *)
 
+
+lemma and_then_log_and:
+  assumes "eval_binop v1 And v2 = BinopNormal (VBool True)"
+  shows "\<exists>v1' v2'. v1 = VBool v1' \<and> v2 = VBool v2' \<and> v1' \<and> v2'"
+  apply (cases v1; cases v2)
+  using assms by auto
 
 lemma semantify_bexp_bnot:
   assumes "make_semantic_bexp \<Delta> (Unop Not b)  \<omega> = Some v"
@@ -345,46 +347,7 @@ proof (cases "\<Delta> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Do
       then show "make_semantic_bexp \<Delta> b \<omega> = Some (\<not> v)"
         by (metis (full_types) False \<open>\<Delta> \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>] Val va\<close> assms make_semantic_bexp_Some)
     qed (simp)
-qed
-
-
-lemma semantify_bexp_beq:
-  assumes "make_semantic_bexp \<Delta> (Binop e1 Eq e2)  \<omega> = Some v"
-  shows "\<exists>v1 v2. v = (v1 = v2) \<and> make_semantic_exp \<Delta> e1 \<omega> = Some v1 \<and> make_semantic_exp \<Delta> e2 \<omega> = Some v2"
-  sorry (* TODO: Do on the same model as semantify_bexp_bnot *)
-
-lemma bexp_refined_by:
-  assumes "typed_bexp b"
-  shows "exp_refined_by tcfe (semantify_bexp b) (make_semantic_bexp \<Delta> (translate_bexp b))"
-proof (rule exp_refined_byI)
-  fix \<omega> v assume asm0: "sep_algebra_class.stable \<omega>" "typed tcfe \<omega>"
-  have "typed_bexp b \<Longrightarrow> make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v"
-  proof (induct b arbitrary: v)
-    case (Beq e1 e2)
-    then obtain v1 v2 where "v = (v1 = v2)" "make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1"
-      "make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2"
-      by (smt (z3) semantify_bexp_beq translate_bexp.simps(1))
-    then have "semantify_exp e1 \<omega> = Some v1 \<and> semantify_exp e2 \<omega> = Some v2"
-      by (meson Beq.prems(1) asm0(1) asm0(2) exp_refined_byE exp_refined_by_int typed_bexp.simps(1))
-    then show ?case
-      using \<open>\<And>thesis. (\<And>v1 v2. \<lbrakk>v = (v1 = v2); make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1; make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> \<open>make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1\<close> \<open>make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<close> semantify_bexp_def semantify_exp_def by auto
-  next
-    case (Band b1 b2)
-    then obtain v1 v2 where "v = (v1 \<and> v2)" "make_semantic_bexp \<Delta> (translate_bexp b1) \<omega> = Some v1"
-      "make_semantic_bexp \<Delta> (translate_bexp b2) \<omega> = Some v2"
-      by (smt (z3) semantify_bexp_band translate_bexp.simps(2))
-    then show ?case 
-      by (smt (verit) Band.hyps(1) Band.hyps(2) Band.prems(1) bdenot.simps(2) semantify_bexp_def typed_bexp.simps(2))
-  next
-    case (Bnot b)
-    then have "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some (\<not> v)"
-      by (metis semantify_bexp_bnot translate_bexp.simps(3))
-    then show ?case
-      by (metis (full_types) Bnot.hyps Bnot.prems(1) bdenot.simps(3) semantify_bexp_def typed_bexp.simps(3))
   qed
-  then show "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v" using assms by blast
-qed
-
 
 definition syntactic_translate_addr :: "var \<Rightarrow> pure_exp" where
   "syntactic_translate_addr r = Var r"
@@ -620,109 +583,7 @@ lemma verifies_more_free:
   apply (simp add:the_address_def split:ref.splits)
   apply (simp add:in_up_close_core_stabilize)
   by (auto simp add:acc_heap_loc_def type_ctxt_front_end_syntactic_def)
-(*
-  apply (rule in_StabilizeI)
-  unfolding full_ownership_def
-  apply simp
-proof -
-  show "\<exists>l. get_store a r = Some (VRef (Address l)) \<and> (\<exists>v. stabilize (get_state a) = acc_virt (l, field_val) (Abs_preal 1) (VInt v))"
-    using assms(1) unfolding make_semantic_assertion_gen_def
-    apply simp
-    apply (erule exE)+
 
-    apply (erule in_emp_star_something[elim_format] | erule in_something_star_emp[elim_format] | erule in_starE)+
-    apply simp
-    apply (erule exE)+
-    apply (erule in_emp_star_something[elim_format] | erule in_something_star_emp[elim_format] | erule in_starE)+
-
-    apply (simp add: red_pure_assert_def corely_def emp_core_def)
-    apply (erule conjE)+
-    apply (erule red_pure_varE)
-    apply (erule red_pure_litE)
-    apply simp
-    apply (erule elim_in_acc_one[elim_format])
-    apply (rule exI)
-    apply (rule conjI)
-     apply (erule conjE)+
-     apply (erule exE)+
-     apply (erule addition_same_store[elim_format])+
-     apply simp *)
-(*
-
-  proof -
-    show "\<And>x xb aa b aaa ba xc v va.
-       snd tcfes field_val = Some xb \<Longrightarrow>
-       pure ba \<Longrightarrow>
-       pure aaa \<Longrightarrow>
-       get_store aaa r = Some (VRef (Address v)) \<Longrightarrow>
-       xc = 1 \<Longrightarrow>
-       PosReal.pmin 1 (Abs_preal 1) = 1 \<Longrightarrow>
-       x = Address v \<Longrightarrow>
-       get_state b = acc_virt (v, field_val) (Abs_preal 1) va \<Longrightarrow>
-       get_store a = get_store aaa \<and> get_store a = get_store b \<Longrightarrow> get_store aa = get_store aaa \<and> get_store aa = get_store ba
-      \<Longrightarrow> v = the_address (Address v)"
-      by simp
-    show "\<And>x xb aa b aaa ba xc.
-       Some a = aa \<oplus> b \<Longrightarrow>
-       Some aa = aaa \<oplus> ba \<Longrightarrow>
-       snd F field_val = Some xb \<Longrightarrow>
-       pure ba \<Longrightarrow>
-       pure aaa \<Longrightarrow>
-       get_store aaa r = Some (VRef x) \<Longrightarrow>
-       xc = 1 \<Longrightarrow>
-       get_m b (the_address x, field_val) = 1 \<and> (\<exists>v. x = Address v) \<and> (\<exists>v. get_state b = acc_virt (the_address x, field_val) (Abs_preal 1) v) \<Longrightarrow>
-       \<exists>v. stabilize (get_state a) = acc_virt (the_address x, field_val) (Abs_preal 1) (VInt v)"
-      apply (erule conjE)+
-      apply (erule exE)+
-      apply (rule exI)
-    proof -
-      fix x xb aa b aaa ba v va
-      fix xc :: preal
-      assume asm0: "Some a = aa \<oplus> b" "Some aa = aaa \<oplus> ba" "snd F field_val = Some xb" "pure ba"
-       "pure aaa" "get_store aaa r = Some (VRef x)" "xc = 1"
-       "get_m b (the_address x, field_val) = 1"
-       "x = Address v" "get_state b = acc_virt (the_address x, field_val) (Abs_preal 1) va"
-       
-      show "stabilize (get_state a) = acc_virt (the_address x, field_val) (Abs_preal 1) (VInt (the_int (the (get_h a (the_address x, field_val)))))"
-        apply (rule virtual_state_ext)
-         apply (rule ext)
-         apply (case_tac "(the_address x, field_val) = xa")
-        apply (metis acc_virt_get_vm asm0(1) asm0(8) commutative greater_def inf.idem larger_mask_full one_preal.abs_eq vstate_stabilize_structure(1))
-        apply (smt (verit, ccfv_SIG) PosReal.padd_cancellative ab_semigroup_add_class.add_ac(1) acc_virt_get_vm add.commute asm0(1) asm0(10) asm0(2) asm0(4) asm0(5) get_m_additive pure_def vstate_stabilize_structure(1))
-         apply (rule ext)
-        apply (case_tac "(the_address x, field_val) \<noteq> xa")
-    qed
-  qed
-qed
-*)
-(*    sorry
-qed *)
-(*
-lemma in_smth_star_red_pure_assertI:
-  assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
-      and "\<omega> \<in> A"
-(*
-TODO: Propagate
-      and "\<And> f vals st. interp.funs \<Delta> f vals st = interp.funs \<Delta> f vals |st|"
-*)
-    shows "\<omega> \<in> (\<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r) \<otimes> A"
-proof -
-  have "|\<omega>| \<in> \<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r"
-    unfolding red_pure_assert_def corely_def emp_core_def
-    apply simp
-    using assms core_is_pure pure_def red_pure_core
-    sorry
-  then show ?thesis
-    using add_set_commm assms(2) core_is_smaller x_elem_set_product by blast
-qed
-*)
-(*
-lemma in_red_pure_assert_star_smthI:
-  assumes "\<Delta> \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>] r"
-      and "\<omega> \<in> A"
-    shows "\<omega> \<in> A \<otimes> (\<Delta> \<turnstile> \<langle>e\<rangle> [\<Down>] r)"
-  using add_set_commm assms(1) assms(2) in_smth_star_red_pure_assertI by blast
-*)
 lemma in_starI:
   assumes "Some x = a \<oplus> b"
       and "a \<in> A"
@@ -857,10 +718,8 @@ lemma core_in_corely [simp] :
 lemma verifies_more_alloc:
   assumes "typed_exp e"
       and "r \<in> dom (variables tcfe)"
-      (*and "TypedEqui.wf_assertion tcfe (Stabilize (full_ownership_with_val r e))"*)
       and "typed tcfe a"
       and "a \<in> Stabilize (full_ownership_with_val r e)"
-(* This translation is wrong... *)
     shows "a \<in> make_semantic_assertion_untyped \<Delta> tcfes (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
   using assms
   apply (clarsimp simp add:make_semantic_assertion_gen_def full_ownership_with_val_def)
@@ -885,105 +744,7 @@ lemma verifies_more_alloc:
      apply (simp)
     by (rule exI, rule conjI, rule equality_edenot; simp add:TypedEqui.typed_core)
   done
-(*
-  using assms(5)
-  unfolding make_semantic_assertion_gen_def
-  apply simp unfolding full_ownership_with_val_def
-  apply simp
-  apply (erule exE)
-  apply (erule conjE)+
-  apply (rule in_red_pure_assert_star_smthI)
-  apply (rule RedBinop)
-  apply (rule RedField)
-      apply (rule RedVar)
-      apply simp_all
-  sorry
-(*
 
-(*
-     apply (erule get_vh_stabilize_implies_normal)
-*)
-     apply (rule exE[OF typed_exp_then_value[OF assms(1) assms(4), of \<Delta>]])
-
-  using eval_pure_exp_works[of \<Delta> "translate_exp e" a]
-  using eval_pure_exp_works[OF equality_edenot[OF assms(1) assms(4), of \<Delta>]] apply simp
-  apply (rule exI)+
-  apply (rule in_starI)
-    apply (rule sum_empty_and_same)
-   apply (rule empty_satisfies_star)
-  apply (rule in_smth_star_red_pure_assertI)
-     apply (rule RedVar)
-     apply simp_all
-    apply (rule conjI)
-  unfolding type_ctxt_front_end_syntactic_def
-     apply simp
-  unfolding emp_def apply blast
-   apply (rule exI)
-   apply (rule in_smth_star_red_pure_assertI)
-  using RedLit[of \<Delta> WritePerm "stabilize |a|" ] apply simp
-   apply (rule in_bool_to_assertion_emp)
-   apply simp
-  apply (simp add: acc_def)
-  apply (rule exI)
-  apply (rule bool_to_assertion_intro)
-   apply simp
-  unfolding acc_heap_loc_def
-  apply simp
-  apply (rule exI)
-  apply (rule conjI)
-
-
-  apply (rule RedLit)
-
-
-
-  apply (rule in_smth_star_red_pure_assertI)
-
-  apply (rule in_red_pure_assert_star_smthI)
-
-
-
-proof -
-  show "\<And>l x. get_store a r = Some (VRef (Address l)) \<Longrightarrow>
-           get_m a (l, field_val) = 1 \<Longrightarrow>
-           get_vh (stabilize (get_state a)) (l, field_val) = Some (VInt (edenot e (get_store a))) \<Longrightarrow>
-           \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val x \<Longrightarrow> \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val (?v2.25 l)"
-
-
-  apply (rule exI)
-
-(*
-  apply (rule in_StabilizeI)
-  unfolding full_ownership_def
-  apply simp
-proof -
-  show "\<exists>l. get_store a r = Some (VRef (Address l)) \<and> get_m a (l, field_val) = 1"
-    using assms(1) unfolding make_semantic_assertion_gen_def
-    apply simp
-    apply (erule exE)+
-
-    apply (erule in_emp_star_something[elim_format] | erule in_something_star_emp[elim_format] | erule in_starE)+
-    apply simp
-    apply (erule exE)+
-    apply (erule in_emp_star_something[elim_format] | erule in_something_star_emp[elim_format] | erule in_starE)+
-
-    apply (simp add: red_pure_assert_def corely_def emp_core_def)
-    apply (erule conjE)+
-    apply (erule red_pure_varE)
-    apply (erule red_pure_litE)
-    apply simp
-    apply (erule elim_in_acc_one[elim_format])
-    by (metis (no_types, lifting) full_add_charact(1) greater_equiv larger_mask_full ref.sel)
-qed
-
-*)
-
-*)
-
-*)
-
-
-(* TODO: Remove useless assumptions *)
 lemma verifies_more_translation_while_exhale:
   assumes "typed tcfe a"
       and "a \<in> make_semantic_assertion_untyped \<Delta> type_ctxt_front_end_syntactic I"
@@ -1057,6 +818,107 @@ proof (rule self_framingI)
       using assms self_framing_def by auto
   qed
 qed
+
+
+lemma and_binop_false_lazy:
+  assumes "eval_binop_lazy v And = Some b"
+  shows "v = VBool False"
+  apply (cases v) using assms by auto
+
+
+
+lemma semantify_bexp_band:
+  assumes "make_semantic_bexp \<Delta> (Binop (translate_bexp b1) And (translate_bexp b2)) \<omega> = Some v"
+      and "typed_bexp b1 \<and> typed_bexp b2"
+      and "typed tcfe \<omega>"
+  shows "\<exists>v1 v2. v = (v1 \<and> v2) \<and> make_semantic_bexp \<Delta> (translate_bexp b1) \<omega> = Some v1 \<and> make_semantic_bexp \<Delta> (translate_bexp b2) \<omega> = Some v2"
+proof (cases "\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool True)")
+  case True
+  then show ?thesis
+    apply (rule red_pure_elim(4))
+    apply (metis (mono_tags, opaque_lifting) eval_binop_lazy.simps(2) eval_binop_lazy.simps(39) eval_binop_lazy_some_bool extended_val.inject option.inject option.simps(3))
+    apply (metis (full_types) True and_then_log_and assms(1) extended_val.inject make_semantic_bexp_Some)
+    by simp_all
+next
+  case False
+  then have "(\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool False))"
+    by (metis (full_types) assms(1) make_semantic_bexp_Some)
+  then show ?thesis
+    apply (rule red_pure_elim(4))
+        apply simp_all
+  proof -
+    fix v1 assume asm0: "\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1" "eval_binop_lazy v1 And = Some (VBool False)"
+    then have "v1 = VBool False"
+      using and_binop_false_lazy by blast
+    then
+    show "\<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
+      by (metis False \<open>\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2);\<omega>\<rangle> [\<Down>] Val (VBool False)\<close> asm0(1) assms(1) assms(2) assms(3) equality_bdenot_2 make_semantic_bexp_def option.inject)
+  next
+    show "\<And>v1 v2.
+       \<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1 \<Longrightarrow>
+       \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val v2 \<Longrightarrow>
+       eval_binop v1 And v2 = BinopNormal (VBool False) \<Longrightarrow>
+       \<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
+      by (smt (z3) RedBinop assms(1) assms(2) assms(3) equality_bdenot_2 eval_binop.simps(3) eval_bool_bool.simps(4) make_semantic_bexp_Some)
+  qed
+qed
+
+lemma vint_binop_eq:
+  assumes "eval_binop v1 Eq v2 = BinopNormal (VBool v)"
+  shows "v = (v1 = v2)"
+  apply (cases v1; cases v2) using assms by auto
+
+
+lemma semantify_bexp_beq:
+  assumes "make_semantic_bexp \<Delta> (Binop (translate_exp e1) Eq (translate_exp e2)) \<omega> = Some v"
+      and "typed_exp e1 \<and> typed_exp e2"
+      and "typed tcfe \<omega>"
+
+  shows "\<exists>v1 v2. v = (v1 = v2) \<and> make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1 \<and> make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2"
+proof -
+  obtain v1 v2 where "\<Delta> \<turnstile> \<langle>translate_exp e1; \<omega>\<rangle> [\<Down>] Val (VInt v1)" "\<Delta> \<turnstile> \<langle>translate_exp e2; \<omega>\<rangle> [\<Down>] Val (VInt v2)"
+    by (meson assms(2) assms(3) typed_exp_then_int_value)
+  moreover have "\<Delta> \<turnstile> \<langle>Binop (translate_exp e1) Eq (translate_exp e2);\<omega>\<rangle> [\<Down>] Val (VBool v)"
+    using assms(1) by force
+  then show ?thesis
+    apply (rule red_pure_elim)
+        apply simp_all
+    apply (drule vint_binop_eq)
+    by blast
+qed
+
+lemma bexp_refined_by:
+  assumes "typed_bexp b"
+  shows "exp_refined_by tcfe (semantify_bexp b) (make_semantic_bexp \<Delta> (translate_bexp b))"
+proof (rule exp_refined_byI)
+  fix \<omega> v assume asm0: "sep_algebra_class.stable \<omega>" "typed tcfe \<omega>"
+  have "typed_bexp b \<Longrightarrow> make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v"
+  proof (induct b arbitrary: v)
+    case (Beq e1 e2)
+    then obtain v1 v2 where "v = (v1 = v2)" "make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1"
+      "make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2"
+      by (metis asm0(2) semantify_bexp_beq translate_bexp.simps(1) typed_bexp.simps(1))
+    then have "semantify_exp e1 \<omega> = Some v1 \<and> semantify_exp e2 \<omega> = Some v2"
+      by (meson Beq.prems(1) asm0(1) asm0(2) exp_refined_byE exp_refined_by_int typed_bexp.simps(1))
+    then show ?case
+      using \<open>\<And>thesis. (\<And>v1 v2. \<lbrakk>v = (v1 = v2); make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1; make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> \<open>make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1\<close> \<open>make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<close> semantify_bexp_def semantify_exp_def by auto
+  next
+    case (Band b1 b2)
+    then obtain v1 v2 where "v = (v1 \<and> v2)" "make_semantic_bexp \<Delta> (translate_bexp b1) \<omega> = Some v1"
+      "make_semantic_bexp \<Delta> (translate_bexp b2) \<omega> = Some v2"
+      by (smt (z3) asm0(2) semantify_bexp_band translate_bexp.simps(2) typed_bexp.simps(2))
+    then show ?case 
+      by (smt (verit) Band.hyps(1) Band.hyps(2) Band.prems(1) bdenot.simps(2) semantify_bexp_def typed_bexp.simps(2))
+  next
+    case (Bnot b)
+    then have "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some (\<not> v)"
+      by (metis semantify_bexp_bnot translate_bexp.simps(3))
+    then show ?case
+      by (metis (full_types) Bnot.hyps Bnot.prems(1) bdenot.simps(3) semantify_bexp_def typed_bexp.simps(3))
+  qed
+  then show "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v" using assms by blast
+qed
+
 
 
 
