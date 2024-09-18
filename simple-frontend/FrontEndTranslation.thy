@@ -280,8 +280,6 @@ lemma in_StabilizeI:
 lemma convert_proof_write:
   assumes "ConcreteSemantics.SL_proof tcfe P (Custom (FieldAssign (semantify_addr r) field_val (semantify_exp e))) Q"
   shows "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
-  sorry
-(*
   using assms(1)
 proof (rule ConcreteSemantics.SL_proof_Custom_elim)
   assume asm0: "SL_Custom tcfe P (custom.FieldAssign (semantify_addr r) field_val (semantify_exp e)) Q"
@@ -293,28 +291,50 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
       "self_framing P" "entails P {\<omega>. \<exists>l. get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l}"
       "framed_by_exp P (semantify_addr r)" "framed_by_exp P (semantify_exp e)"
     show "tcfe \<turnstile>CSL [P] Cwrite r e [Q \<otimes> UNIV]"
-    proof (rule RuleCons)
+    proof (rule RuleConsTyped)
+
+
       let ?F = "Stabilize { remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l}"
       show "tcfe \<turnstile>CSL [Stabilize (full_ownership r) \<otimes> ?F] Cwrite r e [Stabilize (full_ownership_with_val r e) \<otimes> ?F]"
       proof (rule RuleFrame)
         show "tcfe \<turnstile>CSL [Stabilize (full_ownership r)] Cwrite r e [Stabilize (full_ownership_with_val r e)]"
           by (simp add: RuleStabilizeTyped RuleWrite)
       qed (simp_all)
-      show "P \<subseteq> Stabilize (full_ownership r) \<otimes> ?F"
-      proof
-        fix \<omega> assume "\<omega> \<in> P"
+      
+      show "ConcreteSemantics.entails_typed tcfe P (Stabilize (full_ownership r) \<otimes> ?F)"
+      proof (rule ConcreteSemantics.entails_typedI)
+        fix \<omega> assume "\<omega> \<in> P" "typed tcfe \<omega>"
         then obtain l where "get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l"          
           by (smt (verit) CollectD asm1(3) entails_def subsetD)
         then have "Some \<omega> = remove_only \<omega> (l, field_val) \<oplus> set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>)))"
           using split_remove_only_owns_only by blast
-        moreover have "set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))) \<in> Stabilize (full_ownership r)"        
+        moreover obtain v' where "get_h \<omega> (l, field_val) = Some v'"
+          by (metis EquiSemAuxLemma.gr_0_is_ppos \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> not_gr_0 vstate_wf_Some zero_neq_one)
+        then obtain v where "v' = VInt v"
+          by (smt (verit, best) \<open>typed tcfe \<omega>\<close> abs_type_context.select_convs(2) mem_Collect_eq snd_conv type_ctxt_front_end_def type_ctxt_heap_def typed_get_vh vints_def)
+
+        
+        moreover have "set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))) \<in> Stabilize (full_ownership r)"
         proof (rule in_StabilizeI)
           show "stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>)))) \<in> full_ownership r"
             apply (rule in_full_ownership[of _ _ l])
             using \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> semantify_addr_equiv apply auto[1]
-            sorry
-            
-            by (smt (verit, best) \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> add.commute add.right_neutral calculation fun_upd_apply get_m_additive get_m_stabilize remove_only_charact(2))
+          proof (rule virtual_state_ext)
+            show "get_m (stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))))) =
+    get_vm (acc_virt (l, field_val) (Abs_preal 1) (VInt v))"
+              apply (rule ext)
+              apply (case_tac "x = (l, field_val)")
+              apply (metis (no_types, lifting) \<open>get_m \<omega> (l, field_val) = 1 \<and> semantify_addr r \<omega> = Some l\<close> acc_virt_get_vm add_0 calculation(1) fun_upd_same get_m_additive get_m_stabilize inf.idem one_preal.abs_eq pperm_pnone_pgt remove_only_charact(1) vstate_wf_imp)
+              apply simp
+              by (smt (verit, best) PosReal.padd_cancellative add_0 calculation(1) commutative fun_upd_apply get_m_additive get_state_set_state remove_only_charact(2))
+            show "get_h (stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))))) =
+    get_vh (acc_virt (l, field_val) (Abs_preal 1) (VInt v))"
+              apply (rule ext)
+              apply (case_tac "x = (l, field_val)")
+               apply simp_all
+              apply (smt (z3) EquiSemAuxLemma.gr_0_is_ppos \<open>get_h \<omega> (l, field_val) = Some v'\<close> \<open>get_m (stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))))) = get_vm (acc_virt (l, field_val) (Abs_preal 1) (VInt v))\<close> acc_virt_get_vm calculation(1) calculation(2) get_state_set_state get_state_stabilize get_vh_Some_greater greater_equiv inf.idem one_preal.abs_eq option.exhaust pperm_pnone_pgt stabilize_value_persists vstate_wf_ppos zero_neq_one)
+              by (metis (no_types, lifting) EquiSemAuxLemma.gr_0_is_ppos \<open>get_m (stabilize (set_state \<omega> (Abs_virtual_state (concretize (\<lambda>l'. if (l, field_val) = l' then 1 else 0) (get_state \<omega>))))) = get_vm (acc_virt (l, field_val) (Abs_preal 1) (VInt v))\<close> acc_virt_get_vm get_m_stabilize get_state_set_state pperm_pgt_pnone stabilize_is_stable stable_virtual_state_def vstate_stabilize_structure(1))
+          qed
         qed
         moreover have "remove_only \<omega> (l, field_val) \<in> ?F"
         proof (rule in_StabilizeI)
@@ -326,14 +346,19 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
         ultimately show "\<omega> \<in> Stabilize (full_ownership r) \<otimes> ?F"
           using commutative x_elem_set_product by fastforce
       qed
-      show "Stabilize (full_ownership_with_val r e) \<otimes> ?F \<subseteq> Q \<otimes> UNIV"
+      have "Stabilize (full_ownership_with_val r e) \<otimes> ?F \<subseteq> Q \<otimes> UNIV"
       proof
         fix \<omega>' assume "\<omega>' \<in> Stabilize (full_ownership_with_val r e) \<otimes> ?F"
         then obtain ptr f where r: "Some \<omega>' = ptr \<oplus> f" "ptr \<in> Stabilize (full_ownership_with_val r e)" "f \<in> ?F"
           by (meson x_elem_set_product)
-        then obtain l where "get_store (stabilize ptr) r = Some (VRef (Address l)) \<and> get_m (stabilize ptr) (l, field_val) = 1
+        then obtain l where "get_state (stabilize ptr) = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e (get_store ptr)))"
+          "get_store ptr r = Some (VRef (Address l))"
+          unfolding full_ownership_with_val_def
+          by auto
+
+        then have "get_store (stabilize ptr) r = Some (VRef (Address l)) \<and> get_m (stabilize ptr) (l, field_val) = 1
   \<and> get_h (stabilize ptr) (l, field_val) = Some (VInt (edenot e (get_store (stabilize ptr))))"
-          using full_ownership_with_val_def by auto
+          by (simp add: one_preal.abs_eq)
         then have "get_store ptr r = Some (VRef (Address l)) \<and> get_m ptr (l, field_val) = 1
   \<and> get_h ptr (l, field_val) = Some (VInt (edenot e (get_store ptr)))"
           by (simp add: stabilize_value_persists)
@@ -390,10 +415,12 @@ proof (rule ConcreteSemantics.SL_proof_Custom_elim)
         ultimately show "\<omega>' \<in> Q \<otimes> UNIV"
           using asm1(1) greater_def x_elem_set_product by blast
       qed
+      then show "ConcreteSemantics.entails_typed tcfe (Stabilize (full_ownership_with_val r e) \<otimes> Stabilize {remove_only \<omega> (l, field_val) |\<omega> l. \<omega> \<in> P \<and> semantify_addr r \<omega> = Some l})
+     (Q \<otimes> UNIV)"
+        using ConcreteSemantics.entails_typed_def by blast
     qed
   qed
 qed
-*)
 
 
 definition semantify_heap_loc :: "var \<Rightarrow> (int equi_state, int val) AbstractSemantics.exp" where
@@ -418,13 +445,7 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
     assume asm1: "\<omega> \<in> P"
     then obtain l v0 where "get_store \<omega> r = Some (VRef (Address l))" "get_h \<omega> (l, field_val) = Some v0"
       by (metis asm0(2) framed_by_exp_def semantify_heap_loc_def)
-(*
-    then obtain v where "v0 = VInt v"
-      sorry
-      using TypedEqui.typed_assertionE[OF asm0(4) asm1] TypedEqui.typed_def[of tcfe \<omega>] well_typedE(1)[of "custom_context tcfe" "get_abs_state \<omega>"]
-      Instantiation.well_typed_heapE[of "custom_context tcfe" "get_state \<omega>" "(l, field_val)" v0]
-      by (smt (verit, del_insts) CollectD abs_type_context.select_convs(2) option.sel snd_conv snd_get_abs_state type_ctxt_front_end_def type_ctxt_heap_def vints_def)
-*)
+
     then have "stabilize \<omega> \<in> P"
       using asm0(3) asm1 self_framingE by blast
     then have "get_h (stabilize \<omega>) (l, field_val) = Some v0"
@@ -748,11 +769,6 @@ proof
   qed
 qed
 
-(*
-lemma fvA_inhalify_subset:
-  "fvA tcfe (inhalify A) = fvA tcfe A"
-  sorry
-*)
 
 lemma t_entails_add:
   assumes "t_entails A1 A2"
