@@ -496,7 +496,8 @@ definition type_ctxt_store where
 definition type_ctxt_front_end where
   "type_ctxt_front_end = \<lparr> variables = type_ctxt_store, custom_context = type_ctxt_heap \<rparr>"
 
-definition type_ctxt_front_end_syntactic where
+definition type_ctxt_front_end_syntactic :: "(var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+  where
   "type_ctxt_front_end_syntactic = ( (\<lambda>x. if x < undefined then if x mod 2 = 0 then Some TInt else Some TRef else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
 
 (*
@@ -519,22 +520,30 @@ proof -
     by (simp add: type_ctxt_front_end_def)
 qed
 
+(*
+abbreviation well_typed_heap where
+  "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
+*)
 
 lemma red_keeps_well_typed_cmd:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-    and "well_typed_concrete_heap type_ctxt_heap (snd \<sigma>)"
-  shows "well_typed_concrete_heap type_ctxt_heap (snd \<sigma>')"
+    and "heap_typed type_ctxt_heap (snd \<sigma>)"
+  shows "heap_typed type_ctxt_heap (snd \<sigma>')"
   using assms
 proof (induct rule: red.induct)
   case (red_Alloc \<sigma> s h l \<sigma>' x e)
   then show ?case
-    using well_typed_concrete_heap_update[OF red_Alloc(4), of "(l, field_val)" vints "VInt (edenot e s)"]
-    by (simp add: type_ctxt_heap_def vints_def)
+    using heap_typed_update[OF red_Alloc(4), of "(l, field_val)" "VInt (edenot e s)"]
+    by (smt (verit, ccfv_SIG) CollectI option.inject snd_conv type_ctxt_heap_def vints_def)
 next
   case (red_Write \<sigma> s h r l \<sigma>' e)
   then show ?case
-    using well_typed_concrete_heap_update[OF red_Write(5), of "(l, field_val)" vints "VInt (edenot e s)"]
-    by (simp add: type_ctxt_heap_def vints_def)
+    using heap_typed_update[OF red_Write(5), of "(l, field_val)" "VInt (edenot e s)"]
+    by (smt (verit, best) CollectI option.sel snd_conv type_ctxt_heap_def vints_def)
+next
+  case (red_Free \<sigma> s h r l \<sigma>')
+  then show ?case
+    by (metis heap_typed_remove sndI)
 qed (auto)
 
 lemma well_typed_cmd_red:

@@ -329,7 +329,8 @@ qed (simp_all add: remove_only_def)
 
 definition points_to where
   "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> owns_only \<omega> hl }"
-                                                 
+
+(*
 abbreviation well_typed_concrete_heap where
   "well_typed_concrete_heap \<Gamma> h \<equiv> (\<forall>hl v. h hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
 
@@ -346,38 +347,42 @@ lemma well_typed_concrete_heap_remove:
   using assms(1) by auto
 
 (* TODO: change this to "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (heap_typed \<Gamma> (get_vh \<phi>))" *)
-definition well_typed_heap where
-  "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (well_typed_concrete_heap \<Gamma> (get_vh \<phi>))"
+*)
+
+
+abbreviation well_typed_heap where
+  "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
 
 lemma well_typed_heapI[intro]:
-  assumes "\<And>hl v. get_vh \<phi> hl = Some v \<Longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty)"
+  assumes "\<And>hl v ty. get_vh \<phi> hl = Some v \<Longrightarrow> \<Gamma> (snd hl) = Some ty \<Longrightarrow> v \<in> ty"
   shows "well_typed_heap \<Gamma> \<phi>"
-  by (simp add: Instantiation.well_typed_heap_def assms)
+  by (simp add: assms heap_typed_def)
 
 lemma well_typed_heapE:
   assumes "well_typed_heap \<Gamma> \<phi>"
       and "get_vh \<phi> hl = Some v"
-    shows "\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty"
+      and "\<Gamma> (snd hl) = Some ty"
+    shows "v \<in> ty"
   using assms
-  unfolding well_typed_heap_def by blast
+  unfolding heap_typed_def by blast
 
 lemma well_typed_heap_sum:
   assumes "Some x = a \<oplus> b"
       and "well_typed_heap \<Gamma> a"
       and "well_typed_heap \<Gamma> b"
     shows "well_typed_heap \<Gamma> x"
-  using Instantiation.well_typed_heap_def assms(1) assms(2) assms(3) sum_val_defined
-  by blast
+  using assms(1) assms(2) assms(3) heap_typed_def sum_val_defined
+  by smt
 
 lemma well_typed_heap_smaller:
   assumes "a \<succeq> b"
       and "Instantiation.well_typed_heap \<Gamma> a"
     shows "Instantiation.well_typed_heap \<Gamma> b"
-  by (metis Instantiation.well_typed_heap_def assms(1) assms(2) read_field.elims read_field_mono)
+  by (metis heap_typed_def assms(1) assms(2) read_field.elims read_field_mono)
 
 lemma well_typed_heap_core:
   "Instantiation.well_typed_heap \<Gamma> x = Instantiation.well_typed_heap \<Gamma> |x|"
-  by (simp add: Instantiation.well_typed_heap_def core_structure(2))
+  by (simp add: heap_typed_def core_structure(2))
 
 lemma partial_heap_same_sum:
   fixes h :: "'r partial_heap"
@@ -574,24 +579,34 @@ fun wf_custom_stmt where
   \<and> (\<exists>ty. custom_context \<Delta> f = Some ty \<and> TypedEqui.typed_exp ty e)"
 (* | "wf_custom_stmt _ (Label _) \<longleftrightarrow> True" *)
 
+definition typed_value where
+  "typed_value \<Delta> f v \<longleftrightarrow> (\<forall>ty. custom_context \<Delta> f = Some ty \<longrightarrow> v \<in> ty)"
+
+lemma typed_valueI:
+  assumes "\<And>ty. custom_context \<Delta> f = Some ty \<Longrightarrow> v \<in> ty"
+  shows "typed_value \<Delta> f v"
+  by (simp add: assms typed_value_def)
+
+
 definition update_value where
   "update_value \<Delta> A r f e =
-  { \<omega>' |\<omega>' \<omega> l v ty. custom_context \<Delta> f = Some ty \<and> v \<in> ty \<and>
+  { \<omega>' |\<omega>' \<omega> l v. typed_value \<Delta> f v \<and>
  \<omega> \<in> A \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)}"
+
+(* TODO: Start from here *)
 
 lemma in_update_value:
   assumes "\<omega> \<in> A"
       and "r \<omega> = Some l"
       and "e \<omega> = Some v"
       and "\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
-      and "custom_context \<Delta> f = Some ty"
-      and "v \<in> ty"
+      and "typed_value \<Delta> f v"
     shows "\<omega>' \<in> update_value \<Delta> A r f e"
   using assms update_value_def by fast
 
 lemma update_valueE:
   assumes "\<omega>' \<in> update_value \<Delta> A r f e"
-  shows "\<exists>\<omega> l v ty. custom_context \<Delta> f = Some ty \<and> v \<in> ty \<and>
+  shows "\<exists>\<omega> l v. typed_value \<Delta> f v \<and>
  \<omega> \<in> A \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
   using assms update_value_def
   by (smt (verit, best) mem_Collect_eq)
@@ -601,7 +616,7 @@ definition assertion_holds_at where
 
 inductive SL_Custom :: "('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context \<Rightarrow> 'a equi_state set \<Rightarrow> 'a custom \<Rightarrow> 'a equi_state assertion \<Rightarrow> bool"
   where
-  RuleFieldAssign: "\<lbrakk> TypedEqui.self_framing_typed \<Delta> A; entails A { \<omega> |\<omega> l. get_m \<omega> (l, f) = 1 \<and> r \<omega> = Some l};
+  RuleFieldAssign: "\<lbrakk> self_framing A; entails A { \<omega> |\<omega> l. get_m \<omega> (l, f) = 1 \<and> r \<omega> = Some l};
   framed_by_exp A r; framed_by_exp A e \<rbrakk> \<Longrightarrow> SL_Custom \<Delta> A (FieldAssign r f e) (update_value \<Delta> A r f e)"
 (* | RuleLabel: "SL_Custom \<Delta> A (Label l) (assertion_holds_at l A)" *)
 
@@ -609,7 +624,7 @@ inductive SL_Custom :: "('a val, (field_ident \<rightharpoonup> 'a val set)) abs
 inductive_cases SL_custom_FieldAssign[elim!]: "SL_Custom \<Delta> A (FieldAssign r f e) B"
 (* inductive_cases SL_custom_Label[elim!]: "SL_Custom \<Delta> A (Label l) B" *)
 
-
+(*
 lemma typed_then_update_value_typed:
   assumes "TypedEqui.typed_assertion \<Delta> A"
   shows "TypedEqui.typed_assertion \<Delta> (update_value \<Delta> A r f e)"
@@ -644,7 +659,7 @@ proof (rule TypedEqui.typed_assertionI)
     qed
   qed
 qed
-
+*)
 
 lemma set_state_value_inv:
   assumes "get_vh \<phi> l = Some v"
@@ -717,44 +732,44 @@ lemma full_state_ext_better:
 lemma typed_get_vh:
   assumes "TypedEqui.typed \<Delta> \<omega>"
       and "get_vh (get_state \<omega>) hl = Some v"
-    shows "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v \<in> ty"  
-  by (metis TypedEqui.typed_def assms(1) assms(2) get_abs_state_def get_state_def well_typedE(1) well_typed_heapE)
+      and "custom_context \<Delta> (snd hl) = Some ty"
+    shows "v \<in> ty"
+  by (metis TypedEqui.typed_def assms get_abs_state_def get_state_def well_typedE(1) well_typed_heapE)
 
 lemma self_framing_update_value:
-  assumes "TypedEqui.self_framing_typed \<Delta> A"
+  fixes \<Delta> :: "('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
+  assumes "self_framing A"
       and "wf_exp r"
       and "wf_exp e"
       and "framed_by_exp A r"
       and "framed_by_exp A e"
       and "\<And>\<omega> l. \<omega> \<in> A \<Longrightarrow> r \<omega> = Some l \<Longrightarrow> get_m \<omega> (l, f) = 1"
-      and "TypedEqui.typed_assertion \<Delta> A"
-    shows "TypedEqui.self_framing_typed \<Delta> (update_value \<Delta> A r f e)"
-proof (rule TypedEqui.self_framing_typedI)
+    shows "self_framing (update_value \<Delta> A r f e)"
+proof (rule self_framingI)
   fix \<omega>'
-  assume asm0: "TypedEqui.typed \<Delta> \<omega>'"
   show "\<omega>' \<in> update_value \<Delta> A r f e \<longleftrightarrow> stabilize \<omega>' \<in> update_value \<Delta> A r f e" (is "?P \<longleftrightarrow> ?Q")
   proof
     assume ?P
-    then obtain \<omega> l v ty where r: "custom_context \<Delta> f = Some ty \<and> v \<in> ty" "\<omega> \<in> A" "r \<omega> = Some l"
+    then obtain \<omega> l v where r: "typed_value \<Delta> f v" "\<omega> \<in> A" "r \<omega> = Some l"
       "e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
       using update_valueE[of \<omega>' \<Delta> A r f e] by blast
     then have "r (stabilize \<omega>) = Some l \<and> e (stabilize \<omega>) = Some v"
-      using TypedEqui.wf_exp_framed_by_stabilize_typed[OF _ _ \<open>\<omega> \<in> A\<close>, of _ \<Delta>]
-      by (smt (verit, ccfv_threshold) TypedEqui.typed_state_axioms assms(1) assms(2) assms(3) assms(4) assms(5) assms(7) typed_state.typed_assertion_def)
+      by (meson assms(1) assms(2) assms(3) assms(4) assms(5) wf_exp_framed_by_stabilize)
     moreover have "stabilize \<omega>' = set_state (stabilize \<omega>) (set_value (get_state (stabilize \<omega>)) (l, f) v)"
       by (simp add: assms(6) pperm_pnone_pgt r(2) r(3) r(4) stabilize_set_value)
     ultimately show ?Q
-      by (metis TypedEqui.typed_assertion_def TypedEqui.typed_state_axioms assms(1) assms(7) in_update_value r(1) r(2) typed_state.self_framing_typedE)
+      by (metis assms(1) in_update_value r(1) r(2) self_framing_def)
   next
     assume ?Q
-    then obtain \<omega> l v ty where asm1: "custom_context \<Delta> f = Some ty \<and> v \<in> ty \<and> \<omega> \<in> A" "r \<omega> = Some l"
+    then obtain \<omega> l v where asm1: "typed_value \<Delta> f v \<and> \<omega> \<in> A" "r \<omega> = Some l"
       "e \<omega> = Some v \<and> stabilize \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
       using update_valueE[of "stabilize \<omega>'" \<Delta> A r f e] by blast
     then have "stabilize \<omega> \<in> A \<and> r (stabilize \<omega>) = Some l \<and> e (stabilize \<omega>) = Some v"
-      by (meson TypedEqui.self_framing_typedE TypedEqui.typed_assertion_def TypedEqui.typed_state_axioms assms(1) assms(2) assms(3) assms(4) assms(5) assms(7) typed_state.wf_exp_framed_by_stabilize_typed)
+      using self_framingE[OF assms(1)]
+      by (meson assms(1) assms(2) assms(3) assms(4) assms(5) wf_exp_framed_by_stabilize)
     have r: "get_store \<omega>' = get_store \<omega> \<and> get_trace \<omega>' = get_trace \<omega> \<and> get_m \<omega>' = get_m \<omega>"
       by (metis AbstractSemantics.get_store_stabilize asm1(3) get_state_set_state get_state_stabilize get_store_set_state get_trace_set_state get_trace_stabilize get_vh_vm_set_value(2) vstate_stabilize_structure(1))
-    have "\<exists>x. stabilize x = stabilize \<omega> \<and> \<omega>' = set_state x (set_value (get_state x) (l, f) v) \<and> TypedEqui.typed \<Delta> x"
+    have "\<exists>x. stabilize x = stabilize \<omega> \<and> \<omega>' = set_state x (set_value (get_state x) (l, f) v)" (* \<and> TypedEqui.typed \<Delta> x" *)
     proof -
       obtain v0 where "get_h \<omega> (l, f) = Some v0"
         using assms(6) asm1
@@ -805,10 +820,13 @@ proof (rule TypedEqui.self_framing_typedI)
           qed
         qed
       qed (simp_all add: r)
+(*
       moreover have "TypedEqui.typed \<Delta> ?x"
         unfolding TypedEqui.typed_def
       proof
         show "TypedEqui.typed_store \<Delta> (get_store (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
+          sorry
+
           by (metis TypedEqui.typed_def asm0(1) get_store_set_state)
         show "well_typed (custom_context \<Delta>) (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
         proof (rule well_typedI)
@@ -835,10 +853,13 @@ proof (rule TypedEqui.self_framing_typedI)
       qed
       ultimately show ?thesis by fast
     qed
+*)
+      ultimately show ?thesis by blast
+    qed
     then have "\<exists>x. x \<in> A \<and> r x = Some l \<and> e x = Some v \<and> \<omega>' = set_state x (set_value (get_state x) (l, f) v)"
-      by (metis (no_types, lifting) TypedEqui.self_framing_typed_altE \<open>stabilize \<omega> \<in> A \<and> r (stabilize \<omega>) = Some l \<and> e (stabilize \<omega>) = Some v\<close> assms(1) assms(2) assms(3) wf_exp_stabilize)
+      by (metis \<open>stabilize \<omega> \<in> A \<and> r (stabilize \<omega>) = Some l \<and> e (stabilize \<omega>) = Some v\<close> assms(1) assms(2) assms(3) self_framing_invE wf_exp_stabilize)
     then show ?P
-      using asm0(1) in_update_value
+      unfolding update_value_def
       using asm1(1) by blast
   qed
 qed
@@ -854,11 +875,16 @@ inductive red_custom_stmt :: "('a val, field_ident \<rightharpoonup> 'a val set)
 inductive_cases red_custom_stmt_FieldAssign[elim!]: "red_custom_stmt \<Delta> (FieldAssign r f e) \<omega> S"
 (* inductive_cases red_custom_stmt_Label[elim!]: "red_custom_stmt \<Delta> (Label l) \<omega> S" *)
 
+(*
+  assumes SL_proof_custom: "(\<forall>(\<omega> :: (('v, 'a) abs_state list \<times> ('v, 'a) abs_state)) \<in> SA.
+  red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>)) \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> wf_set \<Delta> (snd ` SA)
+  \<Longrightarrow> SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union>\<omega>\<in>SA. f \<omega>))"
+*)
 lemma SL_proof_FieldAssign_easy:
   assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> (FieldAssign r g e) (snd \<omega>) (f \<omega>)"
       and "wf_custom_stmt \<Delta> (FieldAssign r g e)"
       and "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> stable (snd \<alpha>) \<and> TypedEqui.typed \<Delta> (snd \<alpha>)"
-    shows "SL_Custom \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) (FieldAssign r g e) (TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA)))"
+    shows "SL_Custom \<Delta> (Stabilize (snd ` SA)) (FieldAssign r g e) (Stabilize (\<Union> (f ` SA)))"
 proof -
 
   have wfs: "wf_exp r \<and> wf_exp e" using assms by auto
@@ -872,19 +898,19 @@ proof -
   \<and> f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (?r (snd \<alpha>), g) (?e (snd \<alpha>)))} )"
     using assms(1) by fastforce
 
-  let ?A = "TypedEqui.Stabilize_typed \<Delta> (snd ` SA)"
+  let ?A = "Stabilize (snd ` SA)"
   let ?B = "update_value \<Delta> ?A r g e"
 
 
   have "SL_Custom \<Delta> ?A (custom.FieldAssign r g e) ?B"
   proof (rule RuleFieldAssign)
-    show "TypedEqui.self_framing_typed \<Delta> ?A"
+    show "self_framing (Stabilize (snd ` SA))"
       by simp
-    show entails_rel: "entails (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) {\<omega> |\<omega> l. get_m \<omega> (l, g) = PosReal.pwrite \<and> r \<omega> = Some l}"
+    show entails_rel: "entails (Stabilize (snd ` SA)) {\<omega> |\<omega> l. get_m \<omega> (l, g) = PosReal.pwrite \<and> r \<omega> = Some l}"
     proof (rule entailsI)
-      fix \<omega> assume "\<omega> \<in> TypedEqui.Stabilize_typed \<Delta> (snd ` SA)"
+      fix \<omega> assume "\<omega> \<in> Stabilize (snd ` SA)"
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
-        by (metis (no_types, lifting) TypedEqui.Stabilize_typed_def imageE in_Stabilize member_filter)
+        by (meson imageE in_Stabilize)
       then obtain l where "get_m (stabilize \<omega>) (l, g) = PosReal.pwrite \<and> r (stabilize \<omega>) = Some l"
         by (metis r)
       then have "get_m \<omega> (l, g) = 1 \<and> r \<omega> = Some l"
@@ -892,35 +918,40 @@ proof -
       then show "\<omega> \<in> {\<omega> |\<omega> l. get_m \<omega> (l, g) = 1 \<and> r \<omega> = Some l}"
         by blast
     qed
-    then show "framed_by_exp (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r"
+    then show "framed_by_exp (Stabilize (snd ` SA)) r"
       by (smt (verit, best) Collect_mem_eq Collect_mono_iff entails_def framed_by_exp_def option.distinct(1))
-    show "framed_by_exp (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) e"
-      by (smt (verit, ccfv_SIG) TypedEqui.Stabilize_typed_def framed_by_exp_def image_iff in_Stabilize member_filter option.distinct(1) r wf_exp_stabilize wfs)
+    show "framed_by_exp (Stabilize (snd ` SA)) e"
+      by (smt (verit, ccfv_threshold) framed_by_exp_def image_iff in_Stabilize option.distinct(1) r wf_exp_stabilize wfs)
   qed
-  moreover have "?B = TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA))" (is "?B = ?Q")
-  proof (rule TypedEqui.self_framing_typed_ext)
-    show "TypedEqui.self_framing_typed \<Delta> (update_value \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r g e)"
+  moreover have "?B = Stabilize (\<Union> (f ` SA))" (is "?B = ?Q")
+  proof (rule self_framing_ext)
+    show "self_framing (update_value \<Delta> (Stabilize (snd ` SA)) r g e)"
     proof (rule self_framing_update_value)
       show "wf_exp r" using wfs by simp
       show "wf_exp e" using wfs by simp
-      show "framed_by_exp (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r"
+      show "framed_by_exp (Stabilize (snd ` SA)) r"
         using calculation by force
-      show "framed_by_exp (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) e"
+      show "framed_by_exp (Stabilize (snd ` SA)) e"
         using calculation by fastforce
-      show "\<And>\<omega> l. \<omega> \<in> TypedEqui.Stabilize_typed \<Delta> (snd ` SA) \<Longrightarrow> r \<omega> = Some l \<Longrightarrow> get_m \<omega> (l, g) = 1"
-        by (metis (no_types, opaque_lifting) RangeE TypedEqui.Stabilize_typed_def get_m_stabilize in_Stabilize member_filter option.sel r snd_conv snd_eq_Range wf_exp_stabilize wfs)
+      show "\<And>\<omega> l. \<omega> \<in> Stabilize (snd ` SA) \<Longrightarrow> r \<omega> = Some l \<Longrightarrow> get_m \<omega> (l, g) = 1"
+        by (metis (no_types, opaque_lifting) RangeE Stabilize_self_framing \<open>framed_by_exp (Stabilize (snd ` SA)) r\<close> \<open>wf_exp r\<close> get_m_stabilize in_Stabilize option.sel r snd_conv snd_eq_Range wf_exp_framed_by_stabilize)
     qed (simp_all)
 
-    show "TypedEqui.typed_assertion \<Delta> (update_value \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r g e)"
-      using TypedEqui.typed_Stabilize_typed typed_then_update_value_typed by blast
+    show "self_framing (Stabilize (\<Union> (f ` SA)))"
+      by simp
 
-    fix \<omega>'
-    assume asm0: "sep_algebra_class.stable \<omega>'" "TypedEqui.typed \<Delta> \<omega>'"
-    show "\<omega>' \<in> TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA)) \<Longrightarrow> \<omega>' \<in> update_value \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r g e"
+    fix \<omega>' :: "((nat \<Rightarrow> 'b val option) agreement \<times> (char list \<Rightarrow> 'b virtual_state option) agreement \<times> 'b virtual_state)"
+    assume asm0: "sep_algebra_class.stable \<omega>'"
+    show "\<omega>' \<in> Stabilize (\<Union> (f ` SA)) \<Longrightarrow> \<omega>' \<in> update_value \<Delta> (Stabilize (snd ` SA)) r g e"
     proof -
-      assume asm1: "\<omega>' \<in> TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-      then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' \<in> f \<alpha>" "TypedEqui.typed \<Delta> \<omega>'"
+      assume asm1: "\<omega>' \<in> Stabilize (\<Union> (f ` SA))"
+      then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' \<in> f \<alpha>"
+        by auto
+
+(* "TypedEqui.typed \<Delta> \<omega>'"
         by (metis (no_types, lifting) TypedEqui.Stabilize_typed_def UN_E in_Stabilize member_filter)
+*)
+
       then obtain l v where "f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)}"  "r (snd \<alpha>) = Some l" "e (snd \<alpha>) = Some v"
         using r[of \<alpha>] by blast
       then have "stabilize \<omega>' = set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)"
@@ -929,32 +960,35 @@ proof -
         by (simp add: \<open>\<alpha> \<in> SA\<close> assms(3))
       ultimately have "snd \<alpha> \<in> Stabilize (snd ` SA)"
         by (simp add: \<open>\<alpha> \<in> SA\<close> already_stable)
+(*
       moreover have "TypedEqui.typed \<Delta> (stabilize \<omega>')"
         by (simp add: TypedEqui.typed_state_then_stabilize_typed asm0(2))
+*)
       moreover have "stabilize \<omega>' \<in> ?B"
-        using in_update_value[of _ _ r _ e, OF _ \<open>r (snd \<alpha>) = Some l\<close> \<open>e (snd \<alpha>) = Some v\<close> \<open>stabilize \<omega>' = set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)\<close>]
-        by (smt (verit) TypedEqui.Stabilize_typed_def \<open>\<alpha> \<in> SA\<close> \<open>e (snd \<alpha>) = Some v\<close> assms(1) assms(3) calculation(1) member_filter option.sel red_custom_stmt_FieldAssign)
+        using in_update_value[of _ _ r _ e, OF _ \<open>r (snd \<alpha>) = Some l\<close> \<open>e (snd \<alpha>) = Some v\<close>
+            \<open>stabilize \<omega>' = set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)\<close>]
+        by (smt (verit, ccfv_threshold) \<open>\<alpha> \<in> SA\<close> \<open>e (snd \<alpha>) = Some v\<close> calculation option.sel r typed_value_def)
       then show "\<omega>' \<in> ?B" unfolding update_value_def
         by (simp add: \<open>sep_algebra_class.stable \<omega>'\<close> already_stable)
     qed
     
-    show "\<omega>' \<in> update_value \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r g e \<Longrightarrow> \<omega>' \<in> TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA))"
+    show "\<omega>' \<in> update_value \<Delta> (Stabilize (snd ` SA)) r g e \<Longrightarrow> \<omega>' \<in> Stabilize (\<Union> (f ` SA))"
     proof -
-      assume "\<omega>' \<in> update_value \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) r g e"
-      then obtain \<omega> l v where "\<omega> \<in> TypedEqui.Stabilize_typed \<Delta> (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)"
+      assume "\<omega>' \<in> update_value \<Delta> (Stabilize (snd ` SA)) r g e"
+      then obtain \<omega> l v where "\<omega> \<in> Stabilize (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)"
         unfolding update_value_def by blast
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega> = snd \<alpha>"
-        by (metis (no_types, lifting) TypedEqui.Stabilize_typed_def imageE in_Stabilize member_filter)
+        by auto
       then have "f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (the (r (snd \<alpha>)), g) (the (e (snd \<alpha>))))}"
         using r by blast
       moreover have "the (r (snd \<alpha>)) = l \<and> the (e (snd \<alpha>)) = v"
-        by (metis (no_types, lifting) \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> TypedEqui.Stabilize_typed \<Delta> (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> option.sel r wf_exp_stabilize wfs)
+        by (metis (no_types, lifting) \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> option.sel r wf_exp_stabilize wfs)
       then have "stabilize \<omega>' \<in> f \<alpha>"
-        by (metis \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> TypedEqui.Stabilize_typed \<Delta> (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> get_m_stabilize pperm_pnone_pgt r singleton_iff stabilize_set_value zero_neq_one)
-      then show "\<omega>' \<in> TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA))"
-        using TypedEqui.Stabilize_typed_def \<open>\<alpha> \<in> SA\<close> asm0(2) by fastforce
+        by (metis \<open>\<alpha> \<in> SA\<close> \<open>\<omega> \<in> Stabilize (snd ` SA) \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, g) v)\<close> \<open>stabilize \<omega> = snd \<alpha>\<close> get_m_stabilize pperm_pnone_pgt r singleton_iff stabilize_set_value zero_neq_one)
+      then show "\<omega>' \<in> Stabilize (\<Union> (f ` SA))"
+        using \<open>\<alpha> \<in> SA\<close> by auto
     qed
-  qed (simp_all)
+  qed
   ultimately show ?thesis by argo
 qed
 
@@ -965,7 +999,7 @@ lemma SL_proof_aux_custom:
   assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>)"
       and "wf_custom_stmt \<Delta> C"
     and "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> stable (snd \<alpha>) \<and> TypedEqui.typed \<Delta> (snd \<alpha>)"
-  shows "SL_Custom \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) C (TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA)))"
+  shows "SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union> (f ` SA)))"
 proof (cases C)
   case (FieldAssign r g e)
   then show ?thesis
@@ -981,7 +1015,7 @@ lemma custom_reciprocal:
     shows "\<exists>S. red_custom_stmt \<Delta> C \<omega> S \<and> S \<subseteq> B"
   using assms
 proof (induct rule: SL_Custom.induct)
-  case (RuleFieldAssign \<Delta> A f r e)
+  case (RuleFieldAssign A f r e \<Delta>)
   then obtain hl v where "r \<omega> = Some hl" "e \<omega> = Some v" "get_m \<omega> (hl, f) = 1"
     by (smt (verit, ccfv_SIG) CollectD entails_def framed_by_expE subset_iff)
   then obtain ty where "custom_context \<Delta> f = Some ty" "v \<in> ty"
@@ -990,7 +1024,7 @@ proof (induct rule: SL_Custom.induct)
     using RedFieldAssign[of r \<omega> hl e v f \<Delta> ty]
     using \<open>e \<omega> = Some v\<close> \<open>get_m \<omega> (hl, f) = PosReal.pwrite\<close> \<open>r \<omega> = Some hl\<close> by fastforce
   then show "\<exists>S. red_custom_stmt \<Delta> (custom.FieldAssign r f e) \<omega> S \<and> S \<subseteq> update_value \<Delta> A r f e"
-    by (meson RuleFieldAssign.prems(1) \<open>custom_context \<Delta> f = Some ty\<close> \<open>e \<omega> = Some v\<close> \<open>r \<omega> = Some hl\<close> \<open>v \<in> ty\<close> empty_subsetI in_update_value insert_subset)
+    by (metis (no_types, lifting) RuleFieldAssign.prems(1) \<open>custom_context \<Delta> f = Some ty\<close> \<open>e \<omega> = Some v\<close> \<open>r \<omega> = Some hl\<close> \<open>v \<in> ty\<close> in_update_value option.inject singletonD subsetI typed_value_def)
 qed
 
 lemma red_custom_stable:
@@ -1020,9 +1054,9 @@ proof (induct rule: red_custom_stmt.induct)
       by (metis RedFieldAssign.prems(1) RedFieldAssign.prems(3) get_abs_state_def get_trace_def get_trace_set_state singletonD well_typedE(2))
     show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state \<omega>'))"
     proof (rule well_typed_heapI)
-      fix hl v assume "get_vh (snd (get_abs_state \<omega>')) hl = Some v"
-      then show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v \<in> ty"
-        by (metis RedFieldAssign.hyps(4) RedFieldAssign.hyps(5) RedFieldAssign.prems(1) RedFieldAssign.prems(3) fun_upd_other fun_upd_same get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) option.sel singletonD snd_conv well_typedE(1) well_typed_heapE)
+      fix hl v ty assume "get_vh (snd (get_abs_state \<omega>')) hl = Some v" "custom_context \<Delta> (snd hl) = Some ty"
+      then show "v \<in> ty"
+        by (metis (mono_tags, lifting) RedFieldAssign.hyps(4) RedFieldAssign.hyps(5) RedFieldAssign.prems(1) RedFieldAssign.prems(3) fun_upd_triv get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) heap_typed_insert singletonD snd_conv well_typedE(1))
     qed
   qed
 (*
@@ -1051,7 +1085,7 @@ proof
   fix \<Delta> C f
   show "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>) \<Longrightarrow>
        wf_custom_stmt \<Delta> C \<Longrightarrow>
-       TypedEqui.wf_set \<Delta> (snd ` SA) \<Longrightarrow> SL_Custom \<Delta> (TypedEqui.Stabilize_typed \<Delta> (snd ` SA)) C (TypedEqui.Stabilize_typed \<Delta> (\<Union> (f ` SA)))"    
+       TypedEqui.wf_set \<Delta> (snd ` SA) \<Longrightarrow> SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union> (f ` SA)))"    
     by (simp add: SL_proof_aux_custom TypedEqui.wf_set_def TypedEqui.wf_state_def)
   fix A B \<omega>
   show "SL_Custom \<Delta> A C B \<Longrightarrow> \<omega> \<in> A \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> sep_algebra_class.stable \<omega> \<Longrightarrow> TypedEqui.typed \<Delta> \<omega> \<Longrightarrow> \<exists>S. red_custom_stmt \<Delta> C \<omega> S \<and> S \<subseteq> B"
@@ -1251,7 +1285,8 @@ lemma concrete_post_Inhale :
   assumes "rel_stable_assertion \<omega> A"
   assumes "(Set.filter sep_algebra_class.stable ({\<omega>} \<otimes> A)) \<subseteq> S"
   shows "concrete_red_stmt_post \<Delta> (abs_stmt.Inhale A) \<omega> S"
-  using assms unfolding concrete_red_stmt_post_def by (blast intro: ConcreteSemantics.RedInhale)
+  using assms unfolding concrete_red_stmt_post_def
+  by (smt (verit, del_insts) ConcreteSemantics.RedInhale in_mono member_filter subsetI)
 
 lemma concrete_post_Exhale_raw :
   assumes "a \<in> A"
@@ -1271,7 +1306,7 @@ lemma concrete_post_Exhale :
   using assms apply (simp)
   apply (clarsimp simp add: add_set_def)
   apply (rule concrete_post_Exhale_raw; simp?)
-   apply (simp add:stabilize_is_stable)
+   apply (simp)
   using assms by (simp)
 
 lemma concrete_post_Assert :
