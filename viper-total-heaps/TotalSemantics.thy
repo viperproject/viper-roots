@@ -129,6 +129,8 @@ inductive red_exhale :: "'a total_context \<Rightarrow> ('a full_total_state \<R
      red_exhale ctxt R \<omega>0 A \<omega> RFailure"
 
 inductive_cases ExhStar_case: "red_exhale ctxt R \<omega>0 (A && B) m_pm res"
+inductive_cases ExhImp_case: "red_exhale ctxt R \<omega>0 (Imp e B) m_pm res"
+
 
 lemma ExhPure_case: 
   assumes "red_exhale ctxt R \<omega>0 (Atomic (Pure e)) \<omega> res"

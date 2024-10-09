@@ -573,6 +573,74 @@ lemma exhale_rel_imp_2:
   unfolding is_exh_rel_invariant_def
   by blast
 
+lemma exhale_rel_imp_3:
+  assumes Invariant: "\<And>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega>def \<omega> \<Longrightarrow> Q A \<omega>def \<omega>"
+      and ExpWfRel: 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (assert.Imp cond A) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt cond 
+           \<gamma>1 \<gamma>_if" 
+      and ThnRel: "exhale_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)))
+                              R Q ctxt_vpr StateCons P ctxt A \<gamma>_if \<gamma>'"
+      and ElsRel: "rel_general (uncurry R) (uncurry R) (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; (snd \<omega>)\<rangle> [\<Down>]\<^sub>t (Val (VBool False))) (\<lambda>_. False) P ctxt \<gamma>_if \<gamma>'"
+            (is "rel_general ?R1Els ?R1Els ?SuccessEls ?FailEls P ctxt _ _")
+    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 \<gamma>'"
+  unfolding exhale_rel_def
+proof (simp only: uncurry.simps, 
+       rule rel_general_cond_3,
+       fastforce intro: rel_general_conseq_input_output[OF ExpWfRel[simplified wf_rel_def]])
+
+  let ?R1Thn = "(\<lambda>\<omega> ns. R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; snd \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<and> Q A (fst \<omega>) (snd \<omega>))"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"  
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+  
+  show "rel_general ?R1Thn (\<lambda>a. R (fst a) (snd a)) ?SuccessThn ?FailThn P ctxt \<gamma>_if \<gamma>'"
+    using ThnRel[simplified exhale_rel_def]
+    by auto
+  
+  let ?R1Thn = "(\<lambda>\<omega> ns. R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; snd \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<and> Q A (fst \<omega>) (snd \<omega>))"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"  
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+
+  show "rel_general ?R1Els (\<lambda>a. R (fst a) (snd a)) ?SuccessEls ?FailEls P ctxt \<gamma>_if \<gamma>'"
+    using ElsRel
+    by auto
+  thm ExhImp_case
+  show "\<And>\<omega> \<omega>' ns.
+       fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) (RNormal (snd \<omega>')) \<Longrightarrow>
+       R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+       (\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       ((R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<and> Q A (fst \<omega>) (snd \<omega>)) \<and>
+        fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>')) \<or>
+        uncurry R \<omega> ns \<and> \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False))"
+    apply (rule ExhImp_case)
+       apply blast
+      apply (insert Invariant)
+      apply blast
+     apply force
+    apply blast
+    done
+
+  show "\<And>\<omega> ns.
+       red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) RFailure \<Longrightarrow>
+       R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+       ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+       (\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       ((R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<and> Q A (fst \<omega>) (snd \<omega>)) \<and>
+        red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure \<or>
+        uncurry R \<omega> ns \<and> False)"
+    apply (rule ExhImp_case)
+       apply blast
+      apply (insert Invariant)
+      apply blast
+     apply force
+    apply simp
+    apply (erule RedExpListFailure_case)
+     apply simp
+    apply (erule RedExpListFailure_case)
+      apply blast
+     apply blast
+    by simp
+qed
+
 lemma exhale_rel_cond:
   assumes Invariant: "is_exh_rel_invariant ctxt_vpr StateCons cond_assert cond_exp Q"
       and Cond: "cond_exp cond"
@@ -912,7 +980,7 @@ next
       using \<open>p \<ge> 0\<close> Abs_preal_inverse EnoughPerm
       by (simp add: pgte.rep_eq)
     thus "pgte pwrite ((get_mh_total_full (snd \<omega>0_\<omega>def) (the_address r, f)) - (Abs_preal p))"
-      using PermAtMostOne psub_smaller PermAtMostOne pgte_transitive PosReal.pgte.rep_eq less_eq_preal.rep_eq
+      using PermAtMostOne psub_smaller pgte_transitive PosReal.pgte.rep_eq less_eq_preal.rep_eq
       by fastforce
   qed
 
@@ -939,12 +1007,14 @@ qed (auto)
 
 subsection \<open>Pure expression rule\<close>
 
-lemma exhale_rel_pure:
-  assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_vpr 
-           \<gamma> (BigBlock name (Assert e_bpl#cs) str tr, cont)" 
-          (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt e_vpr \<gamma> ?\<gamma>1")
-      and ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
-    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs str tr, cont)"
+lemma exhale_rel_pure_general:
+  assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_vpr \<gamma> \<gamma>1"
+      and ExpCheckRel: "rel_general (\<lambda> \<omega>def_\<omega> ns. R (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>) ns \<and> Q (Atomic (Pure e_vpr)) (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>))
+                           (uncurry R')
+                           (\<lambda> \<omega>def_\<omega> \<omega>def_\<omega>'. \<omega>def_\<omega> = \<omega>def_\<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>def_\<omega>) \<turnstile> \<langle>e_vpr; (snd \<omega>def_\<omega>)\<rangle> [\<Down>]\<^sub>t Val (VBool True))
+                           (\<lambda> \<omega>def_\<omega>. ctxt_vpr, StateCons, Some (fst \<omega>def_\<omega>) \<turnstile> \<langle>e_vpr; (snd \<omega>def_\<omega>)\<rangle> [\<Down>]\<^sub>t Val (VBool False))
+                           P ctxt \<gamma>1 \<gamma>'"
+    shows "exhale_rel R R' Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> \<gamma>'"
 proof (rule exhale_rel_intro)
   fix \<omega>0 \<omega> \<omega>' ns
   assume "R \<omega>0 \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>0 \<omega>" and
@@ -957,21 +1027,20 @@ proof (rule exhale_rel_intro)
     using  exh_if_total_normal_2
     by (metis ExhPure_case stmt_result_total.distinct(5))
 
-  ultimately obtain ns1 where RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
+  ultimately obtain ns1 where "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
     using wf_rel_normal_elim[OF Wf] \<open>R _ _ ns\<close> \<open>Q _ _ _\<close>
     by blast
 
-  from ExpRel RedExpVpr have "red_expr_bpl ctxt e_bpl ns1 (val_rel_vpr_bpl (VBool True))"
-    using \<open>R _ _ ns1\<close> 
-    by (meson exp_rel_vpr_bpl_elim)
+  moreover from this obtain ns2 where "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) (\<gamma>', Normal ns2)" and "R' \<omega>0 \<omega> ns2"
+    using rel_success_elim[where ?\<omega> = "(\<omega>0,\<omega>)", OF ExpCheckRel,simplified] RedExpVpr \<open>Q (Atomic (Pure e_vpr)) \<omega>0 \<omega>\<close>
+    by (metis fst_conv snd_conv)
 
-  hence "red_ast_bpl P ctxt (?\<gamma>1, Normal ns1) ((BigBlock name cs str tr, cont), Normal ns1)"
-    by (simp add: red_ast_bpl_one_assert)
-
-  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and> R \<omega>0 \<omega>' ns'"
-    using RedBpl1 red_ast_bpl_transitive \<open>R _ _ ns1\<close> \<open>\<omega>' = \<omega>\<close>
+  ultimately show "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R' \<omega>0 \<omega>' ns'"
+    unfolding \<open>\<omega>' = \<omega>\<close>
+    using red_ast_bpl_transitive
     by blast
 next
+  fix \<omega>0 \<omega> ns
   fix \<omega>0 \<omega> ns
   assume "R \<omega>0 \<omega> ns" and "Q (Atomic (Pure e_vpr)) \<omega>0 \<omega>" and 
          "red_exhale ctxt_vpr StateCons \<omega>0 (Atomic (Pure e_vpr)) \<omega> RFailure"
@@ -989,20 +1058,52 @@ next
       by simp
   next
     case RedExpVpr
-    from this obtain ns1 where RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (?\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
+
+    from this obtain ns1 where RedBpl1: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>1, Normal ns1)" and "R \<omega>0 \<omega> ns1"
       using wf_rel_normal_elim[OF Wf] \<open>R _ _ ns\<close> \<open>Q _ _ _\<close>
       by blast
 
-    with ExpRel RedExpVpr have "red_expr_bpl ctxt e_bpl ns1 (val_rel_vpr_bpl (VBool False))"
-      by (meson exp_rel_vpr_bpl_elim)
-
-    hence "red_ast_bpl P ctxt (?\<gamma>1, Normal ns1) ((BigBlock name cs str tr, cont), Failure)"
-      by (simp add: red_ast_bpl_one_assert)
-
-    then show ?thesis 
-      using RedBpl1 red_ast_bpl_transitive
-      by blast
+    moreover from this obtain c  where "red_ast_bpl P ctxt (\<gamma>1, Normal ns1) c" and "snd c = Failure"
+      using rel_failure_elim[where ?\<omega> = "(\<omega>0,\<omega>)", OF ExpCheckRel, simplified] RedExpVpr \<open>Q _ _ _\<close>
+      by fastforce
+    ultimately show ?thesis
+      using red_ast_bpl_transitive
+      by (metis prod.exhaust_sel)
   qed
+qed
+
+
+lemma exhale_rel_pure:
+  assumes Wf: "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Pure e_vpr)) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt e_vpr 
+           \<gamma> (BigBlock name (Assert e_bpl#cs) str tr, cont)" 
+          (is "expr_wf_rel _ ctxt_vpr StateCons P ctxt e_vpr \<gamma> ?\<gamma>1")
+      and ExpRel: "exp_rel_vpr_bpl R ctxt_vpr ctxt e_vpr e_bpl"
+    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (Atomic (Pure e_vpr)) \<gamma> (BigBlock name cs str tr, cont)"
+proof (rule exhale_rel_pure_general, rule Wf, rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume R: "R (fst \<omega>) (snd \<omega>) ns \<and> Q (Atomic (Pure e_vpr)) (fst \<omega>) (snd \<omega>)"
+     and Succ: "\<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_vpr;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True)"
+
+
+  with ExpRel have RedExpBpl: "red_expr_bpl ctxt e_bpl ns (BoolV True)"
+    using R
+    by (metis exp_rel_vpr_bpl_elim val_rel_vpr_bpl.simps(2))
+
+  show "\<exists>ns'. red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) str tr, cont), Normal ns) ((BigBlock name cs str tr, cont), Normal ns') \<and>
+             uncurry R \<omega>' ns'"
+    using Succ R
+    by (fastforce intro: red_ast_bpl_one_assert[OF RedExpBpl])
+next
+  fix \<omega> ns
+  assume R: "R (fst \<omega>) (snd \<omega>) ns \<and> Q (Atomic (Pure e_vpr)) (fst \<omega>) (snd \<omega>)"
+     and Fail: "ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>e_vpr;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False)"
+
+  with ExpRel have RedExpBpl: "red_expr_bpl ctxt e_bpl ns (BoolV False)"
+    using R
+    by (metis exp_rel_vpr_bpl_elim val_rel_vpr_bpl.simps(2))
+
+  show "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt ((BigBlock name (cmd.Assert e_bpl # cs) str tr, cont), Normal ns) c'"
+    by (fastforce intro: red_ast_bpl_one_assert[OF RedExpBpl])
 qed
 
 subsection \<open>Misc\<close>
