@@ -2,7 +2,78 @@ theory ViperTyping
 imports ViperLang DeBruijn
 begin
 
-type_synonym type_env = "var \<rightharpoonup> vtyp"
+section \<open>heap typing\<close>
+
+definition heap_typed :: "(field_name \<rightharpoonup> 'v sem_type) \<Rightarrow> 'v partial_heap \<Rightarrow> bool" where
+  "heap_typed F h \<longleftrightarrow> (\<forall>hl ty v. F (snd hl) = Some ty \<longrightarrow> h hl = Some v \<longrightarrow> v \<in> ty)"
+
+abbreviation heap_typed_syn :: "('a \<Rightarrow> abs_type) \<Rightarrow> (field_ident \<rightharpoonup> vtyp) \<Rightarrow> 'a partial_heap \<Rightarrow> bool" where
+"heap_typed_syn \<Delta> F \<equiv> heap_typed (sem_fields \<Delta> F)"
+
+
+lemma heap_typed_lookup :
+  assumes "heap_typed F h"
+  assumes "h hl = Some v"
+  assumes "F (snd hl) = Some ty"
+  shows "v \<in> ty"
+  using assms apply (auto simp add:heap_typed_def) by (metis eq_snd_iff)
+
+lemma heap_typed_insert :
+  assumes "heap_typed F h"
+  assumes "F (snd hl) = Some ty"
+  shows "heap_typed F (h(hl \<mapsto> v)) \<longleftrightarrow> v \<in> ty"
+  using assms apply (auto simp add:heap_typed_def) using prod.collapse by blast
+
+lemma heap_typed_empty [simp] :
+  "heap_typed F Map.empty"
+  by (simp add:heap_typed_def)
+
+lemma heap_typed_remove :
+  assumes "heap_typed F h"
+  shows "heap_typed F (h(hl := None))"
+  using assms by (auto simp add:heap_typed_def)
+
+lemma heap_typed_update:
+  assumes "heap_typed \<Gamma> h"
+      and "\<And>ty. \<Gamma> (snd hl) = Some ty \<Longrightarrow> v \<in> ty"
+    shows "heap_typed \<Gamma> (h(hl \<mapsto> v))"
+  by (smt (verit) assms(1) assms(2) heap_typed_def map_upd_Some_unfold)
+
+section \<open>store typing\<close>
+
+definition store_typed :: "(var \<rightharpoonup> 'v set) \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> bool" where
+  "store_typed \<Lambda> \<sigma> \<longleftrightarrow> (dom \<Lambda> = dom \<sigma> \<and> (\<forall>x v ty. \<sigma> x = Some v \<and> \<Lambda> x = Some ty \<longrightarrow> v \<in> ty))"
+
+abbreviation store_typed_syn :: "('a \<Rightarrow> abs_type) \<Rightarrow> type_context \<Rightarrow> (var \<rightharpoonup> 'a val) \<Rightarrow> bool" where
+"store_typed_syn \<Delta> \<Lambda> \<equiv> store_typed (sem_store \<Delta> \<Lambda>)"
+
+
+lemma store_typed_lookup :
+  assumes "store_typed \<Lambda> \<sigma>"
+  assumes "\<Lambda> n = Some ty"
+  shows "\<exists> v. \<sigma> n = Some v \<and> v \<in> ty"
+  using assms unfolding store_typed_def by blast
+
+lemma store_typed_insert :
+  assumes "store_typed \<Lambda> st"
+  shows "store_typed \<Lambda> (st (x\<mapsto>v)) \<longleftrightarrow> (\<exists> ty. \<Lambda> x = Some ty \<and> v \<in> ty)"
+  using assms unfolding store_typed_def apply (auto)
+  by (metis domD insertI1)
+
+lemma store_typed_delete :
+  assumes "store_typed \<Lambda> \<sigma>"
+  assumes "\<Lambda>' = \<Lambda>(n := None)"
+  assumes "\<sigma>' = \<sigma>(n := None)"
+  shows "store_typed \<Lambda>' \<sigma>'"
+  using assms by (simp add:store_typed_def)
+
+lemma store_typed_unshift :
+  assumes "store_typed \<Lambda> \<sigma>"
+  assumes "\<Lambda>' = (unshift_2 n \<Lambda>)"
+  shows "store_typed \<Lambda>' (unshift_2 n \<sigma>)"
+  using assms by (auto simp add:unshift_2_def store_typed_def; blast)
+
+section \<open>expression and statement typing\<close>
 
 \<comment>\<open>
 The Viper language formalization does not distinguish perm and integer addition/subtraction/multiplcation
@@ -42,7 +113,7 @@ inductive_cases unop_type_elim : "unop_type op ty1 ty2"
 
 text \<open>Syntactic typing relation for expressions. TODO: typing rule for \<^const>\<open>ViperLang.Result\<close>\<close>
 
-inductive pure_exp_typing :: "program \<Rightarrow> type_env \<Rightarrow> pure_exp \<Rightarrow> vtyp \<Rightarrow> bool"
+inductive pure_exp_typing :: "program \<Rightarrow> type_context \<Rightarrow> pure_exp \<Rightarrow> vtyp \<Rightarrow> bool"
   for Pr :: program
   where
     TypVar: "\<lbrakk> \<Lambda> x = Some ty \<rbrakk> \<Longrightarrow> pure_exp_typing Pr \<Lambda> (Var x) ty"
@@ -112,14 +183,14 @@ inductive_simps pure_exp_typing_simps :
   "pure_exp_typing Pr \<Lambda> (PExists vt e1) ty"
   "pure_exp_typing Pr \<Lambda> (PForall vt e1) ty"
 
-inductive exp_or_wildcard_typing :: "program \<Rightarrow> type_env \<Rightarrow> pure_exp exp_or_wildcard \<Rightarrow> vtyp \<Rightarrow> bool"
-  for Pr :: program and \<Lambda> :: type_env
+inductive exp_or_wildcard_typing :: "program \<Rightarrow> type_context \<Rightarrow> pure_exp exp_or_wildcard \<Rightarrow> vtyp \<Rightarrow> bool"
+  for Pr :: program and \<Lambda> :: type_context
   where
     TypPureExp: "\<lbrakk> pure_exp_typing Pr \<Lambda> e ty \<rbrakk> \<Longrightarrow> exp_or_wildcard_typing Pr \<Lambda> (PureExp e) ty"
   | TypWildcard: "exp_or_wildcard_typing Pr \<Lambda> Wildcard TPerm"
 
-inductive atomic_assertion_typing :: "program \<Rightarrow> type_env \<Rightarrow> pure_exp atomic_assert \<Rightarrow> bool"
-  for Pr :: program and \<Lambda> :: type_env
+inductive atomic_assertion_typing :: "program \<Rightarrow> type_context \<Rightarrow> pure_exp atomic_assert \<Rightarrow> bool"
+  for Pr :: program and \<Lambda> :: type_context
   where
     TypPure: "\<lbrakk> pure_exp_typing Pr \<Lambda> e TBool \<rbrakk> \<Longrightarrow> atomic_assertion_typing Pr \<Lambda> (Pure e)"
   | TypAcc:
@@ -138,7 +209,7 @@ inductive_simps atomic_assertion_typing_simps :
   "atomic_assertion_typing Pr \<Lambda> (Acc e f ep)"
   "atomic_assertion_typing Pr \<Lambda> (AccPredicate P es ep)"
 
-inductive assertion_typing :: "program \<Rightarrow> type_env \<Rightarrow> assertion \<Rightarrow> bool"
+inductive assertion_typing :: "program \<Rightarrow> type_context \<Rightarrow> assertion \<Rightarrow> bool"
   for Pr :: program
   where
     TypAtomic: "\<lbrakk> atomic_assertion_typing Pr \<Lambda> A \<rbrakk> \<Longrightarrow> assertion_typing Pr \<Lambda> (Atomic A)"
@@ -170,7 +241,7 @@ inductive_simps assertion_typing_simps :
   "assertion_typing Pr \<Lambda> (ForAll ty A)"
   "assertion_typing Pr \<Lambda> (Exists ty A)"
 
-inductive stmt_typing :: "program \<Rightarrow> type_env \<Rightarrow> stmt \<Rightarrow> bool"
+inductive stmt_typing :: "program \<Rightarrow> type_context \<Rightarrow> stmt \<Rightarrow> bool"
   for Pr :: program
   where
     TypInhale: "\<lbrakk> assertion_typing Pr \<Lambda> A \<rbrakk> \<Longrightarrow> stmt_typing Pr \<Lambda> (Inhale A)"

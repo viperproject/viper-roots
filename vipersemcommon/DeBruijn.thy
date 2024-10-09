@@ -34,6 +34,12 @@ lemma unshift_shift_and_add_id: "unshift_2 (Suc 0) (shift_and_add f x) = f"
   unfolding shift_and_add_def shift_def
   by simp
 
+lemma shift_and_add_unshift_id:
+  assumes "f 0 = Some x"
+  shows "shift_and_add (unshift_2 (Suc 0) f) x = f"
+  using assms apply (simp add:shift_and_add_def unshift_2_def)
+  by (rule ext; auto)
+
 lemma ran_shift: "ran (shift n f) \<subseteq> ran f"
   unfolding shift_def ran_def
   by auto

@@ -1,0 +1,5 @@
+session ViperAbstractRefinesTotal = ViperAbstract +
+  sessions
+    TotalViper
+  theories
+    AbstractRefinesTotal

@@ -23,7 +23,7 @@ datatype ref = is_address: Address (the_address: address) | Null
 subsection \<open>Viper (extended) values\<close>
 
 text \<open>The abstract type parameter in the values is the carrier type for domain values\<close>
-datatype (discs_sels) 'a val = VInt int | VBool bool | VPerm real | VRef ref | VAbs 'a
+datatype (discs_sels) 'a val = VInt (the_int: int) | VBool bool | VPerm real | VRef (the_ref: ref) | VAbs 'a
 
 type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
 
@@ -160,26 +160,83 @@ record ('v, 'a) interp =
   predicates :: "'v predicate_loc \<rightharpoonup> 'a set"
   funs :: "function_ident \<Rightarrow> 'v val list \<Rightarrow> 'a \<rightharpoonup> 'v val"
 
-type_synonym type_context = "var \<rightharpoonup> vtyp"
-
 section \<open>Basic defintions for types\<close>
 
-fun set_from_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val set" where
-  "set_from_type \<Delta> TInt = {VInt n |n. True}"
-| "set_from_type \<Delta> TBool = {VBool True, VBool False}"
-| "set_from_type \<Delta> TPerm = {VPerm r |r. True}"
-| "set_from_type \<Delta> TRef = {VRef r |r. True}"
-| "set_from_type \<Delta> (TAbs t) = {VAbs v |v. \<Delta> v = t}"
+type_synonym type_context = "var \<rightharpoonup> vtyp"
 
-definition has_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val \<Rightarrow> bool" where
-  "has_type \<Delta> t v \<longleftrightarrow> v \<in> set_from_type \<Delta> t"
+(* TODO: naming? *)
+type_synonym 'v sem_type = "'v val set"
 
+(* TODO: replace this function by sem_vtyp *)
 fun get_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> 'v val \<Rightarrow> vtyp" where
   "get_type \<Delta> (VInt _) = TInt"
 | "get_type \<Delta> (VBool _) = TBool"
 | "get_type \<Delta> (VPerm _) = TPerm"
 | "get_type \<Delta> (VRef _) = TRef"
 | "get_type \<Delta> (VAbs v) = TAbs (\<Delta> v)"
+
+
+fun set_from_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v sem_type" where
+  "set_from_type \<Delta> TInt = {VInt n |n. True}"
+| "set_from_type \<Delta> TBool = {VBool b|b. True}"
+| "set_from_type \<Delta> TPerm = {VPerm r |r. True}"
+| "set_from_type \<Delta> TRef = {VRef r |r. True}"
+| "set_from_type \<Delta> (TAbs t) = {VAbs v |v. \<Delta> v = t}"
+
+(* TODO: Rename set_from_type to sem_vtyp? *)
+abbreviation sem_vtyp where "sem_vtyp \<equiv> set_from_type"
+
+lemma sem_vtyp_simps [simp]:
+  "VInt n \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> ty = TInt"
+  "VBool b \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> ty = TBool"
+  "VPerm p \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> ty = TPerm"
+  "VRef r \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> ty = TRef"
+  "VAbs t \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> (\<exists> a. ty = TAbs a \<and> \<Delta> t = a)"
+  by ((cases ty)?; simp)+
+
+lemma sem_vtyp_val_of_lit [simp] :
+  "val_of_lit lit \<in> sem_vtyp \<Delta> ty \<longleftrightarrow> ty = type_of_lit lit"
+  by (cases lit; auto)
+
+lemma sem_vtyp_get_type [simp] :
+  "v \<in> sem_vtyp \<Delta> (get_type \<Delta> v)"
+  by (cases "v"; simp)
+
+lemma sem_vtyp_to_get_type:
+  "v \<in> sem_vtyp \<Delta> t \<longleftrightarrow> get_type \<Delta> v = t"
+  by (cases t; cases v; auto)
+
+
+definition sem_fields :: "('v \<Rightarrow> abs_type) \<Rightarrow> (field_ident \<rightharpoonup> vtyp) \<Rightarrow> (field_ident \<rightharpoonup> 'v sem_type)" where
+ "sem_fields \<Delta> F \<equiv> (\<lambda> ty. Some (sem_vtyp \<Delta> ty)) \<circ>\<^sub>m F" 
+
+lemma sem_fields_eq_Some [simp] :
+  "sem_fields \<Delta> F x = Some ty \<longleftrightarrow> (\<exists> sty. F x = Some sty \<and> ty = sem_vtyp \<Delta> sty)"
+  by (auto simp add:sem_fields_def map_comp_Some_iff)
+
+lemma sem_fields_eq_None [simp] :
+  "sem_fields \<Delta> F x = None \<longleftrightarrow> (F x = None)"
+  by (auto simp add:sem_fields_def map_comp_None_iff)
+
+
+definition sem_store :: "('v \<Rightarrow> abs_type) \<Rightarrow> type_context \<Rightarrow> (var \<rightharpoonup> 'v sem_type)" where
+ "sem_store \<Delta> \<Lambda> \<equiv> (\<lambda> ty. Some (sem_vtyp \<Delta> ty)) \<circ>\<^sub>m \<Lambda>" 
+
+lemma sem_store_eq_Some [simp] :
+  "sem_store \<Delta> \<Lambda> x = Some ty \<longleftrightarrow> (\<exists> sty. \<Lambda> x = Some sty \<and> ty = sem_vtyp \<Delta> sty)"
+  by (auto simp add:sem_store_def map_comp_Some_iff)
+
+lemma sem_store_eq_None [simp] :
+  "sem_store \<Delta> \<Lambda> x = None \<longleftrightarrow> (\<Lambda> x = None)"
+  by (auto simp add:sem_store_def map_comp_None_iff)
+
+lemma sem_store_empty [simp] :
+  "sem_store \<Delta> Map.empty = Map.empty"
+  by (simp add:sem_store_def)
+
+
+definition has_type :: "('v \<Rightarrow> abs_type) \<Rightarrow> vtyp \<Rightarrow> 'v val \<Rightarrow> bool" where
+  "has_type \<Delta> t v \<longleftrightarrow> v \<in> set_from_type \<Delta> t"
 
 lemma has_type_get_type:
   "has_type \<Delta> t v \<longleftrightarrow> get_type \<Delta> v = t"
@@ -202,10 +259,5 @@ lemma has_type_simps [simp]:
 lemma has_type_val_of_lit [simp]:
   "has_type \<Delta> ty (val_of_lit lit) \<longleftrightarrow> ty = type_of_lit lit"
   by (cases lit; auto)
-
-(* Fields are well-typed *)
-(* Maybe say that a location is allocated or not *)
-definition well_typed_heap :: "program \<Rightarrow> ('v \<Rightarrow> abs_type) \<Rightarrow> 'v partial_heap \<Rightarrow> bool" where
-  "well_typed_heap Pr \<Delta> h \<longleftrightarrow> (\<forall>hl f. declared_fields Pr f \<noteq> None \<and> h (hl, f) \<noteq> None \<longrightarrow> has_type \<Delta> (the (declared_fields Pr f)) (the (h (hl, f))))"
 
 end

@@ -1,0 +1,10 @@
+session ViperAbstract = ViperCommon +
+  theories
+    AbstractSemantics
+    AbstractSemanticsProperties
+    EquiSemAuxLemma
+    EquiViper
+    Instantiation
+    SymbolicExecDef
+    SymbolicExecAuto
+    SymbolicExecSound

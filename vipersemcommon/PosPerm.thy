@@ -8,19 +8,6 @@ theory PosPerm
 begin
 
 
-(*
-class_deps archimedean_field
-class_deps linordered_field
-
-class_deps comm_semiring
-
-
-
-term "x::('a::linordered_field)"
-                  
-print_classes
-*)
-
                      
 class pos_perm = zero_neq_one + comm_semiring + comm_monoid_mult + inverse
   + comm_monoid_add + linorder + distrib_lattice + dense_linorder +
