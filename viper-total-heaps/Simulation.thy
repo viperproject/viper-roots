@@ -557,15 +557,93 @@ lemma rel_general_cond_2:
   using RedCond
   apply (metis (full_types))
   done
-  
-lemma rel_general_if_2:
-  assumes "\<And> \<omega> ns \<omega>'. R \<omega> ns \<Longrightarrow> Success \<omega> \<omega>' \<or> Fail \<omega> \<Longrightarrow> red_expr_bpl ctxt e_bpl ns (BoolV (b \<omega>))"
-      and "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> b \<omega>) R_thn Success Fail P ctxt (thn_hd, convert_list_to_cont thn_tl (KSeq next cont)) (next, cont)"
-      and "\<And> \<omega> \<omega>'. rel_general (\<lambda> \<omega> ns. R \<omega> ns \<and> \<not>b \<omega>) R_els Success Fail P ctxt 
-                                     (thn_hd, convert_list_to_cont els_tl (KSeq next cont)) (next, cont)"
-      and "rel_general (\<lambda> \<omega> ns. (b \<omega> \<and> R_thn \<omega> ns) \<or> (\<not>b \<omega> \<and> R_els \<omega> ns)) R' Success Fail P ctxt (next, cont) \<gamma>'"
-  shows "rel_general R R Success Fail P ctxt (if_bigblock name (Some cond_bpl) (thn_hd # thn_tl) (els_hd # els_tl), KSeq next cont) \<gamma>'"
-  oops
 
+lemma rel_general_cond_3:
+  assumes 
+          RelCondExp: "rel_general R1 R1 SuccessExp FailExp P ctxt 
+                           \<gamma> 
+                           \<gamma>_if" and
+          \<comment>\<open>\<^term>\<open>R1Thn\<close> and \<^term>\<open>R1Else\<close> may differ from \<^term>\<open>R1\<close> because the knowledge that a branch is taken
+             constrains the states.\<close>
+          RelThn: "rel_general R1Thn R2 SuccessThn FailThn P ctxt \<gamma>_if \<gamma>'" and
+          RelElse: "rel_general R1Else R2 SuccessElse FailElse P ctxt \<gamma>_if \<gamma>'" and
+          SuccessCond: "\<And> \<omega> \<omega>' ns. Success \<omega> \<omega>' \<Longrightarrow> R1 \<omega> ns \<Longrightarrow>
+                        SuccessExp \<omega> \<omega> \<and> \<comment>\<open>implicit assumption that success of conditional does not lead to side effects\<close>
+                       ( (R1Thn \<omega> ns \<and> SuccessThn \<omega> \<omega>') \<or> 
+                        (R1Else \<omega> ns \<and> SuccessElse \<omega> \<omega>'))"  and
+          FailCond: "\<And> \<omega> ns. Fail \<omega> \<Longrightarrow> R1 \<omega> ns \<Longrightarrow> 
+               FailExp \<omega> \<or>
+               (SuccessExp \<omega> \<omega> \<and>
+                 ( (R1Thn \<omega> ns \<and> FailThn \<omega>) \<or> 
+                   (R1Else \<omega> ns \<and> FailElse \<omega>) )
+               )" 
+        shows "rel_general R1 R2 Success Fail P ctxt \<gamma> \<gamma>'"
+proof (rule rel_intro)
+  fix \<omega> ns \<omega>'
+  assume "R1 \<omega> ns" and "Success \<omega> \<omega>'"
+  have "SuccessExp \<omega> \<omega>"
+    using SuccessCond[OF \<open>Success \<omega> \<omega>'\<close> \<open>R1 \<omega> ns\<close>]
+    by simp
+
+  with rel_success_elim[OF RelCondExp \<open>R1 \<omega> ns\<close>]  
+  obtain ns1 where RedToIf: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>_if, Normal ns1)" and "R1 \<omega> ns1"
+    by blast
+
+  consider (SuccessThn) "R1Thn \<omega> ns1" and "SuccessThn \<omega> \<omega>'"
+    |      (SuccessElse)"R1Else \<omega> ns1" and "SuccessElse \<omega> \<omega>'"
+    using SuccessCond[OF \<open>Success \<omega> \<omega>'\<close> \<open>R1 \<omega> ns1\<close>]
+    by blast
+
+  thus "\<exists>ns'. red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>', Normal ns') \<and> R2 \<omega>' ns'"
+  proof (cases)
+    case SuccessThn
+    then show ?thesis 
+      using RedToIf rel_success_elim[OF RelThn \<open>R1Thn \<omega> ns1\<close> \<open>SuccessThn \<omega> \<omega>'\<close>] red_ast_bpl_transitive
+      by blast
+  next
+    case SuccessElse
+    then show ?thesis
+      using RedToIf rel_success_elim[OF RelElse \<open>R1Else \<omega> ns1\<close> \<open>SuccessElse \<omega> \<omega>'\<close>] red_ast_bpl_transitive
+      by blast
+  qed
+next
+  fix \<omega> ns
+  assume "R1 \<omega> ns" and "Fail \<omega>"
+  from this consider (FailExp) "FailExp \<omega>" | (SuccessExp) "\<not>FailExp \<omega> \<and> SuccessExp \<omega> \<omega>" 
+    using FailCond
+    by blast
+
+  thus "\<exists>c'. snd c' = Failure \<and> red_ast_bpl P ctxt (\<gamma>, Normal ns) c'"
+  proof (cases)
+    case FailExp
+    then show ?thesis 
+      using rel_failure_elim[OF RelCondExp \<open>R1 \<omega> ns\<close>] 
+      by blast
+  next
+    case SuccessExp
+    with rel_success_elim[OF RelCondExp \<open>R1 \<omega> ns\<close>]  
+    obtain ns1 where RedToIf: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>_if, Normal ns1)" and "R1 \<omega> ns1"
+      by blast
+
+    from this consider 
+                (FailThn)"R1Thn \<omega> ns1" "FailThn \<omega>"
+            |   (FailElse)"R1Else \<omega> ns1" "FailElse \<omega>" 
+      using FailCond[OF \<open>Fail \<omega>\<close>] SuccessExp
+      by blast
+
+    thus ?thesis
+    proof (cases)
+      case FailThn
+      then show ?thesis
+        using RedToIf rel_failure_elim[OF RelThn \<open>R1Thn \<omega> ns1\<close> \<open>FailThn \<omega>\<close>]  red_ast_bpl_transitive
+        by blast
+    next
+      case FailElse
+      then show ?thesis 
+        using RedToIf rel_failure_elim[OF RelElse \<open>R1Else \<omega> ns1\<close> \<open>FailElse \<omega>\<close>] red_ast_bpl_transitive
+        by blast
+    qed
+  qed
+qed
 
 end

@@ -573,6 +573,74 @@ lemma exhale_rel_imp_2:
   unfolding is_exh_rel_invariant_def
   by blast
 
+lemma exhale_rel_imp_3:
+  assumes Invariant: "\<And>\<omega>def \<omega>. ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<Longrightarrow> Q (assert.Imp cond A) \<omega>def \<omega> \<Longrightarrow> Q A \<omega>def \<omega>"
+      and ExpWfRel: 
+          "expr_wf_rel (\<lambda> \<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (assert.Imp cond A) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt cond 
+           \<gamma>1 \<gamma>_if" 
+      and ThnRel: "exhale_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> ctxt_vpr, StateCons, Some \<omega>def \<turnstile> \<langle>cond; \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)))
+                              R Q ctxt_vpr StateCons P ctxt A \<gamma>_if \<gamma>'"
+      and ElsRel: "rel_general (uncurry R) (uncurry R) (\<lambda>\<omega> \<omega>'. \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; (snd \<omega>)\<rangle> [\<Down>]\<^sub>t (Val (VBool False))) (\<lambda>_. False) P ctxt \<gamma>_if \<gamma>'"
+            (is "rel_general ?R1Els ?R1Els ?SuccessEls ?FailEls P ctxt _ _")
+    shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (assert.Imp cond A) \<gamma>1 \<gamma>'"
+  unfolding exhale_rel_def
+proof (simp only: uncurry.simps, 
+       rule rel_general_cond_3,
+       fastforce intro: rel_general_conseq_input_output[OF ExpWfRel[simplified wf_rel_def]])
+
+  let ?R1Thn = "(\<lambda>\<omega> ns. R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; snd \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<and> Q A (fst \<omega>) (snd \<omega>))"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"  
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+  
+  show "rel_general ?R1Thn (\<lambda>a. R (fst a) (snd a)) ?SuccessThn ?FailThn P ctxt \<gamma>_if \<gamma>'"
+    using ThnRel[simplified exhale_rel_def]
+    by auto
+  
+  let ?R1Thn = "(\<lambda>\<omega> ns. R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>)  \<turnstile> \<langle>cond; snd \<omega>\<rangle> [\<Down>]\<^sub>t (Val (VBool True)) \<and> Q A (fst \<omega>) (snd \<omega>))"
+  let ?SuccessThn = "\<lambda>\<omega> \<omega>'. fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>'))"  
+  let ?FailThn = "\<lambda>\<omega>. red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure"
+
+  show "rel_general ?R1Els (\<lambda>a. R (fst a) (snd a)) ?SuccessEls ?FailEls P ctxt \<gamma>_if \<gamma>'"
+    using ElsRel
+    by auto
+  thm ExhImp_case
+  show "\<And>\<omega> \<omega>' ns.
+       fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) (RNormal (snd \<omega>')) \<Longrightarrow>
+       R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+       (\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       ((R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<and> Q A (fst \<omega>) (snd \<omega>)) \<and>
+        fst \<omega> = fst \<omega>' \<and> red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) (RNormal (snd \<omega>')) \<or>
+        uncurry R \<omega> ns \<and> \<omega> = \<omega>' \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool False))"
+    apply (rule ExhImp_case)
+       apply blast
+      apply (insert Invariant)
+      apply blast
+     apply force
+    apply blast
+    done
+
+  show "\<And>\<omega> ns.
+       red_exhale ctxt_vpr StateCons (fst \<omega>) (assert.Imp cond A) (snd \<omega>) RFailure \<Longrightarrow>
+       R (fst \<omega>) (snd \<omega>) ns \<and> Q (assert.Imp cond A) (fst \<omega>) (snd \<omega>) \<Longrightarrow>
+       ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t VFailure \<or>
+       (\<omega> = \<omega> \<and> (\<exists>v. ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val v)) \<and>
+       ((R (fst \<omega>) (snd \<omega>) ns \<and> ctxt_vpr, StateCons, Some (fst \<omega>) \<turnstile> \<langle>cond;snd \<omega>\<rangle> [\<Down>]\<^sub>t Val (VBool True) \<and> Q A (fst \<omega>) (snd \<omega>)) \<and>
+        red_exhale ctxt_vpr StateCons (fst \<omega>) A (snd \<omega>) RFailure \<or>
+        uncurry R \<omega> ns \<and> False)"
+    apply (rule ExhImp_case)
+       apply blast
+      apply (insert Invariant)
+      apply blast
+     apply force
+    apply simp
+    apply (erule RedExpListFailure_case)
+     apply simp
+    apply (erule RedExpListFailure_case)
+      apply blast
+     apply blast
+    by simp
+qed
+
 lemma exhale_rel_cond:
   assumes Invariant: "is_exh_rel_invariant ctxt_vpr StateCons cond_assert cond_exp Q"
       and Cond: "cond_exp cond"
