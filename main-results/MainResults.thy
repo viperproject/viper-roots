@@ -46,6 +46,7 @@ definition triple_as_method_decl :: "vtyp list \<Rightarrow> ViperLang.assertion
                                          post = Atomic (Pure (ELit (LBool True))), 
                                          body = Some (scoped_var_list ts ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))))\<rparr>"
 
+
 definition vpr_program_from_method_decl :: "method_decl \<Rightarrow> program"
   where "vpr_program_from_method_decl m = 
            \<lparr> methods = [''m'' \<mapsto> m], predicates = Map.empty, funs = Map.empty, declared_fields = [field_val \<mapsto> TInt], domains = 0 \<rparr>"
@@ -86,12 +87,13 @@ definition initial_vcg_states_equi where
 
 theorem VCG_to_verifies_set :                             
   assumes "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
-      and "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+      and "stmt_typing (program_total ctxt) \<Lambda> (scoped_var_list ts (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"
       and "valid_a2t_stmt C"
     shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) initial_vcg_states_equi
             (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"
   sorry
+
 
 (*  \<and> (\<forall>auxRes \<in> snd Res. valid_a2t_stmt auxRes) *)
 
@@ -108,6 +110,9 @@ lemma valid_a2t_stmt_translate_syn:
                                 syntactic_translate_addr_def)*)
   oops 
 
+abbreviation true_syn_assertion 
+  where "true_syn_assertion \<equiv> (Atomic (Pure (ELit (LBool True))))"
+
 theorem sound_syntactic_translation_VCG:
   assumes "wf_stmt \<Delta> tcfes C"
       and "well_typed_cmd tcfe C"
@@ -121,19 +126,16 @@ theorem sound_syntactic_translation_VCG:
       and AuxiliaryMethodsCorrect:
         "\<And> stmtAux. stmtAux \<in> snd (translate_syn \<Delta> tcfes C) \<Longrightarrow> 
              let mdeclAux = triple_as_method_decl ts 
-                              (Atomic (Pure (ELit (LBool True)))) 
-                              (fst (translate_syn \<Delta> tcfes C)) 
-                              (Atomic (Pure (ELit (LBool True)))) 
+                              true_syn_assertion stmtAux true_syn_assertion 
              in
              vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux"
  
       and ViperTyped: 
             "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option ts)
-                   (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs))"
+                   (scoped_var_list ts (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs)))"
       and "nth_option (map (set_from_type undefined) ts) = abs_type_context.variables tcfe"
       and "P = make_semantic_assertion_gen False \<Delta> tcfes Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> tcfes Qs"
-       (* TODO snd element verifies *)
+      and "Q = make_semantic_assertion_gen False \<Delta> tcfes Qs"     
     shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
 proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
   let ?Ctr_main = "(fst (translate_syn \<Delta> tcfes C))"
@@ -152,20 +154,6 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
        apply blast
       by simp
 
-    have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
-      sorry   
-
-    have "tcfes = (nth_option ts, declared_fields (program_total (default_ctxt (domains \<Delta>) mdecl)))"
-      sorry
-
-    have "\<Delta> = (ctxt_to_interp ?ctxt)"
-      sorry
-    thm abstract_refines_total_verifies_set
-
-
-
-    typ "int equi_state"
-
     have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) ?Ctr_mainV)"
       apply (rule VCG_to_verifies_set)
@@ -180,16 +168,14 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
     have "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi (compile False \<Delta> tcfes ?Ctr_mainV)"
     proof -
       have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
-        sorry   
-  
-      moreover have "tcfes = (nth_option ts, declared_fields (program_total (default_ctxt (domains \<Delta>) mdecl)))"
-        sorry
-  
+        sorry      
+      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"
+        sorry    
       moreover have "\<Delta> = (ctxt_to_interp ?ctxt)"
         sorry
       ultimately show ?thesis
-         using A1
-         by metis
+        using A1
+        by metis
     qed
 
     hence "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi
@@ -198,13 +184,55 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       by simp
 
     thus ?thesis
-      sorry \<comment>\<open>Thibault: TODO\<close>     
+      sorry \<comment>\<open>Thibault: TODO monotonicity etc...\<close>     
   qed
 
+
   fix Cv
+  
   assume "Cv \<in> compile False \<Delta> tcfes ` snd (translate_syn \<Delta> tcfes C)"
-  show "ConcreteSemantics.verifies_set tcfe atrue Cv"
+  from this obtain Cv_syn where "Cv_syn \<in> snd (translate_syn \<Delta> tcfes C)" and "Cv = compile False \<Delta> tcfes Cv_syn"
+    by blast
+  let ?mdeclAux = "triple_as_method_decl ts 
+                              true_syn_assertion Cv_syn true_syn_assertion"
+  let ?ctxt = "(default_ctxt (domains \<Delta>) ?mdeclAux) :: int total_context"
+
+  have TypingAux: "stmt_typing (program_total (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl ts true_syn_assertion Cv_syn true_syn_assertion)))
+     (nth_option ts) (scoped_var_list ts (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
     sorry
+
+  show "ConcreteSemantics.verifies_set tcfe atrue Cv"
+  proof -
+    have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
+               (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
+               (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
+      apply (rule VCG_to_verifies_set)
+      using AuxiliaryMethodsCorrect[OF \<open>Cv_syn \<in> _\<close>]
+      unfolding \<open>mdecl = _\<close> Let_def  
+        apply blast
+       apply (rule TypingAux)
+      sorry
+
+    hence A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
+               (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
+      sorry \<comment>\<open>TODO: Thibault --> remove inhale true exhale true\<close>
+
+    hence "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi (compile False \<Delta> tcfes Cv_syn)"
+    proof -
+      have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
+        sorry      
+      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"
+        sorry    
+      moreover have "\<Delta> = (ctxt_to_interp ?ctxt)"
+        sorry
+      ultimately show ?thesis
+        using A1
+        by argo        
+    qed
+
+    thus ?thesis
+      sorry \<comment>\<open>Thibault: TODO monotonicity etc...\<close>
+  qed
 qed
 
 end
