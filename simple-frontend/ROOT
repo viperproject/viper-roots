@@ -4,3 +4,4 @@ session SimpleViperFrontEnd = ViperAbstract +
 	ParImp
   	CSL_IDF
 	FrontEndTranslation
+	SyntacticTranslation
