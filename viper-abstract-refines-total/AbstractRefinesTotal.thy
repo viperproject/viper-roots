@@ -948,7 +948,7 @@ lemma a2t_extend_typed :
   shows "a2t_extend_ok ctxt \<omega> (a2t_extend ctxt \<omega>)"
   using assms apply (simp add:a2t_extend_ok_def a2t_extend_def a2t_extend_state_def a2t_extend_heap_typed
       full_total_state.defs total_state.defs partial_trace_typing_def trace_typing_def map_comp_Some_iff)
-  using a2t_extend_heap_typed by fastforce
+  using a2t_extend_heap_typed by force
 
 
 
