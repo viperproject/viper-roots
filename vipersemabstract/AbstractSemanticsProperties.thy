@@ -2068,7 +2068,29 @@ next
     by (meson red_stmt_sequential_composition.RedCustom)
 qed (simp_all)
 
-
+lemma inhale_c_exhale_verifies_simplifies:
+  assumes "\<And>\<omega>. sep_algebra_class.stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> |\<omega>| \<in> A"
+      and "verifies_set \<Delta> P (Inhale A;; C;; Exhale B)"
+    shows "verifies_set \<Delta> P C"
+proof (rule verifies_setI)
+  fix \<omega> assume "\<omega> \<in> P" "sep_algebra_class.stable \<omega>" "typed \<Delta> \<omega>"
+  then obtain S where "red_stmt \<Delta> ((Inhale A;; C);; Exhale B) \<omega> S"
+    using assms(2) verifies_def verifies_set_def by fastforce
+  then show "verifies \<Delta> C \<omega>"
+    apply (rule red_stmt_Seq_elim)
+    apply (erule red_stmt_Seq_elim)
+    apply (erule red_stmt_Inhale_elim)
+  proof -
+    fix S0 S1 assume "sequential_composition \<Delta> S0 C S1"
+      "S0 = Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)"
+    then have "|\<omega>| \<in> A"
+      by (simp add: \<open>sep_algebra_class.stable \<omega>\<close> \<open>typed \<Delta> \<omega>\<close> assms(1))
+    then have "\<omega> \<in> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)"
+      by (simp add: \<open>sep_algebra_class.stable \<omega>\<close> \<open>typed \<Delta> \<omega>\<close> core_is_smaller is_in_set_sum)
+    then show "verifies \<Delta> C \<omega>"
+      using \<open>S0 = Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)\<close> \<open>sequential_composition \<Delta> S0 C S1\<close> verifies_def by blast
+  qed
+qed
 
 
 end
