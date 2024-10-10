@@ -626,104 +626,6 @@ lemma typed_set_stabilize_semi_typed:
   apply (rule semi_typedI)
   by (simp add: assms)
 
-(*
-
-lemma proofs_are_self_framing:
-  assumes "\<Delta> \<turnstile> [P] C [Q]"
-      and "wf_abs_stmt \<Delta> C"
-  shows "self_framing P \<and> self_framing Q \<and> semi_typed \<Delta> P \<and> semi_typed \<Delta> Q"
-  using assms
-proof (induct rule: SL_proof.induct)
-  case (RuleInhale A P \<Delta>)
-  then have "self_framing (A \<otimes> P)"
-    using self_framing_star by auto
-  moreover have r: "framed_by A (Set.filter (typed \<Delta> \<circ> stabilize) P)"
-  proof (rule framed_byI)
-    fix \<omega> assume asm0: "\<omega> \<in> A" "sep_algebra_class.stable \<omega>"
-    then have r: "rel_stable_assertion \<omega> P"
-      using RuleInhale.hyps(2) framed_by_def by blast
-    show "rel_stable_assertion \<omega> (Set.filter (typed \<Delta> \<circ> stabilize) P)"
-      unfolding rel_stable_assertion_def
-    proof (rule stable_set_filter_stabilize)
-      show "{\<omega>} \<otimes> P \<subseteq> Stabilize ({\<omega>} \<otimes> P)"
-        using Stable_def r rel_stable_assertion_def by blast
-      show "Stabilize ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> P"
-      proof
-        fix x assume "x \<in> Stabilize ({\<omega>} \<otimes> P)"
-        then obtain p where "p \<in> P" "Some (stabilize x) = \<omega> \<oplus> p"
-          by (smt (verit, best) in_Stabilize singletonD x_elem_set_product)
-        then obtain p' where "Some p' = p \<oplus> |x|"
-          by (metis asso2 decompose_stabilize_pure option.exhaust_sel)
-        then have "p' \<in> P"
-          using wf_assertionE[of \<Delta> P p' p]
-          using RuleInhale.prems \<open>p \<in> P\<close> core_is_pure pure_def pure_larger_def semantics.wf_abs_stmt.simps(2) semantics_axioms by blast
-        then show "x \<in> {\<omega>} \<otimes> P"
-          by (metis (no_types, lifting) \<open>Some (stabilize x) = \<omega> \<oplus> p\<close> \<open>Some p' = p \<oplus> |x|\<close> asso1 decompose_stabilize_pure singletonI x_elem_set_product)
-      qed
-      show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P = Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)" (is "?A = ?B")
-      proof
-        show "{\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P \<subseteq> Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P)"
-        proof
-          fix x assume "x \<in> ?A"
-          then obtain p where "p \<in> P" "typed \<Delta> (stabilize p)" "Some x = \<omega> \<oplus> p"
-            using in_singleton_star by force
-          then have "typed \<Delta> (stabilize x)"
-            sorry
-          then show "x \<in> ?B"
-            by (simp add: \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum)
-        qed
-        show "Set.filter (typed \<Delta> \<circ> stabilize) ({\<omega>} \<otimes> P) \<subseteq> {\<omega>} \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P"
-        proof
-          fix x assume "x \<in> ?B"
-          then obtain p where "p \<in> P" "Some x = \<omega> \<oplus> p" "typed \<Delta> (stabilize x)"
-            by (metis comp_apply in_singleton_star member_filter)
-          then have "typed \<Delta> (stabilize p)"
-            using greater_equiv stabilize_mono typed_smaller by blast
-          then show "x \<in> ?A"
-            using \<open>Some x = \<omega> \<oplus> p\<close> \<open>p \<in> P\<close> is_in_set_sum by fastforce
-        qed
-      qed
-    qed
-  qed
-
-
-  then show ?case sorry
-(*
-  have "self_framing (A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)"
-  proof (rule self_framingI)
-    fix \<omega> show "(\<omega> \<in> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P) = (stabilize \<omega> \<in> A \<otimes> Set.filter (typed \<Delta> \<circ> stabilize) P)" (is "?A = ?B")
-    proof
-      assume ?A then show ?B sorry
-    next
-      assume ?B then show ?A
-        sorry
-(*
-Set.filter (typed \<Delta> \<circ> stabilize) P
-*)
-  then show ?case
-    sorry
-
-    by (simp add: self_framing_star wf_assertion_def)
-*)
-next
-  case (RuleIf A b \<Delta> C1 B1 C2 B2)
-  then show ?case
-    by (simp add: self_framing_def)
-next
-  case (RuleHavoc A \<Delta> x)
-  then show ?case
-    using self_framing_exists_assert by blast
-next
-  case (RuleLocalAssign A e \<Delta> x)
-  then show ?case
-    by (meson self_framing_post_substitute_var_assert wf_abs_stmt.simps(8) )
-next
-  case (RuleAssume A P \<Delta>)
-  then show ?case
-    by (smt (verit) Int_iff self_framing_on_def self_framing_def)
-qed (simp_all)
-
-*)
 
 lemma wf_set_after_union:
   assumes "\<And>\<omega>. \<omega> \<in> S \<Longrightarrow> wf_set \<Delta> (f \<omega>)"
@@ -1973,6 +1875,201 @@ next
   then show ?case using red_wf_complete[OF \<open>SL_Custom \<Delta> A C B\<close>]
     by (meson RedCustom wf_abs_stmt.simps(10))
 qed
+
+lemma greater_singletonI:
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "{\<omega>'} \<ggreater> {\<omega>}"
+  using assms greater_set_singleton by blast
+
+thm red_stmt_sequential_composition.inducts(1)[of \<Delta> C \<omega> S
+"\<lambda>\<Delta> C \<omega> S. \<forall>\<omega>'. \<omega>' \<succeq> \<omega> \<longrightarrow> wf_abs_stmt \<Delta> C \<longrightarrow> (\<exists>S'. red_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S)"
+"\<lambda>\<Delta> S1 C S2. \<forall>S1'. S1' \<ggreater> S1 \<longrightarrow> (\<exists>S2'. sequential_composition \<Delta> S1' C S2' \<and> S2' \<ggreater> S2)"]
+
+thm red_stmt_sequential_composition.inducts
+
+lemma assign_state_larger:
+  assumes "\<omega>' \<succeq> \<omega>"
+  shows "assign_var_state x (Some v) \<omega>' \<succeq> assign_var_state x (Some v) \<omega>"
+  apply (rule greater_prodI)
+   apply (meson assign_var_state_sum assms greater_equiv greater_prod_eq)
+  by (meson assign_var_state_sum assms greater_def greater_prod_eq)
+
+
+definition mono_custom where
+  "mono_custom \<Delta> \<longleftrightarrow> (\<forall>C \<omega> \<omega>' S. \<omega>' \<succeq> \<omega> \<and> red_custom_stmt \<Delta> C \<omega> S \<longrightarrow> (\<exists>S'. red_custom_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S))"
+
+fun no_assert_assume where
+  "no_assert_assume (Assert _) \<longleftrightarrow> False"
+| "no_assert_assume (Assume _) \<longleftrightarrow> False"
+| "no_assert_assume (C1;; C2) \<longleftrightarrow> no_assert_assume C1 \<and> no_assert_assume C2"
+| "no_assert_assume (If _ C1 C2) \<longleftrightarrow> no_assert_assume C1 \<and> no_assert_assume C2"
+| "no_assert_assume _ \<longleftrightarrow> True"
+
+
+abbreviation all_stable where
+  "all_stable S \<equiv> (\<forall>\<omega>\<in>S. stable \<omega>)"
+
+
+lemma monotonicity:
+  assumes "wf_abs_stmt \<Delta> C"
+      and "mono_custom \<Delta>"
+      and "no_assert_assume C"
+    shows "red_stmt \<Delta> C \<omega> S \<Longrightarrow> (\<forall>\<omega>'. stable \<omega>' \<and> \<omega>' \<succeq> \<omega> \<longrightarrow> (\<exists>S'. red_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S))"
+      and "sequential_composition \<Delta> S1 C S2 \<Longrightarrow> (\<forall>S1'. all_stable S1' \<and> S1' \<ggreater> S1 \<longrightarrow> (\<exists>S2'. sequential_composition \<Delta> S1' C S2' \<and> S2' \<ggreater> S2))"
+  using assms
+proof (induct rule: red_stmt_sequential_composition.inducts)
+  case (SeqComp S1 \<Delta> C f S2)
+  show "\<forall>S1'. all_stable S1' \<and> S1' \<ggreater> S1 \<longrightarrow> (\<exists>S2'. sequential_composition \<Delta> S1' C S2' \<and> S2' \<ggreater> S2)"
+  proof clarify
+    fix S1' 
+    let ?f1 = "\<lambda>\<omega>1'. (SOME S'. \<exists>\<omega>1 \<in> S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1)"
+
+    assume asm0: "all_stable S1'" "S1' \<ggreater> S1"
+    then have "\<And>\<omega>1'. \<omega>1' \<in> S1' \<Longrightarrow> (\<exists>\<omega>1\<in>S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1))"
+      by (simp add: SeqComp.hyps(1) greater_set_def)
+    moreover have r: "\<And>\<omega>1'. \<omega>1' \<in> S1' \<Longrightarrow> (\<exists>\<omega>1 \<in> S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' (?f1 \<omega>1') \<and> (?f1 \<omega>1') \<ggreater> f \<omega>1)"
+      subgoal for \<omega>1'
+        apply (rule someI_ex[of "\<lambda>S'. \<exists>\<omega>1 \<in> S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1"])
+        by (meson SeqComp.hyps(2) SeqComp.prems(1) SeqComp.prems(2) SeqComp.prems(3) asm0 calculation)
+      done
+    let ?S2 = "\<Union> (?f1 ` S1')"
+    have "sequential_composition \<Delta> S1' C ?S2"
+      by (metis (no_types, lifting) r red_stmt_sequential_composition.SeqComp)
+    moreover have "?S2 \<ggreater> S2"
+    proof (rule greater_setI)
+      fix a assume asm0: "a \<in> (\<Union>\<omega>1'\<in>S1'. SOME S'. \<exists>\<omega>1 \<in> S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1)"
+      then obtain \<omega>1' where "\<omega>1'\<in>S1'" "a \<in> ?f1 \<omega>1'"
+        by blast
+      then obtain \<omega>1 where "\<omega>1 \<in> S1 \<and> \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' (?f1 \<omega>1') \<and> (?f1 \<omega>1') \<ggreater> f \<omega>1"
+        using r by blast
+      then obtain b where "b \<in> f \<omega>1" "a \<succeq> b"
+        using \<open>a \<in> (SOME S'. \<exists>\<omega>1\<in>S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1)\<close> greater_set_def by blast
+      then show "\<exists>b\<in>S2. a \<succeq> b"
+        using SeqComp.hyps(3) \<open>\<omega>1 \<in> S1 \<and> \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' (SOME S'. \<exists>\<omega>1\<in>S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1) \<and> (SOME S'. \<exists>\<omega>1\<in>S1. \<omega>1' \<succeq> \<omega>1 \<and> red_stmt \<Delta> C \<omega>1 (f \<omega>1) \<and> red_stmt \<Delta> C \<omega>1' S' \<and> S' \<ggreater> f \<omega>1) \<ggreater> f \<omega>1\<close> by blast
+    qed
+    ultimately show "\<exists>S2'. sequential_composition \<Delta> S1' C S2' \<and> S2' \<ggreater> S2"
+      by meson
+  qed
+next
+  case (RedSkip \<Delta> \<omega>)
+  then show ?case
+    using greater_singletonI red_stmt_sequential_composition.RedSkip by blast
+next
+  case (RedInhale \<omega> A \<Delta>)
+  have "\<And>\<omega>''. sep_algebra_class.stable \<omega>'' \<Longrightarrow> \<omega>'' \<succeq> \<omega> \<Longrightarrow> (\<exists>S'. red_stmt \<Delta> (abs_stmt.Inhale A) \<omega>'' S' \<and> S' \<ggreater> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A))"
+  proof -
+    fix \<omega>'' assume asm0: "sep_algebra_class.stable \<omega>''" "\<omega>'' \<succeq> \<omega>"
+    then obtain r where "Some \<omega>'' = \<omega> \<oplus> r"
+      using greater_def by blast
+    then have "Some \<omega>'' = \<omega> \<oplus> stabilize r"
+      by (metis (no_types, lifting) asm0(1) commutative stabilize_sum_result_stable)
+
+    have "rel_stable_assertion \<omega>'' A"
+    proof (rule rel_stable_assertionI)
+      fix \<omega>' a assume asm1: "a \<in> A" "Some \<omega>' = \<omega>'' \<oplus> a"
+      then obtain x where "Some x = \<omega> \<oplus> a"
+        using asm0 compatible_smaller by blast
+      then obtain a' where "Some (stabilize x) = \<omega> \<oplus> a' \<and> a' \<in> A"
+        using rel_stable_assertionE[OF RedInhale(1), of x a]
+        using asm1 by blast
+      then have "Some (stabilize \<omega>') = stabilize x \<oplus> stabilize r"
+        by (metis (no_types, opaque_lifting) \<open>Some \<omega>'' = \<omega> \<oplus> r\<close> \<open>Some x = \<omega> \<oplus> a\<close> asm1(2) asso1 commutative stabilize_sum)
+      then have "Some (stabilize \<omega>') = \<omega>'' \<oplus> a'"
+        by (metis (no_types, opaque_lifting) \<open>Some (stabilize x) = \<omega> \<oplus> a' \<and> a' \<in> A\<close> \<open>Some \<omega>'' = \<omega> \<oplus> stabilize r\<close> asso1 commutative)
+      then show "\<exists>a'\<in>A. Some (stabilize \<omega>') = \<omega>'' \<oplus> a'"
+        using \<open>Some (stabilize x) = \<omega> \<oplus> a' \<and> a' \<in> A\<close> by blast
+    qed
+    then have "red_stmt \<Delta> (abs_stmt.Inhale A) \<omega>'' (Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>''} \<otimes> A))"
+      using red_stmt_sequential_composition.RedInhale[of \<omega>'' A \<Delta>] by blast
+    moreover have "Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>''} \<otimes> A) \<ggreater> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)"
+    proof (rule greater_setI)
+      fix x assume "x \<in> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>''} \<otimes> A)"
+      then obtain a where "sep_algebra_class.stable x \<and> typed \<Delta> x" "Some x = \<omega>'' \<oplus> a" "a \<in> A"
+        using in_singleton_star by force      
+      then obtain y where "Some y = \<omega> \<oplus> a"
+        using asm0(2) compatible_smaller by blast
+      then obtain a' where "Some (stabilize y) = \<omega> \<oplus> a' \<and> a' \<in> A"        
+        using RedInhale.hyps \<open>a \<in> A\<close> rel_stable_assertionE by blast
+      then have "typed \<Delta> (stabilize y)"
+        using \<open>Some x = \<omega>'' \<oplus> a\<close> \<open>Some y = \<omega> \<oplus> a\<close> \<open>sep_algebra_class.stable x \<and> typed \<Delta> x\<close> addition_bigger asm0(2) typed_smaller typed_then_stabilize_typed by blast
+      then have "stabilize y \<in> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)"
+        by (simp add: \<open>Some (stabilize y) = \<omega> \<oplus> a' \<and> a' \<in> A\<close> is_in_set_sum)
+      then show "\<exists>b\<in>Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A). x \<succeq> b"
+        by (meson \<open>Some x = \<omega>'' \<oplus> a\<close> \<open>Some y = \<omega> \<oplus> a\<close> \<open>sep_algebra_class.stable x \<and> typed \<Delta> x\<close> addition_bigger asm0(2) core_stabilize_mono(2) stabilize_sum stabilize_sum_of_stable)
+    qed
+    ultimately show "\<exists>S'. red_stmt \<Delta> (abs_stmt.Inhale A) \<omega>'' S' \<and> S' \<ggreater> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A)"
+      by meson
+  qed
+  then show "\<forall>\<omega>'. sep_algebra_class.stable \<omega>' \<and> \<omega>' \<succeq> \<omega> \<longrightarrow>
+             (\<exists>S'. red_stmt \<Delta> (abs_stmt.Inhale A) \<omega>' S' \<and> S' \<ggreater> Set.filter (\<lambda>\<omega>. sep_algebra_class.stable \<omega> \<and> typed \<Delta> \<omega>) ({\<omega>} \<otimes> A))"
+    by blast
+next
+  case (RedExhale a A \<omega> \<omega>' \<Delta>)
+  have "\<And>\<omega>''. sep_algebra_class.stable \<omega>'' \<Longrightarrow> \<omega>'' \<succeq> \<omega> \<Longrightarrow> (\<exists>S'. red_stmt \<Delta> (abs_stmt.Exhale A) \<omega>'' S' \<and> S' \<ggreater> {\<omega>'})"
+  proof -
+    fix \<omega>'' assume "sep_algebra_class.stable \<omega>''" "\<omega>'' \<succeq> \<omega>"
+    then obtain r where "Some \<omega>'' = \<omega> \<oplus> r" unfolding greater_def by blast
+    then obtain y where "Some y = \<omega>' \<oplus> stabilize r"
+      by (metis (no_types, opaque_lifting) RedExhale.hyps(2) RedExhale.hyps(3) already_stable compatible_smaller greater_def stabilize_sum)
+    then have "Some \<omega>'' = y \<oplus> a"
+      using RedExhale.hyps(2)
+        stabilize_sum_result_stable[OF _ \<open>sep_algebra_class.stable \<omega>''\<close>, of r \<omega>] commutative[of r \<omega>]
+      by (metis (no_types, lifting) \<open>Some \<omega>'' = \<omega> \<oplus> r\<close> asso1 commutative)
+    then have "red_stmt \<Delta> (abs_stmt.Exhale A) \<omega>'' {y}"
+      using red_stmt_sequential_composition.RedExhale[of a A \<omega>'' y]
+      using RedExhale.hyps(1) RedExhale.hyps(3) \<open>Some y = \<omega>' \<oplus> stabilize r\<close> stabilize_is_stable stable_sum by blast
+    then show "\<exists>S'. red_stmt \<Delta> (abs_stmt.Exhale A) \<omega>'' S' \<and> S' \<ggreater> {\<omega>'}"
+      by (metis \<open>Some y = \<omega>' \<oplus> stabilize r\<close> commutative greater_equiv greater_singletonI)
+  qed
+  then show "\<forall>\<omega>''. sep_algebra_class.stable \<omega>'' \<and> \<omega>'' \<succeq> \<omega> \<longrightarrow> (\<exists>S'. red_stmt \<Delta> (abs_stmt.Exhale A) \<omega>'' S' \<and> S' \<ggreater> {\<omega>'})" by simp
+next
+  case (RedIfTrue b \<omega> \<Delta> C1 S C2)
+  then show ?case
+    apply simp
+    using wf_expE[of b _ \<omega> True]
+    by (meson red_stmt_sequential_composition.RedIfTrue)
+next
+  case (RedIfFalse b \<omega> \<Delta> C2 S C1)
+  then show ?case
+    apply simp
+    using wf_expE[of b _ \<omega> False]
+    by (meson red_stmt_sequential_composition.RedIfFalse)
+next
+  case (RedSeq \<Delta> C1 \<omega> S1 C2 S2)
+  then show ?case
+    by (metis no_assert_assume.simps(3) red_stable red_stmt_sequential_composition.RedSeq wf_abs_stmt.simps(7))
+next
+  case (RedLocalAssign \<Delta> x ty e \<omega> v)
+  then show ?case
+    apply simp
+    using wf_expE[of e _ \<omega> v]
+    by (meson assign_state_larger greater_set_singleton red_stmt_sequential_composition.RedLocalAssign)
+next
+  case (RedHavoc \<Delta> x ty \<omega>)
+  have "\<And>\<omega>'. \<omega>' \<succeq> \<omega> \<Longrightarrow> {assign_var_state x (Some v) \<omega>' |v. v \<in> ty} \<ggreater> {assign_var_state x (Some v) \<omega> |v. v \<in> ty}"
+  proof -
+    fix \<omega>' assume asm0: "\<omega>' \<succeq> \<omega>"
+    show "{assign_var_state x (Some v) \<omega>' |v. v \<in> ty} \<ggreater> {assign_var_state x (Some v) \<omega> |v. v \<in> ty}"
+    proof (rule greater_setI)
+      fix a assume "a \<in> {assign_var_state x (Some v) \<omega>' |v. v \<in> ty}"
+      then obtain v where "a = assign_var_state x (Some v) \<omega>'" "v \<in> ty"
+        by blast
+      then have "a \<succeq> assign_var_state x (Some v) \<omega>"
+        by (simp add: asm0 assign_state_larger)
+      then show "\<exists>b\<in>{assign_var_state x (Some v) \<omega> |v. v \<in> ty}. a \<succeq> b"
+        using \<open>v \<in> ty\<close> by blast
+    qed
+  qed
+  then show "\<forall>\<omega>'. sep_algebra_class.stable \<omega>' \<and> \<omega>' \<succeq> \<omega> \<longrightarrow> (\<exists>S'. red_stmt \<Delta> (abs_stmt.Havoc x) \<omega>' S' \<and> S' \<ggreater> {assign_var_state x (Some v) \<omega> |v. v \<in> ty})"
+    using RedHavoc.hyps red_stmt_sequential_composition.RedHavoc by blast
+next
+  case (RedCustom \<Delta> C \<omega> S)
+  then show ?case unfolding mono_custom_def
+    by (meson red_stmt_sequential_composition.RedCustom)
+qed (simp_all)
+
+
+
 
 end
 
