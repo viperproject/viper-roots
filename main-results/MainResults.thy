@@ -85,7 +85,7 @@ definition initial_vcg_states_equi where
       "initial_vcg_states_equi \<equiv> {\<omega> :: int equi_state. stable \<omega> \<and> typed tcfe \<omega> \<and> get_trace \<omega> = Map.empty 
                                    \<and> (\<forall>l. get_m \<omega> l = 0)}"
 
-theorem VCG_to_verifies_set :                             
+corollary VCG_to_verifies_set :                             
   assumes "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
       and "stmt_typing (program_total ctxt) \<Lambda> (scoped_var_list ts (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"
       and "valid_a2t_stmt C"
@@ -93,9 +93,6 @@ theorem VCG_to_verifies_set :
             (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"
   sorry
-
-
-(*  \<and> (\<forall>auxRes \<in> snd Res. valid_a2t_stmt auxRes) *)
 
 lemma valid_a2t_exp_translate_exp: "valid_a2t_exp (translate_exp e)"
   by (induction e) auto
