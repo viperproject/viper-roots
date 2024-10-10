@@ -1,0 +1,6 @@
+session MainResults = ViperAbstract +
+  sessions
+    SimpleViperFrontEnd
+    ViperAbstractRefinesTotal
+  theories
+	MainResults
