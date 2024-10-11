@@ -419,8 +419,8 @@ lemma red_stmt_induct_simple_wf [consumes 4, case_names Inhale Exhale Custom Hav
       and "wf_abs_stmt \<Delta> C"
       and "\<omega>' \<in> S"
       and "\<And>(A :: ('v, 'a) abs_state assertion) \<omega>' \<omega> \<Delta> a.
-        rel_stable_assertion \<omega> A \<Longrightarrow> stable \<omega>' \<Longrightarrow> typed \<Delta> \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> a \<in> A \<Longrightarrow> Some \<omega>' = \<omega> \<oplus> a \<Longrightarrow> wf_assertion \<Delta> A \<Longrightarrow> P \<Delta> \<omega>'"
-      and "\<And>a (A :: ('v, 'a) abs_state assertion) \<omega> \<omega>' \<Delta>. a \<in> A \<Longrightarrow> Some \<omega> = \<omega>' \<oplus> a \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> wf_assertion \<Delta> A \<Longrightarrow> P \<Delta> \<omega>'"
+        rel_stable_assertion \<omega> A \<Longrightarrow> stable \<omega>' \<Longrightarrow> typed \<Delta> \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> a \<in> A \<Longrightarrow> Some \<omega>' = \<omega> \<oplus> a \<Longrightarrow> wf_assertion A \<Longrightarrow> P \<Delta> \<omega>'"
+      and "\<And>a (A :: ('v, 'a) abs_state assertion) \<omega> \<omega>' \<Delta>. a \<in> A \<Longrightarrow> Some \<omega> = \<omega>' \<oplus> a \<Longrightarrow> stable \<omega>' \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> wf_assertion A \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>\<Delta> S \<omega> \<omega>' C. P \<Delta> \<omega> \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> red_custom_stmt \<Delta> C \<omega> S \<Longrightarrow> \<omega>' \<in> S \<Longrightarrow> P \<Delta> \<omega>'"
       and "\<And>\<Delta> x ty \<omega> v. variables \<Delta> x = Some ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
       and "\<And>\<Delta> e \<omega> v x ty. variables \<Delta> x = Some ty \<Longrightarrow> e \<omega> = Some v \<Longrightarrow> v \<in> ty \<Longrightarrow> P \<Delta> \<omega> \<Longrightarrow> P \<Delta> (assign_var_state x (Some v) \<omega>)"
@@ -535,7 +535,7 @@ lemma stable_substitute_var:
   by (simp add: stable_assign_var_state substitute_var_state_def)
 
 lemma wf_assertion_stabilize:
-  assumes "wf_assertion \<Delta> A"
+  assumes "wf_assertion A"
       and "stabilize \<omega> \<in> A"
     shows "\<omega> \<in> A"
   using assms wf_assertion_def pure_larger_stabilize by blast
@@ -1165,7 +1165,7 @@ next
         then obtain p' where "Some p' = p \<oplus> |x|"
           by (metis asso2 decompose_stabilize_pure option.exhaust_sel)
         then have "p' \<in> P"
-          using wf_assertionE[of \<Delta> P p' p]
+          using wf_assertionE[of P p' p]
           using Inhale.prems(2) \<open>p \<in> P\<close> core_is_pure pure_def pure_larger_def semantics.wf_abs_stmt.simps(2) semantics_axioms by blast
         then show "x \<in> {\<omega>} \<otimes> P"
           by (metis (no_types, lifting) \<open>Some (stabilize x) = \<omega> \<oplus> p\<close> \<open>Some p' = p \<oplus> |x|\<close> asso1 decompose_stabilize_pure singletonI x_elem_set_product)
@@ -1463,7 +1463,7 @@ next
       show "(stabilize \<omega> \<in> P) = (\<omega> \<in> P)"
       proof
         show "stabilize \<omega> \<in> P \<Longrightarrow> \<omega> \<in> P"
-          using wf_assertionE[of \<Delta> P \<omega> "stabilize \<omega>"] \<open>wf_abs_stmt \<Delta> (abs_stmt.Assume P)\<close>
+          using wf_assertionE[of P \<omega> "stabilize \<omega>"] \<open>wf_abs_stmt \<Delta> (abs_stmt.Assume P)\<close>
           using wf_abs_stmt.simps(5) wf_assertion_stabilize by blast
         assume "\<omega> \<in> P"
         then have "stable_on \<omega> P"
@@ -1729,8 +1729,8 @@ lemma assign_var_state_sum:
 
 
 lemma exists_wf_assertion: (* Useless? *)
-  assumes "wf_assertion \<Delta> A"
-  shows "wf_assertion \<Delta> (exists_assert \<Delta> x A)"
+  assumes "wf_assertion A"
+  shows "wf_assertion (exists_assert \<Delta> x A)"
 proof (rule wf_assertionI)
   fix x' xa
   assume asm0: "pure_larger x' xa" "xa \<in> exists_assert \<Delta> x A" 

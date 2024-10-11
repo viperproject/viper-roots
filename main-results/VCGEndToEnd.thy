@@ -220,7 +220,7 @@ theorem sound_syntactic_translation_VCG:
       and "well_typed_cmd tcfe C"
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
-      and "TypedEqui.wf_assertion tcfe P \<and> TypedEqui.wf_assertion tcfe Q"
+      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
       and "typed_stmt C" (* TODO: Unify the two notions of typing *)
       and AbsTypeWf: "abs_type_wf (interp.domains \<Delta>)"
 

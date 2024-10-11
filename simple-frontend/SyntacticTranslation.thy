@@ -1,6 +1,6 @@
 theory SyntacticTranslation
   imports FrontEndTranslation
-begin
+begin                  
 
 section \<open>Refinement Calculus\<close>
 
@@ -1220,7 +1220,7 @@ theorem sound_syntactic_translation:
       and "well_typed_cmd tcfe C"
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
-      and "TypedEqui.wf_assertion tcfe P \<and> TypedEqui.wf_assertion tcfe Q"
+      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
       and "typed_stmt C" (* TODO: Unify the two notions of typing *)
 
 (* Verification *)

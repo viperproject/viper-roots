@@ -514,9 +514,9 @@ fun sexec :: "'a sym_state \<Rightarrow> stmt \<Rightarrow> ('a sym_state \<Righ
     sexec_exp \<sigma> e (\<lambda> \<sigma> t. sexec (sym_cond_add \<sigma> t) s1 Q \<and> sexec (sym_cond_add \<sigma> (\<not>\<^sub>s t)) s2 Q)"
 | "sexec \<sigma> (stmt.Seq s1 s2) Q = sexec \<sigma> s1 (\<lambda> \<sigma>. sexec \<sigma> s2 Q)"
 | "sexec \<sigma> (stmt.LocalAssign v e) Q = (sym_store \<sigma> v \<noteq> None \<and> 
-    sexec_exp \<sigma> e (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := sym_store \<sigma>(v \<mapsto> t) \<rparr>)))"
+    sexec_exp \<sigma> e (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := (sym_store \<sigma>)(v \<mapsto> t) \<rparr>)))"
 | "sexec \<sigma> (stmt.Havoc v) Q = (\<exists> ty. sym_store_type \<sigma> v = Some ty \<and>
-    sym_gen_fresh \<sigma> ty (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := sym_store \<sigma>(v \<mapsto> (SVar t)) \<rparr>)))"
+    sym_gen_fresh \<sigma> ty (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := (sym_store \<sigma>)(v \<mapsto> (SVar t)) \<rparr>)))"
 | "sexec \<sigma> (stmt.FieldAssign e f e2) Q = sexec_exp \<sigma> e (\<lambda> \<sigma> t. sexec_exp \<sigma> e2 (\<lambda> \<sigma> t2. 
     sym_heap_extract \<sigma> t f (Some (SPerm 1)) (\<lambda> \<sigma> c.
 \<comment> \<open>We need to ensure that there are no chunks for t with permission 0 left.

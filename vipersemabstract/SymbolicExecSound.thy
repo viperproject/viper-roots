@@ -446,7 +446,7 @@ proof -
   using Hch by (clarsimp simp add:concretize_chunk_eq_Some)
 
   have Hch0 : "get_vm ch0 = (get_vm chh)((a, chunk_field c) := get_vm chh (a, chunk_field c) + Abs_preal p)"
-              "get_vh ch0 = get_vh chh((a, chunk_field c) \<mapsto> v)"
+              "get_vh ch0 = (get_vh chh)((a, chunk_field c) \<mapsto> v)"
     subgoal using Hch Hc by (clarsimp simp add:acc_virt_plus preal_to_real inf.absorb2)
     subgoal using Hch Hc by (clarsimp simp add:acc_virt_plus)
     done
@@ -1315,4 +1315,5 @@ theorem sinit_sexec_verifies_set :
     apply (erule (1) sinit_sound[where \<omega>=\<omega>])
     by (auto simp add:TypedEqui.typed_def TypedEqui.typed_store_def s2a_ctxt_def)
   done
+
 end

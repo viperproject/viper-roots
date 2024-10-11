@@ -338,18 +338,18 @@ text \<open>Works only if (dom \<Delta>) is finite.\<close>
 definition at_least_two_elems:
   "at_least_two_elems S \<longleftrightarrow> (\<exists>a b. a \<in> S \<and> b \<in> S \<and> a \<noteq> b)"
 
-subsection \<open>wf_assertion \<Delta>\<close>
+subsection \<open>wf_assertion\<close>
 
-definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+definition wf_assertion :: "('v, 'a) abs_state assertion \<Rightarrow> bool" where
+  "wf_assertion A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
 
 lemma wf_assertionI:
   assumes "\<And>x' x. pure_larger x' x \<Longrightarrow> x \<in> A \<Longrightarrow> x' \<in> A"
-  shows "wf_assertion \<Delta> A"
+  shows "wf_assertion A"
   using assms wf_assertion_def by blast
 
 lemma wf_assertionE:
-  assumes "wf_assertion \<Delta> A"
+  assumes "wf_assertion A"
       and "pure_larger x' x"
       and "x \<in> A"
     shows "x' \<in> A"
@@ -488,14 +488,19 @@ fun modif where
 | "modif (If _ C1 C2) = modif C1 \<union> modif C2"
 | "modif _ = {}"
 
+(*
+inductive red_stmt :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state set \<Rightarrow> bool"
+
+*)
 (* TODO:
 Remove well-typed requirements *)
-fun wf_abs_stmt where
+fun wf_abs_stmt :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> bool" 
+  where
   "wf_abs_stmt \<Delta> Skip \<longleftrightarrow> True"
-| "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Exhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Assert A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Assume A) \<longleftrightarrow> wf_assertion \<Delta> A"
+| "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Exhale A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Assert A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Assume A) \<longleftrightarrow> wf_assertion A"
 | "wf_abs_stmt \<Delta> (If b C1 C2) \<longleftrightarrow> wf_exp b \<and> wf_abs_stmt \<Delta> C1 \<and> wf_abs_stmt \<Delta> C2"
 | "wf_abs_stmt \<Delta> (Seq C1 C2) \<longleftrightarrow> wf_abs_stmt \<Delta> C1 \<and> wf_abs_stmt \<Delta> C2"
 | "wf_abs_stmt \<Delta> (LocalAssign x e) \<longleftrightarrow> wf_exp e \<and> (\<exists>ty. variables \<Delta> x = Some ty \<and> typed_exp ty e)"

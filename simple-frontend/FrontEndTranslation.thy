@@ -670,7 +670,7 @@ proof (rule invariant_translateI)
   qed
 qed
 
-
+(* Is this lemma 3? *)
 lemma invariant_translate_inhale_exhale_get_proof:
   assumes "\<And>P Q. invariant_translate \<Gamma> P C Q"
       and "ConcreteSemantics.SL_proof tcfe P (Inhale A;; fst (translate \<Gamma> C);; Exhale B) Q"
@@ -1076,7 +1076,7 @@ next
   show ?case
   proof (rule invariant_translate_parallel)
     show "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
-      using Cpar.prems(3) by fastforce
+      using Cpar.prems(3) by simp
     show "wf_stmt \<Gamma> F {P1} C1 {Q1} || {P2} C2 {Q2}"
       using Cpar.prems(1) by blast
     fix P Q
@@ -1141,7 +1141,7 @@ next
   show ?case
   proof (rule invariant_translate_while)
     show "ConcreteSemantics.wf_abs_stmt tcfe (ConcreteSemantics.havoc_list (wrL C))"
-      using Cwhile.prems(3) by force
+      using Cwhile.prems(3) by simp
     show "wf_stmt \<Gamma> F (Cwhile b I C)"
       using Cwhile.prems(1) by auto
     fix P Q show "invariant_translate \<Gamma> P C Q"
@@ -1181,7 +1181,7 @@ theorem sound_translation:
       and "well_typed_cmd tcfe C"
       and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Gamma> C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
-      and "TypedEqui.wf_assertion tcfe P \<and> TypedEqui.wf_assertion tcfe Q"
+      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
       and "ConcreteSemantics.verifies_set tcfe atrue (Inhale P;; fst (translate \<Gamma> C);; Exhale Q)"
       and "\<And>Cv. Cv \<in> snd (translate \<Gamma> C) \<Longrightarrow> ConcreteSemantics.verifies_set tcfe atrue Cv"
 
