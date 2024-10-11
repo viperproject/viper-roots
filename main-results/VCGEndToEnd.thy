@@ -4,41 +4,6 @@ begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
 
-fun scoped_var_list :: "vtyp list \<Rightarrow> stmt \<Rightarrow> stmt"
-  where 
-    "scoped_var_list [] C = C"
-  | "scoped_var_list (t # ts) C = (stmt.Scope t (scoped_var_list ts C))"
-
-term shift_and_add_state_total
-term shift_and_add_list_state
-
-fun shift_and_add_list_total :: "'a full_total_state \<Rightarrow> ('a val) list \<Rightarrow> 'a full_total_state"
-  where 
-    "shift_and_add_list_total \<omega> vs = update_store_total \<omega> (shift_and_add_list (get_store_total \<omega>) vs)"
-
-lemma red_stmt_total_scoped_var_list:
-  assumes "\<not> (red_stmt_total ctxt R \<Lambda> (scoped_var_list ts C) \<omega> RFailure)"
-      and "ts = map (get_type (absval_interp_total ctxt)) (rev vs)"
-    shows "\<not> (red_stmt_total ctxt R (shift_and_add_list \<Lambda> ts) C (shift_and_add_list_total \<omega> vs) RFailure)" 
-  using assms
-  oops
-(*
-proof (induction ts)
-  case Nil
-  then show ?case     
-    by simp
-next
-  case (Cons t ts)  
-  show ?case
-  proof (rule notI)
-    assume "red_stmt_total ctxt R Map.empty (scoped_var_list (t # ts) C) \<omega> RFailure"
-    hence "red_stmt_total ctxt R Map.empty (Scope t (scoped_var_list ts C)) \<omega> RFailure"
-      by simp
-    hence "red_stmt_total ctxt R (shift_and_add Map.empty t) (scoped_var_list ts C) (shift_and_add_state_total \<omega> v) res"    
-qed
-*)
-
-
 definition triple_as_method_decl :: "vtyp list \<Rightarrow> ViperLang.assertion \<Rightarrow> stmt \<Rightarrow> ViperLang.assertion \<Rightarrow> method_decl"
   where "triple_as_method_decl ts P C Q \<equiv> \<lparr> method_decl.args = [], 
                                          rets = ts, 
@@ -58,38 +23,66 @@ definition is_initial_vcg_state
   where "is_initial_vcg_state ctxt \<Lambda> \<omega> \<equiv> 
              total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<and>
              is_empty_total_full \<omega> \<and>
-             (\<forall>x v. get_store_total \<omega> x = Some v \<longrightarrow> \<Lambda> x = Some (get_type (absval_interp_total ctxt) v))"
+             (\<forall>x t. \<Lambda> x = Some t \<longrightarrow> (\<exists>v. get_store_total \<omega> x = Some v \<and> get_type (absval_interp_total ctxt) v = t))"
+
+lemma vpr_method_correct_totalE: 
+  assumes "vpr_method_correct_total ctxt R mdecl"
+      and "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>)"
+      and "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>)"
+      and "is_empty_total_full \<omega>"
+      and "red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre"
+      and "rpre \<noteq> RFailure \<Longrightarrow> rpre = RNormal \<omega>pre"
+      and "method_decl.body mdecl \<noteq> None"
+      and Rec: "vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<Longrightarrow>                 
+                vpr_method_body_correct ctxt R mdecl \<omega>pre \<Longrightarrow> P"
+    shows "P"
+   using assms
+   unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def
+   by blast
 
 lemma vpr_method_correct_red_stmt_total_set_ok:
   assumes MethodCorrect:
           "vpr_method_correct_total (ctxt :: 'a total_context) R (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
     shows "red_stmt_total_set_ok ctxt R \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
-   (*vpr_method_correct_total_def vpr_method_correct_total_aux_def triple_as_method_decl_def
-            vpr_method_body_correct_def*)
   unfolding red_stmt_total_set_ok_def
 proof (rule allI, rule impI, rule notI, simp)
   fix \<omega> :: "'a full_total_state"
-  assume "is_initial_vcg_state ctxt \<Lambda> \<omega>"
-     and "red_stmt_total ctxt R \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
+  assume Init: "is_initial_vcg_state ctxt \<Lambda> \<omega>"
+     and Red: "red_stmt_total ctxt R \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
 
   let ?mdecl = "triple_as_method_decl ts P C Q"
 
-  from MethodCorrect have True
-  unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def 
-            vpr_method_body_correct_def
-  sorry
-  
   show False
-    sorry
+  proof (rule vpr_method_correct_totalE[OF MethodCorrect])
+    from Init[simplified is_initial_vcg_state_def]
+    show "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args (triple_as_method_decl ts P C Q) @ rets (triple_as_method_decl ts P C Q)))
+     (get_store_total \<omega>)"
+      unfolding triple_as_method_decl_def vpr_store_well_typed_def \<open>\<Lambda> = _\<close>
+      by simp
+  next
+    show "red_inhale ctxt R (method_decl.pre (triple_as_method_decl ts P C Q)) \<omega> (RNormal \<omega>)"
+      unfolding triple_as_method_decl_def
+      apply simp
+      apply (rule inh_pure_normal)
+      using RedLit
+      by (metis val_of_lit.simps(1))
+  next
+    assume BodyCorrect: "vpr_method_body_correct ctxt R (triple_as_method_decl ts P C Q) \<omega>"
+
+    show False
+    proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption, 
+           simp add: triple_as_method_decl_def)
+      show "red_stmt_total ctxt R (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
+     (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
+        apply (rule RedSeqFailureOrMagic)
+        using Red
+        unfolding \<open>\<Lambda> = _\<close>
+        sorry \<comment>\<open>need trace independent in our subset\<close>   
+    qed (simp)
+  qed (insert Init[simplified is_initial_vcg_state_def], auto simp: triple_as_method_decl_def)
 qed
 
-
-(*
-declare [[show_types]]
-declare [[show_sorts]]
-declare [[show_consts]]
-*)
 
 definition initial_vcg_states_equi where 
       "initial_vcg_states_equi \<Delta> \<equiv> {\<omega> :: int equi_state. stable \<omega> \<and> 
@@ -154,23 +147,9 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
           unfolding TypedEqui.typed_def TypedEqui.typed_store_def
           by blast
 
-        show "\<forall>x v. get_store_total \<omega>t x = Some v \<longrightarrow> \<Lambda> x = Some (get_type (absval_interp_total ctxt) v)"
-        proof (rule allI | rule impI)+
-          fix x v
-          assume "get_store_total \<omega>t x = Some v"
-          hence "get_store \<omega> x = Some v"
-            using \<open>\<omega>t \<in> _\<close>
-            by simp
-          moreover from this obtain t where "\<Lambda> x = Some t"
-            using StoreTyped[simplified store_typed_def]
-            unfolding t2a_ctxt_def sem_store_def
-            by fastforce
-          ultimately show "\<Lambda> x = Some (get_type (absval_interp_total ctxt) v)"
-            using StoreTyped[simplified store_typed_def]
-            unfolding t2a_ctxt_def
-            apply simp
-            by (metis sem_vtyp_to_get_type)
-        qed
+        show "\<forall>x t. \<Lambda> x = Some t \<longrightarrow> (\<exists>v. get_store_total \<omega>t x = Some v \<and> get_type (absval_interp_total ctxt) v = t)"
+          using StoreTyped[simplified store_typed_def] t2a_ctxt_def sem_store_def
+          by (smt (verit, ccfv_SIG) StoreTyped \<open>\<omega>t \<in> a2t_states ctxt \<omega>\<close> get_store_a2t_states sem_vtyp_to_get_type store_typed_lookup t2a_ctxt_variables)
       qed
     qed
   qed
