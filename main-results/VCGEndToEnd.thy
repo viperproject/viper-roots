@@ -60,17 +60,30 @@ definition is_initial_vcg_state
              is_empty_total_full \<omega> \<and>
              (\<forall>x v. get_store_total \<omega> x = Some v \<longrightarrow> \<Lambda> x = Some (get_type (absval_interp_total ctxt) v))"
 
-lemma convert_vpr_method_correct_total:
-  assumes MethodCorrect: "vpr_method_correct_total (ctxt :: 'a total_context) R (triple_as_method_decl ts P C Q)"
+lemma vpr_method_correct_red_stmt_total_set_ok:
+  assumes MethodCorrect:
+          "vpr_method_correct_total (ctxt :: 'a total_context) R (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
     shows "red_stmt_total_set_ok ctxt R \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
-  unfolding (*vpr_method_correct_total_def vpr_method_correct_total_aux_def triple_as_method_decl_def
+   (*vpr_method_correct_total_def vpr_method_correct_total_aux_def triple_as_method_decl_def
             vpr_method_body_correct_def*)
-            red_stmt_total_set_ok_def \<open>\<Lambda> = _\<close>
-(*proof (rule allI, rule impI, rule notI, simp)
+  unfolding red_stmt_total_set_ok_def
+proof (rule allI, rule impI, rule notI, simp)
   fix \<omega> :: "'a full_total_state"
-  assume "is_initial_vcg_state ctxt (nth_option ts) \<omega>"*)
+  assume "is_initial_vcg_state ctxt \<Lambda> \<omega>"
+     and "red_stmt_total ctxt R \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
+
+  let ?mdecl = "triple_as_method_decl ts P C Q"
+
+  from MethodCorrect have True
+  unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def 
+            vpr_method_body_correct_def
   sorry
+  
+  show False
+    sorry
+qed
+
 
 (*
 declare [[show_types]]
@@ -106,7 +119,7 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
   from MethodCorrect \<open>\<Lambda> = _\<close>
   have "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> 
           ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
-    using convert_vpr_method_correct_total
+    using vpr_method_correct_red_stmt_total_set_ok
     by blast
 
   moreover have "a2t_states ctxt \<omega> \<subseteq> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
@@ -119,11 +132,15 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
       show "is_initial_vcg_state ctxt \<Lambda> \<omega>t"
         unfolding is_initial_vcg_state_def
       proof (intro conjI)
-        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
+        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: 
+          "well_typed_heap (custom_context (t2a_ctxt ctxt \<Lambda>)) (snd (get_abs_state \<omega>))"
           unfolding TypedEqui.typed_def well_typed_def
+          by simp
 
-        show "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>t)"
-          sorry
+        thus "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>t)"
+          using \<open>\<omega>t \<in> _\<close>
+          unfolding t2a_ctxt_def
+          by (simp add: heap_typing_total_heap_well_typed snd_get_abs_state)
       next
         show "is_empty_total_full \<omega>t"          
           unfolding is_empty_total_full_def is_empty_total_def zero_mask_def
@@ -252,14 +269,6 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
   show "ConcreteSemantics.verifies_set tcfe atrue (abs_stmt.Inhale P ;; compile False \<Delta> tcfes ?Ctr_main ;; abs_stmt.Exhale Q)"
   proof -
-   
-    have "red_stmt_total_set_ok ?ctxt (\<lambda>_ :: int full_total_state. True) (nth_option ts) 
-                ?Ctr_mainV 
-                {\<omega>. is_initial_vcg_state ?ctxt (nth_option ts) \<omega>}"
-      apply (rule convert_vpr_method_correct_total)
-      using MethodCorrect \<open>mdecl = _\<close>
-       apply blast
-      by simp
 
     have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) ?Ctr_mainV)"
