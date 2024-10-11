@@ -79,31 +79,95 @@ declare [[show_consts]]
 *)
 
 definition initial_vcg_states_equi where 
-      "initial_vcg_states_equi \<equiv> {\<omega> :: int equi_state. stable \<omega> \<and> 
-                                    typed tcfe \<omega> \<and> 
+      "initial_vcg_states_equi \<Delta> \<equiv> {\<omega> :: int equi_state. stable \<omega> \<and> 
+                                    typed \<Delta> \<omega> \<and> 
                                     get_trace \<omega> = Map.empty \<and> (\<forall>l. get_m \<omega> l = 0)
                                   }"
 
 corollary VCG_to_verifies_set :                             
-  assumes "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
+  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
       and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
       and "valid_a2t_stmt C"
       and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
-    shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) initial_vcg_states_equi
+    shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) (initial_vcg_states_equi (t2a_ctxt ctxt \<Lambda>))
             (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"  
 proof (rule abstract_refines_total_verifies_set[OF _ Typed])
-  fix \<omega>
-  assume "\<omega> \<in> initial_vcg_states_equi"
-  show "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (a2t_states ctxt \<omega>)"
-    sorry
-next 
-  fix \<omega>
-  assume "\<omega> \<in> initial_vcg_states_equi" and TypedState: "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"  
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
 
-  hence TraceEmpty: "get_trace \<omega> = Map.empty"
-    by (simp add: initial_vcg_states_equi_def) 
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>"
+  hence "stable \<omega>" and "typed (t2a_ctxt ctxt \<Lambda>) \<omega>" and "get_trace \<omega> = Map.empty" and 
+        EmptyMask: "\<forall>l. get_m \<omega> l = 0"
+    unfolding initial_vcg_states_equi_def
+    by auto
+
+  from MethodCorrect \<open>\<Lambda> = _\<close>
+  have "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> 
+          ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+    using convert_vpr_method_correct_total
+    by blast
+
+  moreover have "a2t_states ctxt \<omega> \<subseteq> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+  proof 
+    fix \<omega>t
+    assume "\<omega>t \<in> a2t_states ctxt \<omega>"
+
+    show "\<omega>t \<in> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"      
+    proof 
+      show "is_initial_vcg_state ctxt \<Lambda> \<omega>t"
+        unfolding is_initial_vcg_state_def
+      proof (intro conjI)
+        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
+          unfolding TypedEqui.typed_def well_typed_def
+
+        show "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>t)"
+          sorry
+      next
+        show "is_empty_total_full \<omega>t"          
+          unfolding is_empty_total_full_def is_empty_total_def zero_mask_def
+          apply (rule conjI)
+          using EmptyMask \<open>\<omega>t \<in>  _\<close> 
+           apply fastforce
+          using \<open>\<omega>t \<in>  _\<close> 
+          sorry \<comment>\<open>Predicate Mask must be empty, ask Michael\<close>                    
+      next
+        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
+          unfolding TypedEqui.typed_def TypedEqui.typed_store_def
+          by blast
+
+        show "\<forall>x v. get_store_total \<omega>t x = Some v \<longrightarrow> \<Lambda> x = Some (get_type (absval_interp_total ctxt) v)"
+        proof (rule allI | rule impI)+
+          fix x v
+          assume "get_store_total \<omega>t x = Some v"
+          hence "get_store \<omega> x = Some v"
+            using \<open>\<omega>t \<in> _\<close>
+            by simp
+          moreover from this obtain t where "\<Lambda> x = Some t"
+            using StoreTyped[simplified store_typed_def]
+            unfolding t2a_ctxt_def sem_store_def
+            by fastforce
+          ultimately show "\<Lambda> x = Some (get_type (absval_interp_total ctxt) v)"
+            using StoreTyped[simplified store_typed_def]
+            unfolding t2a_ctxt_def
+            apply simp
+            by (metis sem_vtyp_to_get_type)
+        qed
+      qed
+    qed
+  qed
+
+  ultimately show
+    "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (a2t_states ctxt \<omega>)"  
+    using red_stmt_total_set_ok_mono 
+    by blast
+next 
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
+
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>" 
+     and TypedState: "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"
 
   show "abs_state_typing ctxt \<Lambda> \<omega>"
     unfolding abs_state_typing_def
@@ -122,17 +186,17 @@ next
       by (simp add: snd_get_abs_state t2a_ctxt_def)
   next
     show "partial_trace_typing ctxt (get_trace \<omega>)"
-      by (simp add: partial_trace_typing_def TraceEmpty)
+      using \<open>\<omega> \<in> _\<close>
+      by (simp add: partial_trace_typing_def initial_vcg_states_equi_def)
   qed
 next
-  fix \<omega>
-  assume "\<omega> \<in> initial_vcg_states_equi"
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
 
-  hence "get_trace \<omega> = Map.empty"
-    by (simp add: initial_vcg_states_equi_def)
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>"
 
   thus "a2t_state_wf ctxt (get_trace \<omega>)"
-    unfolding a2t_state_wf_def
+    unfolding a2t_state_wf_def initial_vcg_states_equi_def
     by (simp add: AbsTypeWf)
 next
   show "valid_a2t_stmt (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
@@ -197,7 +261,7 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
        apply blast
       by simp
 
-    have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
+    have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) ?Ctr_mainV)"
       apply (rule VCG_to_verifies_set)
       using MethodCorrect
@@ -211,7 +275,7 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       apply (simp add: default_ctxt_def)
       sorry
       
-    have "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi (compile False \<Delta> tcfes ?Ctr_mainV)"
+    have "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes ?Ctr_mainV)"
     proof -
       have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
         sorry      
@@ -224,7 +288,7 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
         by metis
     qed
 
-    hence "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi
+    hence "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
               (abs_stmt.Inhale P ;; compile False \<Delta> tcfes ?Ctr_main ;; abs_stmt.Exhale Q)"
       using \<open>P = _\<close> \<open>Q = _\<close>
       by simp
@@ -249,7 +313,7 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
   show "ConcreteSemantics.verifies_set tcfe atrue Cv"
   proof -
-    have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
+    have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
       apply (rule VCG_to_verifies_set)
@@ -262,11 +326,11 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
        apply (simp add: default_ctxt_def AbsTypeWf)
       sorry
 
-    hence A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) initial_vcg_states_equi
+    hence A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
       sorry \<comment>\<open>TODO: Thibault --> remove inhale true exhale true\<close>
 
-    hence "ConcreteSemantics.verifies_set tcfe initial_vcg_states_equi (compile False \<Delta> tcfes Cv_syn)"
+    hence "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes Cv_syn)"
     proof -
       have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
         sorry      
