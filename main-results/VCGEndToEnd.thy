@@ -4,7 +4,6 @@ begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
 
-
 subsection \<open>Helper\<close>
 
 fun valid_front_end_cmd :: "cmd \<Rightarrow> bool"
@@ -248,7 +247,7 @@ abbreviation true_syn_assertion
 
 lemma custom_context_tcfe_eq:
   "custom_context tcfe =
-    sem_fields i1 (declared_fields (program_total (default_ctxt d mdecl)))"
+   sem_fields i1 (declared_fields (program_total (default_ctxt d mdecl)))"
   unfolding type_ctxt_front_end_def
          default_ctxt_def vpr_program_from_method_decl_def type_ctxt_heap_def
   apply simp
@@ -271,14 +270,15 @@ theorem sound_syntactic_translation_VCG:
 
       and "mdecl = (triple_as_method_decl ts Ps (fst (translate_syn \<Delta> tcfes C)) Qs)"
       and MethodCorrect: "vpr_method_correct_total (default_ctxt (domains \<Delta>) mdecl) (\<lambda>_ :: int full_total_state. True) mdecl"     
-      and AuxiliaryMethodsCorrect:
+      and AuxiliaryMethodsCorrectAndTyped:
         "\<And> stmtAux. stmtAux \<in> snd (translate_syn \<Delta> tcfes C) \<Longrightarrow> 
              let mdeclAux = triple_as_method_decl ts 
                               true_syn_assertion stmtAux true_syn_assertion 
              in
-             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux"
+             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux \<and>
+             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option ts) stmtAux"
  
-      and ViperTyped: 
+      and MainViperTyped: 
             "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option ts)
                    (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs))"
 
@@ -305,7 +305,7 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       unfolding \<open>mdecl = _\<close>
           apply blast
          apply simp
-      using ViperTyped
+      using MainViperTyped
       unfolding \<open>mdecl = _\<close>
         apply blast
       using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd]
@@ -362,15 +362,16 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
   have TypingAux: "stmt_typing (program_total (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl ts true_syn_assertion Cv_syn true_syn_assertion)))
      (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion))"
-    sorry
-
+    using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>, simplified Let_def]    
+    by (auto intro!: stmt_typing.intros
+                        assertion_typing.intros atomic_assertion_typing.intros pure_exp_typing.intros)
   show "ConcreteSemantics.verifies_set tcfe atrue Cv"
   proof -
     have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
       apply (rule VCG_to_verifies_set)
-      using AuxiliaryMethodsCorrect[OF \<open>Cv_syn \<in> _\<close>]
+      using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>]
       unfolding \<open>mdecl = _\<close> Let_def  
          apply blast
         apply simp
