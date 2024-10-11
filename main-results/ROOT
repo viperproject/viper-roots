@@ -3,4 +3,4 @@ session MainResults = ViperAbstract +
     SimpleViperFrontEnd
     ViperAbstractRefinesTotal
   theories
-	MainResults
+	VCGEndToEnd
