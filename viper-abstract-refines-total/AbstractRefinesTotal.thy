@@ -889,7 +889,7 @@ lemma t2a_virtual_state_get_vm[simp] :
 section \<open>abstract state to total state\<close>
 
 definition ctxt_to_interp :: "'a total_context \<Rightarrow> ('a, 'a virtual_state) ValueAndBasicState.interp" where
-"ctxt_to_interp ctxt = undefined\<lparr>domains := absval_interp_total ctxt, funs := (\<lambda> _ _ _. None) \<rparr>"
+  "ctxt_to_interp ctxt = \<lparr>domains = absval_interp_total ctxt, predicates = Map.empty, funs = (\<lambda> _ _ _. None) \<rparr>"
 
 lemma ctxt_to_interp_domains [simp] :
   "domains (ctxt_to_interp ctxt) = absval_interp_total ctxt"

@@ -4,6 +4,47 @@ begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
 
+subsection \<open>Helper\<close>
+
+fun valid_front_end_cmd :: "cmd \<Rightarrow> bool"
+  where
+    "valid_front_end_cmd (Cseq C1 C2) \<longleftrightarrow> valid_front_end_cmd C1 \<and> valid_front_end_cmd C2"
+  | "valid_front_end_cmd ({P1} C1 {P2} || {Q1} C2 {Q2})  \<longleftrightarrow> valid_a2t_assert P1 \<and> valid_a2t_assert P2
+                                                          \<and> valid_a2t_assert Q1 \<and> valid_a2t_assert Q2 \<and>
+                                                            valid_front_end_cmd C1 \<and> valid_front_end_cmd C2"
+  | "valid_front_end_cmd (Cif B C1 C2) \<longleftrightarrow> valid_front_end_cmd C1 \<and> valid_front_end_cmd C2"
+  | "valid_front_end_cmd (Cwhile B I C)    \<longleftrightarrow> valid_a2t_assert I \<and> valid_front_end_cmd C"
+  | "valid_front_end_cmd _    = True"
+
+lemma valid_a2t_exp_translate_exp: "valid_a2t_exp (translate_exp e)"
+  by (induction e) auto
+
+lemma valid_a2t_bexp_translate_exp: "valid_a2t_exp (translate_bexp e)"
+  apply (induction e)
+  using valid_a2t_exp_translate_exp
+  by auto
+
+lemma vald_a2t_stmt_n_havoc: "valid_a2t_stmt (n_havoc xs)"
+  by (induction xs) auto
+  
+lemma valid_a2t_stmt_translate_syn:
+  assumes "valid_front_end_cmd C"
+  shows "valid_a2t_stmt (fst (translate_syn \<Delta> t C)) \<and> (\<forall>aux \<in> snd (translate_syn \<Delta> t C). valid_a2t_stmt aux)"
+  using assms
+  apply (induction C)
+  apply (simp_all add: valid_a2t_exp_translate_exp 
+                      syntactic_translate_heap_loc_def
+                      syntactic_translate_addr_def
+                      Let_def 
+                      vald_a2t_stmt_n_havoc
+                      valid_a2t_bexp_translate_exp)
+    apply fastforce
+   apply blast
+  apply blast
+  done
+
+subsection \<open>Main\<close>
+
 definition triple_as_method_decl :: "vtyp list \<Rightarrow> ViperLang.assertion \<Rightarrow> stmt \<Rightarrow> ViperLang.assertion \<Rightarrow> method_decl"
   where "triple_as_method_decl ts P C Q \<equiv> \<lparr> method_decl.args = [], 
                                          rets = ts, 
@@ -94,7 +135,9 @@ corollary VCG_to_verifies_set :
   assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
       and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-      and "valid_a2t_stmt C"
+      and ValidC: "valid_a2t_stmt C"
+      and ValidPre: "valid_a2t_assert P"
+      and ValidPost: "valid_a2t_assert Q"
       and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
     shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) (initial_vcg_states_equi (t2a_ctxt ctxt \<Lambda>))
             (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
@@ -196,24 +239,21 @@ next
     by (simp add: AbsTypeWf)
 next
   show "valid_a2t_stmt (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-    sorry
-qed    
-
-lemma valid_a2t_exp_translate_exp: "valid_a2t_exp (translate_exp e)"
-  by (induction e) auto
-
-lemma valid_a2t_stmt_translate_syn:
-  assumes "res = translate_syn \<Delta> t C"
-  shows "valid_a2t_stmt (fst res)"
-  using assms
-  (*apply (induction C)
-           apply (simp_all add: valid_a2t_exp_translate_exp 
-                                syntactic_translate_heap_loc_def
-                                syntactic_translate_addr_def)*)
-  oops 
+    by (simp add: ValidC ValidPre ValidPost)
+qed 
 
 abbreviation true_syn_assertion 
   where "true_syn_assertion \<equiv> (Atomic (Pure (ELit (LBool True))))"
+
+lemma custom_context_tcfe_eq:
+  "custom_context tcfe =
+   sem_fields i1 (declared_fields (program_total (default_ctxt d mdecl)))"
+  unfolding type_ctxt_front_end_def
+         default_ctxt_def vpr_program_from_method_decl_def type_ctxt_heap_def
+  apply simp
+  apply (rule ext)
+  apply (case_tac "f = field_val")
+  by (simp_all add: sem_fields_def vints_def)
 
 theorem sound_syntactic_translation_VCG:
   assumes "wf_stmt \<Delta> tcfes C"
@@ -222,21 +262,30 @@ theorem sound_syntactic_translation_VCG:
       and "\<And>Cv. Cv \<in> snd (translate \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
       and "typed_stmt C" (* TODO: Unify the two notions of typing *)
+      and ValidFrontendCmd: "valid_front_end_cmd C"
+      and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
+
       and AbsTypeWf: "abs_type_wf (interp.domains \<Delta>)"
+      and InterpFunsPredsEmpty: "interp.funs \<Delta> = (\<lambda> _ _ _. None) \<and> interp.predicates \<Delta> = Map.empty"
 
       and "mdecl = (triple_as_method_decl ts Ps (fst (translate_syn \<Delta> tcfes C)) Qs)"
       and MethodCorrect: "vpr_method_correct_total (default_ctxt (domains \<Delta>) mdecl) (\<lambda>_ :: int full_total_state. True) mdecl"     
-      and AuxiliaryMethodsCorrect:
+      and AuxiliaryMethodsCorrectAndTyped:
         "\<And> stmtAux. stmtAux \<in> snd (translate_syn \<Delta> tcfes C) \<Longrightarrow> 
              let mdeclAux = triple_as_method_decl ts 
                               true_syn_assertion stmtAux true_syn_assertion 
              in
-             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux"
+             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux \<and>
+             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option ts) stmtAux"
  
-      and ViperTyped: 
+      and MainViperTyped: 
             "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option ts)
                    (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs))"
-      and "nth_option (map (set_from_type undefined) ts) = abs_type_context.variables tcfe"
+
+      \<comment>\<open>we should be able to eliminate these two assumptions by constructing ts from tcfes\<close>
+      and tcfe_eq: "variables tcfe = nth_option (map (set_from_type (domains \<Delta>)) ts)"
+      and fst_tcfes_eq: "fst tcfes = nth_option ts"
+
       and "P = make_semantic_assertion_gen False \<Delta> tcfes Ps"
       and "Q = make_semantic_assertion_gen False \<Delta> tcfes Qs"     
     shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
@@ -256,21 +305,37 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       unfolding \<open>mdecl = _\<close>
           apply blast
          apply simp
-      using ViperTyped
+      using MainViperTyped
       unfolding \<open>mdecl = _\<close>
         apply blast
-       defer
-      apply (simp add: default_ctxt_def)
-      sorry
-      
+      using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd]
+       apply fast
+      by (simp_all add: default_ctxt_def AbsTypeWf ValidPrePost)
+
     have "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes ?Ctr_mainV)"
     proof -
       have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
-        sorry      
-      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"
-        sorry
+        unfolding t2a_ctxt_def
+        apply (rule abs_type_context.equality, simp_all)
+         apply (simp add: sem_store_def)
+         apply (fastforce simp add: tcfe_eq default_ctxt_def)    
+        using custom_context_tcfe_eq
+        by blast
+      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"        
+        unfolding type_ctxt_front_end_syntactic_def        
+        apply clarify
+        apply (rule conjI)
+        using fst_tcfes_eq
+        unfolding type_ctxt_front_end_syntactic_def
+         apply simp
+        apply (simp add: default_ctxt_def vpr_program_from_method_decl_def)
+        apply (rule ext)
+        apply (case_tac "f = field_val")
+        by (simp_all add: if_split)
       moreover have "\<Delta> = (ctxt_to_interp ?ctxt)"
-        sorry
+        apply (simp add: default_ctxt_def ctxt_to_interp_def)
+        apply (rule interp.equality)
+        by (simp_all add: InterpFunsPredsEmpty)        
       ultimately show ?thesis
         using A1
         by metis
@@ -297,22 +362,23 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
   have TypingAux: "stmt_typing (program_total (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl ts true_syn_assertion Cv_syn true_syn_assertion)))
      (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion))"
-    sorry
-
+    using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>, simplified Let_def]    
+    by (auto intro!: stmt_typing.intros
+                        assertion_typing.intros atomic_assertion_typing.intros pure_exp_typing.intros)
   show "ConcreteSemantics.verifies_set tcfe atrue Cv"
   proof -
     have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
       apply (rule VCG_to_verifies_set)
-      using AuxiliaryMethodsCorrect[OF \<open>Cv_syn \<in> _\<close>]
+      using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>]
       unfolding \<open>mdecl = _\<close> Let_def  
          apply blast
         apply simp
         apply (rule TypingAux)
-       defer
-       apply (simp add: default_ctxt_def AbsTypeWf)
-      sorry
+       using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd] \<open>Cv_syn \<in> _\<close>
+       apply fast      
+       by (simp_all add: default_ctxt_def AbsTypeWf ValidPrePost)
 
     hence A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
@@ -320,12 +386,29 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
     hence "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes Cv_syn)"
     proof -
+      \<comment>\<open>these proofs are duplicated from above\<close>
       have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
-        sorry      
+        unfolding t2a_ctxt_def
+        apply (rule abs_type_context.equality, simp_all)
+         apply (simp add: sem_store_def)
+         apply (fastforce simp add: tcfe_eq default_ctxt_def)    
+        using custom_context_tcfe_eq
+        by blast      
       moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"
-        sorry    
+        unfolding type_ctxt_front_end_syntactic_def        
+        apply clarify
+        apply (rule conjI)
+        using fst_tcfes_eq
+        unfolding type_ctxt_front_end_syntactic_def
+         apply simp
+        apply (simp add: default_ctxt_def vpr_program_from_method_decl_def)
+        apply (rule ext)
+        apply (case_tac "f = field_val")
+        by (simp_all add: if_split)    
       moreover have "\<Delta> = (ctxt_to_interp ?ctxt)"
-        sorry
+        apply (simp add: default_ctxt_def ctxt_to_interp_def)
+        apply (rule interp.equality)
+        by (simp_all add: InterpFunsPredsEmpty)        
       ultimately show ?thesis
         using A1
         by argo        
