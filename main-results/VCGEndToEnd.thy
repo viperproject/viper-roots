@@ -1,4 +1,4 @@
-theory MainResults
+theory VCGEndToEnd
 imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal
 begin
 
