@@ -763,8 +763,10 @@ next
     by (auto intro!: TotalSemantics.RedAssertFailure)
 next
   case (RedHavoc \<Lambda> x ty v \<omega>)
-  then show ?case
-    sorry
+  hence "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (Havoc x) \<omega>2 (RNormal (update_var_total \<omega>2 x v))"
+    by (blast intro!: TotalSemantics.RedHavoc)
+  thus ?case
+    by (metis RedHavoc.prems(2) full_total_state.select_convs(1) full_total_state.select_convs(2) full_total_state.select_convs(3) full_total_state.update_convs(1) states_differ_trace_update_trace_eq stmt_result_total.distinct(5) stmt_result_total.inject update_var_total.elims)
 next
   case (RedLocalAssign \<omega> e v \<Lambda> x ty)
   hence "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t Val v"
