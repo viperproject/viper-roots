@@ -2641,7 +2641,7 @@ lemma a2t_states_set_store :
   apply (simp add:image_def Bex_def)
   apply (rule exI[of _ "x\<lparr>get_store_total := get_store \<omega>\<rparr>"]; simp)
   apply (rule a2t_statesI_direct; (simp add: a2t_extend_ok_def)?)
-  unfolding a2t_states_def (* by (clarsimp simp add:abs_state_ext_iff t2a_state_def)*)
+  unfolding a2t_states_def
   using a2t_states_mp_empty a2t_extend_mp_empty
   by (auto simp add:abs_state_ext_iff t2a_state_def)
 
