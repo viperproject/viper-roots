@@ -1525,18 +1525,6 @@ proof (unfold vpr_store_well_typed_def, (rule allI | rule impI)+)
   qed
 qed
 
-abbreviation state_during_exhale_pre_call
-  where "state_during_exhale_pre_call \<omega> v_args \<equiv>
-     \<lparr> get_store_total = (shift_and_add_list_alt Map.empty v_args), 
-                          get_trace_total = [old_label \<mapsto> get_total_full \<omega>], 
-                          get_total_full = get_total_full \<omega> \<rparr>"
-
-abbreviation state_during_inhale_post_call
-  where "state_during_inhale_post_call \<omega>0 \<omega> v_args v_rets \<equiv>
-                              \<lparr> get_store_total = (shift_and_add_list_alt Map.empty (v_args@v_rets)), 
-                                get_trace_total = [old_label \<mapsto> get_total_full \<omega>0], 
-                                get_total_full = get_total_full \<omega> \<rparr>"
-
 subsubsection \<open>General lemma\<close>
 
 lemma method_call_stmt_rel_general:
