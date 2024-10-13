@@ -227,8 +227,9 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
           apply (rule conjI)
           using EmptyMask \<open>\<omega>t \<in>  _\<close> 
            apply fastforce
-          using \<open>\<omega>t \<in>  _\<close> 
-          sorry \<comment>\<open>Predicate Mask must be empty, ask Michael\<close>                    
+          using a2t_states_mp_empty[OF \<open>\<omega>t \<in>  _\<close> ]
+          unfolding zero_mask_def
+          by simp
       next
         from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
           unfolding TypedEqui.typed_def TypedEqui.typed_store_def
