@@ -368,36 +368,36 @@ next
       hence "res = RNormal \<omega>"
         using THResultNormal \<open>W' = _\<close>
         by simp
-      have RedInh2: "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal \<omega>2)"
-        apply (rule TotalExpressions.InhAcc[OF RcvRed PermRed])
+      have RedInh2: "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f Wildcard)) \<omega>2 (RNormal \<omega>2)"
+        apply (rule TotalExpressions.InhAccWildcard[OF RcvRed])
         using \<open>r = Null\<close> THResultNormal
         by (auto intro: THResultNormal_alt)
       show ?thesis
         apply (simp add: \<open>res = RNormal \<omega>\<close>)
-        using RedInh2 \<open>states_differ_only_on_trace \<omega> \<omega>2\<close> states_differ_trace_update_trace_eq             
-        sorry
+        using \<open>r = Null\<close> RedInh2 \<open>states_differ_only_on_trace \<omega> \<omega>2\<close> states_differ_trace_update_trace_eq             
+              local.THResultNormal(1) by blast
     next
       case False
-      hence "\<omega>' = update_mh_loc_total_full \<omega> (the_address r, f) (padd (get_mh_total_full \<omega> (the_address r, f)) (Abs_preal p))"
-        using THResultNormal inhale_perm_single_nonempty \<open>W' = _\<close>
-        sorry
+      from this obtain q
+        where "\<omega>' = update_mh_loc_total_full \<omega> (the_address r, f) (padd (get_mh_total_full \<omega> (the_address r, f)) q)"
+          and qAtMostOne: "PosReal.pgte 1 (get_mh_total_full \<omega> (the_address r, f) + q)"
+          and qNonZero: "option_fold ((=) q) (q \<noteq> 0) None"
+        using THResultNormal \<open>W' = _\<close>
+        unfolding inhale_perm_single_def
+        by blast
 
-      let ?W2' = "(if r = Null then {\<omega>2} else inhale_perm_single (\<lambda>_. True) \<omega>2 (the_address r,f) (Some (Abs_preal p)))"
-      let ?\<omega>2' = "update_mh_loc_total_full \<omega>2 (the_address r, f) (padd (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_preal p))"
+      let ?\<omega>2' = "update_mh_loc_total_full \<omega>2 (the_address r, f) (padd (get_mh_total_full \<omega>2 (the_address r, f)) q)"
 
-      have "?\<omega>2' \<in> inhale_perm_single (\<lambda>_. True) \<omega>2 (the_address r, f) (Some (Abs_preal p))"
+      have "?\<omega>2' \<in> inhale_perm_single (\<lambda>_. True) \<omega>2 (the_address r, f) None"
         apply (rule inhale_perm_single_elem)
-        using \<open>\<omega>' \<in> W'\<close> \<open>W' = _\<close> \<open>r \<noteq> Null\<close> \<open>\<omega>' = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
-        unfolding inhale_perm_single_def 
-        sorry
+        using qNonZero \<open>\<omega>' = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close> qAtMostOne
+        by auto        
 
-      have "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal ?\<omega>2')"
-        apply (rule TotalExpressions.InhAcc[where ?W' = ?W2',OF RcvRed PermRed])
+      have "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f Wildcard)) \<omega>2 (RNormal ?\<omega>2')"
+        apply (rule TotalExpressions.InhAccWildcard[OF RcvRed])
          apply (rule HOL.refl)
         apply (rule THResultNormal_alt)
-        using inhale_perm_single_nonempty \<open>?\<omega>2' \<in> _\<close> \<open>r \<noteq> Null\<close>
-          apply fastforce
-        using THResultNormal \<open>?\<omega>2' \<in> _\<close> 
+        using \<open>?\<omega>2' \<in> _\<close> \<open>r \<noteq> Null\<close> THResultNormal \<open>?\<omega>2' \<in> _\<close> 
         by auto
       moreover have "?\<omega>2' = (update_trace_total \<omega>' (get_trace_total \<omega>2))"
         apply (simp add: \<open>\<omega>' = _\<close>)
@@ -413,7 +413,7 @@ next
   next
     case THResultFailure
     then show ?thesis 
-      using RcvRed PermRed TotalExpressions.InhAcc th_result_rel.THResultFailure 
+      using RcvRed TotalExpressions.InhAcc th_result_rel.THResultFailure 
       by fastforce
   qed
 next
@@ -597,8 +597,58 @@ proof (induction arbitrary: \<omega>2)
       by (auto simp add: \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>)
   qed simp
 next
-  case (ExhAccWildcard mh \<omega> e_r r a q f)
-  then show ?case sorry
+  case (ExhAccWildcard mh \<omega> e_r r a f q)
+    hence RedRcv2: "ctxt, (\<lambda>_. True), Some \<omega>def2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+    using exp_eval_inh_no_old_exp_trace_indep(1)[OF ExhAccWildcard(2)]
+    by auto
+
+(* (exh_if_total (mh (a,f) \<noteq> 0 \<and> r \<noteq> Null) 
+                                        (update_mh_loc_total_full \<omega> (a,f) (mh (a,f) - q))) *)
+
+    let ?cond = "\<lambda>mh. mh (a,f) \<noteq> 0 \<and> r \<noteq> Null"
+    let ?\<omega>' = "update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - q)"
+    let ?res = "exh_if_total (?cond mh) ?\<omega>'"
+
+  thm TotalSemantics.ExhAccWildcard
+
+  show ?case
+  proof (cases ?res)
+    case RFailure
+    hence "\<not>(?cond mh)"
+      by (auto elim: exh_if_total.elims)
+    hence "\<not>(?cond (get_mh_total_full \<omega>2))"
+      using \<open>mh = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+      by auto
+    show ?thesis       
+      unfolding RFailure
+      using ExhAccWildcard.hyps(3) RedRcv2 \<open>\<not> (get_mh_total_full \<omega>2 (a, f) \<noteq> 0 \<and> r \<noteq> Null)\<close> red_exhale_acc_wildcard_failure 
+      by blast 
+  next
+    case (RNormal \<omega>')
+    hence "?cond mh" and
+          "\<omega>' = update_mh_loc_total_full \<omega> (a, f) (mh (a, f) - q)"
+      by (auto elim: exh_if_total.elims)
+    hence "?cond (get_mh_total_full \<omega>2)"
+      using \<open>mh = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+      by auto
+
+    hence qConstraint2: "0 < q \<and> q < get_mh_total_full \<omega>2 (a, f)"
+      using ExhAccWildcard \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+      by simp    
+
+    show ?thesis
+      unfolding RNormal
+      apply simp
+      apply (rule red_exhale_acc_wildcard_normalI[where ?q=q, OF RedRcv2])
+        apply (rule \<open>a = _\<close>)
+      using \<open>?cond (get_mh_total_full \<omega>2)\<close>
+        apply blast
+      using qConstraint2
+       apply blast     
+      apply (rule full_total_state.equality)
+      apply (unfold \<open>\<omega>' = _\<close> \<open>mh = _\<close>)
+      by (simp_all add: \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>)
+  qed simp
 next
   case (ExhAccPred mp \<omega> e_args v_args e_p p pred_id)
   then show ?case by simp

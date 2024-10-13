@@ -592,7 +592,7 @@ lemma red_exhale_acc_failureI:
       and "a = the_address r"
       and "\<not>(p \<ge> 0 \<and> (if r = Null then p = 0 else pgte (get_mh_total_full \<omega> (a,f)) (Abs_preal p)))" (is "\<not>?Success")
     shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f (PureExp e_p))) \<omega> RFailure"
-proof -
+proof -             
   have Eq: "RFailure = exh_if_total ?Success (if r = Null then \<omega> else update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - (Abs_preal p)))"
     using assms
     by auto
@@ -602,6 +602,24 @@ proof -
     using assms
     by auto
 qed
+
+lemma red_exhale_acc_wildcard_normalI:
+  assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+      and "a = the_address r"
+      and "get_mh_total_full \<omega> (a,f) \<noteq> 0 \<and> r \<noteq> Null" (is "?Success")
+      and "q > 0 \<and> get_mh_total_full \<omega> (a,f) > q"
+      and "\<omega>' = update_mh_loc_total_full \<omega> (a,f) ((get_mh_total_full \<omega> (a,f)) - q)" (is "\<omega>' = ?\<omega>def")
+    shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega> (RNormal \<omega>')"  
+  using ExhAccWildcard assms
+  by fastforce
+
+lemma red_exhale_acc_wildcard_failure:
+  assumes "ctxt, R, (Some \<omega>0) \<turnstile> \<langle>e_r; \<omega>\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+      and "a = the_address r"
+      and "\<not>(get_mh_total_full \<omega> (a,f) \<noteq> 0 \<and> r \<noteq> Null)" (is "?Success")
+    shows "red_exhale ctxt R \<omega>0 (Atomic (Acc e_r f Wildcard)) \<omega> RFailure"  
+  using ExhAccWildcard assms
+  by fastforce  
 
 subsection \<open>Well-formed state consistency\<close>
 
