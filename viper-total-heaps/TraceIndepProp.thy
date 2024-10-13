@@ -355,7 +355,67 @@ next
   then show ?case by simp
 next
   case (InhAccWildcard \<omega> e_r r W' f res)
-  then show ?case sorry
+    hence RcvRed: "ctxt, (\<lambda>_. True), Some \<omega>2 \<turnstile> \<langle>e_r;\<omega>2\<rangle> [\<Down>]\<^sub>t Val (VRef r)"
+    by auto
+
+  from \<open>th_result_rel _ _ _ _\<close>
+  show ?case
+  proof (cases rule: th_result_rel.cases)
+    case (THResultNormal \<omega>')
+    show ?thesis
+    proof (cases "r = Null")
+      case True
+      hence "res = RNormal \<omega>"
+        using THResultNormal \<open>W' = _\<close>
+        by simp
+      have RedInh2: "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal \<omega>2)"
+        apply (rule TotalExpressions.InhAcc[OF RcvRed PermRed])
+        using \<open>r = Null\<close> THResultNormal
+        by (auto intro: THResultNormal_alt)
+      show ?thesis
+        apply (simp add: \<open>res = RNormal \<omega>\<close>)
+        using RedInh2 \<open>states_differ_only_on_trace \<omega> \<omega>2\<close> states_differ_trace_update_trace_eq             
+        sorry
+    next
+      case False
+      hence "\<omega>' = update_mh_loc_total_full \<omega> (the_address r, f) (padd (get_mh_total_full \<omega> (the_address r, f)) (Abs_preal p))"
+        using THResultNormal inhale_perm_single_nonempty \<open>W' = _\<close>
+        sorry
+
+      let ?W2' = "(if r = Null then {\<omega>2} else inhale_perm_single (\<lambda>_. True) \<omega>2 (the_address r,f) (Some (Abs_preal p)))"
+      let ?\<omega>2' = "update_mh_loc_total_full \<omega>2 (the_address r, f) (padd (get_mh_total_full \<omega>2 (the_address r, f)) (Abs_preal p))"
+
+      have "?\<omega>2' \<in> inhale_perm_single (\<lambda>_. True) \<omega>2 (the_address r, f) (Some (Abs_preal p))"
+        apply (rule inhale_perm_single_elem)
+        using \<open>\<omega>' \<in> W'\<close> \<open>W' = _\<close> \<open>r \<noteq> Null\<close> \<open>\<omega>' = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+        unfolding inhale_perm_single_def 
+        sorry
+
+      have "red_inhale ctxt (\<lambda>_. True) (Atomic (Acc e_r f (PureExp e_p))) \<omega>2 (RNormal ?\<omega>2')"
+        apply (rule TotalExpressions.InhAcc[where ?W' = ?W2',OF RcvRed PermRed])
+         apply (rule HOL.refl)
+        apply (rule THResultNormal_alt)
+        using inhale_perm_single_nonempty \<open>?\<omega>2' \<in> _\<close> \<open>r \<noteq> Null\<close>
+          apply fastforce
+        using THResultNormal \<open>?\<omega>2' \<in> _\<close> 
+        by auto
+      moreover have "?\<omega>2' = (update_trace_total \<omega>' (get_trace_total \<omega>2))"
+        apply (simp add: \<open>\<omega>' = _\<close>)
+        apply (rule full_total_state.equality)
+        by (simp_all add:  \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>)        
+      ultimately show ?thesis
+        using \<open>res = _\<close> \<open>states_differ_only_on_trace \<omega> \<omega>2\<close>
+        by simp        
+      qed
+  next
+    case THResultMagic
+    then show ?thesis by simp
+  next
+    case THResultFailure
+    then show ?thesis 
+      using RcvRed PermRed TotalExpressions.InhAcc th_result_rel.THResultFailure 
+      by fastforce
+  qed
 next
   case (InhAccPredWildcard \<omega> e_args v_args W' pred_id res)
   then show ?case by simp
