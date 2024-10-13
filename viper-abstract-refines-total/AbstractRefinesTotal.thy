@@ -926,7 +926,7 @@ definition a2t_extend_heap :: "'a total_context \<Rightarrow> 'a partial_heap \<
 "a2t_extend_heap ctxt h hl = case_option (well_typed_val (absval_interp_total ctxt) (the (declared_fields (program_total ctxt) (snd hl)))) id (h hl)"
 
 definition a2t_extend_state :: "'a total_context \<Rightarrow> 'a virtual_state \<Rightarrow> 'a total_state" where
-"a2t_extend_state ctxt st = total_state.make (a2t_extend_heap ctxt (get_vh st)) undefined (get_vm st) undefined"
+"a2t_extend_state ctxt st = total_state.make (a2t_extend_heap ctxt (get_vh st)) undefined (get_vm st) zero_mask"
 
 definition a2t_extend :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state" where
 "a2t_extend ctxt \<omega> = full_total_state.make (get_store \<omega>) ((\<lambda> x. Some (a2t_extend_state ctxt x)) \<circ>\<^sub>m get_trace \<omega>) (a2t_extend_state ctxt (get_state \<omega>))"
@@ -948,14 +948,17 @@ lemma a2t_extend_typed :
   shows "a2t_extend_ok ctxt \<omega> (a2t_extend ctxt \<omega>)"
   using assms apply (simp add:a2t_extend_ok_def a2t_extend_def a2t_extend_state_def a2t_extend_heap_typed
       full_total_state.defs total_state.defs partial_trace_typing_def trace_typing_def map_comp_Some_iff)
-  using a2t_extend_heap_typed by fastforce
+  using a2t_extend_heap_typed by force
 
-
+lemma a2t_extend_mp_empty: "get_mp_total_full (a2t_extend ctxt \<omega>) = zero_mask"   
+  unfolding a2t_extend_def a2t_extend_state_def full_total_state.defs(1) total_state.defs(1)
+  by simp
 
 definition a2t_states :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state set" where
 "a2t_states ctxt \<omega> = {\<omega>\<^sub>t. \<omega> = t2a_state \<omega>\<^sub>t |`\<^sub>a dom (get_vh (get_state \<omega>)) \<and>
   a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t \<and>
-  wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t))}"
+  wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t)) \<and>
+  get_mp_total_full \<omega>\<^sub>t = zero_mask}"
 
 definition a2t_state :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarrow> 'a full_total_state" where
 "a2t_state ctxt \<omega> = (SOME \<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega>)"
@@ -963,7 +966,8 @@ definition a2t_state :: "'a total_context \<Rightarrow> 'a equi_state \<Rightarr
 lemma a2t_states_in_stable :
   assumes "stable \<omega>"
   shows "\<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<longleftrightarrow> \<omega> = stabilize (t2a_state \<omega>\<^sub>t) \<and> a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t \<and>
-    wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t))"
+    wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t)) \<and>
+    get_mp_total_full \<omega>\<^sub>t = zero_mask"
 proof -
   from assms have Hvh: "dom (get_vh (get_state \<omega>)) = {hl. ppos (get_vm (get_state \<omega>) hl)}"
     by (simp add:stable_dom_get_vh_eq_get_vm stable_get_state)
@@ -976,6 +980,7 @@ lemma a2t_statesI_direct :
   assumes "\<omega> = t2a_state \<omega>\<^sub>t |`\<^sub>a dom (get_vh (get_state \<omega>))"
   assumes "a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t"
   assumes "wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t))"
+  assumes "get_mp_total_full \<omega>\<^sub>t = zero_mask"
   shows "\<omega>\<^sub>t \<in> a2t_states ctxt \<omega>"
   using assms by (simp add:a2t_states_def)
 
@@ -984,6 +989,7 @@ lemma a2t_statesI_direct_stable :
   assumes "\<omega> = stabilize (t2a_state \<omega>\<^sub>t)"
   assumes "a2t_extend_ok ctxt \<omega> \<omega>\<^sub>t"
   assumes "wf_mask_simple (get_mh_total (get_total_full \<omega>\<^sub>t))"
+  assumes "get_mp_total_full \<omega>\<^sub>t = zero_mask"
   shows "\<omega>\<^sub>t \<in> a2t_states ctxt \<omega>"
   using assms by (simp add:a2t_states_in_stable)
 
@@ -992,6 +998,7 @@ lemma a2t_statesI :
   assumes "heap_typing ctxt (get_hh_total (get_total_full \<omega>\<^sub>t))"
   assumes "trace_typing ctxt (get_trace_total \<omega>\<^sub>t)"
   assumes "get_store_total \<omega>\<^sub>t = get_store \<omega>"
+  assumes "get_mp_total_full \<omega>\<^sub>t = zero_mask"
   assumes "(\<lambda> x. Some (stabilize (t2a_virtual_state x))) \<circ>\<^sub>m get_trace_total \<omega>\<^sub>t = get_trace \<omega>"
   assumes "get_mh_total (get_total_full \<omega>\<^sub>t) = get_vm (get_state \<omega>)"
   assumes "\<And> hl v. get_vh (get_state \<omega>) hl = Some v \<Longrightarrow> get_hh_total (get_total_full \<omega>\<^sub>t) hl = v"
@@ -1080,6 +1087,13 @@ lemma a2t_states_get_trace_total_None [simp]:
   shows "get_trace_total \<omega>\<^sub>t l = None \<longleftrightarrow> get_trace \<omega> l = None"
   apply (insert assms) by (erule a2t_states_in_exE; simp add:map_comp_None_iff)
 
+lemma a2t_states_mp_empty [simp]:
+  assumes "\<omega>\<^sub>t \<in> a2t_states ctxt \<omega>"
+  shows "get_mp_total_full \<omega>\<^sub>t = zero_mask"
+  using assms
+  unfolding a2t_states_def
+  by blast
+
 lemma a2t_stateI [intro?] :
   assumes "\<And> x. x \<in> a2t_states ctxt \<omega> \<Longrightarrow> P x"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
@@ -1105,6 +1119,9 @@ lemma a2t_stateI [intro?] :
     using assms(2) a2t_state_wf_def by blast
   subgoal
     by (simp add:a2t_extend_def a2t_extend_state_def full_total_state.defs total_state.defs)
+  subgoal
+    using a2t_extend_mp_empty    
+    by blast
   done
 
 lemma a2t_state_in_a2t_states :
@@ -1439,12 +1456,13 @@ lemma red_inhale_set_AccPureI :
   assumes "\<Delta> = ctxt_to_interp ctxt"
   shows  "red_inhale_set ctxt R (Atomic (Acc e f (PureExp ep))) (a2t_states ctxt \<omega>) =
     (if r = Null then (if p = 0 then (a2t_states ctxt \<omega>) else {}) else
-     Set.bind (a2t_states ctxt \<omega>) (\<lambda> \<omega>'. inhale_perm_single R \<omega>' (the_address r, f) (Some (Abs_preal p))))"
+     Set.bind (a2t_states ctxt \<omega>) (\<lambda> \<omega>'. inhale_perm_single R \<omega>' (the_address r, f) (Some (Abs_preal p))))"  
   using assms
-  apply (auto simp add:red_inhale_set_def red_inhale_simps th_result_rel.simps
-      red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"] a2t_states_in_stable dest:red_pure_det) (* Long *)
+    apply (auto simp add:red_inhale_set_def red_inhale_simps th_result_rel.simps
+              red_pure_refines_red_pure_total[where ?\<Delta>="\<Delta>"] a2t_states_in_stable a2t_extend_mp_empty
+              dest:red_pure_det)  (* Long *)      
       apply (auto)
-  by (metis a2t_statesI_direct_stable assms(3) red_pure_val_unique(1) val.inject(3) val.inject(4))+
+  by (metis a2t_statesI_direct_stable assms(3) get_mp_total_full.elims red_pure_val_unique(1) val.inject(3) val.inject(4))+
 
 
 lemma red_inhale_ok_AccWildcardE :
@@ -1770,7 +1788,9 @@ lemma a2t_states_del_perm :
     apply (rule a2t_statesI_direct; (simp add:a2t_extend_ok_def)?)
     apply (rule full_state_ext; simp add:get_trace_a2t_states[symmetric])
     apply (rule virtual_state_ext; simp add:t2a_state_get_state)
-    apply (rule ext; simp add:restrict_map_def) using vstate_wf_Some by fastforce
+     apply (rule ext; simp add:restrict_map_def) using vstate_wf_Some 
+     apply fastforce
+    by (metis a2t_states_mp_empty get_mp_total_full.elims)
   subgoal for \<omega>\<^sub>t
     apply (rule a2t_statesI_direct; (simp add:a2t_extend_ok_def)?)
     apply (rule full_state_ext; simp add:get_trace_a2t_states[symmetric])
@@ -1784,6 +1804,8 @@ lemma a2t_states_del_perm :
     subgoal
       apply (rule wf_mask_simpleI; simp)
       using get_vm_bound by (metis del_perm_get_vm fun_upd_same)
+    subgoal      
+      by (metis a2t_states_mp_empty get_mp_total_full.simps)
     done
   done
 
@@ -2159,6 +2181,10 @@ proof (induction A arbitrary:\<omega>)
                 apply (simp add:a2t_extend_ok_def abs_state_typing_def)
                 by (rule partial_heap_typing_insert; simp add:assms(1))
               subgoal by (simp)
+              subgoal 
+                apply simp
+                using a2t_states_mp_empty
+                by fastforce
               done
             subgoal
               apply (rule full_total_state.equality; simp)
@@ -2208,6 +2234,10 @@ proof (induction A arbitrary:\<omega>)
                 apply (simp add:a2t_extend_ok_def abs_state_typing_def)
                 by (rule partial_heap_typing_insert; simp add:assms(1))
               subgoal by (simp)
+              subgoal
+                apply simp
+                using a2t_states_mp_empty
+                by fastforce
               done
             subgoal
               apply (rule exI[of _ "Abs_preal p"]; simp add:preal_to_real)
@@ -2611,7 +2641,10 @@ lemma a2t_states_set_store :
   apply (simp add:image_def Bex_def)
   apply (rule exI[of _ "x\<lparr>get_store_total := get_store \<omega>\<rparr>"]; simp)
   apply (rule a2t_statesI_direct; (simp add: a2t_extend_ok_def)?)
-  unfolding a2t_states_def by (clarsimp simp add:abs_state_ext_iff t2a_state_def)
+  unfolding a2t_states_def (* by (clarsimp simp add:abs_state_ext_iff t2a_state_def)*)
+  using a2t_states_mp_empty a2t_extend_mp_empty
+  by (auto simp add:abs_state_ext_iff t2a_state_def)
+
 
 lemma a2t_states_set_value :
   assumes "x \<in> a2t_states ctxt (set_state \<omega> (set_value (get_state \<omega>) hl v))"
@@ -2645,6 +2678,9 @@ proof -
         apply (rule heap_typing_insert; simp?)
          apply (rule partial_heap_typing_insert; simp?)
         by (rule partial_heap_typing_elim; assumption)
+      subgoal
+        using a2t_states_mp_empty
+        by fastforce
       done
     subgoal
       apply (rule full_total_state.equality; simp)
@@ -2670,6 +2706,7 @@ proof (rule subsetI)
       by fastforce
     subgoal using assms H\<omega>\<^sub>t by (simp add:abs_state_typing_def)
     subgoal using H\<omega>\<^sub>t by (simp)
+    subgoal using H\<omega>\<^sub>t a2t_states_mp_empty by fastforce
     subgoal using H\<omega>\<^sub>t by (simp add:get_trace_a2t_states[symmetric])
     subgoal using H\<omega>\<^sub>t by (simp)
     subgoal using H\<omega>\<^sub>t by (simp)
