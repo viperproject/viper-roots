@@ -58,14 +58,21 @@ proof (rule self_framingI)
   qed
 qed
 
+lemma store_typed_update:
+  assumes "store_typed vars \<sigma>"
+      and "vars x = Some ty"
+      and "v \<in> ty"
+    shows "store_typed vars (\<sigma>(x \<mapsto> v))"
+  by (simp add: assms(1) assms(2) assms(3) store_typed_insert)
+
+
 lemma typed_store_update:
   assumes "typed_store \<Delta> \<sigma>"
       and "variables \<Delta> x = Some ty"
       and "v \<in> ty"
     shows "typed_store \<Delta> (\<sigma>(x \<mapsto> v))"
   unfolding typed_store_def
-  using assms(1) assms(2) assms(3)
-  by (smt (verit, ccfv_SIG) dom_fun_upd fun_upd_other fun_upd_same insert_dom option.discI option.inject typed_store_def store_typed_def)
+  by (meson assms(1) assms(2) assms(3) store_typed_update typed_store_def)
 
 
 (*

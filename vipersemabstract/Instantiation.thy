@@ -562,7 +562,7 @@ qed
 
 
 global_interpretation TypedEqui: typed_state well_typed
-proof
+proof                             
   fix x a b :: "('a ag_trace \<times> 'a virtual_state)"
   fix \<Gamma>
   show "Some x = a \<oplus> b \<Longrightarrow> well_typed \<Gamma> a \<Longrightarrow> well_typed \<Gamma> b \<Longrightarrow> well_typed \<Gamma> x"
@@ -1104,8 +1104,18 @@ qed
 abbreviation typed where
   "typed \<equiv> TypedEqui.typed"
 
+(*
+text \<open>'v represents the type of the "domain" values, and 'a the type of Viper resource states\<close>
+
+record ('v, 'a) interp =
+  domains :: "'v \<Rightarrow> abs_type"
+  predicates :: "'v predicate_loc \<rightharpoonup> 'a set"
+  funs :: "function_ident \<Rightarrow> 'v val list \<Rightarrow> 'a \<rightharpoonup> 'v val"
+*)
+
 (* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
-definition make_context_semantic where
+definition make_context_semantic  :: "('a, 'a virtual_state) interp \<Rightarrow> (nat \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option) \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
+  where
   "make_context_semantic \<Delta> F = \<lparr> variables = (sem_store (domains \<Delta>) (fst F)), custom_context = (sem_fields (domains \<Delta>) (snd F))  \<rparr>"
 
 definition well_typedly (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set"*)

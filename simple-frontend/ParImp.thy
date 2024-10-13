@@ -442,63 +442,33 @@ definition vints where
 definition vrefs where
   "vrefs = { VRef v |v. True }"
 
-fun well_typed_cmd_aux where
-  "well_typed_cmd_aux _ Cskip \<longleftrightarrow> True"
-| "well_typed_cmd_aux \<Delta> (Cseq C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> (Cassign x e) \<longleftrightarrow> variables \<Delta> x = Some vints"
-| "well_typed_cmd_aux \<Delta> (Cread x r) \<longleftrightarrow> variables \<Delta> x = Some vints \<and> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cwrite r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Calloc r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cfree r) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cif _ C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> (Cwhile _ _ C) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C"
-
-(*
-lemma update_store_typed:
-  assumes "TypedEqui.typed_store \<Delta> s"
-      and "variables \<Delta> x = Some V"
-      and "v \<in> V"
-    shows "TypedEqui.typed_store \<Delta> (s(x \<mapsto> v))"
-  sledgehammer
-*)
-
-lemma red_keeps_typed_store:
-  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-      and "TypedEqui.typed_store \<Delta> (fst \<sigma>)"
-      and "well_typed_cmd_aux \<Delta> C"
-    shows "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
-  using assms
-proof (induct rule: red.induct)
-  case (red_Assign \<sigma> s h \<sigma>' x e)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Assign(3), of x vints "VInt (edenot e s)"]
-    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(3))
-next
-  case (red_Alloc \<sigma> s h l \<sigma>' x e)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Alloc(4), of x vrefs "VRef (Address l)"]
-    by (metis (mono_tags, lifting) CollectI fst_eqD vrefs_def well_typed_cmd_aux.simps(6))
-next
-  case (red_Read \<sigma> s h r l v \<sigma>' x)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Read(5), of x vints "VInt v"]
-    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(4))
-qed (simp_all)
 
 
 definition type_ctxt_heap where
   "type_ctxt_heap f = (if f = field_val then Some vints else None)"
 
+(* list of types *)
+(* Directly partial function? *)
 definition type_ctxt_store where
-  "type_ctxt_store x = (if x < undefined then if x mod 2 = 0 then Some vints else Some vrefs else None)"
+  "type_ctxt_store tys x = (if x < length tys then Some (case tys ! x of TInt \<Rightarrow> vints | _ \<Rightarrow> vrefs) else None)"
 
-definition type_ctxt_front_end where
-  "type_ctxt_front_end = \<lparr> variables = type_ctxt_store, custom_context = type_ctxt_heap \<rparr>"
+definition type_ctxt_store_syntactic where
+  "type_ctxt_store_syntactic tys x = (if x < length tys then Some (case tys ! x of TInt \<Rightarrow> TInt | _ \<Rightarrow> TRef) else None)"
 
-definition type_ctxt_front_end_syntactic :: "(var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+definition type_ctxt_front_end :: "vtyp list \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
   where
-  "type_ctxt_front_end_syntactic = ( (\<lambda>x. if x < undefined then if x mod 2 = 0 then Some TInt else Some TRef else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
+  "type_ctxt_front_end tys = \<lparr> variables = type_ctxt_store tys, custom_context = type_ctxt_heap \<rparr>"
+
+abbreviation tcfe where
+  "tcfe \<equiv> type_ctxt_front_end"
+
+definition type_ctxt_front_end_syntactic :: "vtyp list \<Rightarrow> (var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+  where
+  "type_ctxt_front_end_syntactic tys =
+  ( type_ctxt_store_syntactic tys, (\<lambda>f. if f = field_val then Some TInt else None) )"
+
+abbreviation tcfes where
+  "tcfes \<equiv> type_ctxt_front_end_syntactic"
 
 (*
 definition make_context_semantic where
@@ -506,19 +476,87 @@ definition make_context_semantic where
 *)
 
 lemma make_context_semantic_type_ctxt[simp]:
-  "make_context_semantic \<Delta> type_ctxt_front_end_syntactic = type_ctxt_front_end"
-proof -
-  have "variables (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = variables type_ctxt_front_end"
-    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
-    apply (rule ext)
-    by (simp add:vints_def vrefs_def)
-  moreover have "custom_context (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = custom_context type_ctxt_front_end"
-    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
-    apply (rule ext)
-    by (simp add:vints_def vrefs_def)
-  ultimately show ?thesis
-    by (simp add: type_ctxt_front_end_def)
-qed
+  "make_context_semantic \<Delta> (type_ctxt_front_end_syntactic tys) = type_ctxt_front_end tys"
+  unfolding make_context_semantic_def type_ctxt_front_end_def
+  apply rule
+  apply simp
+  apply (rule conjI)
+  unfolding sem_store_def sem_fields_def type_ctxt_store_def type_ctxt_front_end_syntactic_def type_ctxt_heap_def vints_def vrefs_def map_comp_def
+   apply simp_all
+   apply (rule ext)
+  subgoal for x
+    apply (cases "x < length tys")
+     apply (simp_all add: type_ctxt_store_syntactic_def)
+    by (smt (verit) set_from_type.simps(1) set_from_type.simps(4) vtyp.case(2) vtyp.case(3) vtyp.case(5) vtyp.exhaust vtyp.simps(22) vtyp.simps(25))
+   apply (rule ext)
+  by simp
+
+
+
+
+fun typed_exp where
+  "typed_exp tys (Elit l) \<longleftrightarrow> True"
+| "typed_exp tys (Evar x) \<longleftrightarrow> (x < length tys \<and> tys ! x = TInt)"
+| "typed_exp tys (Ebinop e1 op e2) \<longleftrightarrow> typed_exp tys e1 \<and> typed_exp tys e2"
+
+fun typed_bexp where
+  "typed_bexp tys (Beq e1 e2) \<longleftrightarrow> typed_exp tys e1 \<and> typed_exp tys e2"
+| "typed_bexp tys (Band b1 b2) \<longleftrightarrow> typed_bexp tys b1 \<and> typed_bexp tys b2"
+| "typed_bexp tys (Bnot b) \<longleftrightarrow> typed_bexp tys b"
+
+abbreviation has_type_var where
+  "has_type_var tys x ty \<equiv> x < length tys \<and> tys ! x = ty"
+
+fun well_typed_cmd where
+  "well_typed_cmd _ Cskip \<longleftrightarrow> True"
+| "well_typed_cmd tys (Cseq C1 C2) \<longleftrightarrow> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys (Cassign x e) \<longleftrightarrow> has_type_var tys x TInt \<and> typed_exp tys e"
+| "well_typed_cmd tys (Cread x r) \<longleftrightarrow> has_type_var tys x TInt \<and> has_type_var tys r TRef"
+| "well_typed_cmd tys (Cwrite r e) \<longleftrightarrow> has_type_var tys r TRef \<and> typed_exp tys e"
+| "well_typed_cmd tys (Calloc r e) \<longleftrightarrow> has_type_var tys r TRef \<and> typed_exp tys e"
+| "well_typed_cmd tys (Cfree r) \<longleftrightarrow> has_type_var tys r TRef"
+| "well_typed_cmd tys (Cif b C1 C2) \<longleftrightarrow> typed_bexp tys b \<and> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys (Cwhile b _ C) \<longleftrightarrow> typed_bexp tys b \<and> well_typed_cmd tys C"
+
+(*
+declare [[show_types]]
+declare [[show_sorts]]
+declare [[show_consts]]
+*)
+
+thm TypedEqui.typed_store_update
+
+lemma VInt_in_vints[simp]:
+  "VInt v \<in> vints"
+  unfolding vints_def by blast
+
+lemma red_keeps_typed_store:
+  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+      and "store_typed (type_ctxt_store tys) (fst \<sigma>)"
+      and "well_typed_cmd tys C"
+    shows "store_typed (type_ctxt_store tys) (fst \<sigma>')"
+  using assms
+proof (induct rule: red.induct)
+  case (red_Assign \<sigma> s h \<sigma>' x e)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Assign(3), of x vints "VInt (edenot e s)"]
+    unfolding type_ctxt_store_def
+    by (metis (no_types, lifting) VInt_in_vints fst_conv vtyp.simps(22) well_typed_cmd.simps(3))
+next
+  case (red_Alloc \<sigma> s h l \<sigma>' x e)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Alloc(4), of x vrefs "VRef (Address l)"]
+    unfolding type_ctxt_store_def
+    by (smt (verit, best) CollectI fst_conv vrefs_def vtyp.simps(25) well_typed_cmd.simps(6))
+next
+  case (red_Read \<sigma> s h r l v \<sigma>' x)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Read(5), of x vints "VInt v"]
+    unfolding type_ctxt_store_def
+    by (metis (no_types, lifting) VInt_in_vints fst_eqD vtyp.simps(22) well_typed_cmd.simps(4))
+qed (simp_all)
+
 
 (*
 abbreviation well_typed_heap where
@@ -548,8 +586,8 @@ qed (auto)
 
 lemma well_typed_cmd_red:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-      and "well_typed_cmd_aux \<Delta> C"
-    shows "well_typed_cmd_aux \<Delta> C'"
+      and "well_typed_cmd tys C"
+    shows "well_typed_cmd tys C'"
   using assms
   by (induct rule: red.induct) (auto)
 
