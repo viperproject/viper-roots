@@ -1,5 +1,5 @@
 theory VCGEndToEnd
-imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal
+imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal TotalViper.TraceIndepProp
 begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
@@ -73,7 +73,7 @@ lemma vpr_method_correct_totalE:
       and "is_empty_total_full \<omega>"
       and "red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre"
       and "rpre \<noteq> RFailure \<Longrightarrow> rpre = RNormal \<omega>pre"
-      and "method_decl.body mdecl \<noteq> None"
+      and "method_decl.body mdecl = Some mbody"      
       and Rec: "vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<Longrightarrow>                 
                 vpr_method_body_correct ctxt R mdecl \<omega>pre \<Longrightarrow> P"
     shows "P"
@@ -81,16 +81,53 @@ lemma vpr_method_correct_totalE:
    unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def
    by blast
 
+lemma valid_a2t_exp_to_todo:
+  assumes "valid_a2t_exp e"
+  shows "exp_in_paper_subset e"
+  using assms
+  apply (induction e)
+                apply (solves \<open>simp?\<close>)+
+          defer
+          apply (solves \<open>simp?\<close>)+
+       defer
+       apply (solves \<open>simp?\<close>)+
+  sorry (* discrepancy TODO: Old and Result, discuss *)
+
+lemma valid_a2t_atomic_assert_todo:
+  assumes "valid_a2t_atomic_assert atm"
+  shows "atomic_assert_in_paper_subset atm"
+  using assms
+proof (induction atm)
+  case (Acc e f e_p)
+  then show ?case
+    by (cases e_p) (simp_all add: valid_a2t_exp_to_todo)
+qed (simp_all add: valid_a2t_exp_to_todo)
+  
+lemma valid_a2t_assert_to_todo:
+  assumes "valid_a2t_assert A"
+  shows "assertion_in_paper_subset A"
+  using assms
+  by (induction A)
+     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_todo)
+
+lemma valid_a2t_stmt_to_todo:
+  assumes "valid_a2t_stmt C"
+  shows "stmt_in_paper_subset C"
+  using assms
+  apply (induction C)
+  by (simp_all add: valid_a2t_assert_to_todo valid_a2t_exp_to_todo)
+
 lemma vpr_method_correct_red_stmt_total_set_ok:
   assumes MethodCorrect:
-          "vpr_method_correct_total (ctxt :: 'a total_context) R (triple_as_method_decl ts P C Q)"
+          "vpr_method_correct_total (ctxt :: 'a total_context) (\<lambda>_. True) (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
-    shows "red_stmt_total_set_ok ctxt R \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+      and ValidStmt: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
+    shows "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
   unfolding red_stmt_total_set_ok_def
 proof (rule allI, rule impI, rule notI, simp)
   fix \<omega> :: "'a full_total_state"
   assume Init: "is_initial_vcg_state ctxt \<Lambda> \<omega>"
-     and Red: "red_stmt_total ctxt R \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
+     and Red: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
 
   let ?mdecl = "triple_as_method_decl ts P C Q"
 
@@ -102,26 +139,35 @@ proof (rule allI, rule impI, rule notI, simp)
       unfolding triple_as_method_decl_def vpr_store_well_typed_def \<open>\<Lambda> = _\<close>
       by simp
   next
-    show "red_inhale ctxt R (method_decl.pre (triple_as_method_decl ts P C Q)) \<omega> (RNormal \<omega>)"
+    show "red_inhale ctxt (\<lambda>_. True) (method_decl.pre (triple_as_method_decl ts P C Q)) \<omega> (RNormal \<omega>)"
       unfolding triple_as_method_decl_def
       apply simp
       apply (rule inh_pure_normal)
       using RedLit
       by (metis val_of_lit.simps(1))
   next
-    assume BodyCorrect: "vpr_method_body_correct ctxt R (triple_as_method_decl ts P C Q) \<omega>"
+    assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl ts P C Q) \<omega>"
+    thm BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE]
 
     show False
-    proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption, 
+    proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption,
            simp add: triple_as_method_decl_def)
-      show "red_stmt_total ctxt R (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
+      show "red_stmt_total ctxt (\<lambda>_. True) (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
-        apply (rule RedSeqFailureOrMagic)
-        using Red
-        unfolding \<open>\<Lambda> = _\<close>
-        sorry \<comment>\<open>need trace independent in our subset\<close>   
-    qed (simp)
-  qed (insert Init[simplified is_initial_vcg_state_def], auto simp: triple_as_method_decl_def)
+      proof (rule RedSeqFailureOrMagic)
+        have InSubset: "stmt_in_paper_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+          apply (rule valid_a2t_stmt_to_todo)
+          using ValidStmt
+          by simp
+
+        show "red_stmt_total ctxt (\<lambda>_. True) (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))
+     (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
+          using red_stmt_trace_indep[OF Red InSubset]
+          unfolding \<open>\<Lambda> = _\<close> 
+          by auto
+      qed (simp)
+    qed simp
+  qed  (insert Init[simplified is_initial_vcg_state_def], auto simp: triple_as_method_decl_def)
 qed
 
 
@@ -135,9 +181,7 @@ corollary VCG_to_verifies_set :
   assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
       and "\<Lambda> = nth_option ts"
       and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-      and ValidC: "valid_a2t_stmt C"
-      and ValidPre: "valid_a2t_assert P"
-      and ValidPost: "valid_a2t_assert Q"
+      and ValidBodyPrePost: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
       and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
     shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) (initial_vcg_states_equi (t2a_ctxt ctxt \<Lambda>))
             (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
@@ -155,9 +199,9 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
   from MethodCorrect \<open>\<Lambda> = _\<close>
   have "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> 
           ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
-    using vpr_method_correct_red_stmt_total_set_ok
+    using vpr_method_correct_red_stmt_total_set_ok ValidBodyPrePost
     by blast
-
+    
   moreover have "a2t_states ctxt \<omega> \<subseteq> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
   proof 
     fix \<omega>t
@@ -183,8 +227,9 @@ proof (rule abstract_refines_total_verifies_set[OF _ Typed])
           apply (rule conjI)
           using EmptyMask \<open>\<omega>t \<in>  _\<close> 
            apply fastforce
-          using \<open>\<omega>t \<in>  _\<close> 
-          sorry \<comment>\<open>Predicate Mask must be empty, ask Michael\<close>                    
+          using a2t_states_mp_empty[OF \<open>\<omega>t \<in>  _\<close> ]
+          unfolding zero_mask_def
+          by simp
       next
         from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
           unfolding TypedEqui.typed_def TypedEqui.typed_store_def
@@ -239,7 +284,7 @@ next
     by (simp add: AbsTypeWf)
 next
   show "valid_a2t_stmt (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-    by (simp add: ValidC ValidPre ValidPost)
+    by (simp add: ValidBodyPrePost)
 qed 
 
 abbreviation true_syn_assertion 
@@ -308,9 +353,9 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       using MainViperTyped
       unfolding \<open>mdecl = _\<close>
         apply blast
-      using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd]
-       apply fast
-      by (simp_all add: default_ctxt_def AbsTypeWf ValidPrePost)
+      using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd] ValidPrePost
+      apply fast             
+      by (simp_all add: default_ctxt_def AbsTypeWf)
 
     have "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes ?Ctr_mainV)"
     proof -
@@ -376,8 +421,8 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
          apply blast
         apply simp
         apply (rule TypingAux)
-       using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd] \<open>Cv_syn \<in> _\<close>
-       apply fast      
+       using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd] \<open>Cv_syn \<in> _\<close> ValidPrePost
+       apply force
        by (simp_all add: default_ctxt_def AbsTypeWf ValidPrePost)
 
     hence A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
