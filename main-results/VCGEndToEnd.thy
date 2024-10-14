@@ -83,19 +83,13 @@ lemma vpr_method_correct_totalE:
 
 lemma valid_a2t_exp_to_todo:
   assumes "valid_a2t_exp e"
-  shows "exp_in_paper_subset e"
+  shows "exp_in_core_subset e"
   using assms
-  apply (induction e)
-                apply (solves \<open>simp?\<close>)+
-          defer
-          apply (solves \<open>simp?\<close>)+
-       defer
-       apply (solves \<open>simp?\<close>)+
-  sorry (* discrepancy TODO: Old and Result, discuss *)
+  by (induction e) simp_all
 
 lemma valid_a2t_atomic_assert_todo:
   assumes "valid_a2t_atomic_assert atm"
-  shows "atomic_assert_in_paper_subset atm"
+  shows "atomic_assert_in_core_subset atm"
   using assms
 proof (induction atm)
   case (Acc e f e_p)
@@ -105,14 +99,14 @@ qed (simp_all add: valid_a2t_exp_to_todo)
   
 lemma valid_a2t_assert_to_todo:
   assumes "valid_a2t_assert A"
-  shows "assertion_in_paper_subset A"
+  shows "assertion_in_core_subset A"
   using assms
   by (induction A)
      (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_todo)
 
 lemma valid_a2t_stmt_to_todo:
   assumes "valid_a2t_stmt C"
-  shows "stmt_in_paper_subset C"
+  shows "stmt_in_core_subset C"
   using assms
   apply (induction C)
   by (simp_all add: valid_a2t_assert_to_todo valid_a2t_exp_to_todo)
@@ -147,7 +141,6 @@ proof (rule allI, rule impI, rule notI, simp)
       by (metis val_of_lit.simps(1))
   next
     assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl ts P C Q) \<omega>"
-    thm BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE]
 
     show False
     proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption,
@@ -155,7 +148,7 @@ proof (rule allI, rule impI, rule notI, simp)
       show "red_stmt_total ctxt (\<lambda>_. True) (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
       proof (rule RedSeqFailureOrMagic)
-        have InSubset: "stmt_in_paper_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+        have InSubset: "stmt_in_core_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
           apply (rule valid_a2t_stmt_to_todo)
           using ValidStmt
           by simp

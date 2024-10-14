@@ -6,77 +6,77 @@ begin
 
 subsection \<open>Auxiliary definitions and lemmas\<close>
 
-fun exp_in_paper_subset_no_rec :: "pure_exp \<Rightarrow> bool"
+fun exp_in_core_subset_no_rec :: "pure_exp \<Rightarrow> bool"
   where 
-  "exp_in_paper_subset_no_rec (pure_exp.Var x) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.ELit lit) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.Unop uop e) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.Binop e1 bop e2) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.CondExp cond e1 e2) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.FieldAcc e f) \<longleftrightarrow> True"
-| "exp_in_paper_subset_no_rec (pure_exp.Old lbl e) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.Perm e f) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.PermPred pname es) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.FunApp f es) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec pure_exp.Result \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.Unfolding pname es e) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.Let e e_body) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.PExists ty e) \<longleftrightarrow> False"
-| "exp_in_paper_subset_no_rec (pure_exp.PForall ty e) \<longleftrightarrow> False"
+  "exp_in_core_subset_no_rec (pure_exp.Var x) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.ELit lit) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.Unop uop e) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.Binop e1 bop e2) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.CondExp cond e1 e2) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.FieldAcc e f) \<longleftrightarrow> True"
+| "exp_in_core_subset_no_rec (pure_exp.Old lbl e) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.Perm e f) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.PermPred pname es) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.FunApp f es) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec pure_exp.Result \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.Unfolding pname es e) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.Let e e_body) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.PExists ty e) \<longleftrightarrow> False"
+| "exp_in_core_subset_no_rec (pure_exp.PForall ty e) \<longleftrightarrow> False"
 
-abbreviation exp_in_paper_subset
-  where "exp_in_paper_subset \<equiv> pure_exp_pred exp_in_paper_subset_no_rec"
+abbreviation exp_in_core_subset
+  where "exp_in_core_subset \<equiv> pure_exp_pred exp_in_core_subset_no_rec"
 
-fun atomic_assert_in_paper_subset_no_rec :: "pure_exp atomic_assert \<Rightarrow> bool"
+fun atomic_assert_in_core_subset_no_rec :: "pure_exp atomic_assert \<Rightarrow> bool"
   where
-    "atomic_assert_in_paper_subset_no_rec (Pure e) = True"
-  | "atomic_assert_in_paper_subset_no_rec (Acc e f (PureExp p)) = True"
-  | "atomic_assert_in_paper_subset_no_rec (Acc e f Wildcard) = True"
-  | "atomic_assert_in_paper_subset_no_rec (AccPredicate pred es q) = False"
+    "atomic_assert_in_core_subset_no_rec (Pure e) = True"
+  | "atomic_assert_in_core_subset_no_rec (Acc e f (PureExp p)) = True"
+  | "atomic_assert_in_core_subset_no_rec (Acc e f Wildcard) = True"
+  | "atomic_assert_in_core_subset_no_rec (AccPredicate pred es q) = False"
 
-abbreviation atomic_assert_in_paper_subset :: "pure_exp atomic_assert \<Rightarrow> bool"
-  where "atomic_assert_in_paper_subset \<equiv> atomic_assert_pred atomic_assert_in_paper_subset_no_rec exp_in_paper_subset_no_rec"
+abbreviation atomic_assert_in_core_subset :: "pure_exp atomic_assert \<Rightarrow> bool"
+  where "atomic_assert_in_core_subset \<equiv> atomic_assert_pred atomic_assert_in_core_subset_no_rec exp_in_core_subset_no_rec"
 
 
-fun assert_in_paper_subset_no_rec :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
+fun assert_in_core_subset_no_rec :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
   where
-  "assert_in_paper_subset_no_rec (assert.Atomic A_atm) \<longleftrightarrow> True"
-| "assert_in_paper_subset_no_rec (assert.Imp e A) \<longleftrightarrow> True"
-| "assert_in_paper_subset_no_rec (assert.CondAssert e A B) \<longleftrightarrow> True"
-| "assert_in_paper_subset_no_rec (A && B) \<longleftrightarrow> True"
-| "assert_in_paper_subset_no_rec (assert.ImpureAnd A B) \<longleftrightarrow> False"
-| "assert_in_paper_subset_no_rec (assert.ImpureOr A B) \<longleftrightarrow> False"
-| "assert_in_paper_subset_no_rec (assert.ForAll _ A) \<longleftrightarrow> False"
-| "assert_in_paper_subset_no_rec (assert.Exists _ A) \<longleftrightarrow> False"
-| "assert_in_paper_subset_no_rec (assert.Wand A B) \<longleftrightarrow> False"
+  "assert_in_core_subset_no_rec (assert.Atomic A_atm) \<longleftrightarrow> True"
+| "assert_in_core_subset_no_rec (assert.Imp e A) \<longleftrightarrow> True"
+| "assert_in_core_subset_no_rec (assert.CondAssert e A B) \<longleftrightarrow> True"
+| "assert_in_core_subset_no_rec (A && B) \<longleftrightarrow> True"
+| "assert_in_core_subset_no_rec (assert.ImpureAnd A B) \<longleftrightarrow> False"
+| "assert_in_core_subset_no_rec (assert.ImpureOr A B) \<longleftrightarrow> False"
+| "assert_in_core_subset_no_rec (assert.ForAll _ A) \<longleftrightarrow> False"
+| "assert_in_core_subset_no_rec (assert.Exists _ A) \<longleftrightarrow> False"
+| "assert_in_core_subset_no_rec (assert.Wand A B) \<longleftrightarrow> False"
 
-abbreviation assertion_in_paper_subset :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
+abbreviation assertion_in_core_subset :: "(pure_exp, pure_exp atomic_assert) assert \<Rightarrow> bool"
   where 
-    "assertion_in_paper_subset \<equiv> assert_pred assert_in_paper_subset_no_rec atomic_assert_in_paper_subset_no_rec exp_in_paper_subset_no_rec "
+    "assertion_in_core_subset \<equiv> assert_pred assert_in_core_subset_no_rec atomic_assert_in_core_subset_no_rec exp_in_core_subset_no_rec "
 
-fun stmt_in_paper_subset_no_rec :: "stmt \<Rightarrow> bool"
+fun stmt_in_core_subset_no_rec :: "stmt \<Rightarrow> bool"
   where
-  "stmt_in_paper_subset_no_rec (Inhale A) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (Exhale A) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (ViperLang.Assert A) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (ViperLang.Assume A) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (LocalAssign x e) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (FieldAssign e1 f e2) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (ViperLang.Havoc x) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (If e s1 s2) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (Seq s1 s2) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (MethodCall ys m es) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec (While e A s) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (Unfold pred es p) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (Fold pred es p) \<longleftrightarrow> False" 
-| "stmt_in_paper_subset_no_rec (Package A B) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (Apply A B) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (Label lbl) \<longleftrightarrow> False"
-| "stmt_in_paper_subset_no_rec (Scope vty s) \<longleftrightarrow> True"
-| "stmt_in_paper_subset_no_rec Skip \<longleftrightarrow> True"
+  "stmt_in_core_subset_no_rec (Inhale A) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (Exhale A) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (ViperLang.Assert A) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (ViperLang.Assume A) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (LocalAssign x e) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (FieldAssign e1 f e2) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (ViperLang.Havoc x) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (If e s1 s2) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (Seq s1 s2) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (MethodCall ys m es) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec (While e A s) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (Unfold pred es p) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (Fold pred es p) \<longleftrightarrow> False" 
+| "stmt_in_core_subset_no_rec (Package A B) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (Apply A B) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (Label lbl) \<longleftrightarrow> False"
+| "stmt_in_core_subset_no_rec (Scope vty s) \<longleftrightarrow> True"
+| "stmt_in_core_subset_no_rec Skip \<longleftrightarrow> True"
 
-abbreviation stmt_in_paper_subset
-  where "stmt_in_paper_subset \<equiv> stmt_pred stmt_in_paper_subset_no_rec assertion_in_paper_subset exp_in_paper_subset"
+abbreviation stmt_in_core_subset
+  where "stmt_in_core_subset \<equiv> stmt_pred stmt_in_core_subset_no_rec assertion_in_core_subset exp_in_core_subset"
 
 lemma havoc_locs_state_trace_indep:
   assumes "\<omega> \<in> havoc_locs_state ctxt \<omega>_exh locs"
@@ -100,9 +100,9 @@ proof -
     by blast
 qed
 
-lemma stmt_in_paper_subset_sub_expressions:
-  assumes "stmt_in_paper_subset s"
-  shows "list_all exp_in_paper_subset (sub_expressions s)"
+lemma stmt_in_core_subset_sub_expressions:
+  assumes "stmt_in_core_subset s"
+  shows "list_all exp_in_core_subset (sub_expressions s)"
   using assms
   apply (induction s)
   by simp_all
@@ -126,19 +126,19 @@ lemma states_differ_trace_update_trace_eq_2:
  
 lemma exp_eval_inh_no_old_exp_trace_indep:
   shows "ctxt, (\<lambda>_. True), \<omega>_def1 \<turnstile> \<langle>e;\<omega>1\<rangle> [\<Down>]\<^sub>t resE \<Longrightarrow> 
-        exp_in_paper_subset e \<Longrightarrow>
+        exp_in_core_subset e \<Longrightarrow>
         states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow> 
         \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow> 
         (\<omega>_def2 \<noteq> None \<and> \<omega>_def1 \<noteq> None \<Longrightarrow> states_differ_only_on_trace (the \<omega>_def1) (the \<omega>_def2)) \<Longrightarrow>        
          ctxt, (\<lambda>_. True), \<omega>_def2 \<turnstile> \<langle>e;\<omega>2\<rangle> [\<Down>]\<^sub>t resE" and
         "red_pure_exps_total ctxt (\<lambda>_. True) \<omega>_def1 es \<omega>1 resES \<Longrightarrow> 
-         list_all (\<lambda>e. exp_in_paper_subset e) es \<Longrightarrow>
+         list_all (\<lambda>e. exp_in_core_subset e) es \<Longrightarrow>
         states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow> 
         \<omega>_def2 = None \<longleftrightarrow> \<omega>_def1 = None \<Longrightarrow> 
         (\<omega>_def2 \<noteq> None \<and> \<omega>_def1 \<noteq> None \<Longrightarrow> states_differ_only_on_trace (the \<omega>_def1) (the \<omega>_def2)) \<Longrightarrow>
         red_pure_exps_total ctxt (\<lambda>_. True) \<omega>_def2 es \<omega>2 resES" and
         "red_inhale ctxt (\<lambda>_. True) A \<omega>1 res1 \<Longrightarrow> 
-              assertion_in_paper_subset A \<Longrightarrow>
+              assertion_in_core_subset A \<Longrightarrow>
               states_differ_only_on_trace \<omega>1 \<omega>2 \<Longrightarrow>
               (res1 = RFailure \<longrightarrow> red_inhale ctxt (\<lambda>_. True) A \<omega>2 RFailure) \<and>
               (\<forall>\<omega>1'. res1 = RNormal \<omega>1' \<longrightarrow> 
@@ -530,7 +530,7 @@ next
   qed simp
 next
   case (InhSubExpFailure A \<omega>)
-  hence "list_all exp_in_paper_subset (direct_sub_expressions_assertion A)"
+  hence "list_all exp_in_core_subset (direct_sub_expressions_assertion A)"
     using assert_pred_subexp by presburger
   hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (direct_sub_expressions_assertion A) \<omega>2 None"
     using InhSubExpFailure
@@ -545,7 +545,7 @@ qed
 
 lemma red_exh_trace_indep:
   assumes "red_exhale ctxt (\<lambda>_. True) \<omega>def1 A \<omega>1 res1"
-      and "assertion_in_paper_subset A"
+      and "assertion_in_core_subset A"
       and "states_differ_only_on_trace \<omega>1 \<omega>2"
       and "states_differ_only_on_trace \<omega>def1 \<omega>def2"
     shows "(res1 = RFailure \<longrightarrow> red_exhale ctxt (\<lambda>_. True) \<omega>def2 A \<omega>2 RFailure) \<and>
@@ -785,7 +785,7 @@ next
   qed simp
 next
   case (ExhSubExpFailure A \<omega>)
-  hence SubexpInSubset: "list_all exp_in_paper_subset (direct_sub_expressions_assertion A)"
+  hence SubexpInSubset: "list_all exp_in_core_subset (direct_sub_expressions_assertion A)"
     using assert_pred_subexp
     by simp
   hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>def2) (direct_sub_expressions_assertion A) \<omega>2 None"
@@ -798,7 +798,7 @@ qed
 
 lemma red_stmt_trace_indep:
   assumes "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> stmt \<omega>1 res1"
-      and "stmt_in_paper_subset stmt"
+      and "stmt_in_core_subset stmt"
       \<comment>\<open>Note we do not need the method pre- and postconditions in \<^term>\<open>program.methods (program_total ctxt)\<close>
          to be restricted, because during method calls the old state is given by the current state before 
          the call, which is the same in both states\<close>
@@ -1143,8 +1143,8 @@ next
   qed simp
 next
   case (RedSubExpressionFailure s \<omega> \<Lambda>)
-  hence ExpsInSubset: "list_all exp_in_paper_subset (sub_expressions s)"
-    using stmt_in_paper_subset_sub_expressions
+  hence ExpsInSubset: "list_all exp_in_core_subset (sub_expressions s)"
+    using stmt_in_core_subset_sub_expressions
     by blast
   hence "red_pure_exps_total ctxt (\<lambda>_. True) (Some \<omega>2) (sub_expressions s) \<omega>2 None"
     using RedSubExpressionFailure exp_eval_inh_no_old_exp_trace_indep(2)
