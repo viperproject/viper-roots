@@ -218,6 +218,8 @@ fun valid_a2t_exp_no_rec :: "pure_exp \<Rightarrow> bool"
   where
     "valid_a2t_exp_no_rec (Perm e f) = False"
   | "valid_a2t_exp_no_rec (PermPred e f) = False"
+  | "valid_a2t_exp_no_rec (Old lbl e) = False"
+  | "valid_a2t_exp_no_rec Result = False"
   | "valid_a2t_exp_no_rec (PExists ty e) = False"
   | "valid_a2t_exp_no_rec (PForall ty e) = False"
   | "valid_a2t_exp_no_rec (FunApp f es) = False"
@@ -554,7 +556,10 @@ next
     qed
 next
   case (TypOld \<Lambda> e \<tau> lbl)
-  show ?case
+  thus ?case
+    by simp
+  \<comment>\<open>Once old expressions are validated by \<^const>\<open>valid_a2t_exp\<close> can try the following proof:\<close>
+(*
   proof (cases "get_trace_total \<omega> lbl")
     case (Some \<phi>)
     then obtain r where Hr : "ctxt, R, map_option (get_total_full_update (\<lambda>_. \<phi>)) \<omega>_def \<turnstile> \<langle>e;\<omega>\<lparr>get_total_full := \<phi>\<rparr>\<rangle> [\<Down>]\<^sub>t r \<and>
@@ -572,6 +577,7 @@ next
     qed
   next case None then show ?thesis by (simp add: red_pure_exp_simps)
   qed
+*)
 next
   case (TypPerm \<Lambda> e f \<tau>)
   obtain r where Hr : "ctxt, R, \<omega>_def \<turnstile> \<langle>e;\<omega>\<rangle> [\<Down>]\<^sub>t r \<and>
@@ -1305,12 +1311,16 @@ next
 next
   case (Old x1a e)
   from Old.prems show ?case
+    by simp
+  \<comment>\<open>Once old expressions are validated by \<^const>\<open>valid_a2t_exp\<close> can try the following proof:\<close>
+(*
     apply (simp)
     apply (erule a2t_states_in_exE)
     apply (simp add: red_pure_exp_simps red_pure_simps Map.map_comp_Some_iff)
     apply (subst red_pure_exp_cong_mh_eq; simp?)
     apply (subst red_pure_refines_red_pure_total[where ?\<Delta>=\<Delta>])
     by (auto)
+*)
 next
   case (ELit x)
   then show ?case

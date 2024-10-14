@@ -1,5 +1,5 @@
 theory VCGEndToEnd
-imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal TotalViper.TraceIndepProp
+imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal TotalViper.TraceIndepProperty
 begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
@@ -81,41 +81,35 @@ lemma vpr_method_correct_totalE:
    unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def
    by blast
 
-lemma valid_a2t_exp_to_todo:
+lemma valid_a2t_exp_to_core:
   assumes "valid_a2t_exp e"
-  shows "exp_in_paper_subset e"
+  shows "exp_in_core_subset e"
   using assms
-  apply (induction e)
-                apply (solves \<open>simp?\<close>)+
-          defer
-          apply (solves \<open>simp?\<close>)+
-       defer
-       apply (solves \<open>simp?\<close>)+
-  sorry (* discrepancy TODO: Old and Result, discuss *)
+  by (induction e) simp_all
 
 lemma valid_a2t_atomic_assert_todo:
   assumes "valid_a2t_atomic_assert atm"
-  shows "atomic_assert_in_paper_subset atm"
+  shows "atomic_assert_in_core_subset atm"
   using assms
 proof (induction atm)
   case (Acc e f e_p)
   then show ?case
-    by (cases e_p) (simp_all add: valid_a2t_exp_to_todo)
-qed (simp_all add: valid_a2t_exp_to_todo)
+    by (cases e_p) (simp_all add: valid_a2t_exp_to_core)
+qed (simp_all add: valid_a2t_exp_to_core)
   
-lemma valid_a2t_assert_to_todo:
+lemma valid_a2t_assert_to_core:
   assumes "valid_a2t_assert A"
-  shows "assertion_in_paper_subset A"
+  shows "assertion_in_core_subset A"
   using assms
   by (induction A)
-     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_todo)
+     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_core)
 
-lemma valid_a2t_stmt_to_todo:
+lemma valid_a2t_stmt_to_core:
   assumes "valid_a2t_stmt C"
-  shows "stmt_in_paper_subset C"
+  shows "stmt_in_core_subset C"
   using assms
   apply (induction C)
-  by (simp_all add: valid_a2t_assert_to_todo valid_a2t_exp_to_todo)
+  by (simp_all add: valid_a2t_assert_to_core valid_a2t_exp_to_core)
 
 lemma vpr_method_correct_red_stmt_total_set_ok:
   assumes MethodCorrect:
@@ -147,7 +141,6 @@ proof (rule allI, rule impI, rule notI, simp)
       by (metis val_of_lit.simps(1))
   next
     assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl tys P C Q) \<omega>"
-    thm BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE]
 
     show False
     proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption,
@@ -155,8 +148,8 @@ proof (rule allI, rule impI, rule notI, simp)
       show "red_stmt_total ctxt (\<lambda>_. True) (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
       proof (rule RedSeqFailureOrMagic)
-        have InSubset: "stmt_in_paper_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-          apply (rule valid_a2t_stmt_to_todo)
+        have InSubset: "stmt_in_core_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+          apply (rule valid_a2t_stmt_to_core)
           using ValidStmt
           by simp
 
@@ -305,7 +298,6 @@ theorem sound_syntactic_translation_VCG:
   assumes "wf_stmt \<Delta> tys C"
       and "well_typed_cmd tys C"
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
-
       and ValidFrontendCmd: "valid_front_end_cmd C"
       and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
 

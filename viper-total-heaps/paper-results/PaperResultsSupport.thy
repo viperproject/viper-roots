@@ -1,5 +1,5 @@
 theory PaperResultsSupport
-imports TotalViper.ViperBoogieEndToEnd TotalViper.TraceIndepProp
+imports TotalViper.ViperBoogieEndToEnd TotalViper.TraceIndepProperty
 begin
 
 subsection \<open>BPROP\<close>
@@ -193,11 +193,11 @@ lemma exhale0_stmt_rel:
 
 subsection \<open>Relationship Viper Method Correctness\<close>
 
-definition all_methods_in_paper_subset
-  where "all_methods_in_paper_subset ctxt \<equiv>
+definition all_methods_in_core_subset
+  where "all_methods_in_core_subset ctxt \<equiv>
              (\<forall>mname m. methods (program_total ctxt) mname = Some m \<longrightarrow>
-                      assertion_in_paper_subset (method_decl.pre m) \<and>
-                      assertion_in_paper_subset (method_decl.post m))"
+                      assertion_in_core_subset (method_decl.pre m) \<and>
+                      assertion_in_core_subset (method_decl.post m))"
 
 definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_paper ctxt m \<equiv>
@@ -225,9 +225,9 @@ definition vpr_method_correct_paper :: "'a total_context \<Rightarrow> method_de
 lemma method_correctness_stronger_than_paper:
   assumes "vpr_method_correct_total ctxt (\<lambda>_.True) m"
       and "method_decl.body m = Some mbody"
-      and MethodInPaperSubset: "assertion_in_paper_subset (method_decl.pre m) \<and>
-                                assertion_in_paper_subset (method_decl.post m) \<and>
-                                stmt_in_paper_subset mbody"
+      and MethodInPaperSubset: "assertion_in_core_subset (method_decl.pre m) \<and>
+                                assertion_in_core_subset (method_decl.post m) \<and>
+                                stmt_in_core_subset mbody"
     shows "vpr_method_correct_paper ctxt m"
   unfolding vpr_method_correct_paper_def
 proof (rule allI | rule impI)+
@@ -269,9 +269,9 @@ proof (rule allI | rule impI)+
     have DifferOnlyOnTrace: "states_differ_only_on_trace \<sigma>1 ?\<sigma>1'"
       by simp
 
-    have BodyExhalePostInSubset: "stmt_in_paper_subset (Seq mbody (Exhale (method_decl.post m)))"
+    have BodyExhalePostInSubset: "stmt_in_core_subset (Seq mbody (Exhale (method_decl.post m)))"
       using MethodInPaperSubset
-      unfolding all_methods_in_paper_subset_def
+      unfolding all_methods_in_core_subset_def
       by simp
 
     show "r\<^sub>v \<noteq> RFailure"

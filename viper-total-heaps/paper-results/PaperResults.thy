@@ -113,10 +113,10 @@ text \<open>The components in Figure 1 are defined in (note that the formalisati
 
       Both formalised ASTs include a larger subset than presented in the paper (for example,
       loops for Viper and Boogie). For the artifact, only the subset mentioned in the paper is 
-      relevant. For Viper, \<^prop>\<open>stmt_in_paper_subset s\<close> defines when a Viper statement is in the 
-      paper subset. It is defined via the functions \<^const>\<open>stmt_in_paper_subset_no_rec\<close>,
-      \<^const>\<open>assert_in_paper_subset_no_rec\<close>, \<^const>\<open>atomic_assert_in_paper_subset\<close>, and
-      \<^const>\<open>exp_in_paper_subset_no_rec\<close>. These functions indicate which statement, assertion, primitive
+      relevant. For Viper, \<^prop>\<open>stmt_in_core_subset s\<close> defines when a Viper statement is in the 
+      paper subset. It is defined via the functions \<^const>\<open>stmt_in_core_subset_no_rec\<close>,
+      \<^const>\<open>assert_in_core_subset_no_rec\<close>, \<^const>\<open>atomic_assert_in_core_subset\<close>, and
+      \<^const>\<open>exp_in_core_subset_no_rec\<close>. These functions indicate which statement, assertion, primitive
       assertion (accessibility predicates or Boolean expression), and expression constructors are
       in the paper subset.
       
