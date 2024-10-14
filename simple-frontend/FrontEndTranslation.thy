@@ -101,6 +101,12 @@ are self-framing.
 2) The pre- and postconditions for parallel compositions do not refer to variables modified by the other thread.
 3) r cannot appear in e in \<^term>\<open>Calloc r e\<close>. \<close>
 
+definition no_trace where
+  "no_trace \<omega> \<longleftrightarrow> get_trace \<omega> = Map.empty"
+
+definition atrue where
+  "atrue \<Delta> tys = Set.filter no_trace (inhalify \<Delta> tys UNIV)"
+
 fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarrow> cmd \<Rightarrow> bool" 
   where
   "wf_stmt \<Delta> tys (Cseq C1 C2) \<longleftrightarrow> wf_stmt \<Delta> tys C1 \<and> wf_stmt \<Delta> tys C2"
@@ -108,8 +114,8 @@ fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarr
 
 | "wf_stmt \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
   disjoint
-  (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1) \<otimes> UNIV)) (wrC C2)
-  \<and> disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2) \<otimes> UNIV)) (wrC C1) \<and>
+  (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1) \<otimes> atrue \<Delta> tys)) (wrC C2)
+  \<and> disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2) \<otimes> atrue \<Delta> tys)) (wrC C1) \<and>
   self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1) \<and>
   self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) P2) \<and>
   self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1) \<and>
@@ -124,8 +130,9 @@ fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarr
 | "wf_stmt \<Delta> tys _ \<longleftrightarrow> True"
 
 
-definition atrue where
-  "atrue \<Delta> tys = inhalify \<Delta> tys UNIV"
+(*
+  "atrue \<Delta> tys = Set.filter no_trace (inhalify \<Delta> tys UNIV)"
+*)
 
 lemma atrue_self_framing_and_typed[simp]:
   "self_framing UNIV"
@@ -535,10 +542,33 @@ proof (rule RuleCons)
 qed (simp)
 *)
 
+lemma self_framing_atrue[simp]:
+  "self_framing (atrue \<Delta> tys)"
+  unfolding atrue_def no_trace_def
+  apply (rule self_framingI)
+  apply (rule)
+   apply simp
+  using TypedEqui.typed_state_then_stabilize_typed apply blast
+  by (metis (no_types, lifting) atrue_self_framing_and_typed get_trace_stabilize member_filter self_framing_invE self_framing_then_self_framing_inhalify)
+
+
+
+lemma fvA_atrue[simp]:
+  "fvA (tcfe \<Delta> tys) (atrue \<Delta> tys) = {}"
+proof -
+  have "TypedEqui.overapprox_fv (tcfe \<Delta> tys) (atrue \<Delta> tys) {}"
+    apply (rule TypedEqui.overapprox_fvI)
+    unfolding atrue_def no_trace_def get_trace_def
+    apply simp
+    using TypedEqui.typed_state_then_stabilize_typed by blast
+  then show ?thesis
+    by (simp add: TypedEqui.equal_on_set_def TypedEqui.free_vars_def TypedEqui.overapprox_fv_def)
+qed
+
 lemma CSL_add_atrue:
   assumes "(tcfe \<Delta> tys) \<turnstile>CSL [P] C [Q]"
       and "self_framing P"
-    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   by (rule RuleFrame) (simp_all add: assms)
 
 
@@ -551,19 +581,19 @@ lemma proof_obligations_valid_union:
 
 definition invariant_translate where
   "invariant_translate \<Delta> tys P C Q \<longleftrightarrow>
-  ((proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C)) \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q) \<longrightarrow> (tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV])"
+  ((proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C)) \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q) \<longrightarrow> (tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys])"
 
 lemma invariant_translateE:
   assumes "invariant_translate \<Delta> tys P C Q"
       and "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))"
       and "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q"
-    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   using assms(1) assms(2) assms(3) invariant_translate_def by blast
 
 
 lemma invariant_translateI:
   assumes "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C)) \<Longrightarrow> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q
-    \<Longrightarrow> (tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+    \<Longrightarrow> (tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   shows "invariant_translate \<Delta> tys P C Q"
   using assms invariant_translate_def proof_obligations_valid_def by blast
 
@@ -577,7 +607,7 @@ proof (rule invariant_translateI)
      and "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q"
   then have "(tcfe \<Delta> tys) \<turnstile>CSL [P] C [Q]"
     using assms(1) by blast
-  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
     by (simp add: CSL_add_atrue assms invariant_translateI)
 qed
 
@@ -600,6 +630,98 @@ corollary invariant_translate_alloc:
   using assms cmd.distinct(37) convert_proof_alloc
   by (metis ConcreteSemantics.SL_proof_Havoc_elim ConcreteSemantics.SL_proof_Seq_elim fst_eqD invariant_translateI invariant_translate_simpler translate.simps(3))
 
+lemma no_trace_then_sum_no_trace:
+  assumes "Some x = a \<oplus> b"
+      and "no_trace a"
+      and "no_trace b"
+    shows "no_trace x"
+  using assms
+  unfolding no_trace_def
+  by (simp add: state_add_iff)
+
+lemma no_trace_then_sum_no_trace_simpler:
+  assumes "Some x = a \<oplus> b"
+      and "no_trace b"
+    shows "no_trace x"
+  using assms
+  unfolding no_trace_def
+  by (metis state_add_iff)
+
+lemma no_trace_then_core:
+  assumes "no_trace x"
+  shows "no_trace |x|"
+  using assms unfolding no_trace_def
+  by (simp add: core_charact_equi(3))
+
+lemma in_starE:
+  assumes "x \<in> A \<otimes> B"
+      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
+    shows "P"
+  by (meson assms(1) assms(2) x_elem_set_product)
+
+
+lemma atrue_star_same[simp]:
+  "atrue \<Delta> tys \<otimes> atrue \<Delta> tys = atrue \<Delta> tys"
+proof
+  show "atrue \<Delta> tys \<otimes> atrue \<Delta> tys \<subseteq> atrue \<Delta> tys"
+    unfolding atrue_def
+    apply rule
+    apply (erule in_starE)
+    apply simp
+    using TypedEqui.typed_sum no_trace_then_sum_no_trace stabilize_sum by blast
+  show "atrue \<Delta> tys \<subseteq> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
+  proof 
+    fix x assume "x \<in> atrue \<Delta> tys"
+    then have "|x| \<in> atrue \<Delta> tys" unfolding atrue_def
+      using no_trace_then_core
+      apply simp
+      apply (intro conjI)
+      using TypedEqui.typed_smaller core_stabilize_mono(2) max_projection_prop_pure_core mpp_smaller apply blast
+      by blast
+    then show "x \<in> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
+      using \<open>x \<in> atrue \<Delta> tys\<close> core_is_smaller x_elem_set_product by blast
+  qed
+qed
+
+
+lemma t_entails_univ_atrue:
+  "t_entails \<Delta> tys (UNIV \<otimes> atrue \<Delta> tys) (atrue \<Delta> tys)"
+  apply (rule ConcreteSemantics.entails_typedI)
+  apply (erule in_starE)
+  unfolding atrue_def
+  apply simp
+  apply (intro conjI)
+  using TypedEqui.typed_state_then_stabilize_typed apply blast
+  using no_trace_then_sum_no_trace_simpler by blast
+
+
+
+(*
+lemma atrue_star_univ[simp]:
+  "UNIV \<otimes> atrue \<Delta> tys = atrue \<Delta> tys"
+proof
+  show "UNIV \<otimes> atrue \<Delta> tys \<subseteq> atrue \<Delta> tys"
+    unfolding atrue_def
+    apply rule
+    apply (erule in_starE)
+    apply simp
+    using TypedEqui.typed_sum no_trace_then_sum_no_trace_simpler stabilize_sum
+
+    by blast
+  show "atrue \<Delta> tys \<subseteq> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
+  proof 
+    fix x assume "x \<in> atrue \<Delta> tys"
+    then have "|x| \<in> atrue \<Delta> tys" unfolding atrue_def
+      using no_trace_then_core
+      apply simp
+      apply (intro conjI)
+      using TypedEqui.typed_smaller core_stabilize_mono(2) max_projection_prop_pure_core mpp_smaller apply blast
+      by blast
+    then show "x \<in> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
+      using \<open>x \<in> atrue \<Delta> tys\<close> core_is_smaller x_elem_set_product by blast
+  qed
+qed
+*)
 
 lemma atrue_twice_same:
   "UNIV \<otimes> UNIV \<subseteq> UNIV"
@@ -622,16 +744,24 @@ proof
 qed (simp add: atrue_twice_same)
 
 
+lemma t_entails_add:
+  assumes "t_entails \<Delta> tys A1 A2"
+  assumes "t_entails \<Delta> tys B1 B2"
+  shows "t_entails \<Delta> tys (A1 \<otimes> B1) (A2 \<otimes> B2)"
+  by (smt (verit, best) ConcreteSemantics.entails_typed_def TypedEqui.typed_smaller assms(1) assms(2) greater_equiv in_set_sum is_in_set_sum singletonD x_elem_set_product)
+
+
 corollary invariant_translate_free:
   assumes "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys (Cfree r)))"
     shows "invariant_translate \<Delta> tys P (Cfree r) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys (Cfree r))) Q"
-  then have "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cfree r [(Q \<otimes> UNIV) \<otimes> UNIV]"
-    using RuleFrame[OF convert_proof_free]
-    by (metis ConcreteSemantics.SL_proof_Exhale_elim atrue_self_framing_and_typed disjoint_simps(2) fst_eqD translate.simps(4) wrC.simps(6))
-  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cfree r [Q \<otimes> UNIV]"
-    by (simp add: add_set_asso atrue_twice_equal)
+  then have "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cfree r [(Q \<otimes> UNIV) \<otimes> atrue \<Delta> tys]"
+    by (metis CSL_add_atrue ConcreteSemantics.SL_proof_Exhale_elim convert_proof_free fst_eqD translate.simps(4))
+  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cfree r [Q \<otimes> atrue \<Delta> tys]"
+    apply (rule RuleConsTyped)
+     apply (simp add: ConcreteSemantics.entails_typed_refl)
+    by (simp add: ConcreteSemantics.entails_typed_refl add_set_asso t_entails_add t_entails_univ_atrue)
 qed
 
 corollary invariant_translate_write:
@@ -639,18 +769,19 @@ corollary invariant_translate_write:
     shows "invariant_translate \<Delta> tys P (Cwrite r e) Q"
 proof (rule invariant_translateI)
   assume asm0: "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys (Cwrite r e))) Q"
-  then have "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cwrite r e [(Q \<otimes> UNIV) \<otimes> UNIV]"
-    using RuleFrame[OF convert_proof_write]
-    by (metis ConcreteSemantics.SL_proof_Custom_elim atrue_self_framing_and_typed disjoint_simps(2) fst_eqD translate.simps(5) wrC.simps(4))
-  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cwrite r e [Q \<otimes> UNIV]"
-    by (simp add: add_set_asso atrue_twice_equal)
+  then have "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cwrite r e [(Q \<otimes> UNIV) \<otimes> atrue \<Delta> tys]"
+    by (metis CSL_add_atrue ConcreteSemantics.SL_proof_Custom_elim convert_proof_write fst_eqD translate.simps(5))
+  then show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cwrite r e [Q \<otimes> atrue \<Delta> tys]"
+    apply (rule RuleConsTyped)
+     apply (simp add: ConcreteSemantics.entails_typed_refl)
+    by (simp add: ConcreteSemantics.entails_typed_refl add_set_asso t_entails_add t_entails_univ_atrue)
 qed
 
 corollary invariant_translate_read:
   assumes "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys (Cread x r)))"
     shows "invariant_translate \<Delta> tys P (Cread x r) Q"
-  using convert_proof_read assms
-  by (metis ConcreteSemantics.SL_proof_LocalAssign_elim fst_eqD invariant_translateI invariant_translate_simpler translate.simps(6))
+  using convert_proof_read assms ConcreteSemantics.SL_proof_LocalAssign_elim fst_eqD invariant_translateI invariant_translate_simpler
+  by (metis translate.simps(6)) (* Long *)
 
 
 lemma invariant_translate_seq:
@@ -663,21 +794,14 @@ proof (rule invariant_translateI)
   then obtain R where r: "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C1)) R"
       "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) R (fst (translate \<Delta> tys C2)) Q"
     by (metis ConcreteSemantics.SL_proof_Seq_elim fst_eqD translate.simps(7))
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cseq C1 C2 [Q \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cseq C1 C2 [Q \<otimes> atrue \<Delta> tys]"
   proof (rule RuleSeq)
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C1 [R \<otimes> UNIV]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C1 [R \<otimes> atrue \<Delta> tys]"
       using assms(1)[of R] r
       unfolding invariant_translate_def
       by (metis asm0(1) proof_obligations_valid_union snd_conv translate.simps(7))
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [R \<otimes> UNIV] C2 [Q \<otimes> UNIV]"
-    proof (rule RuleCons)
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [R \<otimes> UNIV] C2 [(Q \<otimes> UNIV) \<otimes> UNIV]"
-          using assms(2)[of R] asm0
-          unfolding invariant_translate_def proof_obligations_valid_def
-          by (metis (no_types, lifting) Un_iff add_set_asso atrue_twice_equal r(2) snd_conv translate.simps(7))
-      show "Q \<otimes> UNIV \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
-        by (simp add: add_set_asso add_set_mono atrue_twice_same)
-    qed (simp)
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [R \<otimes> atrue \<Delta> tys] C2 [Q \<otimes> atrue \<Delta> tys]"
+      by (metis asm0(1) assms(2) invariant_translateE proof_obligations_valid_union r(2) sndI translate.simps(7))
   qed
 qed
 
@@ -686,40 +810,46 @@ lemma invariant_translate_inhale_exhale_get_proof:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C Q"
       and "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (Inhale A;; fst (translate \<Delta> tys C);; Exhale B) Q"
       and "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))"
-    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
+    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
   using assms(2)
 proof (rule ConcreteSemantics.SL_proof_Seq_elim)
   fix R1 assume asm0: "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (abs_stmt.Inhale A ;; fst (translate \<Delta> tys C)) R1"
     "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) R1 (abs_stmt.Exhale B) Q"
   then have "entails R1 (Q \<otimes> B)" by auto
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
   proof (rule ConcreteSemantics.SL_proof_Seq_elim[OF asm0(1)])
     fix R0 assume asm1: "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (abs_stmt.Inhale A) R0"
           "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) R0 (fst (translate \<Delta> tys C)) R1"
     then have "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (P \<otimes> inhalify \<Delta> tys A) (fst (translate \<Delta> tys C)) R1"
       by auto
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
     proof (rule RuleCons)
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> UNIV] C [R1 \<otimes> UNIV]"
+      show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [R1 \<otimes> atrue \<Delta> tys]"
         using \<open>ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (P \<otimes> inhalify \<Delta> tys A) (fst (translate \<Delta> tys C)) R1\<close> assms(1) assms(3) invariant_translate_def by blast
-      show "R1 \<otimes> UNIV \<subseteq> Q \<otimes> B \<otimes> UNIV"
-        by (meson \<open>entails R1 (Q \<otimes> B)\<close> add_set_mono entails_def order_refl)
+      show "R1 \<otimes> atrue \<Delta> tys \<subseteq> Q \<otimes> B \<otimes> atrue \<Delta> tys"
+        by (meson \<open>entails R1 (Q \<otimes> B)\<close> add_set_mono dual_order.refl entails_def)
     qed (simp)
   qed
 qed
 
-
-lemma drop_conjunct_entails:
-  "A \<otimes> B \<otimes> UNIV \<subseteq> B \<otimes> UNIV"
-  by (metis add_set_asso add_set_left_comm add_set_mono equalityD1 top_greatest)
-
-
-(*
-| "translate \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2}) =
-  ((Exhale (P1 \<otimes> P2);; ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);; Inhale (Q1 \<otimes> Q2)),
-  let r1 = translate \<Delta> tys C1 in let r2 = translate \<Delta> tys C2 in
-  { (Inhale P1;; fst r1;; Exhale Q1), (Inhale P2;; fst r2;; Exhale Q2) } \<union> snd r1 \<union> snd r2)"
-*)
+lemma drop_conjunct_t_entails:
+  "t_entails \<Delta> tys (A \<otimes> B \<otimes> atrue \<Delta> tys) (B \<otimes> atrue \<Delta> tys)"
+  apply (rule ConcreteSemantics.entails_typedI)
+  apply (erule in_starE)+
+proof -
+  fix \<omega> a b aa ba
+  assume asm0: "typed (tcfe \<Delta> tys) \<omega>" "b \<in> atrue \<Delta> tys"
+    "Some \<omega> = a \<oplus> b" "aa \<in> A" "ba \<in> B" "Some a = aa \<oplus> ba"
+  then obtain baa where "Some baa = b \<oplus> aa"
+    by (metis (no_types, opaque_lifting) asso3 commutative not_Some_eq)
+  then have "Some \<omega> = ba \<oplus> baa"
+    using asm0(3) asm0(6) asso1 commutative by force
+  moreover have "baa \<in> atrue \<Delta> tys"
+    unfolding atrue_def
+    by (metis (no_types, lifting) ConcreteSemantics.entails_typed_def \<open>Some baa = b \<oplus> aa\<close> add_set_commm asm0(1) asm0(2) atrue_def calculation greater_def in_times_atrue make_context_semantic_type_ctxt t_entails_univ_atrue well_typedly_plus(2))
+  ultimately show "\<omega> \<in> B \<otimes> atrue \<Delta> tys"
+    using asm0(5) x_elem_set_product by blast
+qed
 
 
 lemma typed_self_framing_star:
@@ -781,16 +911,11 @@ proof
 qed
 
 
-lemma t_entails_add:
-  assumes "t_entails \<Delta> tys A1 A2"
-  assumes "t_entails \<Delta> tys B1 B2"
-  shows "t_entails \<Delta> tys (A1 \<otimes> B1) (A2 \<otimes> B2)"
-  by (smt (verit, best) ConcreteSemantics.entails_typed_def TypedEqui.typed_smaller assms(1) assms(2) greater_equiv in_set_sum is_in_set_sum singletonD x_elem_set_product)
-
-
+(*
 lemma univ_t_entails_atrue:
   "t_entails \<Delta> tys UNIV (atrue \<Delta> tys)"
   by (simp add: ConcreteSemantics.entails_typedI TypedEqui.typed_state_then_stabilize_typed atrue_def)
+*)
 
 lemma invariant_translate_parallel:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C1 Q"
@@ -834,64 +959,63 @@ proof (rule invariant_translateI)
 
 (* R1 is the frame! *)
 
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] {P1} C1 {Q1} || {P2} C2 {Q2} [Q \<otimes> atrue \<Delta> tys]"
   proof (rule RuleConsTyped)
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [((inhalify \<Delta> tys ?P1 \<otimes> UNIV) \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> UNIV)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((inhalify \<Delta> tys ?Q1 \<otimes> UNIV) \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> UNIV)) \<otimes> R1]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [((inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys) \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys)) \<otimes> R1] {P1} C1 {Q1} || {P2} C2 {Q2} [((inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys) \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys)) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> UNIV)] {P1} C1 {Q1} || {P2} C2 {Q2} [inhalify \<Delta> tys ?Q1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> UNIV)]"
+      show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys)] {P1} C1 {Q1} || {P2} C2 {Q2} [inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys)]"
       proof (rule RulePar)
-        show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P1 \<otimes> UNIV] C1 [inhalify \<Delta> tys ?Q1 \<otimes> UNIV]"
+        show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys] C1 [inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys]"
         proof (rule RuleConsTyped)
-          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P1 \<otimes> UNIV] C1 [B1 \<otimes> inhalify \<Delta> tys ?Q1 \<otimes> UNIV]"
+          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys] C1 [B1 \<otimes> inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(1) B1_def]
             using r0 by blast
-          show "t_entails \<Delta> tys (inhalify \<Delta> tys ?P1 \<otimes> UNIV) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P1 \<otimes> UNIV)"
-            by (meson ConcreteSemantics.entails_typed_refl ConcreteSemantics.entails_typed_trans conjunct_with_true_t_entails t_entails_add univ_t_entails_atrue)
-          show "t_entails \<Delta> tys (B1 \<otimes> inhalify \<Delta> tys ?Q1 \<otimes> UNIV) (inhalify \<Delta> tys ?Q1 \<otimes> UNIV)"
-            by (simp add: drop_conjunct_entails subset_entails)
+          show "t_entails \<Delta> tys (inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys)"
+            by (smt (verit) ConcreteSemantics.entails_typed_refl add_set_asso add_set_commm atrue_star_same)
+          show "t_entails \<Delta> tys (B1 \<otimes> inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys)"
+            by (simp add: drop_conjunct_t_entails subset_entails)
         qed
-        show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P2 \<otimes> UNIV] C2 [inhalify \<Delta> tys ?Q2 \<otimes> UNIV]"
+        show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys] C2 [inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys]"
         proof (rule RuleConsTyped)
-          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P2 \<otimes> UNIV] C2 [B2 \<otimes> inhalify \<Delta> tys ?Q2 \<otimes> UNIV]"
+          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys] C2 [B2 \<otimes> inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys]"
             using invariant_translate_inhale_exhale_get_proof[OF assms(2) B2_def]
             using r0 by blast
-          show "t_entails \<Delta> tys (B2 \<otimes> inhalify \<Delta> tys ?Q2 \<otimes> UNIV) (inhalify \<Delta> tys ?Q2 \<otimes> UNIV)"
-            by (simp add: drop_conjunct_entails subset_entails)
-          show "t_entails \<Delta> tys (inhalify \<Delta> tys ?P2 \<otimes> UNIV) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P2 \<otimes> UNIV)"
-            by (meson ConcreteSemantics.entails_typed_refl ConcreteSemantics.entails_typed_trans conjunct_with_true_t_entails t_entails_add univ_t_entails_atrue)
+          show "t_entails \<Delta> tys (B2 \<otimes> inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys)"
+            by (simp add: drop_conjunct_t_entails subset_entails)
+          show "t_entails \<Delta> tys (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys)"
+            by (smt (verit) ConcreteSemantics.entails_typed_refl add_set_asso add_set_commm atrue_star_same)
         qed
-        show "disjoint (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys ?Q1 \<otimes> UNIV)) (wrC C2)"
-
-          using assms(4) sorry
-        show "disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys ?Q2 \<otimes> UNIV)) (wrC C1)"
+        show "disjoint (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys)) (wrC C2)"
           using assms(4) by auto
-        show "self_framing (inhalify \<Delta> tys ?P1 \<otimes> UNIV)"
-          using assms(4) self_framing_then_self_framing_inhalify self_framing_typed_star_atrue wf_stmt.simps(3) by blast
-        show "self_framing (inhalify \<Delta> tys ?P2 \<otimes> UNIV)"
-          using assms(4) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify by auto
+        show "disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys)) (wrC C1)"
+          using assms(4) by auto
+        show "self_framing (inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys)"
+          by (meson assms(4) self_framing_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(3))
+        show "self_framing (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys)"
+          by (meson assms(4) self_framing_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(3))
       qed
       show "disjoint (fvA (tcfe \<Delta> tys) R1) (wrC {P1} C1 {Q1} || {P2} C2 {Q2})"
         by (metis (mono_tags, opaque_lifting) Diff_subset_conv Orderings.order_eq_iff r bot.extremum disjoint_minus disjoint_simps(2) disjoint_simps(3) sup.order_iff wrC.simps(7) wrC.simps(8) wrL.simps(7) wrL_wrC_same)
-      show "self_framing (inhalify \<Delta> tys ?P1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> UNIV))"
-        by (meson assms(4) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(3))
+      show "self_framing (inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys))"
+        by (meson assms(4) self_framing_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(3))
       show "self_framing R1"
         using R_defs(3) by blast
     qed
-    show "t_entails \<Delta> tys (P \<otimes> UNIV) (inhalify \<Delta> tys ?P1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> UNIV) \<otimes> R1)"
+    show "t_entails \<Delta> tys (P \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys) \<otimes> R1)"
     proof -
-      have "t_entails \<Delta> tys (P \<otimes> UNIV) ((R0 \<otimes> (inhalify \<Delta> tys ?P1 \<otimes> inhalify \<Delta> tys ?P2)) \<otimes> UNIV)"
-        by (metis P_Q_R_rels add_set_mono atrue_twice_equal atrue_twice_same entails_def inhalify_distributes subset_entails)
-      also have "t_entails \<Delta> tys (...) (R1 \<otimes> (inhalify \<Delta> tys (?P1 \<otimes> ?P2) \<otimes> UNIV))"
+      have "t_entails \<Delta> tys (P \<otimes> atrue \<Delta> tys) ((R0 \<otimes> (inhalify \<Delta> tys ?P1 \<otimes> inhalify \<Delta> tys ?P2)) \<otimes> atrue \<Delta> tys)"
+        by (metis ConcreteSemantics.entails_typed_refl P_Q_R_rels entails_def inhalify_distributes subset_entails t_entails_add)
+      also have "t_entails \<Delta> tys (...) (R1 \<otimes> (inhalify \<Delta> tys (?P1 \<otimes> ?P2) \<otimes> atrue \<Delta> tys))"
         using r add_set_asso
         by (simp add: ConcreteSemantics.entails_typed_refl add_set_commm add_set_left_comm inhalify_distributes t_entails_add)
-      moreover have "t_entails \<Delta> tys (...) (inhalify \<Delta> tys ?P1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> UNIV) \<otimes> R1)"
+      moreover have "t_entails \<Delta> tys (...) (inhalify \<Delta> tys ?P1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?P2 \<otimes> atrue \<Delta> tys) \<otimes> R1)"
         using add_set_commm add_set_left_comm
-        by (metis (no_types, opaque_lifting) conjunct_with_true_t_entails inhalify_distributes)
+        by (smt (verit, ccfv_threshold) ConcreteSemantics.entails_typedI atrue_star_same inhalify_distributes)
       ultimately show ?thesis
         using ConcreteSemantics.entails_typed_trans by blast
     qed
-    show "t_entails \<Delta> tys (inhalify \<Delta> tys ?Q1 \<otimes> UNIV \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> UNIV) \<otimes> R1) (Q \<otimes> UNIV)"
-      by (metis (no_types, lifting) ConcreteSemantics.entails_typedI P_Q_R_rels add_set_commm add_set_left_comm atrue_twice_equal inhalify_distributes)
+    show "t_entails \<Delta> tys (inhalify \<Delta> tys ?Q1 \<otimes> atrue \<Delta> tys \<otimes> (inhalify \<Delta> tys ?Q2 \<otimes> atrue \<Delta> tys) \<otimes> R1) (Q \<otimes> atrue \<Delta> tys)"
+      by (smt (z3) ConcreteSemantics.entails_typed_def P_Q_R_rels add_set_commm add_set_left_comm atrue_star_same inhalify_distributes)
   qed
 qed
 
@@ -919,7 +1043,7 @@ proof (rule invariant_translateI)
   assume asm0: "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys (Cif b C1 C2)))"
     "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys (Cif b C1 C2))) Q"
 
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cif b C1 C2 [Q \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cif b C1 C2 [Q \<otimes> atrue \<Delta> tys]"
   proof (rule ConcreteSemantics.SL_proof_If_elim)
     show "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (abs_stmt.If (semantify_bexp b) (fst (translate \<Delta> tys C1)) (fst (translate \<Delta> tys C2))) Q"
       by (metis asm0(2) fst_eqD translate.simps(8))
@@ -927,42 +1051,40 @@ proof (rule invariant_translateI)
        "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) (fst (translate \<Delta> tys C1)) B1"
        "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))) (fst (translate \<Delta> tys C2)) B2"
        "self_framing P"
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cif b C1 C2 [Q \<otimes> UNIV]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cif b C1 C2 [Q \<otimes> atrue \<Delta> tys]"
     proof (rule RuleIf)
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> UNIV) \<inter> assertify_bexp b] C1 [Q \<otimes> UNIV]"
+      show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp b] C1 [Q \<otimes> atrue \<Delta> tys]"
       proof (rule RuleCons)
-        show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> UNIV] C1 [B1 \<otimes> UNIV]"
+        show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> atrue \<Delta> tys] C1 [B1 \<otimes> atrue \<Delta> tys]"
           by (metis asm0(1) asm1(3) assms(1) invariant_translateE proof_obligations_valid_union snd_conv translate.simps(8))
-        show "B1 \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
+        show "B1 \<otimes> atrue \<Delta> tys \<subseteq> Q \<otimes> atrue \<Delta> tys"
           by (simp add: add_set_mono asm1(1))
-        show "(P \<otimes> UNIV) \<inter> assertify_bexp b \<subseteq> (P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> UNIV"
+        show "(P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp b \<subseteq> (P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> atrue \<Delta> tys"
         proof
-          fix \<omega> assume "\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp b"
-          then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot b (get_store \<omega>)"
-            using in_set_sum[of \<omega> P "UNIV"] assertify_bexp_def
-            by (smt (verit) Int_iff commutative greater_equiv mem_Collect_eq)
+          fix \<omega> assume "\<omega> \<in> (P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp b"
+          then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot b (get_store \<omega>)" "r \<in> atrue \<Delta> tys"
+            by (metis (no_types, lifting) IntE assertify_bexp_def mem_Collect_eq x_elem_set_product)
           then have "|p| \<in> ConcreteSemantics.purify (semantify_bexp b)"
             unfolding ConcreteSemantics.purify_def semantify_bexp_def
             by (simp add: core_charact_equi(1) core_is_pure full_add_charact(1) pure_def)
           then have "p \<in> P \<otimes> ConcreteSemantics.purify (semantify_bexp b)"
             using \<open>p \<in> P\<close> core_is_smaller x_elem_set_product by blast
-          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> UNIV"
-            by (meson UNIV_I \<open>Some \<omega> = p \<oplus> r\<close> x_elem_set_product)
+          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.purify (semantify_bexp b)) \<otimes> atrue \<Delta> tys"
+            using \<open>Some \<omega> = p \<oplus> r\<close> \<open>r \<in> atrue \<Delta> tys\<close> x_elem_set_product by blast
         qed
       qed
 
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)] C2 [Q \<otimes> UNIV]"
+      show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp (Bnot b)] C2 [Q \<otimes> atrue \<Delta> tys]"
       proof (rule RuleCons)
-        show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))) \<otimes> UNIV] C2 [B2 \<otimes> UNIV]"
+        show "(tcfe \<Delta> tys) \<turnstile>CSL [(P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))) \<otimes> atrue \<Delta> tys] C2 [B2 \<otimes> atrue \<Delta> tys]"
           by (metis asm0(1) asm1(4) assms(2) invariant_translateE proof_obligations_valid_union snd_conv translate.simps(8))
-        show "B2 \<otimes> UNIV \<subseteq> Q \<otimes> UNIV"
+        show "B2 \<otimes> atrue \<Delta> tys \<subseteq> Q \<otimes> atrue \<Delta> tys"
           by (simp add: add_set_mono asm1(1))
-        show "(P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b) \<subseteq> P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b)) \<otimes> UNIV"
+        show "(P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp (Bnot b) \<subseteq> P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b)) \<otimes> atrue \<Delta> tys"
         proof
-          fix \<omega> assume "\<omega> \<in> (P \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)"
-          then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot (Bnot b) (get_store \<omega>)"
-            using in_set_sum[of \<omega> P "UNIV"] assertify_bexp_def
-            by (smt (verit) Int_iff commutative greater_equiv mem_Collect_eq)
+          fix \<omega> assume "\<omega> \<in> (P \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp (Bnot b)"
+          then obtain p r where "Some \<omega> = p \<oplus> r" "p \<in> P" "bdenot (Bnot b) (get_store \<omega>)" "r \<in> atrue \<Delta> tys"
+            by (metis (no_types, lifting) IntE assertify_bexp_def mem_Collect_eq x_elem_set_product)
           then have "\<not> bdenot b (get_store |p| )"
             by (simp add: core_charact(1) full_add_charact(1))
           then have "|p| \<in> ConcreteSemantics.purify (negate (semantify_bexp b))"
@@ -970,8 +1092,8 @@ proof (rule invariant_translateI)
             by (simp add: core_is_pure pure_def)
           then have "p \<in> P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))"
             using \<open>p \<in> P\<close> core_is_smaller x_elem_set_product by blast
-          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))) \<otimes> UNIV"
-            by (meson UNIV_I \<open>Some \<omega> = p \<oplus> r\<close> x_elem_set_product)
+          then show "\<omega> \<in> (P \<otimes> ConcreteSemantics.purify (negate (semantify_bexp b))) \<otimes> atrue \<Delta> tys"
+            using \<open>Some \<omega> = p \<oplus> r\<close> \<open>r \<in> atrue \<Delta> tys\<close> x_elem_set_product by blast
         qed
       qed
     qed
@@ -995,10 +1117,15 @@ lemma inhalify_intersection:
   "inhalify \<Delta> tys (A \<inter> B) = inhalify \<Delta> tys A \<inter> B"
   by auto
 
+(*
 lemma t_entails_add_atrue:
   assumes "t_entails \<Delta> tys A B"
   shows "t_entails \<Delta> tys A ((atrue \<Delta> tys) \<otimes> B)"
+  
+*)
+(*
   using ConcreteSemantics.entails_typed_trans assms conjunct_with_true_t_entails t_entails_add univ_t_entails_atrue by blast
+*)
 
 lemma invariant_translate_while:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C Q"
@@ -1022,28 +1149,28 @@ proof (rule invariant_translateI)
 
   (* R1 is the frame *)
 
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] Cwhile b I C [Q \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] Cwhile b I C [Q \<otimes> atrue \<Delta> tys]"
   proof (rule RuleConsTyped)
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [(inhalify \<Delta> tys ?I \<otimes> UNIV) \<otimes> R1] Cwhile b I C [((inhalify \<Delta> tys ?I \<otimes> UNIV) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [(inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<otimes> R1] Cwhile b I C [((inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<inter> (assertify_bexp (Bnot b))) \<otimes> R1]"
     proof (rule RuleFrame)
-      show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?I \<otimes> UNIV] Cwhile b I C [(inhalify \<Delta> tys ?I \<otimes> UNIV) \<inter> assertify_bexp (Bnot b)]"
+      show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys] Cwhile b I C [(inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp (Bnot b)]"
       proof (rule RuleWhile)
-        show "(tcfe \<Delta> tys) \<turnstile>CSL [(inhalify \<Delta> tys ?I \<otimes> UNIV) \<inter> assertify_bexp b] C [inhalify \<Delta> tys ?I \<otimes> UNIV]"
+        show "(tcfe \<Delta> tys) \<turnstile>CSL [(inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp b] C [inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys]"
         proof (rule RuleConsTyped)
-          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys (?I \<inter> assertify_bexp b) \<otimes> UNIV] C [B \<otimes> inhalify \<Delta> tys ?I \<otimes> UNIV]"
+          show "(tcfe \<Delta> tys) \<turnstile>CSL [(atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys (?I \<inter> assertify_bexp b) \<otimes> atrue \<Delta> tys] C [B \<otimes> inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys]"
             using invariant_translate_inhale_exhale_get_proof[OF _ B_def]
             using assms(1) r1 by blast
-          show "t_entails \<Delta> tys (B \<otimes> inhalify \<Delta> tys ?I \<otimes> UNIV) (inhalify \<Delta> tys ?I \<otimes> UNIV)"
-            by (simp add: drop_conjunct_entails subset_entails)
+          show "t_entails \<Delta> tys (B \<otimes> inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys)"
+            by (simp add: drop_conjunct_t_entails subset_entails)
 
-          show "t_entails \<Delta> tys ((inhalify \<Delta> tys ?I \<otimes> UNIV) \<inter> assertify_bexp b) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys (?I \<inter> assertify_bexp b) \<otimes> UNIV)"
-            by (simp add: add_set_asso inhalify_intersection intersect_and_star subset_entails t_entails_add_atrue)
+          show "t_entails \<Delta> tys ((inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp b) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys (?I \<inter> assertify_bexp b) \<otimes> atrue \<Delta> tys)"
+            by (smt (verit) add_set_asso add_set_commm atrue_star_same inhalify_intersection intersect_and_star subset_entails)
         qed
       qed
       show "disjoint (fvA (tcfe \<Delta> tys) R1) (wrC (Cwhile b I C))"
         using \<open>ConcreteSemantics.entails_typed (tcfe \<Delta> tys) R0 R1 \<and> fvA (tcfe \<Delta> tys) R1 \<subseteq> fvA (tcfe \<Delta> tys) R0 - set (wrL C)\<close> disjoint_def wrL_wrC_same by fastforce
-      show "self_framing (inhalify \<Delta> tys ?I \<otimes> UNIV)"
-        using assms(3) self_framing_typed_star_atrue self_framing_then_self_framing_inhalify by auto
+      show "self_framing (inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys)"
+        by (meson assms(3) self_framing_atrue self_framing_then_self_framing_inhalify typed_self_framing_star wf_stmt.simps(5))
       show "self_framing R1"
         using ConcreteSemantics.SL_proof_Havoc_list_elim assms(2) calculation(5) finite_context_simp by blast
     qed
@@ -1058,10 +1185,10 @@ proof (rule invariant_translateI)
     qed
 
 
-    then show "t_entails \<Delta> tys (P \<otimes> UNIV) (inhalify \<Delta> tys ?I \<otimes> UNIV \<otimes> R1)"
-      by (simp add: ConcreteSemantics.entails_typed_refl add_set_commm add_set_left_comm t_entails_add)
+    then show "t_entails \<Delta> tys (P \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys \<otimes> R1)"
+      by (smt (verit, ccfv_threshold) ConcreteSemantics.entails_typed_refl add_set_asso add_set_commm t_entails_add)
 
-    show "t_entails \<Delta> tys ((inhalify \<Delta> tys ?I \<otimes> UNIV) \<inter> assertify_bexp (Bnot b) \<otimes> R1) (Q \<otimes> UNIV)"
+    show "t_entails \<Delta> tys ((inhalify \<Delta> tys ?I \<otimes> atrue \<Delta> tys) \<inter> assertify_bexp (Bnot b) \<otimes> R1) (Q \<otimes> atrue \<Delta> tys)"
       by (smt (verit, best) add_set_asso add_set_commm add_set_mono calculation(4) inhalify_intersection intersect_and_star subsetI subset_entails)
 
   qed
@@ -1188,41 +1315,310 @@ lemma t_entails_inhalify:
   by (simp add: ConcreteSemantics.entails_typed_def TypedEqui.typed_state_then_stabilize_typed)
 
 
+
+
+lemma simp_get_store_core[simp]:
+  "get_store |a| = get_store a"
+  by (simp add: core_charact(1))
+
+
+lemma denot_mono:
+  assumes "a \<succeq> b"
+      and "Some (VInt (edenot e (get_store b))) = Some v"
+    shows "Some (VInt (edenot e (get_store a))) = Some v"
+  using assms
+  apply (induct e)
+    apply simp_all
+  apply (simp add: greater_charact)
+  by (simp add: greater_charact)
+
+lemma wf_exp_semantify[simp]:
+  "wf_exp (semantify_exp x2)"
+  unfolding semantify_exp_def
+  apply (rule wf_expI)
+   apply simp
+  using denot_mono by fast
+
+lemma typed_exp_semantify_vints[simp]:
+  "TypedEqui.typed_exp vints (semantify_exp x2)"
+  unfolding TypedEqui.typed_exp_def semantify_exp_def
+  by (simp add: vints_def)
+
+
+lemma wf_exp_semantify_heap_loc[simp]:
+  "wf_exp (semantify_heap_loc r)"
+  unfolding semantify_heap_loc_def
+  apply (rule wf_expI)
+   apply simp_all
+  apply (simp add: core_charact_equi(2) core_structure(2))
+  by (smt (z3) get_address_simp get_vh_Some_greater greater_cover_store option.discI option.sel some_eq_imp)
+
+
+lemma semantify_heap_loc_typed[simp]:
+  "TypedEqui.typed_exp vints (semantify_heap_loc r)"
+  unfolding semantify_heap_loc_def TypedEqui.typed_exp_def vints_def
+  apply simp
+  by force
+
+lemma simplify_if_some_none:
+  assumes "(if b then Some x else None) = Some y"
+  shows "b \<and> x = y"
+  using assms
+  by (metis option.discI option.inject)
+
+lemma wf_exp_semantify_addr[simp]:
+  "wf_exp (semantify_addr x1)"
+  unfolding semantify_addr_def
+  apply (rule wf_expI)
+  apply simp_all
+  by (metis (mono_tags, lifting) Eps_cong greater_charact_equi simplify_if_some_none)
+
+lemma type_ctxt_field_val[simp]:
+  "type_ctxt_heap field_val = Some vints"
+  unfolding type_ctxt_heap_def by auto
+
+lemma in_dom_type_ctxt_store:
+  assumes "x1 < length tys"
+    shows "x1 \<in> dom (type_ctxt_store \<Delta> tys)"
+  using assms unfolding type_ctxt_store_def by auto
+
+lemma wf_assertion_stabilize[simp]:
+  "TypedEqui.wf_assertion (Stabilize A)"
+  apply (rule TypedEqui.wf_assertionI)
+  by (simp add: pure_larger_stabilize_same)
+
+lemma wf_exp_semantify_bexp[simp]:
+  "wf_exp (semantify_bexp b)"
+  unfolding semantify_bexp_def
+  apply (rule wf_expI)
+  apply simp
+  by (metis greater_charact)
+
+lemma well_typed_cmd_all_written_vars_def:
+  assumes "well_typed_cmd tys C"
+  shows "set (wrL C) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
+  using assms
+  apply (induct C)
+  unfolding type_ctxt_store_def
+           apply simp_all
+  by force+
+
+lemma assertion_while_or_par_wf:
+  assumes "well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+    shows "set (wrL C1 @ wrL C2) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
+  by (simp add: assms well_typed_cmd_all_written_vars_def)
+
+lemma self_framing_inter[simp]:
+  assumes "self_framing A"
+  shows "self_framing (A \<inter> assertify_bexp b)"
+proof (rule self_framingI)
+  fix \<omega>   
+  show "(\<omega> \<in> A \<inter> assertify_bexp b) = (stabilize \<omega> \<in> A \<inter> assertify_bexp b)"
+  proof -
+    have "\<omega> \<in> assertify_bexp b \<longleftrightarrow> stabilize \<omega> \<in> assertify_bexp b"
+      by (simp add: assertify_bexp_def)
+    then show ?thesis
+      using assms self_framing_def by auto
+  qed
+qed
+
+
+lemma wf_stmt_implies_wf_translation:
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
+  shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+  using assms
+  apply (induct C)
+           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def)  
+       apply (metis typed_exp_semantify_vints vints_def)
+      apply (metis semantify_heap_loc_typed vints_def)
+  apply (simp add: in_dom_type_ctxt_store)
+  apply (simp add: Let_def)
+  apply (rule conjI)
+  apply (metis self_framing_eq test_self_framing typed_self_framing_star wf_assertion_stabilize)
+   apply (rule conjI)
+    apply (metis ConcreteSemantics.wf_abs_stmt_havoc_list abs_type_context.select_convs(1) assertion_while_or_par_wf)
+  apply (metis self_framing_eq typed_self_framing_star wf_assertion_stabilize)
+   apply (rule conjI)
+   apply (metis self_framing_eq test_self_framing wf_assertion_stabilize)
+   apply (rule conjI)
+  apply (simp add: ConcreteSemantics.wf_abs_stmt_havoc_list well_typed_cmd_all_written_vars_def)
+  by (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
+
+
+
+
+lemma wf_stmt_implies_wf_translation_snd:
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
+      and "Cv \<in> snd (translate \<Delta> tys C)"
+    shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+  using assms
+  apply (induct C)
+           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def Let_def)
+     apply metis
+    apply (erule disjE)
+     apply simp
+  apply (rule conjI)
+      apply (metis self_framing_eq wf_assertion_stabilize)
+     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+    apply (erule disjE)
+     apply simp
+  apply (rule conjI)
+      apply (metis self_framing_eq wf_assertion_stabilize)
+     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+    apply (erule disjE)
+     apply blast+
+    apply (erule disjE)
+  apply simp
+   apply (rule conjI)+
+  apply (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
+  apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+  by blast
+
+(*
+definition remove_trace :: "'a equi_state \<Rightarrow> 'a equi_state"
+  where
+  "remove_trace \<omega> = set_trace \<omega> Map.empty"
+
+lemma no_trace_remove_trace[simp]:
+  "no_trace (remove_trace \<omega>)"
+  by (simp add: no_trace_def remove_trace_def)
+
+lemma remove_trace_stabilize[simp]:
+  "stabilize (remove_trace \<omega>) = remove_trace (stabilize \<omega>)"
+  unfolding remove_trace_def
+  apply rule
+  apply (simp add: set_trace_def stabilize_equi_state)
+  by (simp add: set_trace_def stabilize_equi_state)
+
+lemma stable_remove_trace[simp]:
+  assumes "stable \<omega>"
+  shows "stable (remove_trace \<omega>)"
+  by (metis already_stable assms remove_trace_stabilize stabilize_is_stable)
+
+lemma typed_remove_trace[simp]:
+  assumes "typed \<Gamma> \<omega>"
+  shows "typed \<Gamma> (remove_trace \<omega>)"
+  using assms unfolding TypedEqui.typed_def remove_trace_def
+  apply (intro conjI)
+  apply simp
+  by (simp add: fst_get_abs_state snd_get_abs_state well_typed_def)
+
+definition indep_trace_exp where
+  "indep_trace_exp e \<longleftrightarrow> (\<forall>\<omega>. e \<omega> = e (remove_trace \<omega>))"
+
+definition indep_trace_assertion where
+  "indep_trace_assertion A \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<longleftrightarrow> remove_trace \<omega> \<in> A)"
+
+lemma remove_trace_star:
+  assumes "Some x = a \<oplus> b"
+  shows "Some (remove_trace x) = remove_trace a \<oplus> remove_trace b"
+
+
+fun no_old_stmt where
+  "no_old_stmt Skip \<longleftrightarrow> True"
+| "no_old_stmt (C1;; C2) \<longleftrightarrow> no_old_stmt C1 \<and> no_old_stmt C2"
+| "no_old_stmt (If b C1 C2) \<longleftrightarrow> indep_trace_exp b \<and> no_old_stmt C1 \<and> no_old_stmt C2"
+| "no_old_stmt (Assert A) \<longleftrightarrow> indep_trace_assertion A"
+| "no_old_stmt (Assume A) \<longleftrightarrow> indep_trace_assertion A"
+| "no_old_stmt (Inhale A) \<longleftrightarrow> indep_trace_assertion A"
+| "no_old_stmt (Exhale A) \<longleftrightarrow> indep_trace_assertion A"
+| "no_old_stmt (LocalAssign x e) \<longleftrightarrow> indep_trace_exp e"
+| "no_old_stmt (Havoc x) \<longleftrightarrow> True"
+| "no_old_stmt (Custom (FieldAssign r f e)) \<longleftrightarrow> indep_trace_exp e"
+
+
+lemma no_label_same_red_stmt:
+  assumes "no_old_stmt C"
+      and "ConcreteSemantics.no_assert_assume C"
+    shows "ConcreteSemantics.red_stmt \<Gamma> C \<omega> S \<Longrightarrow> (\<forall>\<omega>'. \<omega> = remove_trace \<omega>' \<longrightarrow> (\<exists>S'. ConcreteSemantics.red_stmt \<Gamma> C \<omega>' S' \<and> S = remove_trace ` S'))"
+      and "ConcreteSemantics.sequential_composition \<Delta> S1 C S2 \<Longrightarrow> (\<forall>S1'. S1 = remove_trace ` S1' \<longrightarrow>
+  (\<exists>S2'. ConcreteSemantics.sequential_composition \<Delta> S1' C S2' \<and> S2 = remove_trace ` S2'))"
+  using assms
+proof (induct rule: ConcreteSemantics.red_stmt_sequential_composition.inducts)
+  case (SeqComp S \<Delta> C f S')
+  then show ?case 
+next
+  case (RedSkip \<Delta> \<omega>)
+  then show ?case 
+    using ConcreteSemantics.RedSkip by blast
+next
+  case (RedInhale \<omega> A \<Delta>)
+  then show ?case 
+next
+  case (RedExhale a A \<omega> \<omega>' \<Delta>)
+  then show ?case 
+next
+  case (RedIfTrue b \<omega> \<Delta> C1 S C2)
+  then show ?case 
+next
+  case (RedIfFalse b \<omega> \<Delta> C2 S C1)
+  then show ?case 
+next
+  case (RedSeq \<Delta> C1 \<omega> S1 C2 S2)
+  then show ?case 
+next
+  case (RedLocalAssign \<Delta> x ty e \<omega> v)
+  then show ?case 
+next
+  case (RedHavoc \<Delta> x ty \<omega>)
+  then show ?case 
+next
+  case (RedCustom \<Delta> C \<omega> S)
+  then show ?case 
+qed (simp_all)
+
+
+
+lemma no_label_same_verifies:
+  assumes "ConcreteSemantics.verifies_set \<Gamma> (Set.filter no_trace (atrue \<Delta> tys)) C"
+  shows "ConcreteSemantics.verifies_set \<Gamma> (atrue \<Delta> tys) C"
+proof (rule ConcreteSemantics.verifies_setI)
+  fix \<omega>
+  assume asm0: "\<omega> \<in> atrue \<Delta> tys" "sep_algebra_class.stable \<omega>" "typed \<Gamma> \<omega>"
+  then have "remove_trace \<omega> \<in> atrue \<Delta> tys"
+    by (metis ConcreteSemantics.entails_typed_def ConcreteSemantics.semi_typedE UNIV_I already_stable atrue_semi_typed typed_remove_trace univ_t_entails_atrue)
+  then show "ConcreteSemantics.verifies \<Gamma> C \<omega>"
+    by (metis ConcreteSemantics.verifies_def ConcreteSemantics.verifies_set_def asm0(2) asm0(3) assms member_filter no_label_same_red_stmt no_trace_remove_trace stable_remove_trace typed_remove_trace)
+qed
+*)
+
 theorem sound_translation:
   assumes "wf_stmt \<Delta> tys C"
       and "well_typed_cmd tys C"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
-      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
-      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
-      and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (Inhale P;; fst (translate \<Delta> tys C);; Exhale Q)"
-      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
-    shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
+      and ver_main: "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (Inhale P;; fst (translate \<Delta> tys C);; Exhale Q)"
+      and ver_aux: "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
+
+    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
 proof -
 
   obtain B where "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (atrue \<Delta> tys) (Inhale P;; fst (translate \<Delta> tys C);; Exhale Q) B"
-    by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(3) ConcreteSemantics.wf_abs_stmt.simps(7) assms(3) assms(5) assms(6) atrue_def atrue_self_framing_and_typed atrue_semi_typed test_self_framing)
+    by (metis ConcreteSemantics.Viper_implies_SL_proof ConcreteSemantics.semantics_axioms ConcreteSemantics.wf_abs_stmt.simps(7) assms(1) assms(2) assms(3) atrue_semi_typed self_framing_atrue semantics.wf_abs_stmt.simps(2) semantics.wf_abs_stmt.simps(3) ver_main wf_stmt_implies_wf_translation)
   then obtain B' where "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys P) (fst (translate \<Delta> tys C)) B'" "entails B' (B \<otimes> Q)"
     by blast
 
-  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+  show "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   proof (rule RuleConsTyped)
-    show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys) \<otimes> UNIV] C [B' \<otimes> UNIV]"
+    show "(tcfe \<Delta> tys) \<turnstile>CSL [inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys) \<otimes> atrue \<Delta> tys] C [B' \<otimes> atrue \<Delta> tys]"
     proof (rule invariant_translateE[of _ _ "inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys)" C])
       show "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) (inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys)) (fst (translate \<Delta> tys C)) B'"
         by (metis \<open>ConcreteSemantics.SL_proof (tcfe \<Delta> tys) ((atrue \<Delta> tys) \<otimes> inhalify \<Delta> tys P) (fst (translate \<Delta> tys C)) B'\<close> add_set_commm)
       show "invariant_translate \<Delta> tys (inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys)) C B'"
-        by (meson assms(1) assms(2) assms(3) assms(4) invariant_translate_induct)
+        using assms(1) assms(2) invariant_translate_induct wf_stmt_implies_wf_translation wf_stmt_implies_wf_translation_snd by blast
       show "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))"
         unfolding proof_obligations_valid_def
         apply clarify
-        using ConcreteSemantics.Viper_implies_SL_proof[of "tcfe \<Delta> tys" "atrue \<Delta> tys"] assms(4) assms(7)
-        by (metis atrue_def atrue_self_framing_and_typed atrue_semi_typed test_self_framing)
+        using ConcreteSemantics.Viper_implies_SL_proof assms(1) assms(2) atrue_semi_typed self_framing_atrue ver_aux wf_stmt_implies_wf_translation_snd by blast
       qed
-      show "t_entails \<Delta> tys (P \<otimes> UNIV) (inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys) \<otimes> UNIV)"
-        by (simp add: ConcreteSemantics.entails_typed_refl add_set_asso t_entails_add t_entails_add_atrue t_entails_inhalify)
-      show "t_entails \<Delta> tys (B' \<otimes> UNIV) (Q \<otimes> UNIV)"
-        by (metis (no_types, lifting) \<open>entails B' (B \<otimes> Q)\<close> add_set_mono atrue_twice_equal drop_conjunct_entails dual_order.trans entails_def subset_entails)
+      show "t_entails \<Delta> tys (P \<otimes> atrue \<Delta> tys) (inhalify \<Delta> tys P \<otimes> (atrue \<Delta> tys) \<otimes> atrue \<Delta> tys)"
+        by (simp add: ConcreteSemantics.entails_typed_refl add_set_asso t_entails_add t_entails_inhalify)
+      have "t_entails \<Delta> tys (B' \<otimes> atrue \<Delta> tys) ((B \<otimes> Q) \<otimes> atrue \<Delta> tys)"
+        by (meson ConcreteSemantics.entails_typed_refl \<open>entails B' (B \<otimes> Q)\<close> entails_def subset_entails t_entails_add)
+      then show "t_entails \<Delta> tys (B' \<otimes> atrue \<Delta> tys) (Q \<otimes> atrue \<Delta> tys)"
+        using ConcreteSemantics.entails_typed_trans drop_conjunct_t_entails by blast
   qed
 qed
 

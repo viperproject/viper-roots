@@ -1185,7 +1185,7 @@ qed
 
 *)
 
-section \<open>Separealion Algebra Instantiations\<close>
+section \<open>Separation Algebra Instantiations\<close>
 
 subsection \<open>Instantiation of val and virtual_state as pcm_with_core\<close>
 

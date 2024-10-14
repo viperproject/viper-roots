@@ -825,7 +825,7 @@ proof (rule self_framingI)
         unfolding TypedEqui.typed_def
       proof
         show "TypedEqui.typed_store \<Delta> (get_store (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
-          sorry
+          
 
           by (metis TypedEqui.typed_def asm0(1) get_store_set_state)
         show "well_typed (custom_context \<Delta>) (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"

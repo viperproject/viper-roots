@@ -414,11 +414,6 @@ qed
 
 
 
-lemma in_starE:
-  assumes "x \<in> A \<otimes> B"
-      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
-    shows "P"
-  by (meson assms(1) assms(2) x_elem_set_product)
 
 
 (*
@@ -658,11 +653,6 @@ lemma empty_satisfies_star:
     shows "stabilize |x| \<in> A \<otimes> B"
   by (simp add: assms(1) assms(2) core_is_pure in_starI stabilize_sum)
 
-lemma simp_get_store_core[simp]:
-  "get_store |a| = get_store a"
-  by (simp add: core_charact(1))
-
-
 lemma in_bool_to_assertion_emp:
   assumes "P"
   shows "stabilize |x| \<in> \<llangle>P\<rrangle>"
@@ -778,19 +768,6 @@ lemma n_havoc_same:
   "ConcreteSemantics.havoc_list l = compile False \<Delta> F (n_havoc l)"
   by (induct l) simp_all
 
-lemma self_framing_inter[simp]:
-  assumes "self_framing A"
-  shows "self_framing (A \<inter> assertify_bexp b)"
-proof (rule self_framingI)
-  fix \<omega>   
-  show "(\<omega> \<in> A \<inter> assertify_bexp b) = (stabilize \<omega> \<in> A \<inter> assertify_bexp b)"
-  proof -
-    have "\<omega> \<in> assertify_bexp b \<longleftrightarrow> stabilize \<omega> \<in> assertify_bexp b"
-      by (simp add: assertify_bexp_def)
-    then show ?thesis
-      using assms self_framing_def by auto
-  qed
-qed
 
 
 lemma and_binop_false_lazy:
@@ -917,11 +894,6 @@ qed
 well_typed_cmd_aux \<Gamma> (Cread x r) \<longleftrightarrow> variables \<Gamma> x = Some vints \<and> variables \<Gamma> r = Some vrefs"
 *)
 
-lemma simplify_if_some_none:
-  assumes "(if b then Some x else None) = Some y"
-  shows "b \<and> x = y"
-  using assms
-  by (metis option.discI option.inject)
 
 lemma sound_translate_read_heap_loc:
   assumes "custom_context (tcfe \<Delta> tys) = type_ctxt_heap"
@@ -1224,178 +1196,30 @@ lemma verifies_more_verifies:
 
 
 
-
-lemma denot_mono:
-  assumes "a \<succeq> b"
-      and "Some (VInt (edenot e (get_store b))) = Some v"
-    shows "Some (VInt (edenot e (get_store a))) = Some v"
-  using assms
-  apply (induct e)
-    apply simp_all
-  apply (simp add: greater_charact)
-  by (simp add: greater_charact)
-
-lemma wf_exp_semantify[simp]:
-  "wf_exp (semantify_exp x2)"
-  unfolding semantify_exp_def
-  apply (rule wf_expI)
-   apply simp
-  using denot_mono by fast
-
-
-lemma typed_exp_semantify_vints[simp]:
-  "TypedEqui.typed_exp vints (semantify_exp x2)"
-  unfolding TypedEqui.typed_exp_def semantify_exp_def
-  by (simp add: vints_def)
-
-
-lemma wf_exp_semantify_heap_loc[simp]:
-  "wf_exp (semantify_heap_loc r)"
-  unfolding semantify_heap_loc_def
-  apply (rule wf_expI)
-   apply simp_all
-  apply (simp add: core_charact_equi(2) core_structure(2))
-  by (smt (z3) get_address_simp get_vh_Some_greater greater_cover_store option.discI option.sel some_eq_imp)
-
-
-lemma semantify_heap_loc_typed[simp]:
-  "TypedEqui.typed_exp vints (semantify_heap_loc r)"
-  unfolding semantify_heap_loc_def TypedEqui.typed_exp_def vints_def
-  apply simp
-  by force
-
-lemma wf_exp_semantify_addr[simp]:
-  "wf_exp (semantify_addr x1)"
-  unfolding semantify_addr_def
-  apply (rule wf_expI)
-  apply simp_all
-  by (metis (mono_tags, lifting) Eps_cong greater_charact_equi simplify_if_some_none)
-
-lemma type_ctxt_field_val[simp]:
-  "type_ctxt_heap field_val = Some vints"
-  unfolding type_ctxt_heap_def by auto
-
-lemma in_dom_type_ctxt_store:
-  assumes "x1 < length tys"
-    shows "x1 \<in> dom (type_ctxt_store \<Delta> tys)"
-  using assms unfolding type_ctxt_store_def by auto
-
-lemma wf_assertion_stabilize[simp]:
-  "TypedEqui.wf_assertion (Stabilize A)"
-  apply (rule TypedEqui.wf_assertionI)
-  by (simp add: pure_larger_stabilize_same)
-
-lemma wf_exp_semantify_bexp[simp]:
-  "wf_exp (semantify_bexp b)"
-  unfolding semantify_bexp_def
-  apply (rule wf_expI)
-  apply simp
-  by (metis greater_charact)
-
-lemma well_typed_cmd_all_written_vars_def:
-  assumes "well_typed_cmd tys C"
-  shows "set (wrL C) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
-  using assms
-  apply (induct C)
-  unfolding type_ctxt_store_def
-           apply simp_all
-  by force+
-
-lemma assertion_while_or_par_wf:
-  assumes "well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
-    shows "set (wrL C1 @ wrL C2) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
-  by (simp add: assms well_typed_cmd_all_written_vars_def)
-
-(*
-lemma wf_assertion_par:
-  assumes "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) P1)"
-      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) P2)"
-      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1)"
-      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2)"
-      and "wf_stmt tys \<Gamma> C1"
-      and "wf_stmt tys \<Gamma> C2"
-      and "well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
-      
-    ConcreteSemantics.wf_abs_stmt \<lparr>variables = type_ctxt_store \<Delta> tys, custom_context = type_ctxt_heap\<rparr> (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2)) \<and>
-    TypedEqui.wf_assertion (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2)
-*)
-
-
-
-lemma wf_stmt_implies_wf_translation:
-  assumes "wf_stmt \<Delta> tys C"
-      and "well_typed_cmd tys C"
-  shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
-  using assms
-  apply (induct C)
-           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def)  
-       apply (metis typed_exp_semantify_vints vints_def)
-      apply (metis semantify_heap_loc_typed vints_def)
-  apply (simp add: in_dom_type_ctxt_store)
-  apply (simp add: Let_def)
-  apply (rule conjI)
-  apply (metis self_framing_eq test_self_framing typed_self_framing_star wf_assertion_stabilize)
-   apply (rule conjI)
-    apply (metis ConcreteSemantics.wf_abs_stmt_havoc_list abs_type_context.select_convs(1) assertion_while_or_par_wf)
-  apply (metis self_framing_eq typed_self_framing_star wf_assertion_stabilize)
-   apply (rule conjI)
-   apply (metis self_framing_eq test_self_framing wf_assertion_stabilize)
-   apply (rule conjI)
-  apply (simp add: ConcreteSemantics.wf_abs_stmt_havoc_list well_typed_cmd_all_written_vars_def)
-  by (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
-
-
-
-
-lemma wf_stmt_implies_wf_translation_snd:
-  assumes "wf_stmt \<Delta> tys C"
-      and "well_typed_cmd tys C"
-      and "Cv \<in> snd (translate \<Delta> tys C)"
-    shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
-  using assms
-  apply (induct C)
-           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def Let_def)
-     apply metis
-    apply (erule disjE)
-     apply simp
-  apply (rule conjI)
-      apply (metis self_framing_eq wf_assertion_stabilize)
-     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
-    apply (erule disjE)
-     apply simp
-  apply (rule conjI)
-      apply (metis self_framing_eq wf_assertion_stabilize)
-     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
-    apply (erule disjE)
-     apply blast+
-    apply (erule disjE)
-  apply simp
-   apply (rule conjI)+
-  apply (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
-  apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
-  by blast
-
-
-
-
-
 theorem sound_syntactic_translation:
 
 (* Well formedness *)
 
   assumes "wf_stmt \<Delta> tys C"
       and "well_typed_cmd tys C"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
-      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+
+
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
 
 (* Verification *)
       and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
       and "\<And>Cv. Cv \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
-shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
+(*
   using assms(1) assms(2) assms(3) assms(4) assms(5)
-proof (rule sound_translation)
+*)
+proof (rule sound_translation[OF assms(1-2) assms(3)])
+  have r1: "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+    by (simp add: assms(1) assms(2) wf_stmt_implies_wf_translation)
+  have r2: "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+    using assms(1) assms(2) wf_stmt_implies_wf_translation_snd by blast
+
   show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q)"
   proof (rule ConcreteSemantics.verifies_setI)
     fix \<omega> assume asm0: "\<omega> \<in> atrue \<Delta> tys" "sep_algebra_class.stable \<omega>" "typed (tcfe \<Delta> tys) \<omega>"
@@ -1407,25 +1231,40 @@ proof (rule sound_translation)
         apply (rule verifies_more_seq)
             apply simp_all
         using translation_refinement_main
-        using assms(1) assms(2) assms(3) apply blast
-        using assms(5) apply blast
-        apply (simp add: assms(5))
-        using assms(3) assms(5) by blast
-
+        using \<open>ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))\<close> assms(1) assms(2) apply blast
+        using assms(3) apply blast
+        apply (simp add: assms(3))
+        using \<open>ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))\<close> by fastforce
       show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q) \<omega>"
-        using ConcreteSemantics.verifies_set_def asm0(1) asm0(2) asm0(3) assms(6) by blast
+        using ConcreteSemantics.verifies_set_def asm0(1) asm0(2) asm0(3) assms(4) by blast
     qed (simp_all add: asm0)
   qed
   fix Cv
   assume asm0: "Cv \<in> snd (translate \<Delta> tys C)"
   moreover have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
-    using assms(1) assms(2) assms(3) assms(4) translation_refinement_syntactic_semantic(2) by blast
+    by (simp add: \<open>ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))\<close> \<open>\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv\<close> assms(1) assms(2) translation_refinement_syntactic_semantic(2))
   ultimately obtain Cv' where "Cv' \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C))"
     "verifies_more (tcfe \<Delta> tys) Cv Cv'"
     by (meson verifies_more_set)
   then show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
-    by (meson ConcreteSemantics.verifies_set_def assms(7) verifies_more_verifies)
-qed (simp_all)
+    by (meson ConcreteSemantics.verifies_set_def assms(5) verifies_more_verifies)
+qed
+
+
+(*
+(* TODO *)
+lemma test_wf_assertion_interp:
+  "TypedEqui.wf_assertion (make_semantic_assertion_untyped \<Delta> (tcfes tys) A)"
+  sorry
+
+lemma translate_syn_wf:
+  "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
+  apply (induct C)
+           apply (simp_all add: test_wf_assertion_interp)
+
+*)
+
+
 
 
 end

@@ -303,20 +303,6 @@ Program logic (Figure 9) defined in the file simple-frontend/CSL_IDF.thy:
 
 
 
-(*
-TODO:
-Maybe explain the following:
-1. Entailment is typed in consequence rule
-| RuleConsTyped: "\<lbrakk>\<Delta> \<turnstile>CSL [P] C [Q]; ConcreteSemantics.entails_typed \<Delta> P' P; ConcreteSemantics.entails_typed \<Delta> Q Q'\<rbrakk>
-  \<Longrightarrow> \<Delta> \<turnstile>CSL [P'] C [Q']"
-
-2. Those rules are convenient
-
-| RuleStabilizeTyped: "\<Delta> \<turnstile>CSL [P] C [Q] \<Longrightarrow> \<Delta> \<turnstile>CSL [Stabilize P] C [Stabilize Q]"
-| RuleInhalify: "\<Delta> \<turnstile>CSL [P] C [Q] \<Longrightarrow> \<Delta> \<turnstile>CSL [P] C [Set.filter (typed \<Delta> \<circ> stabilize) Q]"
-
-*)
-
 
 
 theorem soundness_CSL:
@@ -327,6 +313,8 @@ theorem soundness_CSL:
 
 text \<open>Theorem 8: Adequacy\<close>
 
+
+(* TODO: Make adequacy work with "\<otimes> atrue" for real e2e theorem? *)
 theorem adequacy_CSL:
   assumes "n_steps C \<sigma> C' \<sigma>'"
       and "tcfe \<Delta> tys \<turnstile>CSL [assertify_state_exp P] C [assertify_state_exp Q]"
@@ -354,13 +342,6 @@ and then show that verification of the syntactic translation into ViperCore impl
 text \<open>Theorem 9: Soundness of the front-end translation\<close>
 
 
-(* TODO *)
-lemma test_wf_assertion_interp:
-  "TypedEqui.wf_assertion (make_semantic_assertion_untyped \<Gamma> (tcfes tys) A)"
-  sorry
-
-
-
 theorem sound_front_end_translation:
 
 (* Well formedness *)
@@ -374,12 +355,8 @@ theorem sound_front_end_translation:
      (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
       and "\<And>Cv. Cv \<in> compile False \<Delta> (tcfes tys) ` snd (translate_syn C) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
-shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
-  apply (rule sound_syntactic_translation)
-        apply (simp_all add: assms)
-  apply (simp add: assms(2) assms(1) wf_stmt_implies_wf_translation)
-  using assms(1) assms(2) wf_stmt_implies_wf_translation_snd by blast
-
+shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
+  by (rule sound_syntactic_translation) (simp_all add: assms)
 
 
 
@@ -392,13 +369,13 @@ Not really, quite a few differences. Maybe we should make lemma and convertible 
 definition convertible where
   "convertible \<Delta> tys C \<longleftrightarrow> (\<forall>P Q.
   (proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C)) \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q)
-  \<longrightarrow> tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV])"
+  \<longrightarrow> tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys])"
 
 lemma lemma_3_inhale_translation_exhale:
   assumes "convertible \<Delta> tys C"
       and "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (Inhale A;; fst (translate \<Delta> tys C);; Exhale B) Q"
       and "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))"
-    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> UNIV] C [Q \<otimes> B \<otimes> UNIV]"
+    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
   using invariant_translate_inhale_exhale_get_proof assms unfolding convertible_def invariant_translate_def
   by meson
 
@@ -423,6 +400,39 @@ lemma lemma_4_exhale_havoc_inhale:
 
 end
 
+
+
+
+
+theorem VCG_e2e_sound:
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
+      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
+      and ValidFrontendCmd: "valid_front_end_cmd C"
+      and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
+
+      and AbsTypeWf: "abs_type_wf (interp.domains \<Delta>)"
+      and InterpFunsPredsEmpty: "interp.funs \<Delta> = (\<lambda> _ _ _. None) \<and> interp.predicates \<Delta> = Map.empty"
+
+      and "mdecl = (triple_as_method_decl tys Ps (fst (translate_syn C)) Qs)"
+      and MethodCorrect: "vpr_method_correct_total (default_ctxt (domains \<Delta>) mdecl) (\<lambda>_ :: int full_total_state. True) mdecl"     
+      and AuxiliaryMethodsCorrectAndTyped:
+        "\<And> stmtAux. stmtAux \<in> snd (translate_syn C) \<Longrightarrow> 
+             let mdeclAux = triple_as_method_decl tys 
+                              true_syn_assertion stmtAux true_syn_assertion 
+             in
+             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux \<and>
+             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option tys) stmtAux"
+ 
+      and MainViperTyped: 
+            "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option tys)
+                   (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn C))) (stmt.Exhale Qs))"
+
+      and "P = make_semantic_assertion_gen False \<Delta> (tcfes tys) Ps"
+      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes tys) Qs"     
+    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
+  using assms sound_syntactic_translation_VCG
+  by blast
 
 
 

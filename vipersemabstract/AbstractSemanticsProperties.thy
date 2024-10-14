@@ -1903,7 +1903,7 @@ lemma assign_state_larger:
 
 
 definition mono_custom where
-  "mono_custom \<Delta> \<longleftrightarrow> (\<forall>C \<omega> \<omega>' S. \<omega>' \<succeq> \<omega> \<and> red_custom_stmt \<Delta> C \<omega> S \<longrightarrow> (\<exists>S'. red_custom_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S))"
+  "mono_custom \<Delta> \<longleftrightarrow> (\<forall>C \<omega> \<omega>' S. \<omega>' \<succeq> \<omega> \<and> red_custom_stmt \<Delta> C \<omega> S \<and> wf_custom_stmt \<Delta> C \<longrightarrow> (\<exists>S'. red_custom_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S))"
 
 fun no_assert_assume where
   "no_assert_assume (Assert _) \<longleftrightarrow> False"
@@ -2072,8 +2072,29 @@ next
 next
   case (RedCustom \<Delta> C \<omega> S)
   then show ?case unfolding mono_custom_def
-    by (meson red_stmt_sequential_composition.RedCustom)
+    by (meson red_stmt_sequential_composition.RedCustom wf_abs_stmt.simps(10))
 qed (simp_all)
+
+
+lemma monotonicityE:
+  assumes "wf_abs_stmt \<Delta> C"
+      and "mono_custom \<Delta>"
+      and "no_assert_assume C"
+      and "red_stmt \<Delta> C \<omega> S"
+      and "stable \<omega>'"
+      and "\<omega>' \<succeq> \<omega>"
+    shows "\<exists>S'. red_stmt \<Delta> C \<omega>' S' \<and> S' \<ggreater> S"
+  using assms(1) assms(2) assms(3) assms(4) assms(5) assms(6) monotonicity(1) by blast
+
+lemma monotonicity_verifiesE:
+  assumes "wf_abs_stmt \<Delta> C"
+      and "mono_custom \<Delta>"
+      and "no_assert_assume C"
+      and "verifies \<Delta> C \<omega>"
+      and "stable \<omega>'"
+      and "\<omega>' \<succeq> \<omega>"
+    shows "verifies \<Delta> C \<omega>'"
+  using assms monotonicityE unfolding verifies_def by blast
 
 lemma inhale_c_exhale_verifies_simplifies:
   assumes "\<And>\<omega>. sep_algebra_class.stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> |\<omega>| \<in> A"
