@@ -19,9 +19,6 @@ primrec option_fold :: "('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'a 
     "option_fold f e (Some x) = f x"
   | "option_fold f e None = e"
 
-fun nth_option :: "'a list => nat => 'a option"
-  where "nth_option xs n = (if n < length xs then Some (nth xs n) else None)"
-
 abbreviation option_if :: "bool \<Rightarrow> 'a option \<Rightarrow> 'a option" where
   "option_if b opt \<equiv> if b then opt else None"
 

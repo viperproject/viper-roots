@@ -266,21 +266,19 @@ fun translate_bexp where
 | "translate_bexp (Band e1 e2) = Binop (translate_bexp e1) And (translate_bexp e2)"
 | "translate_bexp (Bnot b) = Unop Not (translate_bexp b)"
 
-
 lemma exp_refined_by_int:
   assumes "typed_exp tys e"
-  shows "exp_refined_by (tcfe tys) (semantify_exp e) (make_semantic_exp \<Gamma> (translate_exp e))"
+  shows "exp_refined_by (tcfe \<Delta> tys) (semantify_exp e) (make_semantic_exp \<Delta> (translate_exp e))"
 proof (rule exp_refined_byI)
-  fix \<omega> v assume "sep_algebra_class.stable \<omega>" "typed (tcfe tys) \<omega>"
-  then have asm0: "store_typed (variables (tcfe tys)) (get_store \<omega>)"
+  fix \<omega> v assume "sep_algebra_class.stable \<omega>" "typed (tcfe \<Delta> tys) \<omega>"
+  then have asm0: "store_typed (variables (tcfe \<Delta> tys)) (get_store \<omega>)"
     using TypedEqui.typed_def TypedEqui.typed_store_def by blast
 
-  have "typed_exp tys e \<Longrightarrow> make_semantic_exp \<Gamma> (translate_exp e) \<omega> = Some v \<Longrightarrow> semantify_exp e \<omega> = Some v"
+  have "typed_exp tys e \<Longrightarrow> make_semantic_exp \<Delta> (translate_exp e) \<omega> = Some v \<Longrightarrow> semantify_exp e \<omega> = Some v"
   proof (induct e arbitrary: v)
     case (Evar x)
-    then have "variables (tcfe tys) x = Some vints"
-      unfolding type_ctxt_front_end_def type_ctxt_store_def
-      by simp
+    then have "variables (tcfe \<Delta> tys) x = Some vints"
+      unfolding type_ctxt_front_end_def type_ctxt_store_def typed_exp.simps vints_def by auto
     then obtain v' where "get_store \<omega> x = Some v'" "v' \<in> vints"
       using asm0 store_typed_lookup by blast
     then show ?case
@@ -294,7 +292,7 @@ proof (rule exp_refined_byI)
     then show ?case
       by (cases "op"; clarsimp simp add:semantify_exp_def red_pure_simps; fastforce)
   qed
-  then show "make_semantic_exp \<Gamma> (translate_exp e) \<omega> = Some v \<Longrightarrow> semantify_exp e \<omega> = Some v" using assms by blast
+  then show "make_semantic_exp \<Delta> (translate_exp e) \<omega> = Some v \<Longrightarrow> semantify_exp e \<omega> = Some v" using assms by blast
 qed
 
 
@@ -306,9 +304,9 @@ lemma and_then_log_and:
   using assms by auto
 
 lemma semantify_bexp_bnot:
-  assumes "make_semantic_bexp \<Gamma> (Unop Not b)  \<omega> = Some v"
-  shows "make_semantic_bexp \<Gamma> b \<omega> = Some (\<not> v)"
-proof (cases "\<Gamma> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Down>] Val (VBool True)")
+  assumes "make_semantic_bexp \<Delta> (Unop Not b)  \<omega> = Some v"
+  shows "make_semantic_bexp \<Delta> b \<omega> = Some (\<not> v)"
+proof (cases "\<Delta> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Down>] Val (VBool True)")
   case True
   then show ?thesis
     apply (rule red_pure_elim(3))
@@ -316,16 +314,16 @@ proof (cases "\<Gamma> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Do
     by auto
   next
     case False
-    then have "\<Gamma> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Down>] Val (VBool False)"
+    then have "\<Delta> \<turnstile> \<langle>Unop Not b; \<omega>\<rangle> [\<Down>] Val (VBool False)"
       by (metis (full_types) assms make_semantic_bexp_Some)
     then show ?thesis
     proof (rule red_pure_elim(3))
       fix va v'
-      assume "Val (VBool False) = Val v'" "\<Gamma> \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>] Val va" "eval_unop unop.Not va = BinopNormal v'"
+      assume "Val (VBool False) = Val v'" "\<Delta> \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>] Val va" "eval_unop unop.Not va = BinopNormal v'"
       then have "v' = VBool False \<and> va = VBool True"
         using eval_unop.elims by auto
-      then show "make_semantic_bexp \<Gamma> b \<omega> = Some (\<not> v)"
-        by (metis (full_types) False \<open>\<Gamma> \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>] Val va\<close> assms make_semantic_bexp_Some)
+      then show "make_semantic_bexp \<Delta> b \<omega> = Some (\<not> v)"
+        by (metis (full_types) False \<open>\<Delta> \<turnstile> \<langle>b;\<omega>\<rangle> [\<Down>] Val va\<close> assms make_semantic_bexp_Some)
     qed (simp)
   qed
 
@@ -344,7 +342,7 @@ proof (rule ext)
 qed
 
 lemma make_semantic_star:
-  "make_semantic_assertion_untyped \<Gamma> F (A && B) = make_semantic_assertion_untyped \<Gamma> F A \<otimes> make_semantic_assertion_untyped \<Gamma> F B"
+  "make_semantic_assertion_untyped \<Delta> F (A && B) = make_semantic_assertion_untyped \<Delta> F A \<otimes> make_semantic_assertion_untyped \<Delta> F B"
   by (simp add: make_semantic_assertion_gen_def)
 
 
@@ -356,39 +354,40 @@ section \<open>The Translation\<close>
 
 
 
-fun translate_syn where
-  "translate_syn \<Gamma> F Cskip = (stmt.Skip, {})"
-| "translate_syn \<Gamma> F (Cassign x e) = (stmt.LocalAssign x (translate_exp e), {})"
+fun translate_syn :: "cmd \<Rightarrow> stmt \<times> stmt set"
+  where
+  "translate_syn Cskip = (stmt.Skip, {})"
+| "translate_syn (Cassign x e) = (stmt.LocalAssign x (translate_exp e), {})"
 
-| "translate_syn \<Gamma> F (Calloc r e) = ((stmt.Seq (stmt.Havoc r)
+| "translate_syn (Calloc r e) = ((stmt.Seq (stmt.Havoc r)
   (stmt.Inhale (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1)))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))), {}))"
 
-| "translate_syn \<Gamma> F (Cfree r) = (stmt.Exhale (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1))))), {})"
+| "translate_syn (Cfree r) = (stmt.Exhale (Atomic (Acc (Var r) field_val (PureExp (ELit (LPerm 1))))), {})"
 
-| "translate_syn \<Gamma> F (Cwrite r e) = (stmt.FieldAssign (syntactic_translate_addr r) field_val (translate_exp e), {})"
+| "translate_syn (Cwrite r e) = (stmt.FieldAssign (syntactic_translate_addr r) field_val (translate_exp e), {})"
 
-| "translate_syn \<Gamma> F (Cread x r) = (stmt.LocalAssign x (syntactic_translate_heap_loc r), {})"
+| "translate_syn (Cread x r) = (stmt.LocalAssign x (syntactic_translate_heap_loc r), {})"
 
-| "translate_syn \<Gamma> F (Cseq C1 C2) = (let r1 = translate_syn \<Gamma> F C1 in let r2 = translate_syn \<Gamma> F C2 in
+| "translate_syn (Cseq C1 C2) = (let r1 = translate_syn C1 in let r2 = translate_syn C2 in
   (stmt.Seq (fst r1) (fst r2), snd r1 \<union> snd r2))"
 
-| "translate_syn \<Gamma> F (Cif b C1 C2) =
-  (stmt.If (translate_bexp b) (fst (translate_syn \<Gamma> F C1)) (fst (translate_syn \<Gamma> F C2)), snd (translate_syn \<Gamma> F C1) \<union> snd (translate_syn \<Gamma> F C2))"
+| "translate_syn (Cif b C1 C2) =
+  (stmt.If (translate_bexp b) (fst (translate_syn C1)) (fst (translate_syn C2)), snd (translate_syn C1) \<union> snd (translate_syn C2))"
 
-| "translate_syn \<Gamma> F ({P1} C1 {Q1} || {P2} C2 {Q2}) =
+| "translate_syn ({P1} C1 {Q1} || {P2} C2 {Q2}) =
   (stmt.Seq (stmt.Seq
     (stmt.Exhale (P1 && P2))
     (n_havoc (wrL C1 @ wrL C2)))
     (stmt.Inhale (Q1 && Q2)),
-  let r1 = translate_syn \<Gamma> F C1 in let r2 = translate_syn \<Gamma> F C2 in
+  let r1 = translate_syn C1 in let r2 = translate_syn C2 in
   { stmt.Seq (stmt.Seq (stmt.Inhale P1) (fst r1)) (stmt.Exhale Q1),
     stmt.Seq (stmt.Seq (stmt.Inhale P2) (fst r2)) (stmt.Exhale Q2)}
     \<union> snd r1 \<union> snd r2)"
 
-| "translate_syn \<Gamma> F (Cwhile b I C) =
+| "translate_syn (Cwhile b I C) =
   (stmt.Seq (stmt.Seq (stmt.Exhale I) (n_havoc (wrL C))) (stmt.Inhale (I && Atomic (Pure (Unop Not (translate_bexp b))))),
-  { stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn \<Gamma> F C))) (stmt.Exhale I) }
-  \<union> snd (translate_syn \<Gamma> F C))"
+  { stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn C))) (stmt.Exhale I) }
+  \<union> snd (translate_syn C))"
 
 
 
@@ -424,18 +423,18 @@ lemma in_starE:
 
 (*
 definition red_pure_assert ::  "('a, 'a virtual_state) interp \<Rightarrow> pure_exp \<Rightarrow> 'a extended_val \<Rightarrow> 'a equi_state set" ("_ \<turnstile> ((\<langle>_\<rangle>) [\<Down>] _)" [51,0,0] 81) where
-"red_pure_assert \<Gamma> e r = corely {\<omega>. \<Gamma> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r}"
+"red_pure_assert \<Gamma> e r = corely {\<omega>. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r}"
 *)
 
 lemma red_pure_varE:
-  assumes "\<Gamma> \<turnstile> \<langle>Var r; \<omega>\<rangle> [\<Down>] Val v"
+  assumes "\<Delta> \<turnstile> \<langle>Var r; \<omega>\<rangle> [\<Down>] Val v"
       and "get_store \<omega> r = Some v \<Longrightarrow> P"
     shows "P"
   using RedVar2Val_case assms(1) assms(2) by blast
 
 
 lemma red_pure_litE:
-  assumes "\<Gamma> \<turnstile> \<langle>ELit (LPerm p); \<omega>\<rangle> [\<Down>] Val (VPerm p')"
+  assumes "\<Delta> \<turnstile> \<langle>ELit (LPerm p); \<omega>\<rangle> [\<Down>] Val (VPerm p')"
       and "p = p' \<Longrightarrow> P"
     shows "P"
   using assms(1)
@@ -536,7 +535,7 @@ lemma in_up_close_core_stabilize :
 
 
 lemma verifies_more_free:
-  assumes "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
+  assumes "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
   shows "a \<in> Stabilize (full_ownership r)"
   using assms
   apply (clarsimp simp add:full_ownership_def make_semantic_assertion_gen_def)
@@ -570,24 +569,24 @@ lemma get_vh_stabilize_implies_normal:
 
 
 definition eval_pure_exp where
-  "eval_pure_exp \<Gamma> e \<omega> = (SOME v. \<Gamma> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v)"
+  "eval_pure_exp \<Delta> e \<omega> = (SOME v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v)"
 
 lemma eval_pure_exp_works:
-  assumes "\<Gamma> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v"
-  shows "eval_pure_exp \<Gamma> e \<omega> = v"
+  assumes "\<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v"
+  shows "eval_pure_exp \<Delta> e \<omega> = v"
   by (simp add: assms eval_pure_exp_def red_pure_val_unique(1) some_equality)
 
 lemma equality_edenot:
   assumes "typed_exp tys e"
-      and "typed (tcfe tys) a"
-    shows "\<Gamma> \<turnstile> \<langle>translate_exp e; a\<rangle> [\<Down>] Val (VInt (edenot e (get_store a)))"
+      and "typed (tcfe \<Delta> tys) a"
+    shows "\<Delta> \<turnstile> \<langle>translate_exp e; a\<rangle> [\<Down>] Val (VInt (edenot e (get_store a)))"
   using assms
 proof (induct e)
   case (Evar x)
-  moreover have "store_typed (variables (tcfe tys)) (get_store a)"
+  moreover have "store_typed (variables (tcfe \<Delta> tys)) (get_store a)"
     using Evar.prems(2) TypedEqui.typed_def TypedEqui.typed_store_def by blast
   ultimately obtain v where "get_store a x = Some (VInt v)"
-    using store_typed_lookup[of "variables (tcfe tys)" "get_store a" x]
+    using store_typed_lookup[of "variables (tcfe \<Delta> tys)" "get_store a" x]
     unfolding type_ctxt_front_end_def type_ctxt_store_def apply simp
     by (smt (verit) CollectD vints_def)
   then show ?case
@@ -608,22 +607,22 @@ qed
 
 lemma typed_exp_then_int_value:
   assumes "typed_exp tys e"
-      and "typed (tcfe tys) a"
-    shows "\<exists>v. \<Gamma> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val (VInt v)"
+      and "typed (tcfe \<Delta> tys) a"
+    shows "\<exists>v. \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val (VInt v)"
   using assms(1) assms(2) equality_edenot by blast
 
 
 lemma typed_exp_then_value:
   assumes "typed_exp tys e"
-      and "typed (tcfe tys) a"
-    shows "\<exists>v. \<Gamma> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val v"
+      and "typed (tcfe \<Delta> tys) a"
+    shows "\<exists>v. \<Delta> \<turnstile> \<langle>translate_exp e;a\<rangle> [\<Down>] Val v"
   using assms(1) assms(2) typed_exp_then_int_value by blast
 
 
 lemma equality_bdenot:
   assumes "typed_bexp tys b"
-      and "typed (tcfe tys) a"
-    shows "\<Gamma> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool (bdenot b (get_store a)))"
+      and "typed (tcfe \<Delta> tys) a"
+    shows "\<Delta> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool (bdenot b (get_store a)))"
   using assms
 proof (induct b)
   case (Beq e1 e2)
@@ -643,9 +642,9 @@ qed
 
 lemma equality_bdenot_2:
   assumes "typed_bexp tys b"
-      and "typed (tcfe tys) a"
+      and "typed (tcfe \<Delta> tys) a"
       and "x = (bdenot b (get_store a))" 
-    shows "\<Gamma> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool x)"
+    shows "\<Delta> \<turnstile> \<langle>translate_bexp b; a\<rangle> [\<Down>] Val (VBool x)"
   using assms equality_bdenot by blast
 
 lemma sum_empty_and_same:
@@ -687,10 +686,10 @@ lemma core_in_corely [simp] :
 
 lemma verifies_more_alloc:
   assumes "typed_exp tys e"
-      and "r \<in> dom (variables (tcfe tys))"
-      and "typed (tcfe tys) a"
+      and "r \<in> dom (variables (tcfe \<Delta> tys))"
+      and "typed (tcfe \<Delta> tys) a"
       and "a \<in> Stabilize (full_ownership_with_val r e)"
-    shows "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
   using assms
   apply (clarsimp simp add:make_semantic_assertion_gen_def full_ownership_with_val_def)
   apply (simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
@@ -718,65 +717,65 @@ lemma verifies_more_alloc:
   done
 
 lemma verifies_more_translation_while_exhale:
-  assumes "typed (tcfe tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) I"
-    shows "a \<in> inhalify tys (make_semantic_assertion_untyped \<Gamma> (tcfes tys) I)"
+  assumes "typed (tcfe \<Delta> tys) a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
+    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)"
   using assms unfolding make_semantic_assertion_gen_def apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 lemma verifies_more_inter_star_pure:
-  assumes "typed (tcfe tys) a"
+  assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) I \<inter> assertify_bexp b"
-    shows "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
   using assms apply (clarsimp simp add:make_semantic_assertion_gen_def assertify_bexp_def)
   apply (rule add_setI_core_r; simp?)
   apply (simp add:red_pure_assert_def)
   apply (rule equality_bdenot_2)
     apply simp_all
-  by (simp add:TypedEqui.typed_core)
+  using TypedEqui.typed_core[of "tcfe \<Delta> tys" a] by auto
 
 lemma verifies_more_translation_while_inhale:
-  assumes "typed (tcfe tys) a"
+  assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) I \<inter> assertify_bexp (Bnot b)"
-    shows "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp (Bnot b)"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
   using assms verifies_more_inter_star_pure
   by (metis translate_bexp.simps(3) typed_bexp.simps(3))
 
 
 lemma verifies_more_translation_parallel_exhale:
-  assumes "typed (tcfe tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (P1 && P2)"
-    shows "a \<in> inhalify tys
-               (make_semantic_assertion_untyped \<Gamma> (tcfes tys) P1 \<otimes> make_semantic_assertion_untyped \<Gamma> (tcfes tys) P2)"
+  assumes "typed (tcfe \<Delta> tys) a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (P1 && P2)"
+    shows "a \<in> inhalify \<Delta> tys
+               (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) P2)"
   using assms unfolding make_semantic_assertion_gen_def apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 
 
 lemma verifies_more_translation_parallel_inhale:
-  assumes "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2"
-    shows "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (Q1 && Q2)"
+  assumes "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Q1 && Q2)"
   using assms unfolding make_semantic_assertion_gen_def by simp
 
 
 lemma verifies_more_while_snd_exhale:
-  assumes "typed (tcfe tys) a"
+  assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) I \<inter> assertify_bexp b"
-    shows "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
+    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
   using assms verifies_more_inter_star_pure by fastforce
 
 lemma verifies_more_while_snd_exhale_bis:
-  assumes "typed (tcfe tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Gamma> (tcfes tys) I"
-    shows "a \<in> inhalify tys (make_semantic_assertion_untyped \<Gamma> (tcfes tys) I)"
+  assumes "typed (tcfe \<Delta> tys) a"
+      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
+    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)"
   using assms apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 lemma n_havoc_same:
-  "ConcreteSemantics.havoc_list l = compile False \<Gamma> F (n_havoc l)"
+  "ConcreteSemantics.havoc_list l = compile False \<Delta> F (n_havoc l)"
   by (induct l) simp_all
 
 lemma self_framing_inter[simp]:
@@ -802,11 +801,11 @@ lemma and_binop_false_lazy:
 
 
 lemma semantify_bexp_band:
-  assumes "make_semantic_bexp \<Gamma> (Binop (translate_bexp b1) And (translate_bexp b2)) \<omega> = Some v"
+  assumes "make_semantic_bexp \<Delta> (Binop (translate_bexp b1) And (translate_bexp b2)) \<omega> = Some v"
       and "typed_bexp tys b1 \<and> typed_bexp tys b2"
-      and "typed (tcfe tys) \<omega>"
-  shows "\<exists>v1 v2. v = (v1 \<and> v2) \<and> make_semantic_bexp \<Gamma> (translate_bexp b1) \<omega> = Some v1 \<and> make_semantic_bexp \<Gamma> (translate_bexp b2) \<omega> = Some v2"
-proof (cases "\<Gamma> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool True)")
+      and "typed (tcfe \<Delta> tys) \<omega>"
+  shows "\<exists>v1 v2. v = (v1 \<and> v2) \<and> make_semantic_bexp \<Delta> (translate_bexp b1) \<omega> = Some v1 \<and> make_semantic_bexp \<Delta> (translate_bexp b2) \<omega> = Some v2"
+proof (cases "\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool True)")
   case True
   then show ?thesis
     apply (rule red_pure_elim(4))
@@ -815,24 +814,24 @@ proof (cases "\<Gamma> \<turnstile> \<langle>Binop (translate_bexp b1) And (tran
     by simp_all
 next
   case False
-  then have "(\<Gamma> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool False))"
+  then have "(\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2); \<omega>\<rangle> [\<Down>] Val (VBool False))"
     by (metis (full_types) assms(1) make_semantic_bexp_Some)
   then show ?thesis
     apply (rule red_pure_elim(4))
         apply simp_all
   proof -
-    fix v1 assume asm0: "\<Gamma> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1" "eval_binop_lazy v1 And = Some (VBool False)"
+    fix v1 assume asm0: "\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1" "eval_binop_lazy v1 And = Some (VBool False)"
     then have "v1 = VBool False"
       using and_binop_false_lazy by blast
     then
-    show "\<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Gamma> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Gamma> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
-      by (metis False \<open>\<Gamma> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2);\<omega>\<rangle> [\<Down>] Val (VBool False)\<close> asm0(1) assms(1) assms(2) assms(3) equality_bdenot_2 make_semantic_bexp_def option.inject)
+    show "\<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
+      by (metis False \<open>\<Delta> \<turnstile> \<langle>Binop (translate_bexp b1) And (translate_bexp b2);\<omega>\<rangle> [\<Down>] Val (VBool False)\<close> asm0(1) assms(1) assms(2) assms(3) equality_bdenot_2 make_semantic_bexp_def option.inject)
   next
     show "\<And>v1 v2.
-       \<Gamma> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1 \<Longrightarrow>
-       \<Gamma> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val v2 \<Longrightarrow>
+       \<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val v1 \<Longrightarrow>
+       \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val v2 \<Longrightarrow>
        eval_binop v1 And v2 = BinopNormal (VBool False) \<Longrightarrow>
-       \<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Gamma> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Gamma> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
+       \<exists>v1 v2. v = (v1 \<and> v2) \<and> (\<Delta> \<turnstile> \<langle>translate_bexp b1;\<omega>\<rangle> [\<Down>] Val (VBool v1)) \<and> \<Delta> \<turnstile> \<langle>translate_bexp b2;\<omega>\<rangle> [\<Down>] Val (VBool v2)"
       by (smt (z3) RedBinop assms(1) assms(2) assms(3) equality_bdenot_2 eval_binop.simps(3) eval_bool_bool.simps(4) make_semantic_bexp_Some)
   qed
 qed
@@ -844,15 +843,15 @@ lemma vint_binop_eq:
 
 
 lemma semantify_bexp_beq:
-  assumes "make_semantic_bexp \<Gamma> (Binop (translate_exp e1) Eq (translate_exp e2)) \<omega> = Some v"
+  assumes "make_semantic_bexp \<Delta> (Binop (translate_exp e1) Eq (translate_exp e2)) \<omega> = Some v"
       and "typed_exp tys e1 \<and> typed_exp tys e2"
-      and "typed (tcfe tys) \<omega>"
+      and "typed (tcfe \<Delta> tys) \<omega>"
 
-  shows "\<exists>v1 v2. v = (v1 = v2) \<and> make_semantic_exp \<Gamma> (translate_exp e1) \<omega> = Some v1 \<and> make_semantic_exp \<Gamma> (translate_exp e2) \<omega> = Some v2"
+  shows "\<exists>v1 v2. v = (v1 = v2) \<and> make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1 \<and> make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2"
 proof -
-  obtain v1 v2 where "\<Gamma> \<turnstile> \<langle>translate_exp e1; \<omega>\<rangle> [\<Down>] Val (VInt v1)" "\<Gamma> \<turnstile> \<langle>translate_exp e2; \<omega>\<rangle> [\<Down>] Val (VInt v2)"
+  obtain v1 v2 where "\<Delta> \<turnstile> \<langle>translate_exp e1; \<omega>\<rangle> [\<Down>] Val (VInt v1)" "\<Delta> \<turnstile> \<langle>translate_exp e2; \<omega>\<rangle> [\<Down>] Val (VInt v2)"
     by (meson assms(2) assms(3) typed_exp_then_int_value)
-  moreover have "\<Gamma> \<turnstile> \<langle>Binop (translate_exp e1) Eq (translate_exp e2);\<omega>\<rangle> [\<Down>] Val (VBool v)"
+  moreover have "\<Delta> \<turnstile> \<langle>Binop (translate_exp e1) Eq (translate_exp e2);\<omega>\<rangle> [\<Down>] Val (VBool v)"
     using assms(1) by force
   then show ?thesis
     apply (rule red_pure_elim)
@@ -863,34 +862,39 @@ qed
 
 lemma bexp_refined_by:
   assumes "typed_bexp tys b"
-  shows "exp_refined_by (tcfe tys) (semantify_bexp b) (make_semantic_bexp \<Gamma> (translate_bexp b))"
+  shows "exp_refined_by (tcfe \<Delta> tys) (semantify_bexp b) (make_semantic_bexp \<Delta> (translate_bexp b))"
 proof (rule exp_refined_byI)
-  fix \<omega> v assume asm0: "sep_algebra_class.stable \<omega>" "typed (tcfe tys) \<omega>"
-  have "typed_bexp tys b \<Longrightarrow> make_semantic_bexp \<Gamma> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v"
+  fix \<omega> v assume asm0: "sep_algebra_class.stable \<omega>" "typed (tcfe \<Delta> tys) \<omega>"
+  have "typed_bexp tys b \<Longrightarrow> make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v"
   proof (induct b arbitrary: v)
     case (Beq e1 e2)
-    then obtain v1 v2 where "v = (v1 = v2)" "make_semantic_exp \<Gamma> (translate_exp e1) \<omega> = Some v1"
-      "make_semantic_exp \<Gamma> (translate_exp e2) \<omega> = Some v2"
+    then obtain v1 v2 where "v = (v1 = v2)" "make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1"
+      "make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2"
       by (metis asm0(2) semantify_bexp_beq translate_bexp.simps(1) typed_bexp.simps(1))
     then have "semantify_exp e1 \<omega> = Some v1 \<and> semantify_exp e2 \<omega> = Some v2"
       by (meson Beq.prems(1) asm0(1) asm0(2) exp_refined_byE exp_refined_by_int typed_bexp.simps(1))
     then show ?case
-      using \<open>\<And>thesis. (\<And>v1 v2. \<lbrakk>v = (v1 = v2); make_semantic_exp \<Gamma> (translate_exp e1) \<omega> = Some v1; make_semantic_exp \<Gamma> (translate_exp e2) \<omega> = Some v2\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> \<open>make_semantic_exp \<Gamma> (translate_exp e1) \<omega> = Some v1\<close> \<open>make_semantic_exp \<Gamma> (translate_exp e2) \<omega> = Some v2\<close> semantify_bexp_def semantify_exp_def by auto
+      unfolding semantify_bexp_def semantify_exp_def
+
+      using \<open>\<And>thesis. (\<And>v1 v2. \<lbrakk>v = (v1 = v2); make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1; make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close>
+        \<open>make_semantic_exp \<Delta> (translate_exp e1) \<omega> = Some v1\<close> \<open>make_semantic_exp \<Delta> (translate_exp e2) \<omega> = Some v2\<close>
+semantify_bexp_def semantify_exp_def
+      by auto
   next
     case (Band b1 b2)
-    then obtain v1 v2 where "v = (v1 \<and> v2)" "make_semantic_bexp \<Gamma> (translate_bexp b1) \<omega> = Some v1"
-      "make_semantic_bexp \<Gamma> (translate_bexp b2) \<omega> = Some v2"
+    then obtain v1 v2 where "v = (v1 \<and> v2)" "make_semantic_bexp \<Delta> (translate_bexp b1) \<omega> = Some v1"
+      "make_semantic_bexp \<Delta> (translate_bexp b2) \<omega> = Some v2"
       by (smt (z3) asm0(2) semantify_bexp_band translate_bexp.simps(2) typed_bexp.simps(2))
     then show ?case 
       by (smt (verit) Band.hyps(1) Band.hyps(2) Band.prems(1) bdenot.simps(2) semantify_bexp_def typed_bexp.simps(2))
   next
     case (Bnot b)
-    then have "make_semantic_bexp \<Gamma> (translate_bexp b) \<omega> = Some (\<not> v)"
+    then have "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some (\<not> v)"
       by (metis semantify_bexp_bnot translate_bexp.simps(3))
     then show ?case
       by (metis (full_types) Bnot.hyps Bnot.prems(1) bdenot.simps(3) semantify_bexp_def typed_bexp.simps(3))
   qed
-  then show "make_semantic_bexp \<Gamma> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v" using assms by blast
+  then show "make_semantic_bexp \<Delta> (translate_bexp b) \<omega> = Some v \<Longrightarrow> semantify_bexp b \<omega> = Some v" using assms by blast
 qed
 
 
@@ -898,9 +902,9 @@ qed
 (*
 
 lemma sound_translate_heap_loc:
-  "make_semantic_exp \<Gamma> (syntactic_translate_heap_loc r) = semantify_heap_loc r"
+  "make_semantic_exp \<Delta> (syntactic_translate_heap_loc r) = semantify_heap_loc r"
 proof (rule ext)
-  fix \<omega> show "make_semantic_exp \<Gamma> (syntactic_translate_heap_loc r) \<omega> = semantify_heap_loc r \<omega>"
+  fix \<omega> show "make_semantic_exp \<Delta> (syntactic_translate_heap_loc r) \<omega> = semantify_heap_loc r \<omega>"
     unfolding make_semantic_exp_def syntactic_translate_heap_loc_def semantify_heap_loc_def
     sledgehammer
 
@@ -920,24 +924,24 @@ lemma simplify_if_some_none:
   by (metis option.discI option.inject)
 
 lemma sound_translate_read_heap_loc:
-  assumes "custom_context (tcfe tys) = type_ctxt_heap"
-    shows "exp_refined_by (tcfe tys) (semantify_heap_loc x2) (make_semantic_exp \<Gamma> (syntactic_translate_heap_loc x2))"
+  assumes "custom_context (tcfe \<Delta> tys) = type_ctxt_heap"
+    shows "exp_refined_by (tcfe \<Delta> tys) (semantify_heap_loc x2) (make_semantic_exp \<Delta> (syntactic_translate_heap_loc x2))"
   apply (rule exp_refined_byI)
   unfolding make_semantic_exp_def syntactic_translate_heap_loc_def semantify_heap_loc_def
   apply (erule simplify_if_some_none[elim_format])
   subgoal for \<omega> v
-    using someI_ex[of "\<lambda>v. \<Gamma> \<turnstile> \<langle>FieldAcc (Var x2) field_val;\<omega>\<rangle> [\<Down>] Val v"]
+    using someI_ex[of "\<lambda>v. \<Delta> \<turnstile> \<langle>FieldAcc (Var x2) field_val;\<omega>\<rangle> [\<Down>] Val v"]
     apply simp
-    using  typed_get_vh[of "tcfe tys" \<omega>]
+    using  typed_get_vh[of "tcfe \<Delta> tys" \<omega>]
   by (smt (verit, del_insts) RedAccField2Val_case RedVar assms(1) get_address_simp mem_Collect_eq option.sel red_pure_val_unique(1) red_pure_varE semantify_addr_equiv snd_conv someI_ex type_ctxt_heap_def vints_def)
   done
 
 lemma translation_refinement_main:
   assumes "well_typed_cmd tys C"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe tys) (fst (translate tys \<Gamma> C))"
-      and "wf_stmt tys \<Gamma> C"
+      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+      and "wf_stmt \<Delta> tys C"
 (* TODO: Understand the type contexts of verifies_more, translate, compile, translate_syn *)
-  shows "verifies_more (tcfe tys) (fst (translate tys \<Gamma> C)) (compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C)))"
+  shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
   using assms
 proof (induct C)
   case Cskip
@@ -946,8 +950,13 @@ next
   case (Cassign x e)
   then show ?case
     apply simp
-    apply (rule verifies_more_local_assign[of _ "semantify_exp e" "make_semantic_exp \<Gamma> (translate_exp e)" x])
-    apply (rule exp_refined_by_int[of _ e])
+    apply (rule verifies_more_local_assign)
+(*
+lemma exp_refined_by_int:
+  assumes "typed_exp tys e"
+  shows "exp_refined_by (tcfe \<Delta> tys) (semantify_exp e) (make_semantic_exp \<Delta> (translate_exp e))"*
+*)
+    apply (rule exp_refined_by_int)
     by blast
 next
   case (Cread x1 x2)
@@ -982,8 +991,8 @@ next
   case (Cseq C1 C2)
   then show ?case
     apply (simp add:)
-    apply (subgoal_tac "verifies_more (tcfe tys) (fst (translate tys \<Gamma> C1) ;; fst (translate tys \<Gamma> C2))
-     (Seq (compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C1))) (compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C2))))")
+    apply (subgoal_tac "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C1) ;; fst (translate \<Delta> tys C2))
+     (Seq (compile False \<Delta> (tcfes tys) (fst (translate_syn C1))) (compile False \<Delta> (tcfes tys) (fst (translate_syn C2))))")
      apply (metis compile.simps(3) fst_eqD)
     apply (rule verifies_more_seq)
     by (metis ConcreteSemantics.wf_abs_stmt.simps(7) fst_eqD)+
@@ -1029,7 +1038,7 @@ qed
 
 
 lemma simplified_snd_if[simp]:
-  "snd (translate tys \<Gamma> (Cif b C1 C2)) = snd (translate tys \<Gamma> C1) \<union> snd (translate tys \<Gamma> C2)"
+  "snd (translate \<Delta> tys (Cif b C1 C2)) = snd (translate \<Delta> tys C1) \<union> snd (translate \<Delta> tys C2)"
   by simp
 
 
@@ -1039,18 +1048,18 @@ lemma simplified_snd_if[simp]:
 
 lemma translation_refinement_snd:
   assumes "well_typed_cmd tys C"
-      and "wf_stmt tys \<Gamma> C"
-      and "\<And>Cv. Cv \<in> snd (translate tys \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe tys) Cv"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe tys) (fst (translate tys \<Gamma> C))"
-      and "Csem \<in> snd (translate tys \<Gamma> C)"
-    shows "\<exists>Csyn \<in> snd (translate_syn \<Gamma> (tcfes tys) C). verifies_more (tcfe tys) Csem (compile False \<Gamma> (tcfes tys) Csyn)"
+      and "wf_stmt \<Delta> tys C"
+      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+      and "Csem \<in> snd (translate \<Delta> tys C)"
+    shows "\<exists>Csyn \<in> snd (translate_syn C). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
   using assms
 proof (induct C arbitrary: )
   case (Cseq C1 C2)
   show ?case
-  proof (cases "Csem \<in> snd (translate tys \<Gamma> C1)")
+  proof (cases "Csem \<in> snd (translate \<Delta> tys C1)")
     case True
-    have "\<exists>Csyn\<in>snd (translate_syn \<Gamma> (tcfes tys) C1). verifies_more (tcfe tys) Csem (compile False \<Gamma> (tcfes tys) Csyn)"
+    have "\<exists>Csyn\<in>snd (translate_syn C1). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
       apply (rule Cseq(1))
       using Cseq.prems(1) apply fastforce
       using Cseq.prems(2) apply force
@@ -1061,7 +1070,7 @@ proof (induct C arbitrary: )
       by (metis Un_iff snd_conv translate_syn.simps(7))
   next
     case False
-    have "\<exists>Csyn\<in>snd (translate_syn \<Gamma> (tcfes tys) C2). verifies_more (tcfe tys) Csem (compile False \<Gamma> (tcfes tys) Csyn)"
+    have "\<exists>Csyn\<in>snd (translate_syn C2). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
       apply (rule Cseq(2))
       using Cseq.prems(1) apply fastforce
       using Cseq.prems(2) apply force
@@ -1074,32 +1083,32 @@ proof (induct C arbitrary: )
 next
   case (Cpar P1 C1 Q1 P2 C2 Q2)
   then show ?case
-    apply (cases "Csem \<in> snd (translate tys \<Gamma> C1)")
+    apply (cases "Csem \<in> snd (translate \<Delta> tys C1)")
      apply (simp add:)
      apply (metis (no_types, lifting) ConcreteSemantics.wf_abs_stmt.simps(7) Un_iff insertCI)
-    apply (cases "Csem \<in> snd (translate tys \<Gamma> C2)")
+    apply (cases "Csem \<in> snd (translate \<Delta> tys C2)")
      apply (simp add:)
      apply (metis (no_types, lifting) ConcreteSemantics.wf_abs_stmt.simps(7) Un_iff insertCI)
 
   proof -
 
-    let ?P1 = "make_semantic_assertion_untyped \<Gamma> (tcfes tys) P1"
-    let ?Q1 = "make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1"
-    let ?P2 = "make_semantic_assertion_untyped \<Gamma> (tcfes tys) P2"
-    let ?Q2 = "make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2"
+    let ?P1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P1"
+    let ?Q1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1"
+    let ?P2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P2"
+    let ?Q2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
 
-    assume asm0: "well_typed_cmd tys {P1} C1 {Q1} || {P2} C2 {Q2}" "wf_stmt tys \<Gamma> ({P1} C1 {Q1} || {P2} C2 {Q2})"
-      "\<And>Cv. Cv \<in> snd (translate tys \<Gamma> {P1} C1 {Q1} || {P2} C2 {Q2}) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe tys) Cv"
-      "Csem \<in> snd (translate tys \<Gamma> {P1} C1 {Q1} || {P2} C2 {Q2})" "Csem \<notin> snd (translate tys \<Gamma> C1)"
-    "Csem \<notin> snd (translate tys \<Gamma> C2)" "ConcreteSemantics.wf_abs_stmt (tcfe tys) (fst (translate tys \<Gamma> {P1} C1 {Q1} || {P2} C2 {Q2}))"
+    assume asm0: "well_typed_cmd tys {P1} C1 {Q1} || {P2} C2 {Q2}" "wf_stmt \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2})"
+      "\<And>Cv. Cv \<in> snd (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2}) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+      "Csem \<in> snd (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2})" "Csem \<notin> snd (translate \<Delta> tys C1)"
+    "Csem \<notin> snd (translate \<Delta> tys C2)" "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2}))"
 
 
-    then have "Csem = (Inhale ?P1;; fst (translate tys \<Gamma> C1);; Exhale (inhalify tys ?Q1)) \<or> Csem = (Inhale ?P2;; fst (translate tys \<Gamma> C2);; Exhale (inhalify tys ?Q2))"
+    then have "Csem = (Inhale ?P1;; fst (translate \<Delta> tys C1);; Exhale (inhalify \<Delta> tys ?Q1)) \<or> Csem = (Inhale ?P2;; fst (translate \<Delta> tys C2);; Exhale (inhalify \<Delta> tys ?Q2))"
       using asm0 translate.simps(9)[of _ _ P1 C1 Q1 P2 C2 Q2]
       by (simp add: Let_def)
 
 
-    moreover have "verifies_more (tcfe tys) (Inhale ?P1;; fst (translate tys \<Gamma> C1);; Exhale (inhalify tys ?Q1)) (compile False \<Gamma> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P1) (fst (translate_syn \<Gamma> (tcfes tys) C1))) (stmt.Exhale Q1)))"
+    moreover have "verifies_more (tcfe \<Delta> tys) (Inhale ?P1;; fst (translate \<Delta> tys C1);; Exhale (inhalify \<Delta> tys ?Q1)) (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P1) (fst (translate_syn C1))) (stmt.Exhale Q1)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1119,8 +1128,8 @@ next
        apply (simp add: TypedEqui.typed_state_then_stabilize_typed)
       by (meson ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(7) insertI1)
 
-    moreover have "verifies_more (tcfe tys) (Inhale ?P2;; fst (translate tys \<Gamma> C2);; Exhale (inhalify tys ?Q2))
-    (compile False \<Gamma> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P2) (fst (translate_syn \<Gamma> (tcfes tys) C2))) (stmt.Exhale Q2)))"
+    moreover have "verifies_more (tcfe \<Delta> tys) (Inhale ?P2;; fst (translate \<Delta> tys C2);; Exhale (inhalify \<Delta> tys ?Q2))
+    (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P2) (fst (translate_syn C2))) (stmt.Exhale Q2)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1138,38 +1147,38 @@ next
        apply (rule verifies_more_exhale)
        apply (simp add: TypedEqui.typed_state_then_stabilize_typed)
       by (meson ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(7) insertCI)
-    ultimately show "\<exists>Csyn\<in>snd (translate_syn \<Gamma> (tcfes tys) {P1} C1 {Q1} || {P2} C2 {Q2}). verifies_more (tcfe tys) Csem (compile False \<Gamma> (tcfes tys) Csyn)"
+    ultimately show "\<exists>Csyn\<in>snd (translate_syn {P1} C1 {Q1} || {P2} C2 {Q2}). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
       unfolding translate_syn.simps Let_def
       by force
   qed
 next
   case (Cif b C1 C2)
   then show ?case
-    apply (cases "Csem \<in> snd (translate tys \<Gamma> C1)")
+    apply (cases "Csem \<in> snd (translate \<Delta> tys C1)")
     apply simp
-    using Cif(1) Cif.prems translate_syn.simps(8)[of _ _ b C1 C2]
+    using Cif(1) Cif.prems translate_syn.simps(8)[of b C1 C2]
      apply blast
     apply simp
-    using Cif(2) Cif.prems translate_syn.simps(8)[of _ _ b C1 C2]
+    using Cif(2) Cif.prems translate_syn.simps(8)[of b C1 C2]
     by blast
 next
   case (Cwhile b I C)
   then show ?case
-    apply (cases "Csem \<in> snd (translate tys \<Gamma> C)")
+    apply (cases "Csem \<in> snd (translate \<Delta> tys C)")
      apply simp
      apply fastforce
   proof -
-    assume asm0: "well_typed_cmd tys (Cwhile b I C)" "wf_stmt tys \<Gamma> (Cwhile b I C)"
-    "\<And>Cv. Cv \<in> snd (translate tys \<Gamma> (Cwhile b I C)) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe tys) Cv"
-    "Csem \<in> snd (translate tys \<Gamma> (Cwhile b I C))" "Csem \<notin> snd (translate tys \<Gamma> C)"
+    assume asm0: "well_typed_cmd tys (Cwhile b I C)" "wf_stmt \<Delta> tys (Cwhile b I C)"
+    "\<And>Cv. Cv \<in> snd (translate \<Delta> tys (Cwhile b I C)) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+    "Csem \<in> snd (translate \<Delta> tys (Cwhile b I C))" "Csem \<notin> snd (translate \<Delta> tys C)"
 
-    let ?I = "make_semantic_assertion_untyped \<Gamma> (tcfes tys) I"
+    let ?I = "make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
 
-    have r: "Csem = Inhale (?I \<inter> assertify_bexp b);; fst (translate tys \<Gamma> C);; Exhale (inhalify tys ?I)"
+    have r: "Csem = Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys ?I)"
       using asm0 by simp
 
-    have "verifies_more (tcfe tys) (Inhale (?I \<inter> assertify_bexp b);; fst (translate tys \<Gamma> C);; Exhale (inhalify tys ?I))
-  (compile False \<Gamma> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn \<Gamma> (tcfes tys) C))) (stmt.Exhale I)))"
+    have "verifies_more (tcfe \<Delta> tys) (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys ?I))
+  (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn C))) (stmt.Exhale I)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1186,7 +1195,7 @@ next
       apply (metis verifies_more_while_snd_exhale_bis)
       using ConcreteSemantics.wf_abs_stmt.simps(7) asm0(3) asm0(4) r
       by blast
-    then show "\<exists>Csyn\<in>snd (translate_syn \<Gamma> (tcfes tys) (Cwhile b I C)). verifies_more (tcfe tys) Csem (compile False \<Gamma> (tcfes tys) Csyn)"
+    then show "\<exists>Csyn\<in>snd (translate_syn (Cwhile b I C)). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
       using asm0 by simp
   qed
 qed (simp_all)
@@ -1194,11 +1203,11 @@ qed (simp_all)
 
 theorem translation_refinement_syntactic_semantic:
   assumes "well_typed_cmd tys C"
-      and "wf_stmt tys \<Gamma> C"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe tys) (fst (translate tys \<Gamma> C))"
-      and "\<And>Cv. Cv \<in> snd (translate tys \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe tys) Cv"
-    shows "verifies_more (tcfe tys) (fst (translate tys \<Gamma> C)) (compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C)))"
-      and "verifies_more_set (tcfe tys) (snd (translate tys \<Gamma> C)) (compile False \<Gamma> (tcfes tys) ` (snd (translate_syn \<Gamma> (tcfes tys) C)))"
+      and "wf_stmt \<Delta> tys C"
+      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+    shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
+      and "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
   using assms(1) assms(2) assms(3) translation_refinement_main apply blast
   apply (rule verifies_more_setI)
   using translation_refinement_snd[OF assms(1) assms(2) assms(4) assms(3)]
@@ -1214,30 +1223,186 @@ lemma verifies_more_verifies:
   by (meson ConcreteSemantics.verifies_def assms(1) assms(2) assms(3) assms(4) verifies_moreE)
 
 
+
+
+lemma denot_mono:
+  assumes "a \<succeq> b"
+      and "Some (VInt (edenot e (get_store b))) = Some v"
+    shows "Some (VInt (edenot e (get_store a))) = Some v"
+  using assms
+  apply (induct e)
+    apply simp_all
+  apply (simp add: greater_charact)
+  by (simp add: greater_charact)
+
+lemma wf_exp_semantify[simp]:
+  "wf_exp (semantify_exp x2)"
+  unfolding semantify_exp_def
+  apply (rule wf_expI)
+   apply simp
+  using denot_mono by fast
+
+
+lemma typed_exp_semantify_vints[simp]:
+  "TypedEqui.typed_exp vints (semantify_exp x2)"
+  unfolding TypedEqui.typed_exp_def semantify_exp_def
+  by (simp add: vints_def)
+
+
+lemma wf_exp_semantify_heap_loc[simp]:
+  "wf_exp (semantify_heap_loc r)"
+  unfolding semantify_heap_loc_def
+  apply (rule wf_expI)
+   apply simp_all
+  apply (simp add: core_charact_equi(2) core_structure(2))
+  by (smt (z3) get_address_simp get_vh_Some_greater greater_cover_store option.discI option.sel some_eq_imp)
+
+
+lemma semantify_heap_loc_typed[simp]:
+  "TypedEqui.typed_exp vints (semantify_heap_loc r)"
+  unfolding semantify_heap_loc_def TypedEqui.typed_exp_def vints_def
+  apply simp
+  by force
+
+lemma wf_exp_semantify_addr[simp]:
+  "wf_exp (semantify_addr x1)"
+  unfolding semantify_addr_def
+  apply (rule wf_expI)
+  apply simp_all
+  by (metis (mono_tags, lifting) Eps_cong greater_charact_equi simplify_if_some_none)
+
+lemma type_ctxt_field_val[simp]:
+  "type_ctxt_heap field_val = Some vints"
+  unfolding type_ctxt_heap_def by auto
+
+lemma in_dom_type_ctxt_store:
+  assumes "x1 < length tys"
+    shows "x1 \<in> dom (type_ctxt_store \<Delta> tys)"
+  using assms unfolding type_ctxt_store_def by auto
+
+lemma wf_assertion_stabilize[simp]:
+  "TypedEqui.wf_assertion (Stabilize A)"
+  apply (rule TypedEqui.wf_assertionI)
+  by (simp add: pure_larger_stabilize_same)
+
+lemma wf_exp_semantify_bexp[simp]:
+  "wf_exp (semantify_bexp b)"
+  unfolding semantify_bexp_def
+  apply (rule wf_expI)
+  apply simp
+  by (metis greater_charact)
+
+lemma well_typed_cmd_all_written_vars_def:
+  assumes "well_typed_cmd tys C"
+  shows "set (wrL C) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
+  using assms
+  apply (induct C)
+  unfolding type_ctxt_store_def
+           apply simp_all
+  by force+
+
+lemma assertion_while_or_par_wf:
+  assumes "well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+    shows "set (wrL C1 @ wrL C2) \<subseteq> dom (type_ctxt_store \<Delta> tys)"
+  by (simp add: assms well_typed_cmd_all_written_vars_def)
+
+(*
+lemma wf_assertion_par:
+  assumes "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) P1)"
+      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) P2)"
+      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1)"
+      and "self_framing (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2)"
+      and "wf_stmt tys \<Gamma> C1"
+      and "wf_stmt tys \<Gamma> C2"
+      and "well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+      
+    ConcreteSemantics.wf_abs_stmt \<lparr>variables = type_ctxt_store \<Delta> tys, custom_context = type_ctxt_heap\<rparr> (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2)) \<and>
+    TypedEqui.wf_assertion (make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Gamma> (tcfes tys) Q2)
+*)
+
+
+
+lemma wf_stmt_implies_wf_translation:
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
+  shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+  using assms
+  apply (induct C)
+           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def)  
+       apply (metis typed_exp_semantify_vints vints_def)
+      apply (metis semantify_heap_loc_typed vints_def)
+  apply (simp add: in_dom_type_ctxt_store)
+  apply (simp add: Let_def)
+  apply (rule conjI)
+  apply (metis self_framing_eq test_self_framing typed_self_framing_star wf_assertion_stabilize)
+   apply (rule conjI)
+    apply (metis ConcreteSemantics.wf_abs_stmt_havoc_list abs_type_context.select_convs(1) assertion_while_or_par_wf)
+  apply (metis self_framing_eq typed_self_framing_star wf_assertion_stabilize)
+   apply (rule conjI)
+   apply (metis self_framing_eq test_self_framing wf_assertion_stabilize)
+   apply (rule conjI)
+  apply (simp add: ConcreteSemantics.wf_abs_stmt_havoc_list well_typed_cmd_all_written_vars_def)
+  by (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
+
+
+
+
+lemma wf_stmt_implies_wf_translation_snd:
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
+      and "Cv \<in> snd (translate \<Delta> tys C)"
+    shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+  using assms
+  apply (induct C)
+           apply (simp_all add: type_ctxt_front_end_def type_ctxt_store_def Let_def)
+     apply metis
+    apply (erule disjE)
+     apply simp
+  apply (rule conjI)
+      apply (metis self_framing_eq wf_assertion_stabilize)
+     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+    apply (erule disjE)
+     apply simp
+  apply (rule conjI)
+      apply (metis self_framing_eq wf_assertion_stabilize)
+     apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+    apply (erule disjE)
+     apply blast+
+    apply (erule disjE)
+  apply simp
+   apply (rule conjI)+
+  apply (metis self_framing_eq self_framing_inter wf_assertion_stabilize)
+  apply (metis self_framing_eq test_self_framing type_ctxt_front_end_def wf_assertion_stabilize wf_stmt_implies_wf_translation)
+  by blast
+
+
+
+
+
 theorem sound_syntactic_translation:
 
 (* Well formedness *)
 
-  assumes "wf_stmt tys \<Gamma> C"
+  assumes "wf_stmt \<Delta> tys C"
       and "well_typed_cmd tys C"
-      and "ConcreteSemantics.wf_abs_stmt (tcfe tys) (fst (translate tys \<Gamma> C))"
-      and "\<And>Cv. Cv \<in> snd (translate tys \<Gamma> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe tys) Cv"
+      and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+      and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
 
 (* Verification *)
-      and "ConcreteSemantics.verifies_set (tcfe tys) (atrue tys) (abs_stmt.Inhale P ;; compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C)) ;; abs_stmt.Exhale Q)"
-      and "\<And>Cv. Cv \<in> compile False \<Gamma> (tcfes tys) ` (snd (translate_syn \<Gamma> (tcfes tys) C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe tys) (atrue tys) Cv"
+      and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
+      and "\<And>Cv. Cv \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
-shows "(tcfe tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
   using assms(1) assms(2) assms(3) assms(4) assms(5)
 proof (rule sound_translation)
-  show "ConcreteSemantics.verifies_set (tcfe tys) (atrue tys) (abs_stmt.Inhale P ;; fst (translate tys \<Gamma> C) ;; abs_stmt.Exhale Q)"
+  show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q)"
   proof (rule ConcreteSemantics.verifies_setI)
-    fix \<omega> assume asm0: "\<omega> \<in> atrue tys" "sep_algebra_class.stable \<omega>" "typed (tcfe tys) \<omega>"
-    show "ConcreteSemantics.verifies (tcfe tys) (abs_stmt.Inhale P ;; fst (translate tys \<Gamma> C) ;; abs_stmt.Exhale Q) \<omega>"
+    fix \<omega> assume asm0: "\<omega> \<in> atrue \<Delta> tys" "sep_algebra_class.stable \<omega>" "typed (tcfe \<Delta> tys) \<omega>"
+    show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q) \<omega>"
     proof (rule verifies_more_verifies)
-      show "verifies_more (tcfe tys) (abs_stmt.Inhale P ;; fst (translate tys \<Gamma> C) ;; abs_stmt.Exhale Q)
-      (abs_stmt.Inhale P ;; compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C)) ;; abs_stmt.Exhale Q)"
+      show "verifies_more (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q)
+      (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
         apply (rule verifies_more_seq)
         apply (rule verifies_more_seq)
             apply simp_all
@@ -1247,18 +1412,18 @@ proof (rule sound_translation)
         apply (simp add: assms(5))
         using assms(3) assms(5) by blast
 
-      show "ConcreteSemantics.verifies (tcfe tys) (abs_stmt.Inhale P ;; compile False \<Gamma> (tcfes tys) (fst (translate_syn \<Gamma> (tcfes tys) C)) ;; abs_stmt.Exhale Q) \<omega>"
+      show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q) \<omega>"
         using ConcreteSemantics.verifies_set_def asm0(1) asm0(2) asm0(3) assms(6) by blast
     qed (simp_all add: asm0)
   qed
   fix Cv
-  assume asm0: "Cv \<in> snd (translate tys \<Gamma> C)"
-  moreover have "verifies_more_set (tcfe tys) (snd (translate tys \<Gamma> C)) (compile False \<Gamma> (tcfes tys) ` (snd (translate_syn \<Gamma> (tcfes tys) C)))"
+  assume asm0: "Cv \<in> snd (translate \<Delta> tys C)"
+  moreover have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
     using assms(1) assms(2) assms(3) assms(4) translation_refinement_syntactic_semantic(2) by blast
-  ultimately obtain Cv' where "Cv' \<in> compile False \<Gamma> (tcfes tys) ` (snd (translate_syn \<Gamma> (tcfes tys) C))"
-    "verifies_more (tcfe tys) Cv Cv'"
+  ultimately obtain Cv' where "Cv' \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C))"
+    "verifies_more (tcfe \<Delta> tys) Cv Cv'"
     by (meson verifies_more_set)
-  then show "ConcreteSemantics.verifies_set (FrontEndTranslation.tcfe tys) (atrue tys) Cv"
+  then show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
     by (meson ConcreteSemantics.verifies_set_def assms(7) verifies_more_verifies)
 qed (simp_all)
 

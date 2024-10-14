@@ -29,7 +29,7 @@ lemma vald_a2t_stmt_n_havoc: "valid_a2t_stmt (n_havoc xs)"
   
 lemma valid_a2t_stmt_translate_syn:
   assumes "valid_front_end_cmd C"
-  shows "valid_a2t_stmt (fst (translate_syn \<Delta> t C)) \<and> (\<forall>aux \<in> snd (translate_syn \<Delta> t C). valid_a2t_stmt aux)"
+  shows "valid_a2t_stmt (fst (translate_syn  C)) \<and> (\<forall>aux \<in> snd (translate_syn C). valid_a2t_stmt aux)"
   using assms
   apply (induction C)
   apply (simp_all add: valid_a2t_exp_translate_exp 
@@ -46,8 +46,8 @@ lemma valid_a2t_stmt_translate_syn:
 subsection \<open>Main\<close>
 
 definition triple_as_method_decl :: "vtyp list \<Rightarrow> ViperLang.assertion \<Rightarrow> stmt \<Rightarrow> ViperLang.assertion \<Rightarrow> method_decl"
-  where "triple_as_method_decl ts P C Q \<equiv> \<lparr> method_decl.args = [], 
-                                         rets = ts, 
+  where "triple_as_method_decl tys P C Q \<equiv> \<lparr> method_decl.args = [], 
+                                         rets = tys, 
                                          pre = Atomic (Pure (ELit (LBool True))), 
                                          post = Atomic (Pure (ELit (LBool True))), 
                                          body = Some (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))\<rparr>"
@@ -119,8 +119,8 @@ lemma valid_a2t_stmt_to_todo:
 
 lemma vpr_method_correct_red_stmt_total_set_ok:
   assumes MethodCorrect:
-          "vpr_method_correct_total (ctxt :: 'a total_context) (\<lambda>_. True) (triple_as_method_decl ts P C Q)"
-      and "\<Lambda> = nth_option ts"
+          "vpr_method_correct_total (ctxt :: 'a total_context) (\<lambda>_. True) (triple_as_method_decl tys P C Q)"
+      and "\<Lambda> = nth_option tys"
       and ValidStmt: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
     shows "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
   unfolding red_stmt_total_set_ok_def
@@ -129,30 +129,30 @@ proof (rule allI, rule impI, rule notI, simp)
   assume Init: "is_initial_vcg_state ctxt \<Lambda> \<omega>"
      and Red: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
 
-  let ?mdecl = "triple_as_method_decl ts P C Q"
+  let ?mdecl = "triple_as_method_decl tys P C Q"
 
   show False
   proof (rule vpr_method_correct_totalE[OF MethodCorrect])
     from Init[simplified is_initial_vcg_state_def]
-    show "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args (triple_as_method_decl ts P C Q) @ rets (triple_as_method_decl ts P C Q)))
+    show "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args (triple_as_method_decl tys P C Q) @ rets (triple_as_method_decl tys P C Q)))
      (get_store_total \<omega>)"
       unfolding triple_as_method_decl_def vpr_store_well_typed_def \<open>\<Lambda> = _\<close>
       by simp
   next
-    show "red_inhale ctxt (\<lambda>_. True) (method_decl.pre (triple_as_method_decl ts P C Q)) \<omega> (RNormal \<omega>)"
+    show "red_inhale ctxt (\<lambda>_. True) (method_decl.pre (triple_as_method_decl tys P C Q)) \<omega> (RNormal \<omega>)"
       unfolding triple_as_method_decl_def
       apply simp
       apply (rule inh_pure_normal)
       using RedLit
       by (metis val_of_lit.simps(1))
   next
-    assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl ts P C Q) \<omega>"
+    assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl tys P C Q) \<omega>"
     thm BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE]
 
     show False
     proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption,
            simp add: triple_as_method_decl_def)
-      show "red_stmt_total ctxt (\<lambda>_. True) (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
+      show "red_stmt_total ctxt (\<lambda>_. True) (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
       proof (rule RedSeqFailureOrMagic)
         have InSubset: "stmt_in_paper_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
@@ -160,7 +160,7 @@ proof (rule allI, rule impI, rule notI, simp)
           using ValidStmt
           by simp
 
-        show "red_stmt_total ctxt (\<lambda>_. True) (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))
+        show "red_stmt_total ctxt (\<lambda>_. True) (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
           using red_stmt_trace_indep[OF Red InSubset]
           unfolding \<open>\<Lambda> = _\<close> 
@@ -178,8 +178,8 @@ definition initial_vcg_states_equi where
                                   }"
 
 corollary VCG_to_verifies_set :                             
-  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl ts P C Q)"
-      and "\<Lambda> = nth_option ts"
+  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl tys P C Q)"
+      and "\<Lambda> = nth_option tys"
       and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
       and ValidBodyPrePost: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
       and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
@@ -291,7 +291,7 @@ abbreviation true_syn_assertion
   where "true_syn_assertion \<equiv> (Atomic (Pure (ELit (LBool True))))"
 
 lemma custom_context_tcfe_eq:
-  "custom_context tcfe =
+  "custom_context (tcfe \<Delta> tys) =
    sem_fields i1 (declared_fields (program_total (default_ctxt d mdecl)))"
   unfolding type_ctxt_front_end_def
          default_ctxt_def vpr_program_from_method_decl_def type_ctxt_heap_def
@@ -300,47 +300,54 @@ lemma custom_context_tcfe_eq:
   apply (case_tac "f = field_val")
   by (simp_all add: sem_fields_def vints_def)
 
+
 theorem sound_syntactic_translation_VCG:
-  assumes "wf_stmt \<Delta> tcfes C"
-      and "well_typed_cmd tcfe C"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C))"
-      and "\<And>Cv. Cv \<in> snd (translate \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
+  assumes "wf_stmt \<Delta> tys C"
+      and "well_typed_cmd tys C"
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
-      and "typed_stmt C" (* TODO: Unify the two notions of typing *)
+
       and ValidFrontendCmd: "valid_front_end_cmd C"
       and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
 
       and AbsTypeWf: "abs_type_wf (interp.domains \<Delta>)"
       and InterpFunsPredsEmpty: "interp.funs \<Delta> = (\<lambda> _ _ _. None) \<and> interp.predicates \<Delta> = Map.empty"
 
-      and "mdecl = (triple_as_method_decl ts Ps (fst (translate_syn \<Delta> tcfes C)) Qs)"
+      and "mdecl = (triple_as_method_decl tys Ps (fst (translate_syn C)) Qs)"
       and MethodCorrect: "vpr_method_correct_total (default_ctxt (domains \<Delta>) mdecl) (\<lambda>_ :: int full_total_state. True) mdecl"     
       and AuxiliaryMethodsCorrectAndTyped:
-        "\<And> stmtAux. stmtAux \<in> snd (translate_syn \<Delta> tcfes C) \<Longrightarrow> 
-             let mdeclAux = triple_as_method_decl ts 
+        "\<And> stmtAux. stmtAux \<in> snd (translate_syn C) \<Longrightarrow> 
+             let mdeclAux = triple_as_method_decl tys 
                               true_syn_assertion stmtAux true_syn_assertion 
              in
              vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux \<and>
-             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option ts) stmtAux"
+             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option tys) stmtAux"
  
       and MainViperTyped: 
-            "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option ts)
-                   (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs))"
+            "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option tys)
+                   (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn C))) (stmt.Exhale Qs))"
 
-      \<comment>\<open>we should be able to eliminate these two assumptions by constructing ts from tcfes\<close>
-      and tcfe_eq: "variables tcfe = nth_option (map (set_from_type (domains \<Delta>)) ts)"
-      and fst_tcfes_eq: "fst tcfes = nth_option ts"
+      and "P = make_semantic_assertion_gen False \<Delta> (tcfes tys) Ps"
+      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes tys) Qs"     
+    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+proof (rule sound_syntactic_translation[OF assms(1-2) _ _ assms(3)])
+  show "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
+    by (simp add: assms(1) assms(2) wf_stmt_implies_wf_translation)
+  show "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
+    using assms(1) assms(2) wf_stmt_implies_wf_translation_snd by blast
 
-      and "P = make_semantic_assertion_gen False \<Delta> tcfes Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> tcfes Qs"     
-    shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
-proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
-  let ?Ctr_main = "(fst (translate_syn \<Delta> tcfes C))"
+  have tcfe_eq: "variables (tcfe \<Delta> tys) = nth_option (map (set_from_type (domains \<Delta>)) tys)"
+    unfolding type_ctxt_front_end_def type_ctxt_store_def by auto
+  have fst_tcfes_eq: "fst (tcfes tys) = nth_option tys"
+    unfolding type_ctxt_front_end_syntactic_def by auto
+
+
+  let ?Ctr_main = "(fst (translate_syn C))"
   let ?ctxt = "(default_ctxt (domains \<Delta>) mdecl) :: int total_context"
-  let ?\<Lambda> = "nth_option ts"
+  let ?\<Lambda> = "nth_option tys"
   let ?Ctr_mainV = "(stmt.Seq (stmt.Seq (stmt.Inhale Ps) ?Ctr_main) (stmt.Exhale Qs))"
 
-  show "ConcreteSemantics.verifies_set tcfe atrue (abs_stmt.Inhale P ;; compile False \<Delta> tcfes ?Ctr_main ;; abs_stmt.Exhale Q)"
+  show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys)
+    (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
   proof -
 
     have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
@@ -354,19 +361,19 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
       unfolding \<open>mdecl = _\<close>
         apply blast
       using valid_a2t_stmt_translate_syn[OF ValidFrontendCmd] ValidPrePost
-      apply fast             
+      apply fast
       by (simp_all add: default_ctxt_def AbsTypeWf)
 
-    have "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes ?Ctr_mainV)"
+    have "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> (tcfes tys) ?Ctr_mainV)"
     proof -
-      have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
+      have "tcfe \<Delta> tys = t2a_ctxt ?ctxt (nth_option tys)"
         unfolding t2a_ctxt_def
         apply (rule abs_type_context.equality, simp_all)
          apply (simp add: sem_store_def)
          apply (fastforce simp add: tcfe_eq default_ctxt_def)    
         using custom_context_tcfe_eq
         by blast
-      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"        
+      moreover have "tcfes tys = (nth_option tys, declared_fields (program_total ?ctxt))"        
         unfolding type_ctxt_front_end_syntactic_def        
         apply clarify
         apply (rule conjI)
@@ -386,8 +393,8 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
         by metis
     qed
 
-    hence "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
-              (abs_stmt.Inhale P ;; compile False \<Delta> tcfes ?Ctr_main ;; abs_stmt.Exhale Q)"
+    hence "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
+              (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
       using \<open>P = _\<close> \<open>Q = _\<close>
       by simp
 
@@ -398,19 +405,19 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
 
   fix Cv
   
-  assume "Cv \<in> compile False \<Delta> tcfes ` snd (translate_syn \<Delta> tcfes C)"
-  from this obtain Cv_syn where "Cv_syn \<in> snd (translate_syn \<Delta> tcfes C)" and "Cv = compile False \<Delta> tcfes Cv_syn"
+  assume "Cv \<in> compile False \<Delta> (tcfes tys) ` snd (translate_syn C)"
+  from this obtain Cv_syn where "Cv_syn \<in> snd (translate_syn C)" and "Cv = compile False \<Delta> (tcfes tys) Cv_syn"
     by blast
-  let ?mdeclAux = "triple_as_method_decl ts 
+  let ?mdeclAux = "triple_as_method_decl tys 
                               true_syn_assertion Cv_syn true_syn_assertion"
   let ?ctxt = "(default_ctxt (domains \<Delta>) ?mdeclAux) :: int total_context"
 
-  have TypingAux: "stmt_typing (program_total (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl ts true_syn_assertion Cv_syn true_syn_assertion)))
-     (nth_option ts) (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion))"
+  have TypingAux: "stmt_typing (program_total (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl tys true_syn_assertion Cv_syn true_syn_assertion)))
+     (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion))"
     using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>, simplified Let_def]    
     by (auto intro!: stmt_typing.intros
                         assertion_typing.intros atomic_assertion_typing.intros pure_exp_typing.intros)
-  show "ConcreteSemantics.verifies_set tcfe atrue Cv"
+  show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
   proof -
     have "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
@@ -429,17 +436,17 @@ proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
                (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
       sorry \<comment>\<open>TODO: Thibault --> remove inhale true exhale true\<close>
 
-    hence "ConcreteSemantics.verifies_set tcfe (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> tcfes Cv_syn)"
+    hence "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> (tcfes tys) Cv_syn)"
     proof -
       \<comment>\<open>these proofs are duplicated from above\<close>
-      have "tcfe = t2a_ctxt ?ctxt (nth_option ts)"
+      have "tcfe \<Delta> tys = t2a_ctxt ?ctxt (nth_option tys)"
         unfolding t2a_ctxt_def
         apply (rule abs_type_context.equality, simp_all)
          apply (simp add: sem_store_def)
          apply (fastforce simp add: tcfe_eq default_ctxt_def)    
         using custom_context_tcfe_eq
         by blast      
-      moreover have "tcfes = (nth_option ts, declared_fields (program_total ?ctxt))"
+      moreover have "tcfes tys = (nth_option tys, declared_fields (program_total ?ctxt))"
         unfolding type_ctxt_front_end_syntactic_def        
         apply clarify
         apply (rule conjI)

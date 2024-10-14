@@ -2100,6 +2100,12 @@ proof (rule verifies_setI)
 qed
 
 
+lemma wf_abs_stmt_havoc_list:
+  assumes "set l \<subseteq> dom (variables \<Delta>)"
+  shows "wf_abs_stmt \<Delta> (havoc_list l)"
+  using assms by (induct l) simp_all
+
+
 end
 
 end
