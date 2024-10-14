@@ -301,12 +301,11 @@ lemma custom_context_tcfe_eq:
   by (simp_all add: sem_fields_def vints_def)
 
 theorem sound_syntactic_translation_VCG:
-  assumes "wf_stmt \<Delta> tcfes C"
-      and "well_typed_cmd tcfe C"
-      and "ConcreteSemantics.wf_abs_stmt tcfe (fst (translate \<Delta> C))"
-      and "\<And>Cv. Cv \<in> snd (translate \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt tcfe Cv"
+  assumes "wf_stmt ts \<Delta> C"
+      and "well_typed_cmd ts C"
+      and "ConcreteSemantics.wf_abs_stmt (tcfe ts) (fst (translate ts \<Delta> C))"
+      and "\<And>Cv. Cv \<in> snd (translate ts \<Delta> C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe ts) Cv"
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
-      and "typed_stmt C" (* TODO: Unify the two notions of typing *)
       and ValidFrontendCmd: "valid_front_end_cmd C"
       and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
 
@@ -328,12 +327,12 @@ theorem sound_syntactic_translation_VCG:
                    (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn \<Delta> tcfes C))) (stmt.Exhale Qs))"
 
       \<comment>\<open>we should be able to eliminate these two assumptions by constructing ts from tcfes\<close>
-      and tcfe_eq: "variables tcfe = nth_option (map (set_from_type (domains \<Delta>)) ts)"
-      and fst_tcfes_eq: "fst tcfes = nth_option ts"
+      and tcfe_eq: "variables (tcfe ts) = nth_option (map (set_from_type (domains \<Delta>)) ts)"
+      and fst_tcfes_eq: "fst (tcfes ts) = nth_option ts"
 
-      and "P = make_semantic_assertion_gen False \<Delta> tcfes Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> tcfes Qs"     
-    shows "tcfe \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
+      and "P = make_semantic_assertion_gen False \<Delta> (tcfes ts) Ps"
+      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes ts) Qs"     
+    shows "tcfe ts \<turnstile>CSL [P \<otimes> UNIV] C [Q \<otimes> UNIV]"
 proof (rule sound_syntactic_translation[OF assms(1-6)], simp)
   let ?Ctr_main = "(fst (translate_syn \<Delta> tcfes C))"
   let ?ctxt = "(default_ctxt (domains \<Delta>) mdecl) :: int total_context"
