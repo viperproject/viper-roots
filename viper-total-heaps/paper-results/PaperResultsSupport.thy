@@ -1,5 +1,5 @@
 theory PaperResultsSupport
-imports TotalViper.ViperBoogieEndToEnd TotalViper.TraceIndepProp
+imports TotalViper.ViperBoogieEndToEnd TotalViper.TraceIndepProperty
 begin
 
 subsection \<open>BPROP\<close>
