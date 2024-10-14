@@ -1,5 +1,5 @@
 theory VCGEndToEnd
-imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal TotalViper.TraceIndepProp
+imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal TotalViper.TraceIndepProperty
 begin
 
 section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
@@ -81,7 +81,7 @@ lemma vpr_method_correct_totalE:
    unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def
    by blast
 
-lemma valid_a2t_exp_to_todo:
+lemma valid_a2t_exp_to_core:
   assumes "valid_a2t_exp e"
   shows "exp_in_core_subset e"
   using assms
@@ -94,22 +94,22 @@ lemma valid_a2t_atomic_assert_todo:
 proof (induction atm)
   case (Acc e f e_p)
   then show ?case
-    by (cases e_p) (simp_all add: valid_a2t_exp_to_todo)
-qed (simp_all add: valid_a2t_exp_to_todo)
+    by (cases e_p) (simp_all add: valid_a2t_exp_to_core)
+qed (simp_all add: valid_a2t_exp_to_core)
   
-lemma valid_a2t_assert_to_todo:
+lemma valid_a2t_assert_to_core:
   assumes "valid_a2t_assert A"
   shows "assertion_in_core_subset A"
   using assms
   by (induction A)
-     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_todo)
+     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_core)
 
-lemma valid_a2t_stmt_to_todo:
+lemma valid_a2t_stmt_to_core:
   assumes "valid_a2t_stmt C"
   shows "stmt_in_core_subset C"
   using assms
   apply (induction C)
-  by (simp_all add: valid_a2t_assert_to_todo valid_a2t_exp_to_todo)
+  by (simp_all add: valid_a2t_assert_to_core valid_a2t_exp_to_core)
 
 lemma vpr_method_correct_red_stmt_total_set_ok:
   assumes MethodCorrect:
@@ -149,7 +149,7 @@ proof (rule allI, rule impI, rule notI, simp)
      (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
       proof (rule RedSeqFailureOrMagic)
         have InSubset: "stmt_in_core_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
-          apply (rule valid_a2t_stmt_to_todo)
+          apply (rule valid_a2t_stmt_to_core)
           using ValidStmt
           by simp
 

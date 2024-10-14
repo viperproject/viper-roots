@@ -1,4 +1,4 @@
-theory TraceIndepProp
+theory TraceIndepProperty
 imports TotalSemProperties
 begin 
 
