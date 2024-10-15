@@ -1188,7 +1188,7 @@ lemma s2a_state_wf_empty :
 
 lemma sinit_sound :
   assumes "sinit tys F Q"
-  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<Lambda> = nth_option tys"
   assumes "get_trace \<omega> = Map.empty"
   assumes "store_typed (sem_store def_domains \<Lambda>) (get_store \<omega>)"
   assumes "\<And> \<sigma> V.
@@ -1233,7 +1233,7 @@ theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
   (* TODO: replace with nth_option from TotalUtil? *)
-  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<Lambda> = nth_option tys"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
   shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
   apply (rule sexec_verifies_set[where Q=Q]; (rule assms)?)
