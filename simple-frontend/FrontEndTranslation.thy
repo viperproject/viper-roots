@@ -653,12 +653,6 @@ lemma no_trace_then_core:
   using assms unfolding no_trace_def
   by (simp add: core_charact_equi(3))
 
-lemma in_starE:
-  assumes "x \<in> A \<otimes> B"
-      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
-    shows "P"
-  by (meson assms(1) assms(2) x_elem_set_product)
-
 
 lemma atrue_star_same[simp]:
   "atrue \<Delta> tys \<otimes> atrue \<Delta> tys = atrue \<Delta> tys"
@@ -1623,6 +1617,11 @@ proof -
 qed
 
 
+lemma assertify_star_same:
+  assumes "\<And>s h h'. map_le h h' \<and> P (s, h) \<Longrightarrow> P (s, h')"
+  shows "t_entails tys \<Delta> (assertify_state_exp P) (assertify_state_exp P \<otimes> atrue tys \<Delta>)"
+  and "t_entails tys \<Delta> (assertify_state_exp P \<otimes> atrue tys \<Delta>) (assertify_state_exp P)"
+  sorry
 
 
 end

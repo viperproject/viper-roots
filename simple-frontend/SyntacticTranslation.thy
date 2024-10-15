@@ -547,13 +547,6 @@ lemma verifies_more_free:
   apply (simp add:in_up_close_core_stabilize)
   by (auto simp add:acc_heap_loc_def type_ctxt_front_end_syntactic_def)
 
-lemma in_starI:
-  assumes "Some x = a \<oplus> b"
-      and "a \<in> A"
-      and "b \<in> B"
-    shows "x \<in> A \<otimes> B"
-  using assms(1) assms(2) assms(3) x_elem_set_product by blast
-
 
 
 lemma get_vh_stabilize_implies_normal:
@@ -647,6 +640,13 @@ lemma sum_empty_and_same:
   by (simp add: commutative stabilize_core_right_id)
 
 
+lemma in_starI:
+  assumes "Some x = a \<oplus> b"
+      and "a \<in> A"
+      and "b \<in> B"
+    shows "x \<in> A \<otimes> B"
+  using assms(1) assms(2) assms(3) x_elem_set_product by blast
+
 lemma empty_satisfies_star:
   assumes "stabilize |x| \<in> A"
       and "stabilize |x| \<in> B"
@@ -657,6 +657,25 @@ lemma in_bool_to_assertion_emp:
   assumes "P"
   shows "stabilize |x| \<in> \<llangle>P\<rrangle>"
   by (metis Stabilize_up_close_core Stable_def Stable_emp_core assms bool_to_assertion_true core_in_emp_core emp_star_left_id in_Stabilize in_mono up_close_core_def)
+
+context semantics
+begin
+
+lemma entailment_1:
+  assumes "entails_typed \<Delta> R F"
+      and "entails A (R \<otimes> P)"
+    shows "entails_typed \<Delta> A (P \<otimes> F)"
+proof (rule entails_typedI)
+  fix \<omega>
+  assume asm0: "\<omega> \<in> A" "local.typed \<Delta> \<omega>"
+  then obtain r p where "Some \<omega> = r \<oplus> p" "r \<in> R" "p \<in> P"
+    by (meson assms(2) entails_def in_mono in_starE)
+  then have "r \<in> F"
+    by (metis asm0(2) assms(1) commutative entails_typed_def greater_equiv typed_smaller)
+  then show "\<omega> \<in> P \<otimes> F"
+    by (simp add: \<open>Some \<omega> = r \<oplus> p\<close> \<open>p \<in> P\<close> add_set_commm in_starI)
+qed
+end
 
 lemma add_setI_core_l :
   assumes "|a| \<in> A"

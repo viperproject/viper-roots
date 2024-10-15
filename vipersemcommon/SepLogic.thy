@@ -1103,6 +1103,13 @@ lemma in_singleton_star:
   shows "\<exists>p \<in> P. Some x = \<omega> \<oplus> p"
   using assms local.x_elem_set_product by auto
 
+
+lemma in_starE:
+  assumes "x \<in> A \<otimes> B"
+      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
+    shows "P"
+  by (meson assms(1) assms(2) x_elem_set_product)
+
 end
 
 end

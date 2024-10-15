@@ -83,7 +83,10 @@ text\<open>
 paragraph \<open>Definition 1\<close>
 text\<open>C is correct for \<open>\<omega>\<close> iff \<^term>\<open>verifies \<Delta> C \<omega>\<close>\<close>
 
-text \<open>TODO: Why do we define valid, but we don't have it?\<close>
+text \<open>TODO:
+- Use valid later?
+- Restrict it to well-formed states?\<close>
+
 
 definition valid where
   "valid \<Delta> C \<longleftrightarrow> (\<forall>\<omega>. verifies \<Delta> C \<omega>)"
@@ -110,16 +113,6 @@ theorem operational_to_axiomatic_soundness_general:
     shows "\<exists>B. \<Delta> \<turnstile> [A] C [B]"
   using assms Viper_implies_SL_proof by simp
 
-definition atrue_typed where
-  "atrue_typed \<Delta> = { \<omega>. typed \<Delta> (stabilize \<omega>)}"
-
-lemma good_atrue_typed:
-  "semi_typed \<Delta> (atrue_typed \<Delta>)"
-  "self_framing (atrue_typed \<Delta>)"
-  unfolding semi_typed_def atrue_typed_def apply blast
-  apply (rule self_framingI)
-  by (simp add: already_stable)
-
 text \<open>The following is theorem 2 as presented in the paper:\<close>
 
 corollary operational_to_axiomatic_soundness:
@@ -128,29 +121,6 @@ corollary operational_to_axiomatic_soundness:
     shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]"
   using assms good_atrue_typed operational_to_axiomatic_soundness_general 
   unfolding valid_def verifies_set_def by blast
-
-
-lemma entailment_1:
-  assumes "entails_typed \<Delta> R F"
-      and "entails A (R \<otimes> P)"
-    shows "entails_typed \<Delta> A (P \<otimes> F)"
-proof (rule entails_typedI)
-  fix \<omega>
-  assume asm0: "\<omega> \<in> A" "local.typed \<Delta> \<omega>"
-  then obtain r p where "Some \<omega> = r \<oplus> p" "r \<in> R" "p \<in> P"
-    by (meson assms(2) entails_def in_mono in_starE)
-  then have "r \<in> F"
-    by (metis asm0(2) assms(1) commutative entails_typed_def greater_equiv typed_smaller)
-  then show "\<omega> \<in> P \<otimes> F"
-    by (simp add: \<open>Some \<omega> = r \<oplus> p\<close> \<open>p \<in> P\<close> add_set_commm in_starI)
-qed
-
-
-lemma entailment_2:
-  "entails_typed \<Delta> (Q \<otimes> F) (F \<otimes> Set.filter (local.typed \<Delta> \<circ> stabilize) Q)"
-  apply (rule entails_typedI)
-  apply (erule in_starE)
-  by (smt (verit, best) commutative comp_eq_dest_lhs greater_def member_filter typed_smaller typed_state.typed_state_then_stabilize_typed typed_state_axioms x_elem_set_product)
 
 
 paragraph \<open>Lemma 1 (Exhale-inhale)\<close>
@@ -225,30 +195,9 @@ text \<open>Definition 4:
 \<^item> P is self-framing: \<^term>\<open>self_framing P\<close>                 
 \<^item> The state \<omega> frames the assertion P: \<^term>\<open>rel_stable_assertion \<omega> P\<close>
   \<^item> see \<^term>\<open>wf_assertion A\<close>
-(* TODO: Explain why it's the same *)
 \<^item> The assertion B frames the assertion P: \<^term>\<open>framed_by B P\<close>
 \<^item> The assertion P frames the expression e: \<^term>\<open>framed_by_exp P e\<close>
 \<close>
-
-lemma wf_assertion_add:
-  assumes "wf_assertion P"
-  shows "wf_assertion ({\<omega>} \<otimes> P)"
-  apply (rule wf_assertionI)
-  apply (erule in_starE)
-  apply simp
-proof -
-  fix x' x b assume asm0: "pure_larger x' x" "b \<in> P" "Some x = \<omega> \<oplus> b"
-  then obtain p where "pure p" "Some x' = x \<oplus> p"
-    unfolding pure_larger_def by blast
-  then obtain b' where "Some b' = b \<oplus> p"
-    using asm0(3) compatible_smaller greater_equiv by blast
-  then have "b' \<in> P"
-    using \<open>pure p\<close> asm0(2) assms pure_larger_def typed_state.wf_assertionE typed_state_axioms by blast
-  moreover have "Some x' = \<omega> \<oplus> b'"
-    using \<open>Some b' = b \<oplus> p\<close> \<open>Some x' = x \<oplus> p\<close> asm0(3) asso1 by force
-  ultimately show "x' \<in> {\<omega>} \<otimes> P"
-    unfolding add_set_def by blast
-qed
 
 text \<open>The following lemma shows that the definition in the paper and \<^term>\<open>rel_stable_assertion \<omega> P\<close>
 agree for well-formed assertions (i.e., all relevant assertions).\<close>
@@ -297,7 +246,14 @@ lemma lemma_2_from_operational_to_axiomatic_semantics:
 
 
 paragraph \<open>Theorem 5: Completeness\<close>
-text\<open>Theorem 5 is given by: (TODO: first assumption \<^prop>\<open>wf_abs_stmt \<Delta> C\<close> not mentioned in paper)\<close>
+text\<open>Theorem 5 is given by the following.
+Note that we require C to be well-formed, i.e., \<^term>\<open>wf_abs_stmt \<Delta> C\<close>
+TODO: Explain what it checks:
+- Assertions are well-formed (cannot become false because of more info (pure state))
+- Expressions are well-formed (cannot change value because of more info)
+- Expressions and variables for assignment are well-typed
+- Havoced variables are defined
+: (TODO: first assumption \<^prop>\<open>wf_abs_stmt \<Delta> C\<close> not mentioned in paper)\<close>
 
 theorem completeness:
   assumes "wf_abs_stmt \<Delta> C"
@@ -446,12 +402,11 @@ theorem adequacy_CSL:
 
 
 
-
 subsection \<open>5.2: A Sound Front-End Translation\<close>
 
 text \<open>Translation: Figure 10.
 Defined in the file simple-frontend/SyntacticTranslation.thy.
-For historical reasons, we first do a "semantic" translation (into CoreIVL), in simple-frontend/thy,
+For historical reasons, we first do a "semantic" translation (into CoreIVL), in simple-frontend/FrontEndTranslation.thy,
 and then show that verification of the syntactic translation into ViperCore implies verification of the semantic translation.
 
 \<^term>\<open>translate_syn C\<close>
@@ -462,8 +417,6 @@ text \<open>Theorem 9: Soundness of the front-end translation\<close>
 
 
 theorem sound_front_end_translation:
-
-(* Well formedness *)
 
   assumes "wf_stmt \<Delta> tys C"
       and "well_typed_cmd tys C"
@@ -481,13 +434,15 @@ shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \
 
 
 text \<open>Lemma 3: What we call "convertible" is the following:
-Not really, quite a few differences. Maybe we should make lemma and convertible in paper closer to here?
+TODO:
+- Explain "\<otimes> atrue \<Delta> tys"
+- Explain "inhalify \<Delta> tys A" instead of A
 \<close>
 
-(* Concrete for CSL *)
 definition convertible where
   "convertible \<Delta> tys C \<longleftrightarrow> (\<forall>P Q.
-  (proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C)) \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q)
+  (proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))
+  \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q)
   \<longrightarrow> tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys])"
 
 lemma lemma_3_inhale_translation_exhale:
@@ -497,8 +452,6 @@ lemma lemma_3_inhale_translation_exhale:
     shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
   using invariant_translate_inhale_exhale_get_proof assms unfolding convertible_def invariant_translate_def
   by meson
-
-(* TODO: Explain discrepancy with inhalify? *)
 
 context semantics
 begin
@@ -521,6 +474,13 @@ end
 
 
 
+section \<open>End-to-end Theorems\<close>
+
+(*
+TODO:
+- Combine e2e Carbon with adequacy?
+- e2e theorem for symbolic execution?
+*)
 
 
 theorem VCG_e2e_sound:
@@ -555,8 +515,5 @@ theorem VCG_e2e_sound:
 
 
 
-(*
-TODO: Nice e2e theorems?
-*)
 
 end

@@ -2053,10 +2053,10 @@ inductive n_steps where
 
 
 definition assertify_state_exp where
-  "assertify_state_exp P = { (Ag s, \<tau>, h) |s \<tau> h. P (s, get_vh h) }"
+  "assertify_state_exp P = { (Ag s, Ag Map.empty, h) |s h. P (s, get_vh h) }"
 
 lemma in_assertify_equiv:
-  "(Ag s, \<tau>, \<omega>) \<in> assertify_state_exp P \<longleftrightarrow> P (s, get_vh \<omega>)"
+  "(Ag s, Ag Map.empty, \<omega>) \<in> assertify_state_exp P \<longleftrightarrow> P (s, get_vh \<omega>)"
   by (simp add: assertify_state_exp_def)
 
 lemma uu_simps[simp]:
@@ -2123,14 +2123,14 @@ lemma safe_n_steps:
       and "get_vh \<omega> = snd \<sigma>"
       and "binary_mask \<omega>"
       and "sep_algebra_class.stable \<omega>"       
-      and "\<And>n. safe (tcfe \<Delta> tys) n C s \<tau> \<omega> (assertify_state_exp Q)"
-      and "TypedEqui.typed (tcfe \<Delta> tys) (Ag s, \<tau>, \<omega>)"
+      and "\<And>n. safe (tcfe \<Delta> tys) n C s (Ag Map.empty) \<omega> (assertify_state_exp Q)"
+      and "TypedEqui.typed (tcfe \<Delta> tys) (Ag s, Ag Map.empty, \<omega>)"
       and "well_typed_cmd tys C"
     shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
   using assms
 proof (induct arbitrary: s \<omega> rule: n_steps.induct)
   case (NoStep C \<sigma>)
-  then have r: "safe (tcfe \<Delta> tys) (Suc 0) C s \<tau> \<omega> (assertify_state_exp Q)"
+  then have r: "safe (tcfe \<Delta> tys) (Suc 0) C s (Ag Map.empty) \<omega> (assertify_state_exp Q)"
     by presburger
   then show ?case
     using safeE(1)[OF r] no_abortsE[OF safeE(4)[OF r], of \<omega> uu]
@@ -2143,15 +2143,15 @@ next
   proof (rule OneStep(3)[of "fst \<sigma>''" "mk_virtual_state (snd \<sigma>'')"])
     fix n
     obtain \<omega>1 \<omega>1' where "Some \<omega>1' = \<omega>1 \<oplus> uu \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'"
-      "snd \<sigma>'' = get_vh \<omega>1' \<and> safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') \<tau> \<omega>1 (assertify_state_exp Q)"
+      "snd \<sigma>'' = get_vh \<omega>1' \<and> safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') (Ag Map.empty) \<omega>1 (assertify_state_exp Q)"
       using safeE(5)[OF OneStep(8)[of "Suc n"], of uu \<omega> C'' \<sigma>'']
       using OneStep.hyps(1) OneStep.prems(1) OneStep.prems(2) OneStep.prems(3) stable_uu uu_neutral
       using OneStep.prems(6) by auto
-    then show "safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') \<tau> (mk_virtual_state (snd \<sigma>'')) (assertify_state_exp Q)"
+    then show "safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') (Ag Map.empty) (mk_virtual_state (snd \<sigma>'')) (assertify_state_exp Q)"
       by (metis binary_mask_and_stable_then_mk_virtual pure_def stable_and_sum_pure_same uu_neutral)
-    show "TypedEqui.typed (tcfe \<Delta> tys) (Ag (fst \<sigma>''), \<tau>, mk_virtual_state (snd \<sigma>''))"
+    show "TypedEqui.typed (tcfe \<Delta> tys) (Ag (fst \<sigma>''), Ag Map.empty, mk_virtual_state (snd \<sigma>''))"
       using OneStep.hyps(1) OneStep.prems(1) OneStep.prems(2) OneStep.prems(6) OneStep.prems(7) typed_equi_red
-      by (metis \<open>Some \<omega>1' = \<omega>1 \<oplus> uu \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'\<close> \<open>snd \<sigma>'' = get_vh \<omega>1' \<and> safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') \<tau> \<omega>1 (assertify_state_exp Q)\<close> binary_mask_and_stable_then_mk_virtual option.inject prod.collapse uu_neutral)
+      by (metis \<open>Some \<omega>1' = \<omega>1 \<oplus> uu \<and> sep_algebra_class.stable \<omega>1 \<and> binary_mask \<omega>1'\<close> \<open>snd \<sigma>'' = get_vh \<omega>1' \<and> safe (tcfe \<Delta> tys) n C'' (fst \<sigma>'') (Ag Map.empty) \<omega>1 (assertify_state_exp Q)\<close> binary_mask_and_stable_then_mk_virtual option.inject prod.collapse uu_neutral)
     show "well_typed_cmd tys C''"
       by (metis OneStep.hyps(1) OneStep.prems(7) well_typed_cmd_red)
   qed (simp_all)

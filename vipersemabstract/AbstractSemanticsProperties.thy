@@ -2127,6 +2127,46 @@ lemma wf_abs_stmt_havoc_list:
   using assms by (induct l) simp_all
 
 
+
+lemma wf_assertion_add:
+  assumes "wf_assertion P"
+  shows "wf_assertion ({\<omega>} \<otimes> P)"
+  apply (rule wf_assertionI)
+  apply (erule in_starE)
+  apply simp
+proof -
+  fix x' x b assume asm0: "pure_larger x' x" "b \<in> P" "Some x = \<omega> \<oplus> b"
+  then obtain p where "pure p" "Some x' = x \<oplus> p"
+    unfolding pure_larger_def by blast
+  then obtain b' where "Some b' = b \<oplus> p"
+    using asm0(3) compatible_smaller greater_equiv by blast
+  then have "b' \<in> P"
+    using \<open>pure p\<close> asm0(2) assms pure_larger_def typed_state.wf_assertionE typed_state_axioms by blast
+  moreover have "Some x' = \<omega> \<oplus> b'"
+    using \<open>Some b' = b \<oplus> p\<close> \<open>Some x' = x \<oplus> p\<close> asm0(3) asso1 by force
+  ultimately show "x' \<in> {\<omega>} \<otimes> P"
+    unfolding add_set_def by blast
+qed
+
+
+definition atrue_typed where
+  "atrue_typed \<Delta> = { \<omega>. typed \<Delta> (stabilize \<omega>)}"
+
+lemma good_atrue_typed:
+  "semi_typed \<Delta> (atrue_typed \<Delta>)"
+  "self_framing (atrue_typed \<Delta>)"
+  unfolding semi_typed_def atrue_typed_def apply blast
+  apply (rule self_framingI)
+  by (simp add: already_stable)
+
+
+lemma entailment_2:
+  "entails_typed \<Delta> (Q \<otimes> F) (F \<otimes> Set.filter (local.typed \<Delta> \<circ> stabilize) Q)"
+  apply (rule entails_typedI)
+  apply (erule in_starE)
+  by (smt (verit, best) commutative comp_eq_dest_lhs greater_def member_filter typed_smaller typed_state.typed_state_then_stabilize_typed typed_state_axioms x_elem_set_product)
+
+
 end
 
 end

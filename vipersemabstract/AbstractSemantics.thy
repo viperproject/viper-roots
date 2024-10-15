@@ -475,8 +475,6 @@ fun modif where
 inductive red_stmt :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state set \<Rightarrow> bool"
 
 *)
-(* TODO:
-Remove well-typed requirements *)
 fun wf_abs_stmt :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> bool" 
   where
   "wf_abs_stmt \<Delta> Skip \<longleftrightarrow> True"
