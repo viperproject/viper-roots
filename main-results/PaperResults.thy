@@ -46,6 +46,10 @@ rules in the paper. In particular, we use the following Isabelle document elemen
   \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just 
     boolean terms
     --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> and \<open>True\<close> in the example)
+  \<^item> proved lemmas (for example, @{thm VCG_to_verifies_set})
+
+We also provide links to files in some cases such as @{file "../vipersemabstract/Instantiation.thy"}
+(which you can also ctrl-click on).
 \<close>
 
 section \<open>2: Key Ideas\<close>
@@ -197,9 +201,15 @@ contributes and which axioms shown in Figure 5 it contains:
   Figure 5 (all axioms in Figure 5 that contain \<open>stabilize\<close>)\<close>
 
 paragraph\<open>Instantiations\<close>
-text \<open>Instantiations: TODO(can we provide ctrl-clicking elements here?, also improve text)
-For combinators, see file SepAlgebra.thy. 
-State model \<open>\<Sigma>\<^sub>I\<^sub>D\<^sub>F\<close> defined in file EquiViper.thy. Actually our state is much more complex.
+text \<open>Our concrete IDF state model \<Sigma>_IDF is defined in \<^typ>\<open>'a virtual_state\<close>, which is a subset type
+of \<^typ>\<open>'a pre_virtual_state\<close> (restricting permissions to be at most 1 and requiring that nonzero 
+permission for a heap location \<open>loc\<close> implies that the partial heap defines a value for \<open>loc\<close>.
+
+We prove that \<^typ>\<open>'a virtual_state\<close> forms an IDF algebra in the file
+ @{file "../vipersemabstract/EquiSemAuxLemma.thy"} 
+(look for the line "instantiation virtual_state :: (type) sep_algebra").
+
+TODO is there more to say here?
 \<close>
 
 paragraph \<open>State model for CoreIVL\<close>
@@ -300,14 +310,20 @@ end
 
 subsection \<open>3.4: ViperCore: Instantiating CoreIVL with Viper\<close>
 
-text \<open>See the file Instantiation.thy.
-(1) State: \<^typ>\<open>'a equi_state\<close>
-(2) Custom statements:
-  \<^item> \<^typ>\<open>'a custom\<close>
-  \<^item> \<^term>\<open>FieldAssign e1 f e2\<close>
-(3) Semantics of custom statements:
-  \<^item> Operational: \<^term>\<open>red_custom_stmt \<Delta> (FieldAssign e1 f e2) \<omega> S\<close>
-  \<^item> Axiomatic: \<^term>\<open>SL_Custom \<Delta> P (FieldAssign e1 f e2) Q\<close>
+text \<open>The four components that we need for our ViperCore instantiation are given by:
+
+\<^item> (1) IDF algebra instance:
+    Our ViperCore IDF algebra instance is given by \<^typ>\<open>'a virtual_state\<close> (\<Sigma>_IDF in the paper),
+    which we discuss above as part of Section 3.1.
+    TODO where do we mention \<^typ>\<open>'a equi_state\<close>?
+\<^item> (2) Custom statements:
+  We define our custom statements in \<^typ>\<open>'a custom\<close>, which just includes field assignments
+  \<^term>\<open>FieldAssign e1 f e2\<close>.
+\<^item> (3) Semantics of custom statements:
+  \<^item> Operational semantics: \<^term>\<open>red_custom_stmt \<Delta> (FieldAssign e1 f e2) \<omega> S\<close>
+  \<^item> Axiomatic semantics: \<^term>\<open>SL_Custom \<Delta> P (FieldAssign e1 f e2) Q\<close>
+\<^item> (4) Proofs that the semantics in (3) are compatible with our framework
+  TODO: where is this located?
 \<close>
 
 
@@ -317,6 +333,7 @@ section \<open>4: Back-End Soundness\<close>
 
 subsection \<open>4.1: Symbolic Execution\<close>
 
+\<comment>\<open>TODO: Michael\<close>
 
 theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
@@ -335,9 +352,53 @@ theorem sinit_sexec_verifies_set :
 
 subsection \<open>4.2: Verification Condition Generation\<close>
 
-(* TODO! See with Gaurav *)
+paragraph \<open>Formalization of Viper's VCG (VCGSem)\<close>
+text \<open>The formalization of Viper's VCG (which is not a contribution of this paper, but is part of 
+reference 43 in our paper submission) in the paper is presented via the judgement \<open>\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG r\<close>.
+In Isabelle,  \<open>\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG r\<close> is given by \<^prop>\<open>red_stmt_total ctxt (\<lambda>_.True) \<Lambda> C \<sigma>\<^sub>t r\<close> 
+(\<^term>\<open>ctxt\<close> and \<^term>\<open>\<Lambda>\<close> provide context information that we ignored for the sake of presentation in
+the paper.
+\<close>
 
+paragraph \<open>Theorem 7 (VCGSem)\<close>
+text \<open>Theorem 7 is given by:\<close>
+theorem abstract_refines_total_verifies_set :
+  assumes A1: "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> (\<forall> \<sigma>\<^sub>t. \<sigma>\<^sub>t \<in> (a2t_states ctxt \<omega>)  \<longrightarrow> \<not> red_stmt_total ctxt (\<lambda>_. True) \<Lambda> C \<sigma>\<^sub>t RFailure)"
+  assumes A2: "stmt_typing (program_total ctxt) \<Lambda> C"
+  assumes A3: "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> typed (t2a_ctxt ctxt \<Lambda>) \<omega> \<Longrightarrow> abs_state_typing ctxt \<Lambda> \<omega>"
+  assumes A4: "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
+  assumes A5: "valid_a2t_stmt C"
+  shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
+     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+  using assms  
+  apply (simp add:ConcreteSemantics.verifies_set_def)
+  using abstract_refines_total_verifies[simplified red_stmt_total_set_ok_def]
+  by blast
 
+text \<open>One difference to the paper is that here we consider a more general version of Theorem 7 that 
+is parametric in an initial set of states \<^term>\<open>A\<close>. 
+Assumption A1 corresponds to \<open>\<not>(\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG F)\<close> for all states \<open>\<sigma>\<^sub>t\<close> related to \<^term>\<open>\<omega>\<close> in the paper
+(\<^term>\<open>a2t_states ctxt \<omega>\<close> provides the set of VCGSem states related to \<^term>\<open>\<omega>\<close>).
+Assumptions A2 and A3 make sure that the Viper statement \<^term>\<open>C\<close> and the Viper state \<^term>\<open>\<omega>\<close> are 
+well-typed; we omitted these in the paper for the sake of presentation.
+Assumption A5 restricts the Viper statement \<^term>\<open>C\<close> to be in the Viper subset that we consider in the paper
+(our formalization provides syntax for the entire Viper subset, so we need such an additional assumption
+that restricts the syntax).
+\<close>
+
+paragraph \<open>Using Theorem 7 to connect to a Viper method\<close>
+text \<open>The VCG back-end operates on Viper methods that contain Viper statements and not on Viper statements.
+It is straightforward to use Theorem 7 in order to obtain a lemma that instead assumes the correctness of 
+a Viper method w.r.t. VCGSem.
+Such a lemma could then be used to directly connect to the formal results that have been shown
+for Viper's VCG back-end (which shows the correctness of all Viper methods in a Viper program. w.r.t. VCGSem).
+
+We did not show such a lemma in the paper, but we have proved such a lemma.
+If you are interested, such a lemma can be inspected here @{thm [source] VCG_to_verifies_set} 
+(you can ctrl-click on \<open>VCG_to_verifies_set\<close>, the target has some explanations). 
+In particular, this lemma instantiates the initial set of states \<^term>\<open>A\<close> in the above formalization 
+of Theorem 7 and proves assumptions A3 and A4 above for that instantiation.
+\<close>
 
 
 

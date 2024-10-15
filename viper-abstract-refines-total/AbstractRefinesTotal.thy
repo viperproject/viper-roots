@@ -3082,18 +3082,25 @@ qed
 
 
 definition initial_vcg_states_equi where 
-      "initial_vcg_states_equi \<Delta> \<equiv> {\<omega> :: int equi_state. stable \<omega> \<and> 
+      "initial_vcg_states_equi \<Delta> \<equiv> {\<omega> :: 'a equi_state. stable \<omega> \<and> 
                                     typed \<Delta> \<omega> \<and> 
                                     get_trace \<omega> = Map.empty \<and> (\<forall>l. get_m \<omega> l = 0)
                                   }"
 
 text \<open>The following lemma shows that the correctness of a Viper method encoding a Hoare triple
-(w.r.t. the VCG semantics) implies the correctness of \<open>inhale P; C; exhale Q\<close> w.r.t ViperCore's
+(w.r.t. VCGSem) implies the correctness of \<open>inhale P; C; exhale Q\<close> w.r.t ViperCore's
 operational semantics. This lemma can be directly connected to formal results proved for the VCG 
-back-end.\<close>
+back-end.
+
+In this lemma, \<^term>\<open>triple_as_method_decl tys P C Q\<close> is the Viper method that encodes \<open>inhale P; C; exhale Q\<close>.
+Its body is \<open>inhale P; C; exhale Q\<close> and the variables considered in the method are represented by 
+the list of types \<^term>\<open>tys\<close> (variable i has the i-th type in \<^term>\<open>tys\<close>).
+\<^term>\<open>vpr_method_correct_total ctxt (\<lambda>_ :: 'a full_total_state. True) (triple_as_method_decl tys P C Q)\<close> 
+expresses when the method is correct w.r.t. VCGSem.
+\<close>
 
 corollary VCG_to_verifies_set :                             
-  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: int full_total_state. True) (triple_as_method_decl tys P C Q)"
+  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: 'a full_total_state. True) (triple_as_method_decl tys P C Q)"
       and "\<Lambda> = nth_option tys"
       and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
       and ValidBodyPrePost: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
