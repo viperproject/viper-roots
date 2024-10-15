@@ -2051,8 +2051,7 @@ inductive n_steps where
   NoStep: "n_steps C \<sigma> C \<sigma>"
 | OneStep: "\<lbrakk> \<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C'', \<sigma>''\<rangle>; n_steps C'' \<sigma>'' C' \<sigma>' \<rbrakk> \<Longrightarrow>  n_steps C \<sigma> C' \<sigma>'"
 
-
-definition assertify_state_exp where
+definition assertify_state_exp :: "(('a store \<times> 'a partial_heap) \<Rightarrow> bool) \<Rightarrow> 'a equi_state set" where
   "assertify_state_exp P = { (Ag s, Ag Map.empty, h) |s h. P (s, get_vh h) }"
 
 lemma in_assertify_equiv:

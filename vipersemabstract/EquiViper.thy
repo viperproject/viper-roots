@@ -135,7 +135,7 @@ proof (rule wf_pre_virtual_stateI)
 qed
 
 typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_virtual_state \<phi> }"
-  using wf_uuu by blast
+  using wf_uuu by blast                       
 
 setup_lifting type_definition_virtual_state
 

@@ -653,6 +653,12 @@ lemma no_trace_then_core:
   using assms unfolding no_trace_def
   by (simp add: core_charact_equi(3))
 
+lemma in_starE:
+  assumes "x \<in> A \<otimes> B"
+      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
+    shows "P"
+  by (meson assms(1) assms(2) x_elem_set_product)
+
 
 lemma atrue_star_same[simp]:
   "atrue \<Delta> tys \<otimes> atrue \<Delta> tys = atrue \<Delta> tys"
@@ -1616,12 +1622,159 @@ proof -
   qed
 qed
 
-(*
+
+lemma in_starI:
+  assumes "Some x = a \<oplus> b"
+      and "a \<in> A"
+      and "b \<in> B"
+    shows "x \<in> A \<otimes> B"
+  using assms(1) assms(2) assms(3) x_elem_set_product by blast
+
+lemma get_trace_core[simp]:
+  "get_trace |\<omega>| = get_trace \<omega>"
+  using core_charact_equi(3) by blast
+
+lemma get_h_order_map_le:
+  fixes a b :: "'a \<rightharpoonup> 'b val"
+  assumes "a \<succeq> b"
+  shows "map_le b a"
+  unfolding map_le_def
+  apply clarify
+proof -
+  fix l y assume asm0: "b l = Some y"
+  then have "a l = Some y"
+    by (metis assms greaterE greater_def option.simps(3) option_plus_None_r val_option_sum)
+  then show "b l = a l"
+    using asm0 by simp
+qed
+
+
 lemma assertify_star_same:
   assumes "\<And>s h h'. map_le h h' \<and> P (s, h) \<Longrightarrow> P (s, h')"
-  shows "t_entails tys \<Delta> (assertify_state_exp P) (assertify_state_exp P \<otimes> atrue tys \<Delta>)"
-  and "t_entails tys \<Delta> (assertify_state_exp P \<otimes> atrue tys \<Delta>) (assertify_state_exp P)"
-  sorry
-*)
+  shows "t_entails \<Delta> tys (assertify_state_exp P) (assertify_state_exp P \<otimes> atrue \<Delta> tys)"
+  and "t_entails \<Delta> tys (assertify_state_exp P \<otimes> atrue \<Delta> tys) (assertify_state_exp P)"
+  unfolding assertify_state_exp_def
+   apply (rule ConcreteSemantics.entails_typedI)
+  apply (intro in_starI)
+     apply simp_all
+    apply (subgoal_tac "Some \<omega> = \<omega> \<oplus> |\<omega>| ")
+     apply assumption
+  using core_is_smaller apply blast
+  unfolding atrue_def no_trace_def apply simp
+   apply (intro conjI)
+  using TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed apply blast
+  apply (metis agreement.sel fst_conv get_trace_def snd_conv)
+   apply (rule ConcreteSemantics.entails_typedI)
+  apply (erule in_starE)
+  apply simp
+  apply (intro exI conjI)
+   apply (subgoal_tac "\<omega> = (Ag (get_store \<omega>), Ag (\<lambda>x. None), get_state \<omega>)")
+    apply assumption
+   apply (metis set_state_def set_state_get_state state_add_iff)
+  apply (elim exE)
+  apply (rule assms(1))
+  apply (intro conjI)
+   apply (subgoal_tac "get_vh h \<subseteq>\<^sub>m get_h \<omega>")
+    apply assumption
+   defer
+  apply (simp add: full_add_charact(1))
+proof -
+  fix \<omega> :: "'a equi_state"
+  fix a b s h
+  assume asm0: "Some \<omega> = a \<oplus> b" "a = (Ag s, Ag (\<lambda>x. None), h) \<and> P (concretize s h)"
+  then have "get_h \<omega> \<succeq> get_h a"
+    by (simp add: greater_heap_rule read_helper state_add_iff)
+  then have "get_h a \<subseteq>\<^sub>m get_h \<omega>"
+    using get_h_order_map_le[of "get_h \<omega>"] by blast
+  then show "get_vh h \<subseteq>\<^sub>m get_h \<omega>"
+    by (simp add: asm0(2))
+qed
+                                                
+definition pure_virtual_state_heap :: "'a partial_heap \<Rightarrow> 'a virtual_state" where
+  "pure_virtual_state_heap h = Abs_virtual_state (zero_mask, h)"
+
+lemma get_vh_vm_pure_virtual_state[simp]:
+  "get_vh (pure_virtual_state_heap h) = h"
+  "get_vm (pure_virtual_state_heap h) = zero_mask"
+proof -
+  have "wf_pre_virtual_state (zero_mask, h)"
+    apply (rule wf_pre_virtual_stateI)
+    unfolding zero_mask_def
+     apply (simp add: norm_preal(1))
+    unfolding wf_mask_simple_def
+    using all_pos by blast
+  then show "get_vh (pure_virtual_state_heap h) = h"
+    by (simp add: get_wf_easy pure_virtual_state_heap_def)
+  show "get_vm (pure_virtual_state_heap h) = zero_mask"
+    by (simp add: \<open>wf_pre_virtual_state (zero_mask, h)\<close> get_wf_easy pure_virtual_state_heap_def)
+qed
+
+lemma pure_pure_virtual_state_heap:
+  "pure (pure_virtual_state_heap h)"
+  by (metis core_is_smaller core_structure(2) get_vh_vm_pure_virtual_state(2) pure_def uu_neutral uu_simps(2) vstate_add_iff)
+
+lemma sum_ag_simp[simp]:
+  "Ag s \<oplus> Ag s = Some (Ag s)"
+  by (simp add: plus_AgI)
+
+
+lemma wf_assertion_assertify_implies_mono:
+  fixes h h' :: "'a partial_heap"
+
+  assumes "TypedEqui.wf_assertion (assertify_state_exp P)"
+      and "map_le h h'"
+      and "P (s, h)"
+    shows "P (s, h')"
+proof -
+  have r: "Some h' = h \<oplus> h'"
+    apply (rule plus_funI)
+    apply (case_tac "h l")
+     apply simp
+    apply (subgoal_tac "h' l = Some a")
+     apply (simp add: plus_val_id)
+    by (metis assms(2) domI map_le_def)
+
+  have "(Ag s, Ag (\<lambda>x. None), pure_virtual_state_heap h') \<in> assertify_state_exp P"
+    apply (rule TypedEqui.wf_assertionE[OF assms(1), of _ "(Ag s, Ag (\<lambda>x. None), pure_virtual_state_heap h)"])
+    unfolding pure_larger_def
+     apply (rule exI[of _ "(Ag s, Ag (\<lambda>x. None), pure_virtual_state_heap h')"])
+     apply (intro conjI)
+      apply (meson pure_def pure_pure_virtual_state_heap sum_equi_states_easy)
+     apply (intro plus_prodI)
+       apply simp_all
+     apply (intro compatible_virtual_state_implies_pre_virtual_state_rev)
+     apply (intro plus_prodI)
+      apply (metis get_vh_vm_pure_virtual_state(2) get_vm_def zero_mask_identity)
+    using r
+     apply (metis get_vh_def get_vh_vm_pure_virtual_state(1))
+    unfolding assertify_state_exp_def
+    using assms(3) by force
+  then show ?thesis unfolding assertify_state_exp_def
+    by simp
+qed
+
+lemma assertify_star_same_wf:
+  assumes "TypedEqui.wf_assertion (assertify_state_exp P)"
+  shows "t_entails \<Delta> tys (assertify_state_exp P) (assertify_state_exp P \<otimes> atrue \<Delta> tys)"
+  and "t_entails \<Delta> tys (assertify_state_exp P \<otimes> atrue \<Delta> tys) (assertify_state_exp P)"
+  apply (metis assertify_star_same(1) assms wf_assertion_assertify_implies_mono)
+  by (metis assertify_star_same(2) assms wf_assertion_assertify_implies_mono)
+
+
+corollary adequacy_with_star:
+  assumes "n_steps C \<sigma> C' \<sigma>'"
+      and "(tcfe \<Delta> tys) \<turnstile>CSL [assertify_state_exp P \<otimes> atrue \<Delta> tys] C [assertify_state_exp Q \<otimes> atrue \<Delta> tys]"
+      and "P \<sigma>"
+      and "well_typed_cmd tys C"
+      and "TypedEqui.typed_store (tcfe \<Delta> tys) (fst \<sigma>)"
+      and "heap_typed type_ctxt_heap (snd \<sigma>)"
+      and "TypedEqui.wf_assertion (assertify_state_exp P) \<and> TypedEqui.wf_assertion (assertify_state_exp Q)"
+    shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
+  apply (rule adequacy[OF assms(1) _ _ assms(4-6)])
+   defer
+  using assms(3) apply assumption
+  apply (rule RuleConsTyped[OF assms(2)])
+  apply (simp add: assertify_star_same_wf(1) assms(7))
+  using assertify_star_same_wf(2) assms(7) by blast
 
 end

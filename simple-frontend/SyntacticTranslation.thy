@@ -640,12 +640,6 @@ lemma sum_empty_and_same:
   by (simp add: commutative stabilize_core_right_id)
 
 
-lemma in_starI:
-  assumes "Some x = a \<oplus> b"
-      and "a \<in> A"
-      and "b \<in> B"
-    shows "x \<in> A \<otimes> B"
-  using assms(1) assms(2) assms(3) x_elem_set_product by blast
 
 lemma empty_satisfies_star:
   assumes "stabilize |x| \<in> A"
@@ -1269,19 +1263,6 @@ proof (rule sound_translation[OF assms(1-2) assms(3)])
     by (meson ConcreteSemantics.verifies_set_def assms(5) verifies_more_verifies)
 qed
 
-
-(*
-(* TODO *)
-lemma test_wf_assertion_interp:
-  "TypedEqui.wf_assertion (make_semantic_assertion_untyped \<Delta> (tcfes tys) A)"
-  sorry
-
-lemma translate_syn_wf:
-  "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
-  apply (induct C)
-           apply (simp_all add: test_wf_assertion_interp)
-
-*)
 
 
 
