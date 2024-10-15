@@ -200,33 +200,16 @@ datatype ('a, 'v, 'c) abs_stmt =
 | If "'a bexp" "('a, 'v, 'c) abs_stmt" "('a, 'v, 'c) abs_stmt"
 | Seq "('a, 'v, 'c) abs_stmt" "('a, 'v, 'c) abs_stmt" (infixl ";;" 60)
 
-\<comment>\<open>Assignments\<close>
+\<comment>\<open>Basic statements\<close>
 | LocalAssign var "('a, 'v) exp"
 | Havoc var
 
-(*
-| FieldAssign "('a, 'r) exp" "('a, 'v) exp"
-(* TODO: Probably should be a parameter of the locale! *)
-*)
 | Custom 'c
-
-(*
-\<comment>\<open>Misc\<close>
-| Label label (* Should this one be a parameter of the locale as well? *)
-*)
-
-(*
-| Scope "'v abs_vtyp" "('a, 'v, 'c) abs_stmt"
-*)
 | Skip
 
 record ('v, 'c) abs_type_context =
   variables :: "var \<rightharpoonup> 'v abs_vtyp"
   custom_context :: 'c
-
-(* Should also have a mapping from heap loc to abs_typ?
-Maybe should not...
- *)
 
 locale typed_state =
     fixes wf_custom_state :: "'c \<Rightarrow> ('a :: sep_algebra) \<Rightarrow> bool"

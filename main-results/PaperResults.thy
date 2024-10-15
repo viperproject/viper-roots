@@ -4,22 +4,57 @@ theory PaperResults
 begin
 
 
-section \<open>Summary of the Results from the Paper\<close>
+section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
 
-text \<open>This file contains the formal results mentioned the paper. It is organized in the same order
-and with the same structure as the paper.
-\<^item> You can use the panel "Sidekick" on the right to see and navigate the structure of the file, via sections and subsections.
-\<^item> You can ctrl+click on terms to jump to their definition.
-\<^item> After jumping to another location, you can come back to the previous location by clicking the
-  green left arrow, on the right side of the menu above.\<close>
+text \<open>
+Follow the instructions in the README for the artifact, which
+shows how to identify that Isabelle has checked all files correctly that are loaded when this file
+\<open>PaperResults.thy\<close> is opened.
 
+Once Isabelle has successfully checked all files, continue here.
 
-subsection \<open>2: Key Ideas\<close>
+The following Isabelle theory file contains references to all the formalised results explicitly
+mentioned in the paper. The theory file is structured using Isabelle sections and subsections,
+which match those from the paper. Within each subsection we structured the different parts that we 
+show via Isabelle paragraphs (there is one Isabelle paragraph per bullet point at the lowest level 
+in the artifact README). You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly 
+jump to a section, subsection, or paragraph.
 
-subsubsection \<open>2.1: A Core Language for SL-Based IVLs\<close>
+The following Isabelle theory file contains references to all the formalised results explicitly
+mentioned in the paper. The theory file is structured using Isabelle sections and subsections,
+which match those from the paper. Within each subsection we structured the different parts that we 
+show via Isabelle paragraphs (there is one Isabelle paragraph per bullet point at the lowest level 
+in the artifact README). You can use the "Sidekick" view on the right side of the Isabelle IDE to quickly 
+jump to a section, subsection, or paragraph.
 
+In the Isabelle IDE, you can ctrl-and-click on defined names, which takes you to the Isabelle source 
+where the name is defined (for example, a standard definition or an Isabelle function). 
+Whenever you jump somewhere via ctrl-and-clicking (for example, by jumping to a section or a definition),
+you can use the two green arrow buttons at the top of the Isabelle IDE to jump back (or forward) to the 
+previous position.
+
+In this document, we make use of Isabelle's documentation features, which itself can contain Isabelle
+elements (and are checked via Isabelle), to walk you through the formalisation of the definitions and 
+rules in the paper. In particular, we use the following Isabelle document elements:
+
+  \<^item> types (for example, \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close>)
+     --> you can click on defined names in types (i.e. \<open>abs_stmt\<close> in the example)
+  \<^item> defined names (for example, \<^const>\<open>semantics.red_stmt\<close> --> you can click on defined names)
+  \<^item> terms (for example, \<^term>\<open>semantics.red_stmt \<Delta>\<close>)
+    --> you can click on defined names in terms (i.e. \<open>semantics.red_stmt\<close> in the example)
+  \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just 
+    boolean terms
+    --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> and \<open>True\<close> in the example)
+\<close>
+
+section \<open>2: Key Ideas\<close>
+
+subsection \<open>2.1: A Core Language for SL-Based IVLs\<close>
+
+paragraph \<open>Figure 1\<close>
 text \<open>The syntax of CoreIVL (Figure 1) is defined in the file AbstractSemantics.thy as
-the type \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close> (<-- you can ctrl+click on the name \<open>abs_stmt\<close> to jump to its definition).
+the type \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close> (<-- you can ctrl+click on the name \<open>abs_stmt\<close> to jump to its definition,
+as mentioned above).
                               
 \<open>'a\<close>, \<open>'v\<close>, and \<open>'c\<close> are type parameters:
 \<^item> \<open>'a\<close>: Type of state (IDF algebra...)
@@ -27,36 +62,40 @@ the type \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close> (<-- you can ctrl+click on 
 \<^item> \<open>'c\<close>: Type of custom statements\<close>
 
 
-subsubsection \<open>2.3: Operational Semantics and Back-End Verifiers\<close>
+subsection \<open>2.3: Operational Semantics and Back-End Verifiers\<close>
 
 context semantics
 begin
 
-text \<open>Figure 3 (a): In the file AbstractSemantics.thy, ...
-\<^term>\<open>red_stmt\<close>
-signature: \<^term>\<open>red_stmt \<Delta> C \<omega> S\<close>
-represents \<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close>.
+paragraph \<open>Figure 3 a)\<close> 
+text\<open> 
+In the file AbstractSemantics.thy, \<^const>\<open>red_stmt\<close> defines the operational semantics of CoreIVL,
+which contains the rules in Figure 3 a). 
+\<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close> in the paper is represented by \<^prop>\<open>red_stmt \<Delta> C \<omega> S\<close>.
 \<close>
 
-text \<open>Definition 1: C is correct for \<open>\<omega>\<close> iff
-\<^term>\<open>verifies \<Delta> C \<omega>\<close>
-\<close>
+paragraph \<open>Definition 1\<close>
+text\<open>C is correct for \<open>\<omega>\<close> iff \<^term>\<open>verifies \<Delta> C \<omega>\<close>\<close>
 
 text \<open>TODO: Why do we define valid, but we don't have it?\<close>
 
 definition valid where
   "valid \<Delta> C \<longleftrightarrow> (\<forall>\<omega>. verifies \<Delta> C \<omega>)"
 
-subsubsection \<open>2.4: Axiomatic Semantics\<close>
+subsection \<open>2.4: Axiomatic Semantics\<close>
 
-text \<open>Axiomatic semantics:
-\<^item> \<^term>\<open>SL_proof \<Delta> P C Q\<close>
-\<^item> \<^term>\<open>\<Delta> \<turnstile> [P] C [Q]\<close>\<close>
+paragraph \<open>Triple \<open>\<Delta> \<turnstile> [P] C [Q]\<close> and Figure 3b)\<close>
+text \<open>
+In the file AbstractSemantics.thy, \<^const>\<open>SL_proof\<close> defines the axiomatic semantics of CoreIVL,
+which contains the rules in Figure 3 b).
+\<open>\<Delta> \<turnstile> [P] C [Q]\<close> in the paper is represented by \<^prop>\<open>\<Delta> \<turnstile> [P] C [Q]\<close> (which is syntactic sugar for 
+\<^prop>\<open>SL_proof \<Delta> P C Q\<close>)
+\<close>
 
+paragraph \<open>Theorem 2: Operational-to-Axiomatic Soundness\<close>
 
-text \<open>Theorem 2: Operational-to-Axiomatic Soundness\<close>
+text \<open>The following is a general version of theorem 2:\<close>
 
-text \<open>General theorem\<close>
 theorem operational_to_axiomatic_soundness_general:
   assumes "verifies_set \<Delta> A C"
       and "wf_abs_stmt \<Delta> C"
@@ -75,9 +114,10 @@ lemma good_atrue_typed:
   apply (rule self_framingI)
   by (simp add: already_stable)
 
-text \<open>Actual theorem 2\<close>
+text \<open>The following is theorem 2 as presented in the paper:\<close>
+
 corollary operational_to_axiomatic_soundness:
-  assumes "wf_abs_stmt \<Delta> C"
+  assumes "wf_abs_stmt \<Delta> C" \<comment>\<open>C is well-typed\<close>
       and "valid \<Delta> C"
     shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]"
   using assms good_atrue_typed operational_to_axiomatic_soundness_general 
@@ -107,7 +147,8 @@ lemma entailment_2:
   by (smt (verit, best) commutative comp_eq_dest_lhs greater_def member_filter typed_smaller typed_state.typed_state_then_stabilize_typed typed_state_axioms x_elem_set_product)
 
 
-text \<open>Lemma 1\<close>
+paragraph \<open>Lemma 1 (Exhale-inhale)\<close>
+text \<open>The following shows lemma 1 from the paper:\<close>
 lemma exhale_havoc_inhale:
   assumes context_well_formed: "wrC C \<subseteq> dom (variables \<Delta>) \<and> finite_context \<Delta>"
 
@@ -137,9 +178,9 @@ lemma exhale_havoc_inhale:
   done
 
 
-subsection \<open>3: Semantics\<close>
+section \<open>3: Semantics\<close>
 
-subsubsection \<open>3.1: An Algebra for Separation Logic and Implicit Dynamic Frames\<close>
+subsection \<open>3.1: An Algebra for Separation Logic and Implicit Dynamic Frames\<close>
 
 text \<open>See file: SepAlgebraDef.thy. Definition 3.
 Layered:
@@ -200,7 +241,7 @@ lemma rel_stable_assertion_same_as_in_paper:
 
 
 
-subsubsection \<open>3.2: Operational Semantics\<close>
+subsection \<open>3.2: Operational Semantics\<close>
 
 
 text \<open>Figure 7: In the file AbstractSemantics.thy, ...
@@ -208,7 +249,7 @@ text \<open>Figure 7: In the file AbstractSemantics.thy, ...
 signature: \<^term>\<open>red_stmt \<Delta> C \<omega> S\<close>
 represents \<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close>.\<close>
 
-subsubsection \<open>3.3: Axiomatic Semantics\<close>
+subsection \<open>3.3: Axiomatic Semantics\<close>
 
 text \<open>Axiomatic semantics:
 \<^item> \<^term>\<open>SL_proof \<Delta> P C Q\<close>
@@ -242,7 +283,7 @@ theorem completeness:
 
 end
 
-subsubsection \<open>3.4: ViperCore: Instantiating CoreIVL with Viper\<close>
+subsection \<open>3.4: ViperCore: Instantiating CoreIVL with Viper\<close>
 
 text \<open>See the file Instantiation.thy.
 (1) State: \<^typ>\<open>'a equi_state\<close>
@@ -255,11 +296,11 @@ text \<open>See the file Instantiation.thy.
 \<close>
 
 
-subsection \<open>4: Back-End Soundness\<close>
+section \<open>4: Back-End Soundness\<close>
 
 
 
-subsubsection \<open>4.1: Symbolic Execution\<close>
+subsection \<open>4.1: Symbolic Execution\<close>
 
 
 theorem sinit_sexec_verifies_set :
@@ -278,7 +319,7 @@ theorem sinit_sexec_verifies_set :
 
 (* TODO! See with Gaurav, and Michael? *)
 
-subsubsection \<open>4.2: Verification Condition Generation\<close>
+subsection \<open>4.2: Verification Condition Generation\<close>
 
 (* TODO! See with Gaurav *)
 
@@ -286,9 +327,9 @@ subsubsection \<open>4.2: Verification Condition Generation\<close>
 
 
 
-subsection \<open>5: Front-End Soundness\<close>
+section \<open>5: Front-End Soundness\<close>
 
-subsubsection \<open>5.1: An IDF-Based Concurrent Separation Logic\<close>
+subsection \<open>5.1: An IDF-Based Concurrent Separation Logic\<close>
 
 text \<open>ParImp defined in the file simple-frontend/ParImp.thy.
 \<^item> Syntax:
@@ -328,7 +369,7 @@ theorem adequacy_CSL:
 
 
 
-subsubsection \<open>5.2: A Sound Front-End Translation\<close>
+subsection \<open>5.2: A Sound Front-End Translation\<close>
 
 text \<open>Translation: Figure 10.
 Defined in the file simple-frontend/SyntacticTranslation.thy.
