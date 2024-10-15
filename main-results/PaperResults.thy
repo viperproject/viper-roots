@@ -39,6 +39,7 @@ rules in the paper. In particular, we use the following Isabelle document elemen
 
   \<^item> types (for example, \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close>)
      --> you can click on defined names in types (i.e. \<open>abs_stmt\<close> in the example)
+  \<^item> type classes (for example, \<^class>\<open>sep_algebra\<close>)
   \<^item> defined names (for example, \<^const>\<open>semantics.red_stmt\<close> --> you can click on defined names)
   \<^item> terms (for example, \<^term>\<open>semantics.red_stmt \<Delta>\<close>)
     --> you can click on defined names in terms (i.e. \<open>semantics.red_stmt\<close> in the example)
@@ -52,9 +53,8 @@ section \<open>2: Key Ideas\<close>
 subsection \<open>2.1: A Core Language for SL-Based IVLs\<close>
 
 paragraph \<open>Figure 1\<close>
-text \<open>The syntax of CoreIVL (Figure 1) is defined in the file AbstractSemantics.thy as
-the type \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close> (<-- you can ctrl+click on the name \<open>abs_stmt\<close> to jump to its definition,
-as mentioned above).
+text \<open>The syntax of CoreIVL (Figure 1) is defined as the type \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close> 
+(<-- you can ctrl+click on the name \<open>abs_stmt\<close> to jump to its definition, as mentioned above).
                               
 \<open>'a\<close>, \<open>'v\<close>, and \<open>'c\<close> are type parameters:
 \<^item> \<open>'a\<close>: Type of state (IDF algebra...)
@@ -69,8 +69,7 @@ begin
 
 paragraph \<open>Figure 3 a)\<close> 
 text\<open> 
-In the file AbstractSemantics.thy, \<^const>\<open>red_stmt\<close> defines the operational semantics of CoreIVL,
-which contains the rules in Figure 3 a). 
+\<^const>\<open>red_stmt\<close> defines the operational semantics of CoreIVL, which contains the rules in Figure 3 a). 
 \<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close> in the paper is represented by \<^prop>\<open>red_stmt \<Delta> C \<omega> S\<close>.
 \<close>
 
@@ -86,7 +85,7 @@ subsection \<open>2.4: Axiomatic Semantics\<close>
 
 paragraph \<open>Triple \<open>\<Delta> \<turnstile> [P] C [Q]\<close> and Figure 3b)\<close>
 text \<open>
-In the file AbstractSemantics.thy, \<^const>\<open>SL_proof\<close> defines the axiomatic semantics of CoreIVL,
+\<^const>\<open>SL_proof\<close> defines the axiomatic semantics of CoreIVL,
 which contains the rules in Figure 3 b).
 \<open>\<Delta> \<turnstile> [P] C [Q]\<close> in the paper is represented by \<^prop>\<open>\<Delta> \<turnstile> [P] C [Q]\<close> (which is syntactic sugar for 
 \<^prop>\<open>SL_proof \<Delta> P C Q\<close>)
@@ -182,23 +181,33 @@ section \<open>3: Semantics\<close>
 
 subsection \<open>3.1: An Algebra for Separation Logic and Implicit Dynamic Frames\<close>
 
-text \<open>See file: SepAlgebraDef.thy. Definition 3.
-Layered:
-\<^item> \<^class>\<open>pcm\<close>: Accepts a type and binary operation \<^term>\<open>a \<oplus> b\<close>, first 3 axioms.
-\<^item> \<^class>\<open>pcm_with_core\<close>: Adds core \<^term>\<open>|x|\<close>, and next 5 axioms.
-\<^item> \<^class>\<open>sep_algebra\<close>: Adds \<^term>\<open>stable\<close> and \<^term>\<open>stabilize\<close>, last 5 axioms.\<close>
+paragraph \<open>Definition 3 (IDF algebra) and Figure 5\<close>
+text \<open>IDF algebras are formalized via type type class \<^class>\<open>sep_algebra\<close>. 
+This type class is defined via other type classes. To see all the axioms listed in Figure 5, one must
+inspect all of the type classes.
+More concretely, \<^class>\<open>sep_algebra\<close> is defined in terms of type classes \<^class>\<open>pcm_with_core\<close>, which
+is defined in terms of \<^class>\<open>pcm\<close>. The following gives a brief description of what each type class
+contributes and which axioms shown in Figure 5 it contains:
 
-text \<open>Instantiations:
-For combinators, see file SepAlgebra.thy.
+\<^item> \<^class>\<open>pcm\<close>: Accepts a type and binary operation \<^term>\<open>a \<oplus> b\<close> and contains the first 3 axioms (top row) 
+  in Figure 5 (note that here, the associativity axiom in Figure 5 is split into two axioms)
+\<^item> \<^class>\<open>pcm_with_core\<close>: Adds core \<^term>\<open>|x|\<close>, and contains the next 5 axioms in Figure 5 (second row
+  and first axiom in third row).
+\<^item> \<^class>\<open>sep_algebra\<close>: Adds \<^term>\<open>stable\<close> and \<^term>\<open>stabilize\<close>, and contains the last 5 axioms. in 
+  Figure 5 (all axioms in Figure 5 that contain \<open>stabilize\<close>)\<close>
+
+paragraph\<open>Instantiations\<close>
+text \<open>Instantiations: TODO(can we provide ctrl-clicking elements here?, also improve text)
+For combinators, see file SepAlgebra.thy. 
 State model \<open>\<Sigma>\<^sub>I\<^sub>D\<^sub>F\<close> defined in file EquiViper.thy. Actually our state is much more complex.
 \<close>
 
-text \<open>State model for CoreIVL:
-\<^typ>\<open>('v, 'a) abs_state\<close>, where
+paragraph \<open>State model for CoreIVL\<close>
+text \<open>The state model for CoreIVL is given by \<^typ>\<open>('v, 'a) abs_state\<close>, where
 \<^item> \<open>'v\<close> is the type of values for local variables, and
 \<^item> \<open>'a\<close> is the type of states (IDF algebra).\<close>
 
-
+paragraph\<open>Definition 4\<close>
 text \<open>Definition 4:
 \<^item> P is self-framing: \<^term>\<open>self_framing P\<close>                 
 \<^item> The state \<omega> frames the assertion P: \<^term>\<open>rel_stable_assertion \<omega> P\<close>
@@ -244,18 +253,24 @@ lemma rel_stable_assertion_same_as_in_paper:
 subsection \<open>3.2: Operational Semantics\<close>
 
 
-text \<open>Figure 7: In the file AbstractSemantics.thy, ...
-\<^term>\<open>red_stmt\<close>
-signature: \<^term>\<open>red_stmt \<Delta> C \<omega> S\<close>
-represents \<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close>.\<close>
+paragraph \<open>Figure 6\<close>
+text \<open>
+\<^const>\<open>red_stmt\<close> defines the operational semantics of CoreIVL, which contains the rules in Figure 6. 
+\<open>\<langle>C, \<omega>\<rangle> \<rightarrow>\<^sub>\<Delta> S\<close> in the paper is represented by \<^prop>\<open>red_stmt \<Delta> C \<omega> S\<close>.
+\<close>
 
 subsection \<open>3.3: Axiomatic Semantics\<close>
 
-text \<open>Axiomatic semantics:
-\<^item> \<^term>\<open>SL_proof \<Delta> P C Q\<close>
-\<^item> \<^term>\<open>\<Delta> \<turnstile> [P] C [Q]\<close>\<close>
+paragraph \<open>Triple \<open>\<Delta> \<turnstile> [P] C [Q]\<close> and Figure 7\<close>
+text \<open>
+\<^const>\<open>SL_proof\<close> defines the axiomatic semantics of CoreIVL,
+which contains the rules in Figure 7.
+\<open>\<Delta> \<turnstile> [P] C [Q]\<close> in the paper is represented by \<^prop>\<open>\<Delta> \<turnstile> [P] C [Q]\<close> (which is syntactic sugar for 
+\<^prop>\<open>SL_proof \<Delta> P C Q\<close>)
+\<close>
 
-text \<open>Lemma 2\<close>
+paragraph \<open>Lemma 2\<close>
+text\<open>Lemma 2 is given by:\<close>
 
 lemma lemma_2_from_operational_to_axiomatic_semantics:
   fixes S :: "(('v, 'a) abs_state list \<times> ('v, 'a) abs_state) \<Rightarrow> ('v, 'a) abs_state set"
@@ -268,8 +283,8 @@ lemma lemma_2_from_operational_to_axiomatic_semantics:
   unfolding wf_set_def wf_state_def using assms(1) by auto
 
 
-text \<open>Completeness\<close>
-
+paragraph \<open>Theorem 5: Completeness\<close>
+text\<open>Theorem 5 is given by: (TODO: first assumption \<^prop>\<open>wf_abs_stmt \<Delta> C\<close> not mentioned in paper)\<close>
 
 theorem completeness:
   assumes "wf_abs_stmt \<Delta> C"
