@@ -6,8 +6,6 @@ begin
 
 section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
 
-text \<open>TODO: make sure text here is in sync with README\<close>
-
 text \<open>
 Follow the instructions in the README for the artifact, which
 shows how to identify that Isabelle has checked all files correctly that are loaded when this file
@@ -67,13 +65,6 @@ text \<open>The syntax of CoreIVL (Figure 1) is defined as the type \<^typ>\<ope
 \<^item> \<open>'a\<close>: Type of state (IDF algebra...)
 \<^item> \<open>'v\<close>: Type of values for local variables
 \<^item> \<open>'c\<close>: Type of custom statements\<close>
-
-subsection \<open>2.2: Background: Translational Verification of a Parallel Program\<close>
-
-paragraph \<open>The CSL Triple \<open>\<Delta> \<turnstile>\<^sub>C\<^sub>S\<^sub>L [P] C [Q]\<close> \<close>
-text \<open>The CSL Triple \<open>\<Delta> \<turnstile>\<^sub>C\<^sub>S\<^sub>L [P] C [Q]\<close> and its rules are formalized as \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>
-(which is notation for \<^term>\<open>CSL_syn \<Delta> P C Q\<close> ). E.g. the rule \<open>Par\<close> is @{thm RulePar}
-\<close>
 
 subsection \<open>2.3: Operational Semantics and Back-End Verifiers\<close>
 
@@ -191,10 +182,7 @@ permission for a heap location \<open>loc\<close> implies that the partial heap 
 
 We prove that \<^typ>\<open>'a virtual_state\<close> forms an IDF algebra in the file
  @{file "../vipersemabstract/EquiSemAuxLemma.thy"} 
-(look for the line "instantiation virtual_state :: (type) sep_algebra").
-
-TODO is there more to say here?
-\<close>
+(look for the line "instantiation virtual_state :: (type) sep_algebra").\<close>
 
 paragraph \<open>State model for CoreIVL\<close>
 text \<open>The state model for CoreIVL is given by \<^typ>\<open>('v, 'a) abs_state\<close>, where
@@ -258,13 +246,12 @@ lemma lemma_2_from_operational_to_axiomatic_semantics:
 
 paragraph \<open>Theorem 5: Completeness\<close>
 text\<open>Theorem 5 is given by the following.
-Note that we require C to be well-formed, i.e., \<^term>\<open>wf_abs_stmt \<Delta> C\<close>
-TODO: Explain what it checks:
-- Assertions are well-formed (cannot become false because of more info (pure state))
-- Expressions are well-formed (cannot change value because of more info)
-- Expressions and variables for assignment are well-typed
-- Havoced variables are defined
-: (TODO: first assumption \<^prop>\<open>wf_abs_stmt \<Delta> C\<close> not mentioned in paper)\<close>
+Note that in this theorem, as in many theorems below as well, we require C to be well-formed,
+i.e., \<^term>\<open>wf_abs_stmt \<Delta> C\<close>, which we ignored in the paper. This ensures that
+- assertions are well-formed (\<^term>\<open>wf_assertion A\<close>): Adding a pure state cannot make the assertion become false.
+- expressions are well-formed (\<^term>\<open>wf_exp e\<close>): Adding a pure state cannot change the value of the expression.
+- expressions and variables for local assignments are well-typed.
+- Variables that are havoced must be defined in the type context.\<close>
 
 theorem completeness:
   assumes "wf_abs_stmt \<Delta> C"
@@ -279,6 +266,8 @@ theorem completeness:
 end
 
 subsection \<open>3.4: ViperCore: Instantiating CoreIVL with Viper\<close>
+
+paragraph \<open>Components for ViperCore instantiation\<close>
 
 text \<open>The four components that we need for our ViperCore instantiation are given by:
 
@@ -384,20 +373,26 @@ section \<open>5: Front-End Soundness\<close>
 
 subsection \<open>5.1: An IDF-Based Concurrent Separation Logic\<close>
 
+paragraph \<open>The language ParImp\<close>
+
 text \<open>ParImp defined in the file simple-frontend/ParImp.thy.
 \<^item> Syntax:
   \<^item> Commands: \<^typ>\<open>cmd\<close>
   \<^item> Arithmetic expressions: \<^typ>\<open>exp\<close>
   \<^item> Boolean expressions: \<^typ>\<open>bexp\<close>
 \<^item> Small-step semantics: \<^term>\<open>red C \<sigma> C' \<sigma>'\<close>, or equivalently, \<^term>\<open>\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>\<close>
+\<close>
 
-Program logic (Figure 9) defined in the file simple-frontend/CSL_IDF.thy:
+paragraph \<open>The IDF-Based CSL (Figure 9)\<close>
+
+text \<open>Program logic (Figure 9) defined in the file simple-frontend/CSL_IDF.thy:
 \<^term>\<open>CSL_syn \<Delta> P C Q\<close> or \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>
 \<close>
 
+paragraph \<open>Theorem 8: Soundness and Adequacy\<close>
 
-
-
+text \<open>For a well-typed program, a valid syntactic derivation \<open>tcfe \<Delta> tys \<turnstile>CSL [P] C [Q]\<close>
+implies the semantic judgment \<open>CSL (tcfe \<Delta> tys) P C Q\<close>.\<close>
 
 theorem soundness_CSL:
   assumes "tcfe \<Delta> tys \<turnstile>CSL [P] C [Q]"
@@ -405,23 +400,44 @@ theorem soundness_CSL:
     shows "CSL (tcfe \<Delta> tys) P C Q"
   using assms CSL_sound by blast
 
+
 text \<open>Theorem 8: Adequacy\<close>
 
-
-(* TODO: Make adequacy work with "\<otimes> atrue" for real e2e theorem? *)
 theorem adequacy_CSL:
   assumes "n_steps C \<sigma> C' \<sigma>'"
       and "tcfe \<Delta> tys \<turnstile>CSL [assertify_state_exp P] C [assertify_state_exp Q]"
       and "P \<sigma>"
+
+  \<comment> \<open>The following three assumptions require that the program and the initial state are well-typed.\<close>
       and "well_typed_cmd tys C"
       and "TypedEqui.typed_store (tcfe \<Delta> tys) (fst \<sigma>)"
       and "heap_typed type_ctxt_heap (snd \<sigma>)"
+
     shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
   using assms adequacy by blast
 
+text \<open>To connect to the CSL triples that we establish in the next subsection, we also prove a version
+of adequacy where every assertion in the CSL triple is conjoined with \<^term>\<open>atrue \<Delta> tys\<close>.\<close>
+corollary adequacy_CSL_with_star:
+  assumes "n_steps C \<sigma> C' \<sigma>'"
+      and "(tcfe \<Delta> tys) \<turnstile>CSL [assertify_state_exp P \<otimes> atrue \<Delta> tys] C [assertify_state_exp Q \<otimes> atrue \<Delta> tys]"
+      and "P \<sigma>"
 
+  \<comment> \<open>The following three assumptions require that the program and the initial state are well-typed.\<close>
+      and "well_typed_cmd tys C"
+      and "TypedEqui.typed_store (tcfe \<Delta> tys) (fst \<sigma>)"
+      and "heap_typed type_ctxt_heap (snd \<sigma>)"
+
+  \<comment> \<open>We also require that P and Q well-formed.\<close>
+      and "TypedEqui.wf_assertion (assertify_state_exp P) \<and> TypedEqui.wf_assertion (assertify_state_exp Q)"
+
+    shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
+  using adequacy_with_star assms
+  by blast
 
 subsection \<open>5.2: A Sound Front-End Translation\<close>
+
+paragraph \<open>Front-End Translation (Figure 10)\<close>
 
 text \<open>Translation: Figure 10.
 Defined in the file simple-frontend/SyntacticTranslation.thy.
@@ -432,7 +448,7 @@ and then show that verification of the syntactic translation into ViperCore impl
 \<close>
 
 
-text \<open>Theorem 9: Soundness of the front-end translation\<close>
+paragraph \<open>Theorem 9: Soundness of the front-end translation\<close>
 
 
 theorem sound_front_end_translation:
@@ -450,12 +466,14 @@ shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \
   by (rule sound_syntactic_translation) (simp_all add: assms)
 
 
+paragraph \<open>Lemma 3: Inhale-translation-exhale pattern\<close>
 
+text \<open>In the following, we systematically use \<^term>\<open>A \<otimes> atrue \<Delta> tys\<close> instead of \<^term>\<open>A\<close>:
+This ensures that all the assertions are "affine" (also called "intuitionistic"), which allows the
+logic to "drop" resources.\<close>
 
 text \<open>Lemma 3: What we call "convertible" is the following:
-TODO:
-- Explain "\<otimes> atrue \<Delta> tys"
-- Explain "inhalify \<Delta> tys A" instead of A
+TODO:- Explain "inhalify \<Delta> tys A" instead of A
 \<close>
 
 definition convertible where
@@ -475,7 +493,8 @@ lemma lemma_3_inhale_translation_exhale:
 context semantics
 begin
 
-text \<open>Lemma 4\<close>
+paragraph \<open>Lemma 4: Exhale-havoc-inhale\<close>
+
 lemma lemma_4_exhale_havoc_inhale:
   assumes context_well_formed: "wrC C \<subseteq> dom (variables \<Delta>) \<and> finite_context \<Delta>"
 
@@ -501,44 +520,6 @@ backends. The theorem for the symbolic execution back-end is
 @{thm sound_syntactic_translation_symexec} and the theorem for the VCG back-end is
 @{thm sound_syntactic_translation_VCG}.
 \<close>
-
-(*
-TODO:
-- Combine e2e Carbon with adequacy?
-- e2e theorem for symbolic execution?
-- Remove the theorem below?
-*)
-
-
-theorem VCG_e2e_sound:
-  assumes "wf_stmt \<Delta> tys C"
-      and "well_typed_cmd tys C"
-      and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
-      and ValidFrontendCmd: "valid_front_end_cmd C"
-      and ValidPrePost: "valid_a2t_assert Ps \<and> valid_a2t_assert Qs"
-
-      and AbsTypeWf: "abs_type_wf (interp.domains \<Delta>)"
-      and InterpFunsPredsEmpty: "interp.funs \<Delta> = (\<lambda> _ _ _. None) \<and> interp.predicates \<Delta> = Map.empty"
-
-      and "mdecl = (triple_as_method_decl tys Ps (fst (translate_syn C)) Qs)"
-      and MethodCorrect: "vpr_method_correct_total (default_ctxt (domains \<Delta>) mdecl) (\<lambda>_ :: int full_total_state. True) mdecl"     
-      and AuxiliaryMethodsCorrectAndTyped:
-        "\<And> stmtAux. stmtAux \<in> snd (translate_syn C) \<Longrightarrow> 
-             let mdeclAux = triple_as_method_decl tys 
-                              true_syn_assertion stmtAux true_syn_assertion 
-             in
-             vpr_method_correct_total (default_ctxt (domains \<Delta>) mdeclAux) (\<lambda>_ :: int full_total_state. True) mdeclAux \<and>
-             stmt_typing (program_total (default_ctxt (domains \<Delta>) mdeclAux)) (nth_option tys) stmtAux"
- 
-      and MainViperTyped: 
-            "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option tys)
-                   (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn C))) (stmt.Exhale Qs))"
-
-      and "P = make_semantic_assertion_gen False \<Delta> (tcfes tys) Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes tys) Qs"     
-    shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
-  using assms sound_syntactic_translation_VCG
-  by blast
 
 
 

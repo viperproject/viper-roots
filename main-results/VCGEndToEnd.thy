@@ -139,7 +139,7 @@ proof -
     unfolding sem_fields_def absval_interp_total_def
      apply simp
      apply (metis TypedEqui.typed_core TypedEqui.typed_def TypedEqui.typed_state_axioms assms(1) custom_context_tcfe_eq sem_fields_def typed_state.typed_state_then_stabilize_typed)
-    using assms(2) by blast
+    using assms(2) by simp
 qed
 
 theorem sound_syntactic_translation_VCG:
@@ -384,7 +384,7 @@ proof (rule sound_translation[OF assms(1-3)])
       apply (meson ConcreteSemantics.verifies_set_def TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed \<open>ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl tys true_syn_assertion Cv_syn true_syn_assertion)) (nth_option tys))) (compile False \<Delta> (tcfes tys) Cv_syn)\<close> stabilize_is_stable)
       apply (rule stabilize_core_initial_state)
         apply simp_all
-      using no_trace_atrue apply blast
+      using no_trace_atrue apply fastforce
       using TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed by blast
   qed
 qed
