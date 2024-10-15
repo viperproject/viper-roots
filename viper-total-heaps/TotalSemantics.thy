@@ -516,6 +516,21 @@ definition vpr_method_correct_total :: "'a total_context \<Rightarrow> ('a full_
           )
        "
 
+lemma vpr_method_correct_totalE: 
+  assumes "vpr_method_correct_total ctxt R mdecl"
+      and "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args mdecl @ rets mdecl)) (get_store_total \<omega>)"
+      and "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>)"
+      and "is_empty_total_full \<omega>"
+      and "red_inhale ctxt R (method_decl.pre mdecl) \<omega> rpre"
+      and "rpre \<noteq> RFailure \<Longrightarrow> rpre = RNormal \<omega>pre"
+      and "method_decl.body mdecl = Some mbody"      
+      and Rec: "vpr_postcondition_framed ctxt R (method_decl.post mdecl) (get_total_full \<omega>pre) (get_store_total \<omega>) \<Longrightarrow>                 
+                vpr_method_body_correct ctxt R mdecl \<omega>pre \<Longrightarrow> P"
+    shows "P"
+   using assms
+   unfolding vpr_method_correct_total_def vpr_method_correct_total_aux_def
+   by blast
+
 definition vpr_method_correct_total_expanded :: "'a total_context \<Rightarrow> ('a full_total_state \<Rightarrow> bool) \<Rightarrow> method_decl \<Rightarrow> bool" where
   "vpr_method_correct_total_expanded ctxt R mdecl \<equiv>
          (\<forall>(\<omega> :: 'a full_total_state) rpre. 
