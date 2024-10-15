@@ -77,62 +77,12 @@ lemma eval_binop_Lte_perm_r_eq_True :
   by (cases v1; auto)
 
 section \<open>def\<close>
-(*
-look into https://arxiv.org/pdf/2311.07559
-look into http://malte.schwerhoff.de/docs/phd_thesis.pdf
-look at featherweight verifast
-
-idea: 
-- use the symbolic execution from gradual viper paper
-- add permissions and wildcards, inhale statements (just not part of their syntax)
-- remove predicates
-- define it as a relation in Isabelle
-  - can be executed in the prover with simp
-  - can leave decision procedures open/parametric/semantic
-  - can have a semantic state consolidation algorithm 
-      (the gradual viper paper does not have one since they only have 1 or 0 permission, so their heap chunks are disjoint)
-
-notes on symbolic execution from gradual viper paper:
-- I don't understand how exactly their formalization of symbolic execution works. I thought that the
-  symbolic execution would construct a derivation of their rules and one would prove that if one has
-  such a derivation, then the program is safe or so. But their non-determinism is the wrong way around
-  for that. In particular, branching on conditionals is handled with non-deterministic rules, so if
-  the symbolic execution could pick the non-determinism it could determine the branching of conditionals
-  which does not make sense. Instead it seems like they construct a derivation of their symbolic execution
-  rules in their soundness proof.
-- On trick to make this work is that they complete their derivation with failure steps like SConsumeAccFailure, which
-  allows them to prove e.g. lemma 46. In their case, verification failure is denoted by always failing runtime checks (see 3.3)
-- I am not sure if one can extend their setup to permissions since in this case the symbolic execution would need to
-  handle all possible ways how a permission can be removed from the heap. Also already for the case where
-  heap fragments are non-disjoint, their setup becomes weird (they mention that they prove disjointness of heap fragments).
-- I am not sure if one can extend their setting to cases where one wants to give more flexibility to the symbolic execution.
-  In particular, we might want to allow an arbitrary state consolidation algorithm. But this would need a different
-  kind of non-determinism than the non-determinism from branching \<rightarrow> dual non-det to the rescue!
-
-plan for function:
-- add symbolic values to expressions to get symbolic expressions? Or hijack var constructor for symbolic values?
-- state: 
-  + path condition: boolean valued symbolic expression
-  + store: maps vars to symbolic expressions
-  + heap: 
-    * permissions: map from heap locations to symbolic expressions representing permissions
-    * heap: total (?) map from heap locations to symbolic expressions
-  + trace: Ignore?
-  + counter for generating fresh names for new symbolic expressions
-
-questions:
-- how to handle havocing of the heap when one does not have permission anymore?
-
-type: recursive function that takes a program and a state and generates a new state and a list of sideconditions
- *)
-
 
 subsection \<open>basic definitions\<close>
 
 definition def_domains :: "'a \<Rightarrow> abs_type" where
 "def_domains = undefined"
 
-(* C of https://arxiv.org/pdf/2311.07559 *)
 subsection \<open>symbolic expressions\<close>
 type_synonym sym_val = var
 type_synonym 'a valuation = "sym_val \<rightharpoonup> 'a val"

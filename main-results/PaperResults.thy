@@ -1,6 +1,6 @@
 theory PaperResults
   imports SimpleViperFrontEnd.SyntacticTranslation ViperAbstractRefinesTotal.AbstractRefinesTotal VCGEndToEnd
-  ViperAbstract.SymbolicExecSound  
+  ViperAbstract.SymbolicExecSound ViperAbstract.SymbolicExecAuto SymbolicExecEndToEnd
 begin
 
 
@@ -68,6 +68,12 @@ text \<open>The syntax of CoreIVL (Figure 1) is defined as the type \<^typ>\<ope
 \<^item> \<open>'v\<close>: Type of values for local variables
 \<^item> \<open>'c\<close>: Type of custom statements\<close>
 
+subsection \<open>2.2: Background: Translational Verification of a Parallel Program\<close>
+
+paragraph \<open>The CSL Triple \<open>\<Delta> \<turnstile>\<^sub>C\<^sub>S\<^sub>L [P] C [Q]\<close> \<close>
+text \<open>The CSL Triple \<open>\<Delta> \<turnstile>\<^sub>C\<^sub>S\<^sub>L [P] C [Q]\<close> and its rules are formalized as \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>
+(which is notation for \<^term>\<open>CSL_syn \<Delta> P C Q\<close> ). E.g. the rule \<open>Par\<close> is @{thm RulePar}
+\<close>
 
 subsection \<open>2.3: Operational Semantics and Back-End Verifiers\<close>
 
@@ -103,7 +109,7 @@ which contains the rules in Figure 3 b).
 
 paragraph \<open>Theorem 2: Operational-to-Axiomatic Soundness\<close>
 
-text \<open>The following is a general version of theorem 2:\<close>
+text \<open>The following is a more general version of Theorem 2:\<close>
 
 theorem operational_to_axiomatic_soundness_general:
   assumes "verifies_set \<Delta> A C"
@@ -113,18 +119,23 @@ theorem operational_to_axiomatic_soundness_general:
     shows "\<exists>B. \<Delta> \<turnstile> [A] C [B]"
   using assms Viper_implies_SL_proof by simp
 
-text \<open>The following is theorem 2 as presented in the paper:\<close>
+text \<open>From this theorem, we can derive Theorem 2 as presented in the paper:\<close>
 
 corollary operational_to_axiomatic_soundness:
   assumes "wf_abs_stmt \<Delta> C" \<comment>\<open>C is well-typed\<close>
       and "valid \<Delta> C"
-    shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]"
+    shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]" \<comment>\<open>atrue_typed corresponds to \<top>\<close>
   using assms good_atrue_typed operational_to_axiomatic_soundness_general 
   unfolding valid_def verifies_set_def by blast
 
 
+paragraph \<open>Figure 4\<close>
+text \<open>The CSL Triple \<open>\<Delta> \<turnstile>\<^sub>C\<^sub>S\<^sub>L [P] C [Q]\<close> is forrmalized as \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>.
+ See the description of Section 2.2 above.\<close>
+
 paragraph \<open>Lemma 1 (Exhale-inhale)\<close>
-text \<open>The following shows lemma 1 from the paper:\<close>
+text \<open>The following shows lemma 1 from the paper.
+(The formalization of the proof of the frontend uses the rules like SL_proof_Seq_elim directly).\<close>
 lemma exhale_havoc_inhale:
   assumes context_well_formed: "wrC C \<subseteq> dom (variables \<Delta>) \<and> finite_context \<Delta>"
 
@@ -174,7 +185,7 @@ contributes and which axioms shown in Figure 5 it contains:
   Figure 5 (all axioms in Figure 5 that contain \<open>stabilize\<close>)\<close>
 
 paragraph\<open>Instantiations\<close>
-text \<open>Our concrete IDF state model \<Sigma>_IDF is defined in \<^typ>\<open>'a virtual_state\<close>, which is a subset type
+text \<open>Our concrete IDF state model \<open>\<Sigma>\<^sub>I\<^sub>D\<^sub>F\<close> is defined in \<^typ>\<open>'a virtual_state\<close>, which is a subset type
 of \<^typ>\<open>'a pre_virtual_state\<close> (restricting permissions to be at most 1 and requiring that nonzero 
 permission for a heap location \<open>loc\<close> implies that the partial heap defines a value for \<open>loc\<close>.
 
@@ -273,8 +284,8 @@ text \<open>The four components that we need for our ViperCore instantiation are
 
 \<^item> (1) IDF algebra instance:
     Our ViperCore IDF algebra instance is given by \<^typ>\<open>'a virtual_state\<close> (\<Sigma>_IDF in the paper),
-    which we discuss above as part of Section 3.1.
-    TODO where do we mention \<^typ>\<open>'a equi_state\<close>?
+    which we discuss above as part of Section 3.1. The state model of the instantiated CoreIVL
+    is \<^typ>\<open>'a equi_state\<close>.
 \<^item> (2) Custom statements:
   We define our custom statements in \<^typ>\<open>'a custom\<close>, which just includes field assignments
   \<^term>\<open>FieldAssign e1 f e2\<close>.
@@ -282,32 +293,40 @@ text \<open>The four components that we need for our ViperCore instantiation are
   \<^item> Operational semantics: \<^term>\<open>red_custom_stmt \<Delta> (FieldAssign e1 f e2) \<omega> S\<close>
   \<^item> Axiomatic semantics: \<^term>\<open>SL_Custom \<Delta> P (FieldAssign e1 f e2) Q\<close>
 \<^item> (4) Proofs that the semantics in (3) are compatible with our framework
-  TODO: where is this located?
+   This is done by the \<open>global_interpretation ConcreteSemantics\<close> in
+   @{file "../vipersemabstract/Instantiation.thy"}
 \<close>
 
 
 section \<open>4: Back-End Soundness\<close>
 
-
-
 subsection \<open>4.1: Symbolic Execution\<close>
 
-\<comment>\<open>TODO: Michael\<close>
+paragraph \<open>Figure 8: Definition of the symbolic execution\<close>
+text\<open>The definition of the symbolic execution can be found in
+ @{file "../vipersemabstract/SymbolicExecDef.thy"} and the
+ corresponding automation in @{file "../vipersemabstract/SymbolicExecAuto.thy"}
+ (including some testcases). Concretely,
+ - \<open>SymState\<close> is \<^typ>\<open>'a sym_state\<close>
+ - \<open>Chunk\<close> is \<^typ>\<open>'a chunk\<close>
+ - \<open>SymExpr\<close> (denoted by t) is \<^typ>\<open>'a sym_exp\<close> (defined semantically)
+ - \<open>sexec\<close> is \<^term>\<open>sexec\<close>
+ - \<open>sproduce\<close> is \<^term>\<open>sproduce\<close>
+ - \<open>sconsume\<close> is \<^term>\<open>sconsume\<close>
+ - \<open>scleanup\<close> is \<^term>\<open>sym_stabilize\<close>
+ - \<open>pc_add\<close> is \<^term>\<open>sym_cond_add\<close>
+ - \<open>sexp\<close> is \<^term>\<open>sexec_exp\<close>
+ - \<open>chunk_add\<close> is \<^term>\<open>sym_heap_do_add\<close>
+ - \<open>extract\<close> is \<^term>\<open>sym_heap_extract\<close>
+ - \<open>consolidate\<close> is \<^term>\<open>sym_consolidate\<close>
+ - \<open>\<omega> \<sim>\<^sub>s\<^sub>y\<^sub>m \<sigma>\<close> is the conjunction of \<^term>\<open>\<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>)\<close>
+     and \<open>s2a_state_wf \<Lambda> F V \<sigma>\<close>
+\<close>
 
-theorem sinit_sexec_verifies_set :
-  assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
-  assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
-  assumes "\<Lambda> = nth_option tys"
-  assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
-  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
-  apply (rule sexec_verifies_set[where Q=Q]; (rule assms)?)
-  using assms apply -
-  subgoal for \<omega>
-    apply (erule (1) sinit_sound[where \<omega>=\<omega>])
-    by (auto simp add:TypedEqui.typed_def TypedEqui.typed_store_def s2a_ctxt_def)
-  done
+paragraph \<open>Theorem 6\<close>
 
-(* TODO! See with Gaurav, and Michael? *)
+text\<open>Theorem 6 corresponds to @{thm sexec_verifies_set}. Note that the formal theorem has some
+additional sideconditions that the state and statement is well-typed.\<close>
 
 subsection \<open>4.2: Verification Condition Generation\<close>
 
@@ -476,10 +495,18 @@ end
 
 section \<open>End-to-end Theorems\<close>
 
+text\<open>To check that all different theorems fit together, we have proven two end-to-end theorems that
+allow one to obtain a proof in the front-end CSL logic from a successful verification by the two 
+backends. The theorem for the symbolic execution back-end is
+@{thm sound_syntactic_translation_symexec} and the theorem for the VCG back-end is
+@{thm sound_syntactic_translation_VCG}.
+\<close>
+
 (*
 TODO:
 - Combine e2e Carbon with adequacy?
 - e2e theorem for symbolic execution?
+- Remove the theorem below?
 *)
 
 
