@@ -6,6 +6,8 @@ begin
 
 section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
 
+text \<open>TODO: make sure text here is in sync with README\<close>
+
 text \<open>
 Follow the instructions in the README for the artifact, which
 shows how to identify that Isabelle has checked all files correctly that are loaded when this file
@@ -39,14 +41,15 @@ rules in the paper. In particular, we use the following Isabelle document elemen
 
   \<^item> types (for example, \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close>)
      --> you can click on defined names in types (i.e. \<open>abs_stmt\<close> in the example)
-  \<^item> type classes (for example, \<^class>\<open>sep_algebra\<close>)
-  \<^item> defined names (for example, \<^const>\<open>semantics.red_stmt\<close> --> you can click on defined names)
-  \<^item> terms (for example, \<^term>\<open>semantics.red_stmt \<Delta>\<close>)
-    --> you can click on defined names in terms (i.e. \<open>semantics.red_stmt\<close> in the example)
+  \<^item> type classes (for example, \<^class>\<open>sep_algebra\<close> --> you can click on defined names in type classes)
+  \<^item> defined names (for example, \<^const>\<open>red_stmt_total\<close> --> you can click on defined names)
+  \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
+    --> you can click on defined names in terms (i.e. \<open>red_stmt_total ctxt\<close> in the example)
   \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just 
     boolean terms
     --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> and \<open>True\<close> in the example)
   \<^item> proved lemmas (for example, @{thm VCG_to_verifies_set})
+    --> you can click on the lemma names (i.e. \<open>VCG_to_verifies_set\<close> in the example)
 
 We also provide links to files in some cases such as @{file "../vipersemabstract/Instantiation.thy"}
 (which you can also ctrl-click on).
