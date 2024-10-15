@@ -1616,12 +1616,12 @@ proof -
   qed
 qed
 
-
+(*
 lemma assertify_star_same:
   assumes "\<And>s h h'. map_le h h' \<and> P (s, h) \<Longrightarrow> P (s, h')"
   shows "t_entails tys \<Delta> (assertify_state_exp P) (assertify_state_exp P \<otimes> atrue tys \<Delta>)"
   and "t_entails tys \<Delta> (assertify_state_exp P \<otimes> atrue tys \<Delta>) (assertify_state_exp P)"
   sorry
-
+*)
 
 end
