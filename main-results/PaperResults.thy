@@ -321,8 +321,7 @@ subsection \<open>4.1: Symbolic Execution\<close>
 theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
-  (* TODO: replace with nth_option from TotalUtil? *)
-  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<Lambda> = nth_option tys"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
   shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
   apply (rule sexec_verifies_set[where Q=Q]; (rule assms)?)
