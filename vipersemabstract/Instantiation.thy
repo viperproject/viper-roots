@@ -254,18 +254,7 @@ proof -
   show "get_vm (get_state (remove_only \<omega> l)) = (get_vm (get_state \<omega>))(l := PosReal.pnone)"
     by (metis (mono_tags, lifting) Abs_virtual_state_inverse r get_state_set_state get_vm_def mem_Collect_eq prod.sel(1) remove_only_def)
 qed
-(*
-lemma remove_only_core:
-  "|remove_only \<omega> l| = |\<omega>|"
-proof (rule full_state_ext)
-  show "get_store |remove_only \<omega> l| = get_store |\<omega>|"
-    by (simp add: core_charact(1) remove_only_def)
-  show "get_trace |remove_only \<omega> l| = get_trace |\<omega>|"
-    by (metis get_trace_set_state remove_only_def set_state_core)
-  show "get_state |remove_only \<omega> l| = get_state |\<omega>|"
-    by (metis Rep_virtual_state_inverse agreement.exhaust_sel core_charact(2) core_def core_structure(1) core_structure(2) get_abs_state_def get_abs_state_set_abs_state get_state_def get_state_set_state get_state_set_trace get_vh_def get_vm_def prod.exhaust_sel remove_only_charact(1) set_abs_state_def set_trace_def)
-qed
-*)
+
 
 lemma remove_only_stabilize:
   "stabilize (remove_only \<omega> l) = remove_only (stabilize \<omega>) l"
@@ -448,11 +437,6 @@ definition pure_post_field_assign where
 definition well_typed :: "(field_ident \<rightharpoonup> 'a val set) \<Rightarrow> ('a ag_trace \<times> 'a virtual_state) \<Rightarrow> bool" where
   "well_typed \<Gamma> \<omega> \<longleftrightarrow> well_typed_heap \<Gamma> (snd \<omega>) \<and> (\<forall>l \<phi>. the_ag (fst \<omega>) l = Some \<phi> \<longrightarrow> well_typed_heap \<Gamma> \<phi>)"
 
-(* TODO:
-1. Adapt interpretation and prove rules
-2. Prove simpler rules for FieldAssign when heap independent
-3. Prove rule label?
-*)
 
 lemma well_typedI[intro]:
   assumes "well_typed_heap \<Gamma> (snd \<omega>)"
@@ -527,7 +511,7 @@ qed
 fun wf_custom_stmt where
   "wf_custom_stmt \<Delta> (FieldAssign r f e) \<longleftrightarrow> sep_algebra_class.wf_exp r \<and> sep_algebra_class.wf_exp e
   \<and> (\<exists>ty. custom_context \<Delta> f = Some ty \<and> TypedEqui.typed_exp ty e)"
-(* | "wf_custom_stmt _ (Label _) \<longleftrightarrow> True" *)
+
 
 definition typed_value where
   "typed_value \<Delta> f v \<longleftrightarrow> (\<forall>ty. custom_context \<Delta> f = Some ty \<longrightarrow> v \<in> ty)"
@@ -572,42 +556,7 @@ inductive SL_Custom :: "('a val, (field_ident \<rightharpoonup> 'a val set)) abs
 inductive_cases SL_custom_FieldAssign[elim!]: "SL_Custom \<Delta> A (FieldAssign r f e) B"
 (* inductive_cases SL_custom_Label[elim!]: "SL_Custom \<Delta> A (Label l) B" *)
 
-(*
-lemma typed_then_update_value_typed:
-  assumes "TypedEqui.typed_assertion \<Delta> A"
-  shows "TypedEqui.typed_assertion \<Delta> (update_value \<Delta> A r f e)"
-proof (rule TypedEqui.typed_assertionI)
-  fix \<omega>' assume asm0: "\<omega>' \<in> update_value \<Delta> A r f e"
-  then obtain \<omega> l v ty where "custom_context \<Delta> f = Some ty" "v \<in> ty"
- "\<omega> \<in> A" "r \<omega> = Some l" "e \<omega> = Some v" "\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
-    using update_valueE by blast
-  show "TypedEqui.typed \<Delta> \<omega>'"
-    unfolding TypedEqui.typed_def
-  proof
-    show "TypedEqui.typed_store \<Delta> (get_store \<omega>')"
-      by (metis TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<omega> \<in> A\<close> \<open>\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<close> assms get_store_set_state)
-    show "well_typed (custom_context \<Delta>) (get_abs_state \<omega>')"
-    proof (rule well_typedI)
-      show "\<And>l \<phi>. the_ag (fst (get_abs_state \<omega>')) l = Some \<phi> \<Longrightarrow> Instantiation.well_typed_heap (custom_context \<Delta>) \<phi>"
-        by (metis TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<omega> \<in> A\<close> \<open>\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<close> assms get_abs_state_def get_trace_def get_trace_set_state well_typedE(2))
-      show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state \<omega>'))"
-      proof (rule well_typed_heapI)
-        fix hl v assume asm1: "get_vh (snd (get_abs_state \<omega>')) hl = Some v"
-        show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v \<in> ty"
-        proof (cases "fst hl = l")
-          case True
-          then show ?thesis
-            by (smt (verit, ccfv_SIG) TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<And>thesis. (\<And>\<omega> l v ty. \<lbrakk>custom_context \<Delta> f = Some ty; v \<in> ty; \<omega> \<in> A; r \<omega> = Some l; e \<omega> = Some v; \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> asm1 assms get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) snd_conv well_typedE(1) well_typed_concrete_heap_update well_typed_heapE)
-        next
-          case False
-          then show ?thesis
-            by (smt (verit, ccfv_SIG) TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<And>thesis. (\<And>\<omega> l v ty. \<lbrakk>custom_context \<Delta> f = Some ty; v \<in> ty; \<omega> \<in> A; r \<omega> = Some l; e \<omega> = Some v; \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> asm1 assms get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) snd_conv well_typedE(1) well_typed_concrete_heap_update well_typed_heapE)
-        qed
-      qed
-    qed
-  qed
-qed
-*)
+
 
 lemma set_state_value_inv:
   assumes "get_vh \<phi> l = Some v"
@@ -768,40 +717,6 @@ proof (rule self_framingI)
           qed
         qed
       qed (simp_all add: r)
-(*
-      moreover have "TypedEqui.typed \<Delta> ?x"
-        unfolding TypedEqui.typed_def
-      proof
-        show "TypedEqui.typed_store \<Delta> (get_store (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
-          
-
-          by (metis TypedEqui.typed_def asm0(1) get_store_set_state)
-        show "well_typed (custom_context \<Delta>) (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
-        proof (rule well_typedI)
-          show "\<And>la \<phi>. the_ag (fst (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))) la = Some \<phi> \<Longrightarrow>
-       Instantiation.well_typed_heap (custom_context \<Delta>) \<phi>"
-            by (metis TypedEqui.typed_def asm0(1) get_abs_state_def get_trace_def get_trace_set_state well_typedE(2))
-          show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0))))"
-          proof (rule well_typed_heapI)
-            fix hl v' assume asm2: "get_vh (snd (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))) hl = Some v'"
-            show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v' \<in> ty"
-              apply (cases "hl = (l, f)")
-              apply (metis (mono_tags, lifting) TypedEqui.typed_assertionE \<open>get_h \<omega> (l, f) = Some v0\<close> asm1(1) asm2 assms(7) get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) map_upd_Some_unfold typed_get_vh)
-            proof -
-              assume "hl \<noteq> (l, f)"
-              then have "get_vh (set_value (get_state \<omega>') (l, f) v0) hl = Some v'"
-                by (metis get_abs_state_def get_state_def get_state_set_state asm2)
-              then have "get_vh (get_state \<omega>') hl = Some v'"
-                by (simp add: \<open>hl \<noteq> (l, f)\<close>)
-              then show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v' \<in> ty"
-                using asm0 typed_get_vh by blast
-            qed
-          qed
-        qed
-      qed
-      ultimately show ?thesis by fast
-    qed
-*)
       ultimately show ?thesis by blast
     qed
     then have "\<exists>x. x \<in> A \<and> r x = Some l \<and> e x = Some v \<and> \<omega>' = set_state x (set_value (get_state x) (l, f) v)"
@@ -823,11 +738,7 @@ inductive red_custom_stmt :: "('a val, field_ident \<rightharpoonup> 'a val set)
 inductive_cases red_custom_stmt_FieldAssign[elim!]: "red_custom_stmt \<Delta> (FieldAssign r f e) \<omega> S"
 (* inductive_cases red_custom_stmt_Label[elim!]: "red_custom_stmt \<Delta> (Label l) \<omega> S" *)
 
-(*
-  assumes SL_proof_custom: "(\<forall>(\<omega> :: (('v, 'a) abs_state list \<times> ('v, 'a) abs_state)) \<in> SA.
-  red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>)) \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> wf_set \<Delta> (snd ` SA)
-  \<Longrightarrow> SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union>\<omega>\<in>SA. f \<omega>))"
-*)
+
 lemma SL_proof_FieldAssign_easy:
   assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> (FieldAssign r g e) (snd \<omega>) (f \<omega>)"
       and "wf_custom_stmt \<Delta> (FieldAssign r g e)"
@@ -896,9 +807,6 @@ proof -
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' \<in> f \<alpha>"
         by auto
 
-(* "TypedEqui.typed \<Delta> \<omega>'"
-        by (metis (no_types, lifting) TypedEqui.Stabilize_typed_def UN_E in_Stabilize member_filter)
-*)
 
       then obtain l v where "f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)}"  "r (snd \<alpha>) = Some l" "e (snd \<alpha>) = Some v"
         using r[of \<alpha>] by blast
@@ -908,10 +816,7 @@ proof -
         by (simp add: \<open>\<alpha> \<in> SA\<close> assms(3))
       ultimately have "snd \<alpha> \<in> Stabilize (snd ` SA)"
         by (simp add: \<open>\<alpha> \<in> SA\<close> already_stable)
-(*
-      moreover have "TypedEqui.typed \<Delta> (stabilize \<omega>')"
-        by (simp add: TypedEqui.typed_state_then_stabilize_typed asm0(2))
-*)
+
       moreover have "stabilize \<omega>' \<in> ?B"
         using in_update_value[of _ _ r _ e, OF _ \<open>r (snd \<alpha>) = Some l\<close> \<open>e (snd \<alpha>) = Some v\<close>
             \<open>stabilize \<omega>' = set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)\<close>]
@@ -1052,14 +957,6 @@ qed
 abbreviation typed where
   "typed \<equiv> TypedEqui.typed"
 
-(*
-text \<open>'v represents the type of the "domain" values, and 'a the type of Viper resource states\<close>
-
-record ('v, 'a) interp =
-  domains :: "'v \<Rightarrow> abs_type"
-  predicates :: "'v predicate_loc \<rightharpoonup> 'a set"
-  funs :: "function_ident \<Rightarrow> 'v val list \<Rightarrow> 'a \<rightharpoonup> 'v val"
-*)
 
 (* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
 definition make_context_semantic  :: "('a, 'a virtual_state) interp \<Rightarrow> (nat \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option) \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"

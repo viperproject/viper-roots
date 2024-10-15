@@ -75,18 +75,6 @@ lemma typed_store_update:
   by (meson assms(1) assms(2) assms(3) store_typed_update typed_store_def)
 
 
-(*
-
-definition equal_on_set :: "var set \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> (var \<rightharpoonup> 'v) \<Rightarrow> bool" where
-  "equal_on_set S \<sigma>1 \<sigma>2 \<longleftrightarrow> (\<forall>x \<in> S. \<sigma>1 x = \<sigma>2 x)"
-
-definition overapprox_fv :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> var set \<Rightarrow> bool" where
-  "overapprox_fv \<Delta> A S \<longleftrightarrow> (\<forall>\<sigma>1 \<sigma>2 \<gamma>. typed_store \<Delta> \<sigma>1 \<and> typed_store \<Delta> \<sigma>2 \<and> equal_on_set S \<sigma>1 \<sigma>2 \<longrightarrow> ((Ag \<sigma>1, \<gamma>) \<in> A \<longleftrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A))"
-
-
-definition free_vars where
-  "free_vars A = (\<Inter>S \<in> {S. overapprox_fv \<Delta> A S \<and> S \<subseteq> dom (variables \<Delta>)}. S)"
-*)
 
 lemma fvaA_atrue_empty[simp]:
   "free_vars \<Delta> UNIV = {}"
@@ -97,9 +85,6 @@ proof -
   then show ?thesis unfolding free_vars_def by blast
 qed
 
-
-
-(* Free variables *)
 
 
 section \<open>Free variables\<close>
@@ -1132,9 +1117,6 @@ next
         using red_stmt_Inhale_elim by blast
       then have "\<omega> \<in> f l"
         by (smt (verit, best) Inhale.prems(4) \<open>l \<in> SA\<close> \<open>snd l = stabilize a\<close> already_stable asm0(1) asm0(2) asm0(4) calculation comp_apply is_in_set_sum member_filter stabilize_sum typed_sum)
-(*
-        by (metis (no_types, lifting) Inhale.prems(3) asm0(1) asm0(3) asm0(4) calculation in_Stabilize is_in_set_sum member_filter typed_sum wf_set_def wf_state_def)
-*)
       then show "\<omega> \<in> \<Union> (f ` SA)"
         using \<open>l \<in> SA\<close> by blast
     qed
@@ -1309,11 +1291,7 @@ next
 
   have r: "\<And>\<alpha>. \<alpha> \<in> SA \<Longrightarrow> (variables \<Delta> x = Some ?ty \<and> f \<alpha> = { assign_var_state x (Some v) (snd \<alpha>) |v. v \<in> ?ty})"
     using Havoc by fastforce
-(*
-    ?\<omega>7 \<in> SA \<Longrightarrow> red_stmt \<Delta> (abs_stmt.Havoc x) (snd ?\<omega>7) (f ?\<omega>7)
-    wf_abs_stmt \<Delta> (abs_stmt.Havoc x)
-    wf_set \<Delta> (snd ` SA)
-*)
+
   have "\<Delta> \<turnstile> [?A] abs_stmt.Havoc x [?B]"
     by (rule RuleHavoc) simp
   moreover have "?B = Stabilize (\<Union> (f ` SA))"
@@ -1486,20 +1464,6 @@ lemma entails_refl:
   "entails A A"
   by (simp add: entailsI)
 
-(*
-lemma free_vars_subset:
-  assumes "\<And>\<sigma>1 \<sigma>2 \<tau> \<gamma>. typed \<Delta> (Ag \<sigma>1, \<gamma>) \<and> typed \<Delta> (Ag \<sigma>2, \<gamma>) \<and> equal_on_set V \<sigma>1 \<sigma>2 \<Longrightarrow> (Ag \<sigma>1, \<gamma>) \<in> A \<Longrightarrow> (Ag \<sigma>2, \<gamma>) \<in> A"
-      and "V \<subseteq> dom (variables \<Delta>)"
-     shows "free_vars A \<subseteq> V"
-proof -
-  have "overapprox_fv \<Delta> A V"
-    sledgehammer
-
-    by (smt (verit, del_insts) assms equal_on_set_def overapprox_fv_def)
-  then show ?thesis
-    by (simp add: Inf_lower free_vars_def assms(2))
-qed
-*)
 
 lemma entails_trans:
   assumes "entails A B"
@@ -1572,21 +1536,6 @@ proof (rule free_vars_subset)
     by (metis \<open>get_store (Ag \<sigma>2, \<gamma>) x = Some v0'\<close> assign_var_state_def calculation(2) in_exists_assert r(3) r(4))
 qed
 
-(*
-lemma exists_assert_entails:
-  assumes "typed_assertion \<Delta> A"
-      and "variables \<Delta> x \<noteq> None"
-  shows "entails A (exists_assert \<Delta> x A)"
-proof (rule entailsI)
-  fix \<omega> assume asm0: "\<omega> \<in> A"
-  then have "typed \<Delta> \<omega>"
-    using assms(1) typed_assertion_def by blast
-  then obtain v0 ty v where "v0 \<in> ty \<and> get_store \<omega> x = Some v0 \<and> variables \<Delta> x = Some ty \<and> v \<in> ty" "(set_store \<omega> ((get_store \<omega>)(x \<mapsto> v))) \<in> A"
-    by (smt (verit, best) asm0 assms(2) domD domIff full_state_ext fun_upd_triv get_abs_state_set_store get_store_set_store typed_def typed_store_def store_typed_def)
-  then show "\<omega> \<in> exists_assert \<Delta> x A"
-    by (metis \<open>typed \<Delta> \<omega>\<close> assign_var_state_def exists_assertI)
-qed
-*)
 
 definition entails_typed where
   "entails_typed \<Delta> A B \<longleftrightarrow> (\<forall>\<omega>. \<omega> \<in> A \<and> typed \<Delta> \<omega> \<longrightarrow> \<omega> \<in> B)"
@@ -1795,9 +1744,7 @@ next
   case (RuleAssume A P \<Delta>)
   then have "(\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))"
     using self_framing_on_def by blast
-(*
-  self_framing_on A P = (\<forall>\<omega>\<in>A. (stabilize \<omega> \<in> P) = (\<omega> \<in> P))
-*)
+
   moreover have asm0: "stable_on \<omega> P"
   proof (rule stable_onI)
     fix x assume "pure_larger x \<omega>"

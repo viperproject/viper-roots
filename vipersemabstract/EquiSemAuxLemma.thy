@@ -192,10 +192,6 @@ qed
 
 
 
-(*
-real_mult_permexpr does not seem to be defined...
-*)
-
 
 lemma real_mult_permexpr_case_split:
   assumes "p > 0"
@@ -638,17 +634,6 @@ next
     by (simp add: compatible_virtual_state_implies_pre_virtual_state_rev)
 qed
 
-(*
-lemma lambda_None_is_identity:
-  shows "\<And>t :: 'v trace. Some t = t \<oplus> (Ag Map.Emp)"
-proof -
-  fix t :: "'v trace"
-  have "\<And>l. Some (t l) = (t l) \<oplus> ((\<lambda>l. None) l)"
-    by (simp add: commutative)
-  then show "Some t = t \<oplus> (\<lambda>l. None)"
-    by (simp add: plus_funI)
-qed
-*)
 
 lemma zero_mask_identity:
   "Some x = x \<oplus> (zero_mask :: ('b, preal) abstract_mask)"
@@ -1544,15 +1529,9 @@ qed
 
 end
 
+
+
 (*
-lemma stable_rel_virtual_stateI:
-  assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
-  shows "stable_rel a x"
-proof (clarsimp simp add: stable_rel_def stable_virtual_state_def)
-*)
-
-
-
 lemma stable_rel_virtual_stateE:
   assumes "stable_rel a x"
       and "get_vh x hl = Some v"
@@ -1561,6 +1540,7 @@ lemma stable_rel_virtual_stateE:
 (* This does not hold! But it also should not hold. If there is a contradiction between a and x, all locations become stable. *)
   oops
   (* by (metis assms option.discI stable_rel_virtual_state_def) *)
+*)
 
 
 subsection \<open>heap_typed\<close>

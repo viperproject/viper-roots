@@ -79,23 +79,18 @@ proof (rule self_framingI)
     using assms self_framingE self_framing_invE test_self_framing by blast
 qed
 
+definition no_trace where
+  "no_trace \<omega> \<longleftrightarrow> get_trace \<omega> = Map.empty"
 
-(* Parameters
-- tys: A list of vtyps for the variables of the program
-- F???
- *)
+definition atrue where
+  "atrue \<Delta> tys = Set.filter no_trace (inhalify \<Delta> tys UNIV)"
+
 
 text \<open>The following checks:
 1) Whether all provided annotations (loop invariants, pre- and postconditions for parallel compositions)
 are self-framing.
 2) The pre- and postconditions for parallel compositions do not refer to variables modified by the other thread.
 3) r cannot appear in e in \<^term>\<open>Calloc r e\<close>. \<close>
-
-definition no_trace where
-  "no_trace \<omega> \<longleftrightarrow> get_trace \<omega> = Map.empty"
-
-definition atrue where
-  "atrue \<Delta> tys = Set.filter no_trace (inhalify \<Delta> tys UNIV)"
 
 fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarrow> cmd \<Rightarrow> bool" 
   where
@@ -120,29 +115,10 @@ fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarr
 | "wf_stmt \<Delta> tys _ \<longleftrightarrow> True"
 
 
-(*
-  "atrue \<Delta> tys = Set.filter no_trace (inhalify \<Delta> tys UNIV)"
-*)
-
 lemma atrue_self_framing_and_typed[simp]:
   "self_framing UNIV"
   by (simp add: self_framing_def)
 
-(*
-lemma wf_context_type_context[simp]:
-  "TypedEqui.wf_context (tcfe \<Delta> tys)"
-  unfolding TypedEqui.wf_context_def
-proof -
-  have "dom (variables (tcfe \<Delta> tys)) \<subseteq> {x. x < undefined}"
-    by (metis CollectI abs_type_context.select_convs(1) domIff subsetI type_ctxt_front_end_def type_ctxt_store_def)
-  then show "finite (dom (variables (tcfe \<Delta> tys)))"
-    by (simp add: finite_subset)
-qed
-*)
-
-(*
-Set.filter (typed \<Delta> \<circ> stabilize) P
-*)
 
 
 abbreviation stab_inhalify where
@@ -472,7 +448,7 @@ proof (rule ConcreteSemantics.SL_proof_LocalAssign_elim)
   proof (rule RuleCons)
     show "(tcfe \<Delta> tys) \<turnstile>CSL [P] Cread x r [read_result P x r]"
     proof (rule RuleRead)
-      show "P \<subseteq> read_perm r" (* Should come from framed_by_exp *)
+      show "P \<subseteq> read_perm r"
         using r
         unfolding read_perm_def 
         by (simp add: subsetI)
@@ -521,16 +497,7 @@ fun translate :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Righta
   ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion \<Delta> (tcfes tys) I) \<inter> assertify_bexp (Bnot b)),
   { Inhale ((make_semantic_assertion \<Delta> (tcfes tys) I) \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) I)) } \<union> snd (translate \<Delta> tys C))"
 
-(*
-lemma CSL_weaken_post_atrue:
-  assumes "(tcfe \<Delta> tys) \<turnstile>CSL [P] C [Q]"
-  shows "(tcfe \<Delta> tys) \<turnstile>CSL [P] C [Q \<otimes> UNIV]"
-  using assms(1)
-proof (rule RuleCons)
-  show "Q \<subseteq> Q \<otimes> UNIV"
-    using add_set_commm assms(2) conjunct_with_true_entails by blast
-qed (simp)
-*)
+
 
 lemma self_framing_atrue[simp]:
   "self_framing (atrue \<Delta> tys)"
@@ -686,33 +653,6 @@ lemma t_entails_univ_atrue:
 
 
 
-(*
-lemma atrue_star_univ[simp]:
-  "UNIV \<otimes> atrue \<Delta> tys = atrue \<Delta> tys"
-proof
-  show "UNIV \<otimes> atrue \<Delta> tys \<subseteq> atrue \<Delta> tys"
-    unfolding atrue_def
-    apply rule
-    apply (erule in_starE)
-    apply simp
-    using TypedEqui.typed_sum no_trace_then_sum_no_trace_simpler stabilize_sum
-
-    by blast
-  show "atrue \<Delta> tys \<subseteq> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
-  proof 
-    fix x assume "x \<in> atrue \<Delta> tys"
-    then have "|x| \<in> atrue \<Delta> tys" unfolding atrue_def
-      using no_trace_then_core
-      apply simp
-      apply (intro conjI)
-      using TypedEqui.typed_smaller core_stabilize_mono(2) max_projection_prop_pure_core mpp_smaller apply blast
-      by blast
-    then show "x \<in> atrue \<Delta> tys \<otimes> atrue \<Delta> tys"
-      using \<open>x \<in> atrue \<Delta> tys\<close> core_is_smaller x_elem_set_product by blast
-  qed
-qed
-*)
-
 lemma atrue_twice_same:
   "UNIV \<otimes> UNIV \<subseteq> UNIV"
   unfolding add_set_def
@@ -795,7 +735,7 @@ proof (rule invariant_translateI)
   qed
 qed
 
-(* Is this lemma 3? *)
+
 lemma invariant_translate_inhale_exhale_get_proof:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C Q"
       and "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (Inhale A;; fst (translate \<Delta> tys C);; Exhale B) Q"
@@ -901,11 +841,6 @@ proof
 qed
 
 
-(*
-lemma univ_t_entails_atrue:
-  "t_entails \<Delta> tys UNIV (atrue \<Delta> tys)"
-  by (simp add: ConcreteSemantics.entails_typedI TypedEqui.typed_state_then_stabilize_typed atrue_def)
-*)
 
 lemma invariant_translate_parallel:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C1 Q"
@@ -1009,21 +944,6 @@ proof (rule invariant_translateI)
   qed
 qed
 
-(*
-Maybe prove? Need to prove that assertions are wf...
-lemma translation_wf:
-  assumes "wf_stmt \<Delta> tys C"
-      and "well_typed_cmd tys C"
-    shows "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
-  using assms
-proof (induct C)
-  case (Cseq C1 C2)
-  then show ?case
-    by (metis ConcreteSemantics.wf_abs_stmt.simps(7) fst_eqD translate.simps(7) well_typed_cmd.simps(2) wf_stmt.simps(1))
-next
-  ...
-qed (simp_all)
-*)
 
 lemma invariant_translate_if:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C1 Q"
@@ -1107,15 +1027,7 @@ lemma inhalify_intersection:
   "inhalify \<Delta> tys (A \<inter> B) = inhalify \<Delta> tys A \<inter> B"
   by auto
 
-(*
-lemma t_entails_add_atrue:
-  assumes "t_entails \<Delta> tys A B"
-  shows "t_entails \<Delta> tys A ((atrue \<Delta> tys) \<otimes> B)"
-  
-*)
-(*
-  using ConcreteSemantics.entails_typed_trans assms conjunct_with_true_t_entails t_entails_add univ_t_entails_atrue by blast
-*)
+
 
 lemma invariant_translate_while:
   assumes "\<And>P Q. invariant_translate \<Delta> tys P C Q"
@@ -1294,11 +1206,6 @@ lemma atrue_semi_typed:
   "ConcreteSemantics.semi_typed (tcfe \<Delta> tys) (atrue \<Delta> tys)"
   by (metis ConcreteSemantics.semi_typedI atrue_def comp_apply member_filter)
 
-(*
-lemma self_framing_atrue:
-  "self_framing (atrue \<Delta> tys)"
-proof (rule self_framingI)
-*)
 
 lemma t_entails_inhalify:
   "t_entails \<Delta> tys P (inhalify \<Delta> tys P)"

@@ -2,36 +2,15 @@ theory ParImp
   imports ViperCommon.SepAlgebra ViperCommon.SepLogic ViperAbstract.Instantiation VHelper
 begin
 
-(* Maybe adapt 'a state model to instantiation, just remove mask... *)
-
 definition field_val :: "string" where
   "field_val = ''val''"
 
-term "x :: int equi_state"
-(*
-  :: "(nat \<Rightarrow> int val option) agreement \<times> (char list \<Rightarrow> int virtual_state option) agreement \<times> int virtual_state"
-*)
 
-(*
-type_synonym val = int
-type_synonym var = nat
-type_synonym 'a heap_loc = int
-type_synonym 'a heap = "'a heap_loc \<rightharpoonup> val" (* concrete 'a heap *)
-type_synonym 'a stack = "var \<Rightarrow> val"
-*)
 type_synonym 'a stack = "var \<rightharpoonup> 'a val"
 type_synonym 'a heap = "'a partial_heap"
 (* address are nat here... *)
 type_synonym 'a state = "'a stack \<times> 'a heap"
 
-(*
-datatype binop =
-  Add | Sub | Mult | IntDiv | PermDiv | Mod
-| Eq | Neq
-| Gt | Gte | Lt | Lte
-| Or | BImp | And
-
-*)
 datatype int_binop = Add | Sub | Mult
 
 fun interp_int_binop :: "int_binop \<Rightarrow> int \<Rightarrow> int \<Rightarrow> int" where
@@ -77,11 +56,7 @@ primrec
 | "bdenot (Band b1 b2) s = (bdenot b1 s \<and> bdenot b2 s)"
 | "bdenot (Bnot b) s = (\<not> bdenot b s)"
 
-(*
-| RedLocalAssign: "\<lbrakk>variables \<Delta> x = Some ty; e \<omega> = Some v; v \<in> ty \<rbrakk> \<Longrightarrow>
-   red_stmt \<Delta> (LocalAssign x e) \<omega> ({assign_var_state x (Some v) \<omega>})"
-*)
-term "TypedEqui.assign_var_state"
+
                    
 inductive red :: "cmd \<Rightarrow> 'a state \<Rightarrow> cmd \<Rightarrow> 'a state \<Rightarrow> bool"
   ("\<langle>_, _\<rangle> \<rightarrow> \<langle>_, _\<rangle>" [51,0] 81)
@@ -448,19 +423,9 @@ definition vrefs where
 definition type_ctxt_heap where
   "type_ctxt_heap f = (if f = field_val then Some vints else None)"
 
-(* list of types *)
-(* Directly partial function? *)
+
 definition type_ctxt_store where
-(*
-  "type_ctxt_store tys x = (if x < length tys then Some (case tys ! x of TInt \<Rightarrow> vints | _ \<Rightarrow> vrefs) else None)"
-*)
   "type_ctxt_store \<Delta> tys x = (if x < length tys then Some (set_from_type (domains \<Delta>) (tys ! x)) else None )"
-
-(*
-case tys ! x of TInt \<Rightarrow> vints | _ \<Rightarrow> vrefs) else None)"
-(* TODO: Adjust to reflect tys? *)
-
-*)
 
 
 definition type_ctxt_front_end :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
@@ -478,10 +443,6 @@ definition type_ctxt_front_end_syntactic :: "vtyp list \<Rightarrow> (var \<Righ
 abbreviation tcfes where
   "tcfes \<equiv> type_ctxt_front_end_syntactic"
 
-(*
-definition make_context_semantic where
-  "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
-*)
 
 lemma make_context_semantic_type_ctxt[simp]:
   "make_context_semantic \<Delta> (tcfes tys) = tcfe \<Delta> tys"
@@ -522,11 +483,6 @@ fun well_typed_cmd where
 | "well_typed_cmd tys ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
 | "well_typed_cmd tys (Cwhile b _ C) \<longleftrightarrow> typed_bexp tys b \<and> well_typed_cmd tys C"
 
-(*
-declare [[show_types]]
-declare [[show_sorts]]
-declare [[show_consts]]
-*)
 
 thm TypedEqui.typed_store_update
 
@@ -561,10 +517,6 @@ next
 qed (simp_all)
 
 
-(*
-abbreviation well_typed_'a heap where
-  "well_typed_'a heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
-*)
 
 lemma red_keeps_well_typed_cmd:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"

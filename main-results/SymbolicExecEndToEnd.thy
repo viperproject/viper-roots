@@ -27,7 +27,9 @@ theorem sound_syntactic_translation_symexec:
 
       and "P = make_semantic_assertion \<Delta> (tcfes tys) Ps"
       and "Q = make_semantic_assertion \<Delta> (tcfes tys) Qs"
+
     shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
+
 proof (rule sound_syntactic_translation[OF assms(1-3)])
 
   let ?Ctr_main = "(fst (translate_syn C))"

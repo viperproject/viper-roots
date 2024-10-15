@@ -246,9 +246,6 @@ qed
 
 section \<open>Syntactic Translation\<close>
 
-(* Goal: Show that if syntactic translation verifies, then the "semantic" translation also verifies *)
-(* verifies_more semantic syntactic *)
-(* exp_refined_by semantic syntactic *)
 
 
 fun translate_binop :: "int_binop \<Rightarrow> binop" where
@@ -415,12 +412,6 @@ qed
 
 
 
-
-(*
-definition red_pure_assert ::  "('a, 'a virtual_state) interp \<Rightarrow> pure_exp \<Rightarrow> 'a extended_val \<Rightarrow> 'a equi_state set" ("_ \<turnstile> ((\<langle>_\<rangle>) [\<Down>] _)" [51,0,0] 81) where
-"red_pure_assert \<Gamma> e r = corely {\<omega>. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] r}"
-*)
-
 lemma red_pure_varE:
   assumes "\<Delta> \<turnstile> \<langle>Var r; \<omega>\<rangle> [\<Down>] Val v"
       and "get_store \<omega> r = Some v \<Longrightarrow> P"
@@ -437,9 +428,7 @@ lemma red_pure_litE:
   apply (simp add: assms(2))  
   by simp
 
-(*
-"emp = {a. \<exists> b. a = stabilize |b| }"
-*)
+
 lemma plus_emp_same:
   assumes "Some \<omega> = stabilize |x| \<oplus> y"
   shows "\<omega> = y"
@@ -889,25 +878,6 @@ qed
 
 
 
-(*
-
-lemma sound_translate_heap_loc:
-  "make_semantic_exp \<Delta> (syntactic_translate_heap_loc r) = semantify_heap_loc r"
-proof (rule ext)
-  fix \<omega> show "make_semantic_exp \<Delta> (syntactic_translate_heap_loc r) \<omega> = semantify_heap_loc r \<omega>"
-    unfolding make_semantic_exp_def syntactic_translate_heap_loc_def semantify_heap_loc_def
-    sledgehammer
-
-    by (smt (verit) RedAccField2Val_case RedVar RedVar2Val_case get_address_simp option.sel red_pure_simps(6) someI_ex)
-qed
-
-*)
-
-(*
-well_typed_cmd_aux \<Gamma> (Cread x r) \<longleftrightarrow> variables \<Gamma> x = Some vints \<and> variables \<Gamma> r = Some vrefs"
-*)
-
-
 lemma sound_translate_read_heap_loc:
   assumes "custom_context (tcfe \<Delta> tys) = type_ctxt_heap"
     shows "exp_refined_by (tcfe \<Delta> tys) (semantify_heap_loc x2) (make_semantic_exp \<Delta> (syntactic_translate_heap_loc x2))"
@@ -925,7 +895,7 @@ lemma translation_refinement_main:
   assumes "well_typed_cmd tys C"
       and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
       and "wf_stmt \<Delta> tys C"
-(* TODO: Understand the type contexts of verifies_more, translate, compile, translate_syn *)
+
   shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) (fst (translate_syn C)))"
   using assms
 proof (induct C)
@@ -936,11 +906,7 @@ next
   then show ?case
     apply simp
     apply (rule verifies_more_local_assign)
-(*
-lemma exp_refined_by_int:
-  assumes "typed_exp tys e"
-  shows "exp_refined_by (tcfe \<Delta> tys) (semantify_exp e) (make_semantic_exp \<Delta> (translate_exp e))"*
-*)
+
     apply (rule exp_refined_by_int)
     by blast
 next
@@ -1224,9 +1190,7 @@ theorem sound_syntactic_translation:
       and "\<And>Cv. Cv \<in> compile \<Delta> (tcfes tys) ` (snd (translate_syn C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
 shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
-(*
-  using assms(1) assms(2) assms(3) assms(4) assms(5)
-*)
+
 proof (rule sound_translation[OF assms(1-2) assms(3)])
   have r1: "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
     by (simp add: assms(1) assms(2) wf_stmt_implies_wf_translation)

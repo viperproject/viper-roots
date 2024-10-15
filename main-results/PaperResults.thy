@@ -4,7 +4,7 @@ theory PaperResults
 begin
 
 
-section \<open>Getting Started Guide for Exploration of the Isabelle Formalisation\<close>
+section \<open>Getting Started Guide for Exploration of the Isabelle Formalization\<close>
 
 text \<open>
 Follow the instructions in the README for the artifact, which
@@ -27,18 +27,18 @@ you can use the two green arrow buttons at the top of the Isabelle IDE to jump b
 previous position.
 
 In this document, we make use of Isabelle's documentation features, which itself can contain Isabelle
-elements (and are checked via Isabelle), to walk you through the formalisation of the definitions and 
+elements (and are checked via Isabelle), to walk you through the formalization of the definitions and 
 rules in the paper. In particular, we use the following Isabelle document elements:
 
   \<^item> types (for example, \<^typ>\<open>('a, 'v, 'c) abs_stmt\<close>)
      --> you can click on defined names in types (i.e. \<open>abs_stmt\<close> in the example)
   \<^item> type classes (for example, \<^class>\<open>sep_algebra\<close> --> you can click on defined names in type classes)
   \<^item> defined names (for example, \<^const>\<open>red_stmt_total\<close> --> you can click on defined names)
-  \<^item> terms (for example, \<^term>\<open>red_stmt_total ctxt\<close>)
-    --> you can click on defined names in terms (i.e. \<open>red_stmt_total ctxt\<close> in the example)
-  \<^item> propositions (for example, \<^prop>\<open>red_stmt_total ctxt (\<lambda>_. True) \<Lambda> s \<sigma>\<^sub>v r\<^sub>v\<close>); these are just 
+  \<^item> terms (for example, \<^term>\<open>red C \<sigma>\<close>)
+    --> you can click on defined names in terms (i.e. \<open>red\<close> in the example)
+  \<^item> propositions (for example, \<^prop>\<open>red Cskip \<sigma> Cskip \<sigma>\<close>); these are just 
     boolean terms
-    --> you can click on defined names in proposition (i.e. \<open>red_stmt_total\<close> and \<open>True\<close> in the example)
+    --> you can click on defined names in proposition (i.e. \<open>red\<close> and \<open>Cskip\<close> in the example)
   \<^item> proved lemmas (for example, @{thm VCG_to_verifies_set})
     --> you can click on the lemma names (i.e. \<open>VCG_to_verifies_set\<close> in the example)
 
@@ -55,7 +55,7 @@ text \<open>The syntax of CoreIVL (Figure 1) is defined as the type \<^typ>\<ope
 (<-- you can ctrl+click on the name \<open>abs_stmt\<close> to jump to its definition, as mentioned above).
                               
 \<open>'a\<close>, \<open>'v\<close>, and \<open>'c\<close> are type parameters:
-\<^item> \<open>'a\<close>: Type of state (IDF algebra...)
+\<^item> \<open>'a\<close>: Type of state (must be an IDF algebra instance)
 \<^item> \<open>'v\<close>: Type of values for local variables
 \<^item> \<open>'c\<close>: Type of custom statements\<close>
 
@@ -71,15 +71,17 @@ text\<open>
 \<close>
 
 paragraph \<open>Definition 1\<close>
-text\<open>C is correct for \<open>\<omega>\<close> iff \<^term>\<open>verifies \<Delta> C \<omega>\<close>\<close>
 
-text \<open>TODO:
-- Use valid later?
-- Restrict it to well-formed states?\<close>
+text \<open>C is correct for \<open>\<omega>\<close> iff \<^term>\<open>verifies \<Delta> C \<omega>\<close>\<close>
 
+text \<open>A state is well-formed w.r.t. a type context \<Delta> (\<^term>\<open>wf_state \<Delta> \<omega>\<close>)
+iff it is both stable and typed.\<close>
 
 definition valid where
-  "valid \<Delta> C \<longleftrightarrow> (\<forall>\<omega>. verifies \<Delta> C \<omega>)"
+  "valid \<Delta> C \<longleftrightarrow> (\<forall>\<omega>. wf_state \<Delta> \<omega> \<longrightarrow> verifies \<Delta> C \<omega>)"
+
+text \<open>C is valid iff \<^term>\<open>valid \<Delta> C\<close>\<close>
+
 
 subsection \<open>2.4: Axiomatic Semantics\<close>
 
@@ -95,6 +97,7 @@ paragraph \<open>Theorem 2: Operational-to-Axiomatic Soundness\<close>
 
 text \<open>The following is a more general version of Theorem 2:\<close>
 
+
 theorem operational_to_axiomatic_soundness_general:
   assumes "verifies_set \<Delta> A C"
       and "wf_abs_stmt \<Delta> C"
@@ -108,9 +111,10 @@ text \<open>From this theorem, we can derive Theorem 2 as presented in the paper
 corollary operational_to_axiomatic_soundness:
   assumes "wf_abs_stmt \<Delta> C" \<comment>\<open>C is well-typed\<close>
       and "valid \<Delta> C"
-    shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]" \<comment>\<open>\<^const>\<open>atrue_typed\<close> corresponds to \<top>\<close>
+    shows "\<exists>B. \<Delta> \<turnstile> [atrue_typed \<Delta>] C [B]" \<comment>\<open>\<^const>\<open>atrue_typed\<close> corresponds to \<top> restricted to well-typed states\<close>
   using assms good_atrue_typed operational_to_axiomatic_soundness_general 
-  unfolding valid_def verifies_set_def by blast
+  unfolding valid_def verifies_set_def
+  by (metis wf_state_def)
 
 
 paragraph \<open>Figure 4\<close>
@@ -154,7 +158,7 @@ section \<open>3: Semantics\<close>
 subsection \<open>3.1: An Algebra for Separation Logic and Implicit Dynamic Frames\<close>
 
 paragraph \<open>Definition 3 (IDF algebra) and Figure 5\<close>
-text \<open>IDF algebras are formalized via type class \<^class>\<open>sep_algebra\<close>. 
+text \<open>IDF algebras are formalized via the type class \<^class>\<open>sep_algebra\<close>. 
 This type class is defined via other type classes. To see all the axioms listed in Figure 5, one must
 inspect all of the type classes.
 More concretely, \<^class>\<open>sep_algebra\<close> is defined in terms of type classes \<^class>\<open>pcm_with_core\<close>, which
@@ -257,7 +261,8 @@ i.e., \<^term>\<open>wf_abs_stmt \<Delta> C\<close>, which we ignored in the pap
 - expressions and variables for local assignments are well-typed.
 - Variables that are havoced must be defined in the type context.
 Also, here we restrict \<^term>\<open>\<omega>\<close> to be well-typed (\<^term>\<open>typed \<Delta> \<omega>\<close>); as discussed in footnote 6 of 
-our paper submission, we ignore typing in the paper for the sake of presentation.
+our paper submission, we ignored typing in the paper for the sake of presentation, but handle it
+in this formalization.
 \<close>
 
 end
@@ -271,7 +276,8 @@ text \<open>The four components that we need for our ViperCore instantiation are
 \<^item> (1) IDF algebra instance:
     Our ViperCore IDF algebra instance is given by \<^typ>\<open>'a virtual_state\<close> (\<Sigma>_IDF in the paper),
     which we discuss above as part of Section 3.1. The state model of the instantiated CoreIVL
-    is \<^typ>\<open>'a equi_state\<close>.
+    is \<^typ>\<open>'a equi_state\<close> (equi_states contain one more component of type \<^typ>\<open>'a ag_trace\<close>,
+    which is irrelevant for the subset considered in this paper).
 \<^item> (2) Custom statements:
   We define our custom statements in \<^typ>\<open>'a custom\<close>, which just includes field assignments
   \<^term>\<open>FieldAssign e1 f e2\<close>.
@@ -312,17 +318,17 @@ text\<open>The definition of the symbolic execution can be found in
 paragraph \<open>Theorem 6\<close>
 
 text\<open>Theorem 6 corresponds to @{thm sexec_verifies_set}. Note that the formal theorem has some
-additional sideconditions that the state and statement is well-typed.\<close>
+additional side-conditions that the state and statement are well-typed.\<close>
 
 subsection \<open>4.2: Verification Condition Generation\<close>
 
 paragraph \<open>Formalization of Viper's VCG (VCGSem)\<close>
+
 text \<open>The formalization of Viper's VCG (which is not a contribution of this paper, but is part of 
 reference 43 in our paper submission) in the paper is presented via the judgement \<open>\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG r\<close>.
 In Isabelle,  \<open>\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG r\<close> is given by \<^prop>\<open>red_stmt_total ctxt (\<lambda>_.True) \<Lambda> C \<sigma>\<^sub>t r\<close> 
 (\<^term>\<open>ctxt\<close> and \<^term>\<open>\<Lambda>\<close> provide context information that we ignored for the sake of presentation in
-the paper).
-\<close>
+the paper).\<close>
 
 paragraph \<open>Theorem 7 (VCGSem)\<close>
 text \<open>Theorem 7 is given by:\<close>
@@ -339,7 +345,7 @@ theorem abstract_refines_total_verifies_set :
   using abstract_refines_total_verifies[simplified red_stmt_total_set_ok_def]
   by blast
 
-text \<open>One difference to the paper is that here we consider a more general version of Theorem 7 that 
+text \<open>One difference with the paper is that here we consider a more general version of Theorem 7 that 
 is parametric in an initial set of states \<^term>\<open>A\<close>. 
 Assumption A1 corresponds to \<open>\<not>(\<langle>C, \<sigma>\<^sub>t\<rangle> \<rightarrow>_VCG F)\<close> for all states \<open>\<sigma>\<^sub>t\<close> related to \<^term>\<open>\<omega>\<close> in the paper
 (\<^term>\<open>a2t_states ctxt \<omega>\<close> provides the set of VCGSem states related to \<^term>\<open>\<omega>\<close>).
@@ -351,18 +357,21 @@ that restricts the syntax).
 \<close>
 
 paragraph \<open>Using Theorem 7 to connect to a Viper method\<close>
+
 text \<open>The VCG back-end operates on Viper methods that contain Viper statements and not on Viper statements.
 It is straightforward to use Theorem 7 in order to obtain a lemma that instead assumes the correctness of 
 a Viper method w.r.t. VCGSem.
 Such a lemma could then be used to directly connect to the formal results that have been shown
 for Viper's VCG back-end in prior work (which shows the correctness of all Viper methods in a Viper program. w.r.t. VCGSem).
 
-We did not show such a lemma in the paper, but we have proved such a lemma.
+We did not show such a lemma in the paper, but we have proved such a lemma in Isabelle.
 If you are interested, such a lemma can be inspected here @{thm [source] VCG_to_verifies_set} 
 (you can ctrl-click on \<open>VCG_to_verifies_set\<close>, the target has some explanations). 
 In particular, this lemma instantiates the initial set of states \<^term>\<open>A\<close> in the above formalization 
 of Theorem 7 and proves assumptions A3 and A4 above for that instantiation.
 \<close>
+
+
 
 
 
@@ -372,7 +381,7 @@ subsection \<open>5.1: An IDF-Based Concurrent Separation Logic\<close>
 
 paragraph \<open>The language ParImp\<close>
 
-text \<open>ParImp defined in the file @{file "../simple-frontend/ParImp.thy"}.
+text \<open>ParImp is defined in the file @{file "../simple-frontend/ParImp.thy"}.
 \<^item> Syntax:
   \<^item> Commands: \<^typ>\<open>cmd\<close>
   \<^item> Arithmetic expressions: \<^typ>\<open>exp\<close>
@@ -380,11 +389,13 @@ text \<open>ParImp defined in the file @{file "../simple-frontend/ParImp.thy"}.
 \<^item> Small-step semantics: \<^term>\<open>red C \<sigma> C' \<sigma>'\<close>, or equivalently, \<^term>\<open>\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>\<close>
 \<close>
 
+
 paragraph \<open>The IDF-Based CSL (Figure 9)\<close>
 
-text \<open>Program logic (Figure 9) defined in the file simple-frontend/CSL_IDF.thy:
-\<^term>\<open>CSL_syn \<Delta> P C Q\<close> or \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>
+text \<open>The program logic (Figure 9) is defined in the file @{file "../simple-frontend/CSL_IDF.thy"},
+as \<^term>\<open>CSL_syn \<Delta> P C Q\<close> or \<^term>\<open>\<Delta> \<turnstile>CSL [P] C [Q]\<close>
 \<close>
+
 
 paragraph \<open>Theorem 8: Adequacy\<close>
 
@@ -414,11 +425,15 @@ theorem adequacy_CSL:
     shows "\<not> aborts C' \<sigma>' \<and> (C' = Cskip \<longrightarrow> Q \<sigma>')"
   using assms adequacy by blast
 
+
 text \<open>To connect to the CSL triples that we establish in the next subsection, we also prove a version
 of adequacy where every assertion in the CSL triple is conjoined with \<^term>\<open>atrue \<Delta> tys\<close>.\<close>
 corollary adequacy_CSL_with_star:
   assumes "n_steps C \<sigma> C' \<sigma>'"
+
+  \<comment> \<open>The main difference between this corollary and the previous theorem is this assumption:\<close>
       and "(tcfe \<Delta> tys) \<turnstile>CSL [assertify_state_exp P \<otimes> atrue \<Delta> tys] C [assertify_state_exp Q \<otimes> atrue \<Delta> tys]"
+
       and "P \<sigma>"
 
   \<comment> \<open>The following three assumptions require that the program and the initial state are well-typed.\<close>
@@ -433,16 +448,18 @@ corollary adequacy_CSL_with_star:
   using adequacy_with_star assms
   by blast
 
+
+
 subsection \<open>5.2: A Sound Front-End Translation\<close>
+
 
 paragraph \<open>Front-End Translation (Figure 10)\<close>
 
-text \<open>Translation: Figure 10.
-Defined in the file simple-frontend/SyntacticTranslation.thy.
-For historical reasons, we first do a "semantic" translation (into CoreIVL), in simple-frontend/FrontEndTranslation.thy,
+text \<open>The translation from Figure 10 is defined in the file @{file "../simple-frontend/SyntacticTranslation.thy"}.
+For historical reasons, we first do a "semantic" translation (into CoreIVL), in @{file "../simple-frontend/FrontEndTranslation.thy"},
 and then show that verification of the syntactic translation into ViperCore implies verification of the semantic translation.
 
-\<^term>\<open>translate_syn C\<close>
+The semantic translation is \<^term>\<open>translate \<Delta> tys C\<close>, and the syntactic translation is \<^term>\<open>translate_syn C\<close>.
 \<close>
 
 
@@ -462,8 +479,9 @@ theorem sound_front_end_translation:
 shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   by (rule sound_syntactic_translation) (simp_all add: assms)
 
-text \<open>Note that as in other results have ignored well-formedness and typedness in the paper 
-for the sake of presentation.
+
+text \<open>Note that, as in other results, we have ignored well-formedness and typedness in the paper 
+for the sake of presentation, but handle those in this Isabelle formalization.
 Moreover, we use \<^term>\<open>A \<otimes> atrue \<Delta> tys\<close> instead of \<^term>\<open>A\<close>:
 This ensures that all the assertions are "affine" (also called "intuitionistic"), which allows the
 logic to drop resources. For affine logics (such as Iris) \<^term>\<open>A \<otimes> atrue \<Delta> tys\<close> and \<^term>\<open>A\<close> are
@@ -471,17 +489,21 @@ equivalent.
 \<close>
 
 
+
 paragraph \<open>Lemma 3: Inhale-translation-exhale pattern\<close>
 
-text \<open>Lemma 3: What we call "convertible" is the following:
-TODO:- Explain "inhalify \<Delta> tys A" instead of A
-\<close>
-
+text \<open>Lemma 3: We define convertible as follows.\<close>
 definition convertible where
   "convertible \<Delta> tys C \<longleftrightarrow> (\<forall>P Q.
   (proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))
   \<and> ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys C)) Q)
   \<longrightarrow> tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys])"
+
+text \<open>For convenience, we use \<^term>\<open>proof_obligations_valid \<Delta> tys Cs\<close>, which expresses that all programs in Cs
+have a valid derivation in the axiomatic semantics, whereas in the paper we only require that they
+are valid w.r.t. the operational semantics. It is straightforward to derive the former from the latter
+thanks to the soundness theorem.\<close>
+
 
 lemma lemma_3_inhale_translation_exhale:
   assumes "convertible \<Delta> tys C"
@@ -490,6 +512,11 @@ lemma lemma_3_inhale_translation_exhale:
     shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> inhalify \<Delta> tys A \<otimes> atrue \<Delta> tys] C [Q \<otimes> B \<otimes> atrue \<Delta> tys]"
   using invariant_translate_inhale_exhale_get_proof assms unfolding convertible_def invariant_translate_def
   by meson
+
+text \<open>Note that we use \<^term>\<open>inhalify \<Delta> tys A\<close> instead of \<open>A\<close> in the precondition of the conclusion,
+which restricts \<open>A\<close> to well-typed states. We find it more convenient to use than the alternative,
+which is to require \<open>A\<close> to only contain well-typed states.\<close>
+
 
 context semantics
 begin

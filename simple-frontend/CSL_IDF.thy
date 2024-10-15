@@ -41,11 +41,6 @@ lemma no_abortsE:
 
 
 
-(*
-type_synonym 'v ag_store = "(var \<rightharpoonup> 'v) agreement"
-type_synonym ('v, 'a) abs_state = "'v ag_store \<times> 'a"
-('a val, ('a ag_trace \<times> 'a virtual_state)) abs_state"
-*)
 
 type_synonym 'a concrete_type_context = "('a val, (field_ident \<rightharpoonup> 'a val set)) abs_type_context"
 
@@ -161,40 +156,7 @@ proof (rule TypedEqui.free_vars_agree)
 qed (simp_all add: assms)
 
 
-thm TypedEqui.typed_store_def
 
-(* variables and tys should agree? *)
-
-(*
-make_context_semantic \<Delta> (type_ctxt_front_end_syntactic tys)
-
-definition type_ctxt_front_end_syntactic :: "vtyp list \<Rightarrow> (var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
-  where
-  "type_ctxt_front_end_syntactic tys =
-  ( (\<lambda>x. if x < length tys then Some (case tys ! x of TInt \<Rightarrow> TInt | _ \<Rightarrow> TRef) else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
-
-
-*)
-
-(*
-thm red_keeps_typed_store
-
-term "make_context_semantic \<Delta> (type_ctxt_front_end_syntactic tys)"
-abbreviation well_typed_cmd where
-  "well_typed_cmd tys C \<equiv> custom_context \<Delta> = type_ctxt_heap \<and> variables \<Delta> = type_ctxt_store \<Delta> tys \<and> well_typed_cmd tys C"
-*)
-(*
-definition make_context_semantic  :: "('a, 'a virtual_state) interp \<Rightarrow> (nat \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option) \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
-  where
-  "make_context_semantic \<Delta> F = \<lparr> variables = (sem_store (domains \<Delta>) (fst F)), custom_context = (sem_fields (domains \<Delta>) (snd F))  \<rparr>"
-*)
-
-thm red_keeps_typed_store
-(*
-\<langle>?C, ?\<sigma>\<rangle> \<rightarrow> \<langle>?C', ?\<sigma>'\<rangle> \<Longrightarrow>
-TypedEqui.typed_store (make_context_semantic ?\<Delta> (type_ctxt_front_end_syntactic ?tys)) (fst ?\<sigma>) \<Longrightarrow>
-well_typed_cmd ?tys ?C \<Longrightarrow> TypedEqui.typed_store (make_context_semantic ?\<Delta> (type_ctxt_front_end_syntactic ?tys)) (fst ?\<sigma>')
-*)
 
 lemma compatibleI:
   assumes "get_store a = get_store b"
@@ -263,10 +225,6 @@ qed
 definition mk_virtual_state where
   "mk_virtual_state h = Abs_virtual_state (\<lambda>l. if l \<in> dom h then 1 else 0, h)"
 
-(* TODO: lift_definition
-\<longrightarrow> ex: t2a_virtual_state AbstractRefinesTotal
-.rep_eq
- *)
 
 lemma get_wf_easy:
   assumes "wf_pre_virtual_state \<phi>"
@@ -380,15 +338,6 @@ proof
   qed
 qed
 
-(*
-lemma fvA_agrees:
-  assumes "agrees (fvA \<Delta> Q) s s'"
-      and "TypedEqui.finite_fv \<Delta> Q"
-      and "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>)"
-      and "TypedEqui.typed \<Delta> (Ag s', \<tau>, \<omega>)"
-    shows "(Ag s, \<tau>, \<omega>) \<in> Q \<longleftrightarrow> (Ag s', \<tau>, \<omega>) \<in> Q"
-proof (rule TypedEqui.free_vars_agree)
-*)
 
 lemma fvA_agrees_better:
   assumes "agrees (fvA \<Delta> A) (get_store a) (get_store b)"
@@ -660,11 +609,8 @@ lemma stabilize_equi_state:
   fixes \<tau> :: "'a ag_trace"
   shows "stabilize (Ag s, \<tau>, \<omega>) = (Ag s, \<tau>, stabilize \<omega>)"
   by (smt (z3) core_def decompose_stabilize_pure snd_conv stabilize_prod_def sum_equi_states_easy_rev)
-(*
-lemma stabilize_stable_simp[simp]:
-  "sep_algebra_class.stable (stabilize \<omega>)"
-  using stabilize_is_stable by blast
-*)
+
+
 
 proposition frame_rule:
   assumes "CSL (tcfe \<Delta> tys) P C Q"
@@ -678,11 +624,7 @@ proof (rule CSL_I)
     "TypedEqui.typed (tcfe \<Delta> tys) (Ag s, \<tau>, \<omega>)"
   then obtain \<omega>p \<omega>r where r: "Some \<omega> = \<omega>p \<oplus> \<omega>r" "(Ag s, \<tau>, \<omega>p) \<in> P" "(Ag s, \<tau>, \<omega>r) \<in> R"
     by (meson sum_equi_states_easy_decompose)
-(*
-  then have "TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>p) \<and> TypedEqui.typed \<Delta> (Ag s, \<tau>, \<omega>r)"
-    using TypedEqui.typed_assertionE[OF assms(5), of "(Ag s, \<tau>, \<omega>p)"] TypedEqui.typed_assertionE[OF assms(6)]
-    by simp
-*)
+
   show "safe (tcfe \<Delta> tys) (Suc n) C s \<tau> \<omega> (Q \<otimes> R)"
   proof (rule frame_safe[of _ _ "Suc n" C s \<tau> "stabilize \<omega>p" Q R \<omega> "stabilize \<omega>r"])
     show "Some \<omega> = stabilize \<omega>p \<oplus> stabilize \<omega>r"
@@ -1119,10 +1061,7 @@ qed
 
 subsection \<open>Conditional rule\<close>
 
-(*
-| RuleIf: "\<lbrakk> self_framing_and_typed (tcfe \<Delta> tys) A; framed_by_exp A b; (tcfe \<Delta> tys) \<turnstile> [A \<otimes> pure_typed (tcfe \<Delta> tys) b] C1 [B1] ; (tcfe \<Delta> tys) \<turnstile> [A \<otimes> pure_typed (tcfe \<Delta> tys) (negate b)] C2 [B2] \<rbrakk>
-  \<Longrightarrow> (tcfe \<Delta> tys) \<turnstile> [A] If b C1 C2 [B1 \<union> B2]"
-*)
+
 definition assertify_bexp where
   "assertify_bexp b = { \<omega> |\<omega>. bdenot b (get_store \<omega>)}"
 
@@ -1297,14 +1236,8 @@ proof -
     qed
   qed
 qed
-(*
-definition force_typing where
-  "force_typing (tcfe \<Delta> tys) A = Set.filter (TypedEqui.typed (tcfe \<Delta> tys)) A"
 
-lemma force_typing_is_typed[simp]:
-  "TypedEqui.typed_assertion (tcfe \<Delta> tys) (force_typing (tcfe \<Delta> tys) A)"
-  by (simp add: TypedEqui.typed_assertion_def force_typing_def)
-*)
+
 definition full_ownership :: "var \<Rightarrow> 'a equi_state set"
   where
   "full_ownership r = { \<omega> |\<omega> l v. get_store \<omega> r = Some (VRef (Address l)) \<and> 
@@ -1317,30 +1250,14 @@ lemma in_full_ownership:
   using assms full_ownership_def by blast
 
 
-(*
-Use:
-get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) v
-*)
+
 
 definition full_ownership_with_val where
   "full_ownership_with_val r e = { \<omega> |\<omega> l.
   get_state \<omega> = acc_virt (l, field_val) (Abs_preal 1) (VInt (edenot e (get_store \<omega>)))
   \<and> get_store \<omega> r = Some (VRef (Address l)) }"
 
-(*
-definition full_ownership_with_val where
-  "full_ownership_with_val r e = { \<omega> |\<omega> l. get_store \<omega> r = Some (VRef (Address l)) \<and> get_m \<omega> (l, field_val) = 1
-  \<and> get_h \<omega> (l, field_val) = Some (VInt (edenot e (get_store \<omega>)))  }"
-*)
-(*
-lemma in_full_ownership_with_val:
-  assumes "get_store \<omega> r = Some (VRef (Address l))"
-      and "get_m \<omega> (l, field_val) = 1"
-      and "get_h \<omega> (l, field_val) = Some (VInt (edenot e (get_store \<omega>)))"
-    shows "\<omega> \<in> full_ownership_with_val r e"
-  using assms full_ownership_with_val_def by blast
 
-*)
 
 lemma in_full_ownership_with_val:
   assumes "s r = Some (VRef (Address l))"
@@ -1441,12 +1358,7 @@ qed
 
 subsection \<open>Rule assignment\<close>
 
-(*
-| RuleLocalAssign: "\<lbrakk> self_framing_and_typed (tcfe \<Delta> tys) A; framed_by_exp A e \<rbrakk> \<Longrightarrow> (tcfe \<Delta> tys) \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
-*)
-(*
-| red_Assign[intro]:"\<lbrakk> \<sigma> = (s,h); \<sigma>' = (s(x \<mapsto> VInt (edenot e s)), h) \<rbrakk> \<Longrightarrow> \<langle>Cassign x e, \<sigma>\<rangle> \<rightarrow> \<langle>Cskip, \<sigma>'\<rangle>"
-*)
+
 
 definition sub_pre where
   "sub_pre x e P = { (Ag s, \<tau>, \<omega>) |s \<tau> \<omega>. (Ag (s(x \<mapsto> VInt (edenot e s))), \<tau>, \<omega>) \<in> P }"
@@ -1475,7 +1387,6 @@ subsection \<open>Rule Alloc\<close>
 definition set_perm_and_value :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> preal \<Rightarrow> 'a val option \<Rightarrow> 'a virtual_state" where
   "set_perm_and_value \<phi> hl p v = Abs_virtual_state ((get_vm \<phi>)(hl := p), (get_vh \<phi>)(hl := v))"
 
-(* Not true, needs pre... *)
 lemma wf_set_perm:
   assumes "p > 0 \<Longrightarrow> v \<noteq> None"
       and "p \<le> 1"
@@ -1756,11 +1667,6 @@ lemma read_helper:
   by (metis assms(1) assms(2) commutative greater_equiv read_field.elims read_field_mono)
 
 
-(*
-ConcreteSemantics.post_substitute_var_assert x (semantify_heap_loc r) P"
-*)
-thm ConcreteSemantics.post_substitute_var_assert_def
-thm ConcreteSemantics.substitute_var_state_def
 
 definition read_result :: "'a equi_state set \<Rightarrow> var \<Rightarrow> var \<Rightarrow> 'a equi_state set" where
   "read_result A x r = { TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega> |\<omega> l.
@@ -1811,42 +1717,6 @@ lemma fvA_assign_var_state_reciprocal:
    apply (simp add: TypedEqui.assign_var_state_def)
   by (simp add: TypedEqui.typed_state_axioms assms(3) assms(4) assms(5) typed_state.typed_assign_var)
 
-
-(*
-lemma read_result_simple_same:
-  assumes "x \<notin> fvA (tcfe \<Delta> tys) A"
-      and "x \<noteq> r"
-      and "TypedEqui.typed_store (tcfe \<Delta> tys) (get_store \<omega>)"
-      and "variables (tcfe \<Delta> tys) x = Some ty"
-      and "v \<in> ty"
-  shows "read_result A x r = A \<inter> simple_read_result x r" (is "?A = ?B")
-proof
-  show "?A \<subseteq> ?B"
-  proof
-    fix \<omega>' assume asm0: "\<omega>' \<in> read_result A x r"
-    then obtain \<omega> l where "\<omega>' = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>"
-      "\<omega> \<in> A" "get_store \<omega> r = Some (VRef (Address l))"
-      using read_result_def by auto
-    then have "\<omega>' \<in> A"
-      using assms fvA_assign_var_state by blast
-    moreover have "\<omega>' \<in> simple_read_result x r"
-      unfolding simple_read_result_def
-      by (smt (verit, ccfv_threshold) CollectI TypedEqui.assign_var_state_def \<open>\<omega>' = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>\<close> \<open>get_store \<omega> r = Some (VRef (Address l))\<close> assms(2) fun_upd_other fun_upd_same get_state_set_store get_store_assign_var)
-    ultimately show "\<omega>' \<in> ?B"
-      by blast
-  qed
-  show "?B \<subseteq> ?A"
-  proof
-    fix \<omega> assume "\<omega> \<in> A \<inter> simple_read_result x r"
-    then obtain l where "get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val)"
-      unfolding simple_read_result_def by blast
-    then have "\<omega> = TypedEqui.assign_var_state x (get_h \<omega> (l, field_val)) \<omega>"
-      by (metis assign_var_state_refl)
-    then show "\<omega> \<in> ?A"
-      by (smt (verit, del_insts) CollectI Int_iff \<open>\<omega> \<in> A \<inter> simple_read_result x r\<close> \<open>get_store \<omega> r = Some (VRef (Address l)) \<and> get_store \<omega> x = get_h \<omega> (l, field_val)\<close> read_result_def)
-  qed
-qed
-*)
 
 
 proposition rule_read:
@@ -1941,10 +1811,8 @@ lemma can_convert_to_Stabilize:
     shows "CSL (tcfe \<Delta> tys) (Stabilize A) C (Stabilize B)"
   apply (rule CSL_I)
   by (metis CSL_E already_stable assms(1) assms(2) can_convert_safe_to_stabilize get_simps_unfolded(2) in_Stabilize stable_get_state)
-(*
-abbreviation inhalify where
-  "inhalify P \<equiv> Set.filter (typed tcfe \<circ> stabilize) P"
-*)
+
+
 lemma can_convert_safe_to_inhalify:
   assumes "safe (tcfe \<Delta> tys) n C s \<tau> \<omega> A"
       and "TypedEqui.typed (tcfe \<Delta> tys) (Ag s, \<tau>, \<omega>)"
@@ -2015,9 +1883,6 @@ inductive CSL_syn :: "'a concrete_type_context \<Rightarrow> 'a equi_state set \
   self_framing P2;
     \<Delta> \<turnstile>CSL [P1] C1 [Q1]; \<Delta> \<turnstile>CSL [P2] C2 [Q2] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P1 \<otimes> P2] {_} C1 {_} || {_} C2 {_} [Q1 \<otimes> Q2]"
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile>CSL [P] C1 [Q]; \<Delta> \<turnstile>CSL [Q] C2 [R] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P] Cseq C1 C2 [R]"
-(*
-| RuleCons: "\<lbrakk>\<Delta> \<turnstile>CSL [P] C [Q]; P' \<subseteq> P; Q \<subseteq> Q'\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P'] C [Q']"
-*)
 | RuleIf: "\<lbrakk> \<Delta> \<turnstile>CSL [P \<inter> assertify_bexp b] C1 [Q]; \<Delta> \<turnstile>CSL [P \<inter> assertify_bexp (Bnot b)] C2 [Q]\<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [P] Cif b C1 C2 [Q]"
 | RuleWhile: "\<lbrakk> \<Delta> \<turnstile>CSL [I \<inter> assertify_bexp b] C [I] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile>CSL [I] (Cwhile b I' C) [I \<inter> assertify_bexp (Bnot b)]"
 | RuleWrite: "\<Delta> \<turnstile>CSL [full_ownership r] Cwrite r e [full_ownership_with_val r e]"
