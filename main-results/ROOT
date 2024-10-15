@@ -3,5 +3,6 @@ session MainResults = ViperAbstract +
     SimpleViperFrontEnd
     ViperAbstractRefinesTotal
   theories
+    PaperResults
     VCGEndToEnd
     SymbolicExecEndToEnd

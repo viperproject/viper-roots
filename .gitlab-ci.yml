@@ -16,8 +16,11 @@ setup_isabelle:
     - ./isabelle/bin/isabelle components -u vipersemcommon
     - ./isabelle/bin/isabelle components -u viper-total-heaps
     - ./isabelle/bin/isabelle components -u vipersemabstract
+    - ./isabelle/bin/isabelle components -u viper-abstract-refines-total
+    - ./isabelle/bin/isabelle components -u simple-frontend
     # paper-results has viper-total-heaps as a parent session
     - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps/paper-results
     - ./isabelle/bin/isabelle build -j4 -D vipersemabstract
     - ./isabelle/bin/isabelle build -j4 -D viper-abstract-refines-total
     - ./isabelle/bin/isabelle build -j4 -D simple-frontend
+    - ./isabelle/bin/isabelle build -j4 -D main-results
