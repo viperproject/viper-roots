@@ -342,8 +342,8 @@ proof (rule ext)
 qed
 
 lemma make_semantic_star:
-  "make_semantic_assertion_untyped \<Delta> F (A && B) = make_semantic_assertion_untyped \<Delta> F A \<otimes> make_semantic_assertion_untyped \<Delta> F B"
-  by (simp add: make_semantic_assertion_gen_def)
+  "make_semantic_assertion \<Delta> F (A && B) = make_semantic_assertion \<Delta> F A \<otimes> make_semantic_assertion \<Delta> F B"
+  by (simp add: make_semantic_assertion_def)
 
 
 
@@ -530,10 +530,10 @@ lemma in_up_close_core_stabilize :
 
 
 lemma verifies_more_free:
-  assumes "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
+  assumes "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))))"
   shows "a \<in> Stabilize (full_ownership r)"
   using assms
-  apply (clarsimp simp add:full_ownership_def make_semantic_assertion_gen_def)
+  apply (clarsimp simp add:full_ownership_def make_semantic_assertion_def)
   apply (clarsimp simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
   apply (clarsimp simp add: red_pure_assert_def red_pure_simps)
   apply (simp add:acc_def add_set_ex_comm_r split:bool_to_assertion_splits if_splits)
@@ -692,9 +692,9 @@ lemma verifies_more_alloc:
       and "r \<in> dom (variables (tcfe \<Delta> tys))"
       and "typed (tcfe \<Delta> tys) a"
       and "a \<in> Stabilize (full_ownership_with_val r e)"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
+    shows "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (Atomic (Acc (Var r) field_val (PureExp (ELit WritePerm))) && Atomic (Pure (Binop (FieldAcc (Var r) field_val) Eq (translate_exp e))))"
   using assms
-  apply (clarsimp simp add:make_semantic_assertion_gen_def full_ownership_with_val_def)
+  apply (clarsimp simp add:make_semantic_assertion_def full_ownership_with_val_def)
   apply (simp add:add_set_ex_comm_r add_set_ex_comm_l add_set_asso[symmetric])
   apply (simp add:red_pure_assert_def red_pure_simps)
   apply ((rule exI)+)
@@ -721,17 +721,17 @@ lemma verifies_more_alloc:
 
 lemma verifies_more_translation_while_exhale:
   assumes "typed (tcfe \<Delta> tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
-    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)"
-  using assms unfolding make_semantic_assertion_gen_def apply simp
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) I"
+    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) I)"
+  using assms unfolding make_semantic_assertion_def apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 lemma verifies_more_inter_star_pure:
   assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
-  using assms apply (clarsimp simp add:make_semantic_assertion_gen_def assertify_bexp_def)
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
+    shows "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
+  using assms apply (clarsimp simp add:make_semantic_assertion_def assertify_bexp_def)
   apply (rule add_setI_core_r; simp?)
   apply (simp add:red_pure_assert_def)
   apply (rule equality_bdenot_2)
@@ -741,44 +741,44 @@ lemma verifies_more_inter_star_pure:
 lemma verifies_more_translation_while_inhale:
   assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp (Bnot b)"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) I \<inter> assertify_bexp (Bnot b)"
+    shows "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (I && Atomic (Pure (Unop unop.Not (translate_bexp b))))"
   using assms verifies_more_inter_star_pure
   by (metis translate_bexp.simps(3) typed_bexp.simps(3))
 
 
 lemma verifies_more_translation_parallel_exhale:
   assumes "typed (tcfe \<Delta> tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (P1 && P2)"
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (P1 && P2)"
     shows "a \<in> inhalify \<Delta> tys
-               (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) P2)"
-  using assms unfolding make_semantic_assertion_gen_def apply simp
+               (make_semantic_assertion \<Delta> (tcfes tys) P1 \<otimes> make_semantic_assertion \<Delta> (tcfes tys) P2)"
+  using assms unfolding make_semantic_assertion_def apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 
 
 lemma verifies_more_translation_parallel_inhale:
-  assumes "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (Q1 && Q2)"
-  using assms unfolding make_semantic_assertion_gen_def by simp
+  assumes "a \<in> make_semantic_assertion \<Delta> (tcfes tys) Q1 \<otimes> make_semantic_assertion \<Delta> (tcfes tys) Q2"
+    shows "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (Q1 && Q2)"
+  using assms unfolding make_semantic_assertion_def by simp
 
 
 lemma verifies_more_while_snd_exhale:
   assumes "typed (tcfe \<Delta> tys) a"
       and "typed_bexp tys b"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
-    shows "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) I \<inter> assertify_bexp b"
+    shows "a \<in> make_semantic_assertion \<Delta> (tcfes tys) (I && Atomic (Pure (translate_bexp b)))"
   using assms verifies_more_inter_star_pure by fastforce
 
 lemma verifies_more_while_snd_exhale_bis:
   assumes "typed (tcfe \<Delta> tys) a"
-      and "a \<in> make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
-    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)"
+      and "a \<in> make_semantic_assertion \<Delta> (tcfes tys) I"
+    shows "a \<in> inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) I)"
   using assms apply simp
   using TypedEqui.typed_state_then_stabilize_typed by blast
 
 lemma n_havoc_same:
-  "ConcreteSemantics.havoc_list l = compile False \<Delta> F (n_havoc l)"
+  "ConcreteSemantics.havoc_list l = compile \<Delta> F (n_havoc l)"
   by (induct l) simp_all
 
 
@@ -926,7 +926,7 @@ lemma translation_refinement_main:
       and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
       and "wf_stmt \<Delta> tys C"
 (* TODO: Understand the type contexts of verifies_more, translate, compile, translate_syn *)
-  shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
+  shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) (fst (translate_syn C)))"
   using assms
 proof (induct C)
   case Cskip
@@ -977,7 +977,7 @@ next
   then show ?case
     apply (simp add:)
     apply (subgoal_tac "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C1) ;; fst (translate \<Delta> tys C2))
-     (Seq (compile False \<Delta> (tcfes tys) (fst (translate_syn C1))) (compile False \<Delta> (tcfes tys) (fst (translate_syn C2))))")
+     (Seq (compile \<Delta> (tcfes tys) (fst (translate_syn C1))) (compile \<Delta> (tcfes tys) (fst (translate_syn C2))))")
      apply (metis compile.simps(3) fst_eqD)
     apply (rule verifies_more_seq)
     by (metis ConcreteSemantics.wf_abs_stmt.simps(7) fst_eqD)+
@@ -1037,14 +1037,14 @@ lemma translation_refinement_snd:
       and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
       and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
       and "Csem \<in> snd (translate \<Delta> tys C)"
-    shows "\<exists>Csyn \<in> snd (translate_syn C). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
+    shows "\<exists>Csyn \<in> snd (translate_syn C). verifies_more (tcfe \<Delta> tys) Csem (compile \<Delta> (tcfes tys) Csyn)"
   using assms
 proof (induct C arbitrary: )
   case (Cseq C1 C2)
   show ?case
   proof (cases "Csem \<in> snd (translate \<Delta> tys C1)")
     case True
-    have "\<exists>Csyn\<in>snd (translate_syn C1). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
+    have "\<exists>Csyn\<in>snd (translate_syn C1). verifies_more (tcfe \<Delta> tys) Csem (compile \<Delta> (tcfes tys) Csyn)"
       apply (rule Cseq(1))
       using Cseq.prems(1) apply fastforce
       using Cseq.prems(2) apply force
@@ -1055,7 +1055,7 @@ proof (induct C arbitrary: )
       by (metis Un_iff snd_conv translate_syn.simps(7))
   next
     case False
-    have "\<exists>Csyn\<in>snd (translate_syn C2). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
+    have "\<exists>Csyn\<in>snd (translate_syn C2). verifies_more (tcfe \<Delta> tys) Csem (compile \<Delta> (tcfes tys) Csyn)"
       apply (rule Cseq(2))
       using Cseq.prems(1) apply fastforce
       using Cseq.prems(2) apply force
@@ -1077,10 +1077,10 @@ next
 
   proof -
 
-    let ?P1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P1"
-    let ?Q1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1"
-    let ?P2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P2"
-    let ?Q2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
+    let ?P1 = "make_semantic_assertion \<Delta> (tcfes tys) P1"
+    let ?Q1 = "make_semantic_assertion \<Delta> (tcfes tys) Q1"
+    let ?P2 = "make_semantic_assertion \<Delta> (tcfes tys) P2"
+    let ?Q2 = "make_semantic_assertion \<Delta> (tcfes tys) Q2"
 
     assume asm0: "well_typed_cmd tys {P1} C1 {Q1} || {P2} C2 {Q2}" "wf_stmt \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2})"
       "\<And>Cv. Cv \<in> snd (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2}) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
@@ -1093,7 +1093,7 @@ next
       by (simp add: Let_def)
 
 
-    moreover have "verifies_more (tcfe \<Delta> tys) (Inhale ?P1;; fst (translate \<Delta> tys C1);; Exhale (inhalify \<Delta> tys ?Q1)) (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P1) (fst (translate_syn C1))) (stmt.Exhale Q1)))"
+    moreover have "verifies_more (tcfe \<Delta> tys) (Inhale ?P1;; fst (translate \<Delta> tys C1);; Exhale (inhalify \<Delta> tys ?Q1)) (compile \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P1) (fst (translate_syn C1))) (stmt.Exhale Q1)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1114,7 +1114,7 @@ next
       by (meson ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(7) insertI1)
 
     moreover have "verifies_more (tcfe \<Delta> tys) (Inhale ?P2;; fst (translate \<Delta> tys C2);; Exhale (inhalify \<Delta> tys ?Q2))
-    (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P2) (fst (translate_syn C2))) (stmt.Exhale Q2)))"
+    (compile \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale P2) (fst (translate_syn C2))) (stmt.Exhale Q2)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1132,7 +1132,7 @@ next
        apply (rule verifies_more_exhale)
        apply (simp add: TypedEqui.typed_state_then_stabilize_typed)
       by (meson ConcreteSemantics.wf_abs_stmt.simps(2) ConcreteSemantics.wf_abs_stmt.simps(7) insertCI)
-    ultimately show "\<exists>Csyn\<in>snd (translate_syn {P1} C1 {Q1} || {P2} C2 {Q2}). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
+    ultimately show "\<exists>Csyn\<in>snd (translate_syn {P1} C1 {Q1} || {P2} C2 {Q2}). verifies_more (tcfe \<Delta> tys) Csem (compile \<Delta> (tcfes tys) Csyn)"
       unfolding translate_syn.simps Let_def
       by force
   qed
@@ -1157,13 +1157,13 @@ next
     "\<And>Cv. Cv \<in> snd (translate \<Delta> tys (Cwhile b I C)) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
     "Csem \<in> snd (translate \<Delta> tys (Cwhile b I C))" "Csem \<notin> snd (translate \<Delta> tys C)"
 
-    let ?I = "make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
+    let ?I = "make_semantic_assertion \<Delta> (tcfes tys) I"
 
     have r: "Csem = Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys ?I)"
       using asm0 by simp
 
     have "verifies_more (tcfe \<Delta> tys) (Inhale (?I \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys ?I))
-  (compile False \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn C))) (stmt.Exhale I)))"
+  (compile \<Delta> (tcfes tys) (stmt.Seq (stmt.Seq (stmt.Inhale (I && Atomic (Pure (translate_bexp b)))) (fst (translate_syn C))) (stmt.Exhale I)))"
       apply simp
       apply (rule verifies_more_seq)
       apply (rule verifies_more_seq)
@@ -1180,7 +1180,7 @@ next
       apply (metis verifies_more_while_snd_exhale_bis)
       using ConcreteSemantics.wf_abs_stmt.simps(7) asm0(3) asm0(4) r
       by blast
-    then show "\<exists>Csyn\<in>snd (translate_syn (Cwhile b I C)). verifies_more (tcfe \<Delta> tys) Csem (compile False \<Delta> (tcfes tys) Csyn)"
+    then show "\<exists>Csyn\<in>snd (translate_syn (Cwhile b I C)). verifies_more (tcfe \<Delta> tys) Csem (compile \<Delta> (tcfes tys) Csyn)"
       using asm0 by simp
   qed
 qed (simp_all)
@@ -1191,8 +1191,8 @@ theorem translation_refinement_syntactic_semantic:
       and "wf_stmt \<Delta> tys C"
       and "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))"
       and "\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv"
-    shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) (fst (translate_syn C)))"
-      and "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
+    shows "verifies_more (tcfe \<Delta> tys) (fst (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) (fst (translate_syn C)))"
+      and "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
   using assms(1) assms(2) assms(3) translation_refinement_main apply blast
   apply (rule verifies_more_setI)
   using translation_refinement_snd[OF assms(1) assms(2) assms(4) assms(3)]
@@ -1220,8 +1220,8 @@ theorem sound_syntactic_translation:
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
 
 (* Verification *)
-      and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
-      and "\<And>Cv. Cv \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
+      and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
+      and "\<And>Cv. Cv \<in> compile \<Delta> (tcfes tys) ` (snd (translate_syn C)) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
 shows "(tcfe \<Delta> tys) \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
 (*
@@ -1239,7 +1239,7 @@ proof (rule sound_translation[OF assms(1-2) assms(3)])
     show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q) \<omega>"
     proof (rule verifies_more_verifies)
       show "verifies_more (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; fst (translate \<Delta> tys C) ;; abs_stmt.Exhale Q)
-      (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
+      (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
         apply (rule verifies_more_seq)
         apply (rule verifies_more_seq)
             apply simp_all
@@ -1248,15 +1248,15 @@ proof (rule sound_translation[OF assms(1-2) assms(3)])
         using assms(3) apply blast
         apply (simp add: assms(3))
         using \<open>ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))\<close> by fastforce
-      show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q) \<omega>"
+      show "ConcreteSemantics.verifies (tcfe \<Delta> tys) (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q) \<omega>"
         using ConcreteSemantics.verifies_set_def asm0(1) asm0(2) asm0(3) assms(4) by blast
     qed (simp_all add: asm0)
   qed
   fix Cv
   assume asm0: "Cv \<in> snd (translate \<Delta> tys C)"
-  moreover have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
+  moreover have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) ` (snd (translate_syn C)))"
     by (simp add: \<open>ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (fst (translate \<Delta> tys C))\<close> \<open>\<And>Cv. Cv \<in> snd (translate \<Delta> tys C) \<Longrightarrow> ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) Cv\<close> assms(1) assms(2) translation_refinement_syntactic_semantic(2))
-  ultimately obtain Cv' where "Cv' \<in> compile False \<Delta> (tcfes tys) ` (snd (translate_syn C))"
+  ultimately obtain Cv' where "Cv' \<in> compile \<Delta> (tcfes tys) ` (snd (translate_syn C))"
     "verifies_more (tcfe \<Delta> tys) Cv Cv'"
     by (meson verifies_more_set)
   then show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"

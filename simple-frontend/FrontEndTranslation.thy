@@ -68,16 +68,6 @@ proof
     using \<open>\<omega> \<in> P\<close> x_elem_set_product by blast
 qed
 
-(*
-definition make_semantic_assertion_untyped :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion_untyped (tcfe \<Delta> tys) F A = well_typedly (tcfe \<Delta> tys) F (\<langle>type_ctxt_front_end, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-*)
-
-(*
-abbreviation tcfe :: "vtyp list \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context" where
-  "tcfe \<equiv> type_ctxt_front_end"
-*)
-
 abbreviation inhalify where
   "inhalify \<Delta> tys P \<equiv> Set.filter (typed (tcfe \<Delta> tys) \<circ> stabilize) P"
 
@@ -114,17 +104,17 @@ fun wf_stmt :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarr
 
 | "wf_stmt \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2}) \<longleftrightarrow>
   disjoint
-  (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1) \<otimes> atrue \<Delta> tys)) (wrC C2)
-  \<and> disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2) \<otimes> atrue \<Delta> tys)) (wrC C1) \<and>
-  self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1) \<and>
-  self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) P2) \<and>
-  self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1) \<and>
-  self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2) \<and>
+  (fvC C1 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) Q1) \<otimes> atrue \<Delta> tys)) (wrC C2)
+  \<and> disjoint (fvC C2 \<union> fvA (tcfe \<Delta> tys) (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) Q2) \<otimes> atrue \<Delta> tys)) (wrC C1) \<and>
+  self_framing (make_semantic_assertion \<Delta> (tcfes tys) P1) \<and>
+  self_framing (make_semantic_assertion \<Delta> (tcfes tys) P2) \<and>
+  self_framing (make_semantic_assertion \<Delta> (tcfes tys) Q1) \<and>
+  self_framing (make_semantic_assertion \<Delta> (tcfes tys) Q2) \<and>
   wf_stmt \<Delta> tys C1 \<and> wf_stmt \<Delta> tys C2"
 
 | "wf_stmt \<Delta> tys (Cif b C1 C2) \<longleftrightarrow> wf_stmt \<Delta> tys C1 \<and> wf_stmt \<Delta> tys C2"
 
-| "wf_stmt \<Delta> tys (Cwhile b I C) \<longleftrightarrow> self_framing (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)
+| "wf_stmt \<Delta> tys (Cwhile b I C) \<longleftrightarrow> self_framing (make_semantic_assertion \<Delta> (tcfes tys) I)
                               \<and> wf_stmt \<Delta> tys C"
 
 | "wf_stmt \<Delta> tys _ \<longleftrightarrow> True"
@@ -520,16 +510,16 @@ fun translate :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Righta
 | "translate \<Delta> tys (Cif b C1 C2) = (If (semantify_bexp b) (fst (translate \<Delta> tys C1)) (fst (translate \<Delta> tys C2)), snd (translate \<Delta> tys C1) \<union> snd (translate \<Delta> tys C2))"
 
 | "translate \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2}) =
-  ((Exhale (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) P2));;
+  ((Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) P1 \<otimes> make_semantic_assertion \<Delta> (tcfes tys) P2));;
   ConcreteSemantics.havoc_list (wrL C1 @ wrL C2);;
-  Inhale (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1 \<otimes> make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2)),
+  Inhale (make_semantic_assertion \<Delta> (tcfes tys) Q1 \<otimes> make_semantic_assertion \<Delta> (tcfes tys) Q2)),
   let r1 = translate \<Delta> tys C1 in let r2 = translate \<Delta> tys C2 in
-  { (Inhale (make_semantic_assertion_untyped \<Delta> (tcfes tys) P1);; fst r1;; Exhale (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1))),
-  (Inhale (make_semantic_assertion_untyped \<Delta> (tcfes tys) P2);; fst r2;; Exhale (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2))) } \<union> snd r1 \<union> snd r2)"
+  { (Inhale (make_semantic_assertion \<Delta> (tcfes tys) P1);; fst r1;; Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) Q1))),
+  (Inhale (make_semantic_assertion \<Delta> (tcfes tys) P2);; fst r2;; Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) Q2))) } \<union> snd r1 \<union> snd r2)"
 
-| "translate \<Delta> tys (Cwhile b I C) = (Exhale (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I));;
-  ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion_untyped \<Delta> (tcfes tys) I) \<inter> assertify_bexp (Bnot b)),
-  { Inhale ((make_semantic_assertion_untyped \<Delta> (tcfes tys) I) \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys (make_semantic_assertion_untyped \<Delta> (tcfes tys) I)) } \<union> snd (translate \<Delta> tys C))"
+| "translate \<Delta> tys (Cwhile b I C) = (Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) I));;
+  ConcreteSemantics.havoc_list (wrL C);; Inhale ((make_semantic_assertion \<Delta> (tcfes tys) I) \<inter> assertify_bexp (Bnot b)),
+  { Inhale ((make_semantic_assertion \<Delta> (tcfes tys) I) \<inter> assertify_bexp b);; fst (translate \<Delta> tys C);; Exhale (inhalify \<Delta> tys (make_semantic_assertion \<Delta> (tcfes tys) I)) } \<union> snd (translate \<Delta> tys C))"
 
 (*
 lemma CSL_weaken_post_atrue:
@@ -924,10 +914,10 @@ lemma invariant_translate_parallel:
       and "wf_stmt \<Delta> tys ({P1} C1 {Q1} || {P2} C2 {Q2})"
     shows "invariant_translate \<Delta> tys P ({P1} C1 {Q1} || {P2} C2 {Q2}) Q"
 proof (rule invariant_translateI)
-  let ?P1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P1"
-  let ?P2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P2"
-  let ?Q1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1"
-  let ?Q2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
+  let ?P1 = "make_semantic_assertion \<Delta> (tcfes tys) P1"
+  let ?P2 = "make_semantic_assertion \<Delta> (tcfes tys) P2"
+  let ?Q1 = "make_semantic_assertion \<Delta> (tcfes tys) Q1"
+  let ?Q2 = "make_semantic_assertion \<Delta> (tcfes tys) Q2"
 
   assume asm0: "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2}))"
     "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys {P1} C1 {Q1} || {P2} C2 {Q2})) Q"
@@ -1133,7 +1123,7 @@ lemma invariant_translate_while:
       and "wf_stmt \<Delta> tys (Cwhile b I C)"
     shows "invariant_translate \<Delta> tys P (Cwhile b I C) Q"
 proof (rule invariant_translateI)
-  let ?I = "make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
+  let ?I = "make_semantic_assertion \<Delta> (tcfes tys) I"
   assume asm0: "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys (Cwhile b I C)))"
     "ConcreteSemantics.SL_proof (tcfe \<Delta> tys) P (fst (translate \<Delta> tys (Cwhile b I C))) Q"
   then have r1: "proof_obligations_valid \<Delta> tys (snd (translate \<Delta> tys C))"
@@ -1208,10 +1198,10 @@ proof (induct C arbitrary: P Q)
     by (metis (no_types, lifting) ConcreteSemantics.wf_abs_stmt.simps(7) Un_iff fst_eqD invariant_translate_seq snd_conv translate.simps(7) well_typed_cmd.simps(2) wf_stmt.simps(1))
 next
   case (Cpar P1 C1 Q1 P2 C2 Q2)
-  let ?P1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P1"
-  let ?P2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) P2"
-  let ?Q1 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q1"
-  let ?Q2 = "make_semantic_assertion_untyped \<Delta> (tcfes tys) Q2"
+  let ?P1 = "make_semantic_assertion \<Delta> (tcfes tys) P1"
+  let ?P2 = "make_semantic_assertion \<Delta> (tcfes tys) P2"
+  let ?Q1 = "make_semantic_assertion \<Delta> (tcfes tys) Q1"
+  let ?Q2 = "make_semantic_assertion \<Delta> (tcfes tys) Q2"
   show ?case
   proof (rule invariant_translate_parallel)
     show "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (ConcreteSemantics.havoc_list (wrL C1 @ wrL C2))"
@@ -1276,7 +1266,7 @@ next
   qed
 next
   case (Cwhile b I C)
-  let ?I = "make_semantic_assertion_untyped \<Delta> (tcfes tys) I"
+  let ?I = "make_semantic_assertion \<Delta> (tcfes tys) I"
   show ?case
   proof (rule invariant_translate_while)
     show "ConcreteSemantics.wf_abs_stmt (tcfe \<Delta> tys) (ConcreteSemantics.havoc_list (wrL C))"

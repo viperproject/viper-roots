@@ -1046,13 +1046,13 @@ theorem sexec_sound :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile False def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
+  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
     \<exists> V' \<sigma>'. \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and> s2a_state_wf \<Lambda> F V' \<sigma>' \<and> Q \<sigma>'}"
   using assms
 proof (induction C arbitrary: \<sigma> \<omega> V Q)
   case (Inhale A)
   then show ?case
-    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_gen_def)
+    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_def)
     apply (drule (3) sproduce_sound)
     apply (clarsimp)
     apply (rule concrete_post_Inhale)
@@ -1067,7 +1067,7 @@ next
       apply (clarsimp)
       apply (rule concrete_post_Exhale[where \<omega>'=\<omega>'])
         apply (solves \<open>simp\<close>)
-      subgoal  by (clarsimp simp add:make_semantic_assertion_gen_def)
+      subgoal  by (clarsimp simp add:make_semantic_assertion_def)
       apply (erule (2) sym_stabilize_soundE)
       by blast
     done
@@ -1159,7 +1159,7 @@ theorem sexec_verifies :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile False def_interp (\<Lambda>, F) C) \<omega>"
+  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega>"
   using assms
   apply (simp add: ConcreteSemantics.verifies_def)
   using sexec_sound concrete_red_stmt_post_def by blast
@@ -1169,7 +1169,7 @@ theorem sexec_verifies_set :
     \<exists> \<sigma> V. \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<and>
       s2a_state_wf \<Lambda> F V \<sigma> \<and> sexec \<sigma> C Q"
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
-  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile False def_interp (\<Lambda>, F) C)"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile def_interp (\<Lambda>, F) C)"
   using assms
   apply (simp add: ConcreteSemantics.verifies_set_def)
   using sexec_verifies by blast
@@ -1232,10 +1232,9 @@ qed
 theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
-  (* TODO: replace with nth_option from TotalUtil? *)
   assumes "\<Lambda> = nth_option tys"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
-  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile def_interp (\<Lambda>, F) C)"
   apply (rule sexec_verifies_set[where Q=Q]; (rule assms)?)
   using assms apply -
   subgoal for \<omega>

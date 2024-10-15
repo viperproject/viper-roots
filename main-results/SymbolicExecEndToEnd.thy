@@ -25,8 +25,8 @@ theorem sound_syntactic_translation_symexec:
             stmt_typing (fields_to_prog (snd (tcfes tys))) (nth_option tys) Cv \<and>
             sinit tys (snd (tcfes tys)) (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> Cv (\<lambda> _. True))"
 
-      and "P = make_semantic_assertion_gen False \<Delta> (tcfes tys) Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes tys) Qs"
+      and "P = make_semantic_assertion \<Delta> (tcfes tys) Ps"
+      and "Q = make_semantic_assertion \<Delta> (tcfes tys) Qs"
     shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
 proof (rule sound_syntactic_translation[OF assms(1-3)])
 
@@ -41,10 +41,10 @@ proof (rule sound_syntactic_translation[OF assms(1-3)])
 
 
   show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys)
-    (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
+    (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
   proof -
     have A1: "ConcreteSemantics.verifies_set (s2a_ctxt ?F ?\<Lambda>) (atrue \<Delta> tys)
-               (compile False def_interp (?\<Lambda>, ?F) ?Ctr_mainV)"
+               (compile def_interp (?\<Lambda>, ?F) ?Ctr_mainV)"
       apply (rule sinit_sexec_verifies_set)
       using assms by (simp_all add:type_ctxt_front_end_syntactic_def atrue_def no_trace_def)
 
@@ -52,9 +52,9 @@ proof (rule sound_syntactic_translation[OF assms(1-3)])
       using A1 assms(4,8,9) by (simp add:tcfe_s2a_eq type_ctxt_front_end_syntactic_def)
   qed
 
-  fix Cv assume HCv: "Cv \<in> compile False \<Delta> (tcfes tys) ` snd (translate_syn C)"
+  fix Cv assume HCv: "Cv \<in> compile \<Delta> (tcfes tys) ` snd (translate_syn C)"
 
-  obtain Cvv where HCvv: "Cvv \<in> snd (translate_syn C)" "Cv = compile False \<Delta> (tcfes tys) Cvv"
+  obtain Cvv where HCvv: "Cvv \<in> snd (translate_syn C)" "Cv = compile \<Delta> (tcfes tys) Cvv"
     using HCv by blast
 
   show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"

@@ -336,7 +336,7 @@ theorem abstract_refines_total_verifies_set :
   assumes A4: "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes A5: "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
-     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
   using assms  
   apply (simp add:ConcreteSemantics.verifies_set_def)
   using abstract_refines_total_verifies[simplified red_stmt_total_set_ok_def]
@@ -459,8 +459,8 @@ theorem sound_front_end_translation:
       and "TypedEqui.wf_assertion P \<and> TypedEqui.wf_assertion Q"
 
       and "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys)
-     (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
-      and "\<And>Cv. Cv \<in> compile False \<Delta> (tcfes tys) ` snd (translate_syn C) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
+     (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) (fst (translate_syn C)) ;; abs_stmt.Exhale Q)"
+      and "\<And>Cv. Cv \<in> compile \<Delta> (tcfes tys) ` snd (translate_syn C) \<Longrightarrow> ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
 
 shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
   by (rule sound_syntactic_translation) (simp_all add: assms)

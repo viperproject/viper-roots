@@ -166,8 +166,8 @@ theorem sound_syntactic_translation_VCG:
             "stmt_typing (program_total (default_ctxt (domains \<Delta>) mdecl)) (nth_option tys)
                    (stmt.Seq (stmt.Seq (stmt.Inhale Ps) (fst (translate_syn C))) (stmt.Exhale Qs))"
 
-      and "P = make_semantic_assertion_gen False \<Delta> (tcfes tys) Ps"
-      and "Q = make_semantic_assertion_gen False \<Delta> (tcfes tys) Qs"     
+      and "P = make_semantic_assertion \<Delta> (tcfes tys) Ps"
+      and "Q = make_semantic_assertion \<Delta> (tcfes tys) Qs"
     shows "tcfe \<Delta> tys \<turnstile>CSL [P \<otimes> atrue \<Delta> tys] C [Q \<otimes> atrue \<Delta> tys]"
 
 proof (rule sound_translation[OF assms(1-3)])
@@ -193,7 +193,7 @@ proof (rule sound_translation[OF assms(1-3)])
   proof -
 
     have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
-               (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) ?Ctr_mainV)"
+               (compile (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) ?Ctr_mainV)"
       apply (rule VCG_to_verifies_set)
       using MethodCorrect
       unfolding \<open>mdecl = _\<close>
@@ -206,7 +206,7 @@ proof (rule sound_translation[OF assms(1-3)])
       apply fast
       by (simp_all add: default_ctxt_def AbsTypeWf)
 
-    have "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> (tcfes tys) ?Ctr_mainV)"
+    have "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile \<Delta> (tcfes tys) ?Ctr_mainV)"
     proof -
       have "tcfe \<Delta> tys = t2a_ctxt ?ctxt (nth_option tys)"
         unfolding t2a_ctxt_def
@@ -236,7 +236,7 @@ proof (rule sound_translation[OF assms(1-3)])
     qed
 
     hence r: "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
-              (abs_stmt.Inhale P ;; compile False \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
+              (abs_stmt.Inhale P ;; compile \<Delta> (tcfes tys) ?Ctr_main ;; abs_stmt.Exhale Q)"
       using \<open>P = _\<close> \<open>Q = _\<close>
       by simp
 
@@ -270,8 +270,8 @@ proof (rule sound_translation[OF assms(1-3)])
         apply (simp add: calculation(3))
         using calculation(1) no_trace_atrue by blast
     then show "ConcreteSemantics.verifies (tcfe \<Delta> tys)
-          (abs_stmt.Inhale (make_semantic_assertion_untyped \<Delta> (tcfes tys) Ps) ;; compile False \<Delta> (tcfes tys) (fst (translate_syn C)) ;;
-           abs_stmt.Exhale (make_semantic_assertion_untyped \<Delta> (tcfes tys) Qs))
+          (abs_stmt.Inhale (make_semantic_assertion \<Delta> (tcfes tys) Ps) ;; compile \<Delta> (tcfes tys) (fst (translate_syn C)) ;;
+           abs_stmt.Exhale (make_semantic_assertion \<Delta> (tcfes tys) Qs))
           (stabilize |\<omega>| )"
         by (metis ConcreteSemantics.verifies_set_def TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed assms(12) assms(13) calculation(3) r stabilize_is_stable)
       
@@ -288,10 +288,10 @@ proof (rule sound_translation[OF assms(1-3)])
   
   assume "Cv \<in> snd (translate \<Delta> tys C)"
 
-  have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile False \<Delta> (tcfes tys) ` snd (translate_syn C))"
+  have "verifies_more_set (tcfe \<Delta> tys) (snd (translate \<Delta> tys C)) (compile \<Delta> (tcfes tys) ` snd (translate_syn C))"
     apply (rule translation_refinement_syntactic_semantic(2)[OF assms(2) assms(1)])
     using wf_fst wf_snd by force+
-  then obtain Cv_syn where ver_more: "Cv_syn \<in> snd (translate_syn C)" "verifies_more (tcfe \<Delta> tys) Cv (compile False \<Delta> (tcfes tys) Cv_syn)"
+  then obtain Cv_syn where ver_more: "Cv_syn \<in> snd (translate_syn C)" "verifies_more (tcfe \<Delta> tys) Cv (compile \<Delta> (tcfes tys) Cv_syn)"
     using \<open>Cv \<in> snd (translate \<Delta> tys C)\<close> assms(1) assms(2) translation_refinement_snd wf_fst wf_snd by blast
 
 
@@ -309,7 +309,7 @@ proof (rule sound_translation[OF assms(1-3)])
   show "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (atrue \<Delta> tys) Cv"
   proof -
     have ver1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
-               (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
+               (compile (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale true_syn_assertion) Cv_syn) (stmt.Exhale true_syn_assertion)))"
       apply (rule VCG_to_verifies_set)
       using AuxiliaryMethodsCorrectAndTyped[OF \<open>Cv_syn \<in> _\<close>]
@@ -322,18 +322,18 @@ proof (rule sound_translation[OF assms(1-3)])
        by (simp_all add: default_ctxt_def AbsTypeWf ValidPrePost)
 
    moreover have A1: "ConcreteSemantics.verifies_set (t2a_ctxt ?ctxt ?\<Lambda>) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>))
-               (compile False (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
+               (compile (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) Cv_syn)"
      apply (rule ConcreteSemantics.inhale_c_exhale_verifies_simplifies[where
-         ?A="make_semantic_assertion_untyped (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) true_syn_assertion" and
-         ?B="make_semantic_assertion_untyped (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) true_syn_assertion"])
+         ?A="make_semantic_assertion (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) true_syn_assertion" and
+         ?B="make_semantic_assertion (ctxt_to_interp ?ctxt) (?\<Lambda>, declared_fields (program_total ?ctxt)) true_syn_assertion"])
       defer
      using ver1 apply simp
-     unfolding make_semantic_assertion_gen_def apply simp
+     unfolding make_semantic_assertion_def apply simp
      unfolding ctxt_to_interp_def red_pure_assert_def corely_def emp_core_def apply simp
      by (metis core_is_pure pure_def red_pure_red_pure_exps.RedLit val_of_lit.simps(1))
 
 
-    hence "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile False \<Delta> (tcfes tys) Cv_syn)"
+    hence "ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)) (compile \<Delta> (tcfes tys) Cv_syn)"
     proof -
       \<comment>\<open>these proofs are duplicated from above\<close>
       have "tcfe \<Delta> tys = t2a_ctxt ?ctxt (nth_option tys)"
@@ -381,7 +381,7 @@ proof (rule sound_translation[OF assms(1-3)])
           apply (metis already_stable core_stabilize_mono(2) max_projection_prop_pure_core mpp_smaller)
          apply simp_all
        apply (subgoal_tac "stabilize |\<omega>| \<in> initial_vcg_states_equi (t2a_ctxt ?ctxt ?\<Lambda>)")
-      apply (meson ConcreteSemantics.verifies_set_def TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed \<open>ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl tys true_syn_assertion Cv_syn true_syn_assertion)) (nth_option tys))) (compile False \<Delta> (tcfes tys) Cv_syn)\<close> stabilize_is_stable)
+      apply (meson ConcreteSemantics.verifies_set_def TypedEqui.typed_core TypedEqui.typed_state_then_stabilize_typed \<open>ConcreteSemantics.verifies_set (tcfe \<Delta> tys) (initial_vcg_states_equi (t2a_ctxt (default_ctxt (interp.domains \<Delta>) (triple_as_method_decl tys true_syn_assertion Cv_syn true_syn_assertion)) (nth_option tys))) (compile \<Delta> (tcfes tys) Cv_syn)\<close> stabilize_is_stable)
       apply (rule stabilize_core_initial_state)
         apply simp_all
       using no_trace_atrue apply fastforce

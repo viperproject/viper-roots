@@ -11,13 +11,6 @@ definition make_semantic_bexp :: "('a, ('a virtual_state)) interp \<Rightarrow> 
 definition make_semantic_exp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> ('a equi_state, 'a val) exp" where
   "make_semantic_exp \<Delta> e \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v then Some (SOME v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) else None)"
 
-(*
-definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> field_ident \<Rightarrow> ('a equi_state, address \<times> field_ident) exp" where
-  "make_semantic_rexp \<Delta> r f \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v))
-  then Some (SOME v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v)), f)
-  else None)"
-*)
-
 definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> ('a equi_state, address) exp" where
   "make_semantic_rexp \<Delta> r \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v))
   then Some (SOME v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v)))
@@ -180,24 +173,6 @@ fun sat_set :: "('a, 'a virtual_state) ValueAndBasicState.interp \<Rightarrow> (
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>ImpureAnd A B\<rangle>) = \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<inter> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>ImpureOr A B\<rangle>) = \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<union> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>"
 
-(*
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
-  "make_semantic_assertion \<Delta> F A \<omega> \<longleftrightarrow> \<omega> \<in> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-*)
-
-
-
-
-(*
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion \<Delta> A = { \<omega> |\<omega>. \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle> }"
-*)
-
-(*
-TODO: Ignoring domains so far...
-record ('v, 'a) interp =
-  domains :: "'v \<Rightarrow> abs_type"
-*)
 
 datatype 'a custom =
   FieldAssign "('a equi_state, address) exp" field_ident "('a equi_state, 'a val) exp"
@@ -237,11 +212,6 @@ next
   then show ?thesis
     using Some by fastforce
 qed
-
-(*
-definition set_value :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" where
-  "set_value \<phi> hl v = Abs_virtual_state (get_vm \<phi>, (get_vh \<phi>)(hl := Some v))"
-*)
 
 
 definition owns_only where
@@ -329,26 +299,6 @@ qed (simp_all add: remove_only_def)
 
 definition points_to where
   "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> owns_only \<omega> hl }"
-
-(*
-abbreviation well_typed_concrete_heap where
-  "well_typed_concrete_heap \<Gamma> h \<equiv> (\<forall>hl v. h hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
-
-lemma well_typed_concrete_heap_update:
-  assumes "well_typed_concrete_heap \<Gamma> h"
-      and "\<Gamma> (snd hl) = Some ty"
-      and "v \<in> ty"
-    shows "well_typed_concrete_heap \<Gamma> (h(hl \<mapsto> v))"
-  using assms(1) assms(2) assms(3) by auto
-
-lemma well_typed_concrete_heap_remove:
-  assumes "well_typed_concrete_heap \<Gamma> h"
-    shows "well_typed_concrete_heap \<Gamma> (h(hl := None))"
-  using assms(1) by auto
-
-(* TODO: change this to "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (heap_typed \<Gamma> (get_vh \<phi>))" *)
-*)
-
 
 abbreviation well_typed_heap where
   "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
@@ -592,8 +542,6 @@ definition update_value where
   "update_value \<Delta> A r f e =
   { \<omega>' |\<omega>' \<omega> l v. typed_value \<Delta> f v \<and>
  \<omega> \<in> A \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)}"
-
-(* TODO: Start from here *)
 
 lemma in_update_value:
   assumes "\<omega> \<in> A"
@@ -1121,9 +1069,6 @@ definition make_context_semantic  :: "('a, 'a virtual_state) interp \<Rightarrow
 definition well_typedly (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set"*)
   where
     "well_typedly \<Delta> F A = Set.filter (typed (make_context_semantic \<Delta> F)) A"
-(*
-A \<inter> {\<omega> |\<omega>. typed (make_context_semantic \<Delta> F)}"
-*)
 
 lemma well_typedly_incl :
   shows "well_typedly \<Delta> F A \<subseteq> A"
@@ -1175,99 +1120,41 @@ lemma Stable_well_typedly :
   apply (simp add:Stable_def Stabilize_def well_typedly_def)
   using TypedEqui.typed_state_then_stabilize_typed by fastforce
 
-definition make_semantic_assertion_gen
-  :: "bool \<Rightarrow> ('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
+definition make_semantic_assertion
+  :: "('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
   where
-  "make_semantic_assertion_gen ta \<Delta> F A = (if ta then well_typedly \<Delta> F else (\<lambda> x. x)) (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  (*"make_semantic_assertion \<Delta> F A = \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>" *)
-
-abbreviation make_semantic_assertion where
- "make_semantic_assertion \<equiv> make_semantic_assertion_gen True"
-
-lemma make_semantic_assertion_def :
-  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  by (simp add:make_semantic_assertion_gen_def)
-
-abbreviation make_semantic_assertion_untyped where
- "make_semantic_assertion_untyped \<equiv> make_semantic_assertion_gen False"
-
-(*
-lemma well_behaved:
-  "TypedEqui.typed_assertion \<Delta> (Set.filter stable (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>))" oops
-*)
-
-(*
-
-
-typed (make_context_semantic \<Delta> F)
-*)
-
-lemma make_semantic_assertion_in_unfold :
-  shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>"
-  by (simp add:make_semantic_assertion_gen_def well_typedly_incl)
+  "make_semantic_assertion \<Delta> F A = (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 
 fun compile (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt" *)
   where
-  "compile ta \<Delta> F stmt.Skip = abs_stmt.Skip"
+  "compile \<Delta> F stmt.Skip = abs_stmt.Skip"
 
-| "compile ta \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
-| "compile ta \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
+| "compile \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile \<Delta> F C1) (compile \<Delta> F C2)"
+| "compile \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile \<Delta> F C1) (compile \<Delta> F C2)"
 
-| "compile ta \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
-| "compile ta \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
+| "compile \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
+| "compile \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
 
 
-| "compile ta \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion_gen ta \<Delta> F A)"
+| "compile \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion \<Delta> F A)"
 
-| "compile ta \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
 
 (* TODO: We can take the program as input, and emit the encodings *)
-| "compile ta \<Delta> F (stmt.MethodCall _ _ _) = undefined"
-| "compile ta \<Delta> F (stmt.While b I C) = undefined"
-| "compile ta \<Delta> F (stmt.Scope _ _) = undefined"
-| "compile ta \<Delta> F (stmt.Label l) = undefined"
+| "compile \<Delta> F (stmt.MethodCall _ _ _) = undefined"
+| "compile \<Delta> F (stmt.While b I C) = undefined"
+| "compile \<Delta> F (stmt.Scope _ _) = undefined"
+| "compile \<Delta> F (stmt.Label l) = undefined"
 
-| "compile ta \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
-
-
+| "compile \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
 
 
-
-(*
-definition viper_prog_verifies where
-  "viper_prog_verifies Pr \<Delta> ty C \<omega> \<longleftrightarrow> ConcreteSemantics.verifies ty (compile \<Delta> F C) \<omega>"
-  (* ty is a type-context *)
-*)
-
-
-
-
-
-
-
-
-
-
-
-
-(* TODO:
-
-*)
-
-
-
-(*
-
-lemma make_semantic_assertion_inh :
-  "\<langle>make_semantic_assertion \<Delta> F A\<rangle> = (\<langle>\<Delta>,F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  by (simp add:ConcreteSemantics.inh_def make_semantic_assertion_def)
-*)
 
 
 section \<open>red_stmt with (overapproximating) postcondition\<close>

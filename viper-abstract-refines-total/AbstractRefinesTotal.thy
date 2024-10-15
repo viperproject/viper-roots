@@ -36,21 +36,6 @@ lemma get_trace_in_star :
   shows "get_trace \<omega>' = get_trace \<omega>"
   using assms abs_state_star_singletonE by blast
 
-(* TODO: remove? *)
-lemma abs_state_defined:
-  "a ## b \<longleftrightarrow> get_store a = get_store b \<and> get_trace a = get_trace b \<and> get_state a ## get_state b"
-  by (simp add: ag_comp ag_the_ag_same comp_prod get_store_def get_trace_def get_state_def)
-
-(* TODO: remove? *)
-lemma get_vh_Some_defined_eq :
-  assumes "\<phi>1 ## \<phi>2"
-  assumes "get_vh \<phi>1 hl = Some v1"
-  assumes "get_vh \<phi>2 hl = Some v2"
-  shows "v1 = v2"
-  using assms
-  apply (clarsimp simp add:defined_def)
-  by (smt (verit, best) option.discI plus_funE plus_option.simps(3) plus_val_def vstate_add_iff)
-
 section \<open>Separation logic basics\<close>
 
 subsection \<open>partial_heap_typing\<close>
@@ -202,12 +187,6 @@ inductive_simps red_exhale_simps :
   "red_exhale ctxt R \<omega>1 (Wand A1 A2) \<omega>2 r"
   "red_exhale ctxt R \<omega>1 (ForAll ty A) \<omega>2 r"
   "red_exhale ctxt R \<omega>1 (Exists ty A) \<omega>2 r"
-
-(* TODO: remove ? *)
-inductive_simps red_atomic_assert_simps :
-  "red_atomic_assert \<Delta> (Pure e) \<omega> b"
-  "red_atomic_assert \<Delta> (Acc e f ep) \<omega> b"
-  "red_atomic_assert \<Delta> (AccPredicate P es ep) \<omega> b"
 
 inductive_simps th_result_rel_RFailure [simp] :
   "th_result_rel b1 b2 W RFailure"
@@ -2377,8 +2356,8 @@ lemma red_inhale_is_stable :
   assumes "valid_a2t_assert A"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   shows "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>) \<Longrightarrow>
-         rel_stable_assertion \<omega> (make_semantic_assertion_untyped \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A)"
-  apply (simp add: make_semantic_assertion_gen_def rel_stable_assertion_def)
+         rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A)"
+  apply (simp add: make_semantic_assertion_def rel_stable_assertion_def)
   using assms red_inhale_refines by blast
 
 lemma inhale_refines :
@@ -2388,13 +2367,13 @@ lemma inhale_refines :
   assumes "\<Delta> = ctxt_to_interp ctxt"
   assumes "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>)"
   assumes "stable \<omega>'"
-  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion_untyped \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A"
+  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A"
   assumes "\<omega>\<^sub>t' \<in> a2t_states ctxt \<omega>'"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_assert A"
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
-  apply (simp add: make_semantic_assertion_gen_def)
+  apply (simp add: make_semantic_assertion_def)
   using red_inhale_refines
   by (smt (verit, ccfv_SIG) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subsetD)
 
@@ -2747,7 +2726,7 @@ theorem abstract_refines_total :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   \<comment>\<open>We don't need store_typing in the post condition because red_stmt_total preserves store-typing\<close>
-  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
+  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
        (a2t_states ctxt -`\<^sub>s (red_stmt_total_set ctxt R \<Lambda> C (a2t_states ctxt \<omega>)))"
   \<comment>\<open>We could also use ` instead of `\<forall>, which would be a weaker (easier to prove) statement for most cases, but for
      sequential composition, it requires showing that red_stmt_total creates a set that is closed under
@@ -2772,7 +2751,7 @@ next
     subgoal for \<omega>'
       apply (rule concrete_post_Exhale[where ?\<omega>'="\<down>\<omega>'"])
         apply (assumption)
-      subgoal by (clarsimp simp add:make_semantic_assertion_gen_def)
+      subgoal by (clarsimp simp add:make_semantic_assertion_def)
       apply (simp add:red_stmt_total_set_ExhaleI)
       apply (insert havoc_locs_state_a2t[of ctxt \<Lambda> "\<down>\<omega>'"])
       apply (drule red_exhale_set_preserves_typing_a2t; assumption?; (simp add:get_trace_in_star)?)
@@ -2813,7 +2792,7 @@ next
   proof (rule concrete_post_If)
     from calc show "make_semantic_bexp \<Delta> e \<omega> = Some b" by (simp; blast)
   next
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
         (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.If e C1 C2) (a2t_states ctxt \<omega>))"
 (* Why does presburger solve this and non of the other solvers? *)
       using calc apply (clarsimp)
@@ -2831,13 +2810,13 @@ next
     apply (rule concrete_post_Seq)
     apply (rule concrete_red_stmt_post_stable_wf) using calc apply (solves \<open>simp\<close>) using calc apply (solves \<open>simp\<close>)
   proof (rule concrete_red_stmt_post_impl)
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
        (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>))"
       using calc by simp
   next
     show "a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>) \<subseteq> {\<omega>''.
         sep_algebra_class.stable \<omega>'' \<longrightarrow> a2t_state_wf ctxt (get_trace \<omega>'') \<longrightarrow> \<omega>'' \<in> {\<omega>''.
-        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
+        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
          (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.Seq C1 C2) (a2t_states ctxt \<omega>))}}"
       apply (rule subsetI)
       subgoal for \<omega>'
@@ -2867,9 +2846,6 @@ next
     apply (clarsimp simp add:red_stmt_total_set_LocalAssignI[where \<Delta>="\<Delta>"] assms(2))
     (* The state here would have xa in the goal if we use the different formulation. *)
     apply (drule a2t_states_set_store)
-    (* apply (rule exI, rule conjI, assumption) *)
-    (* apply (rule exI, rule conjI, assumption) *)
-    (* apply (rule conjI, rule) *)
     apply (auto simp add:a2t_states_in_stable)
     done
 next
@@ -2949,7 +2925,7 @@ theorem abstract_refines_total_verifies :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
-     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
   using assms
   apply (simp add:ConcreteSemantics.verifies_def)
   using abstract_refines_total
@@ -2962,7 +2938,7 @@ theorem abstract_refines_total_verifies_set :
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
-     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
   using assms
   apply (simp add:ConcreteSemantics.verifies_set_def)
   using abstract_refines_total_verifies
@@ -3106,7 +3082,7 @@ corollary VCG_to_verifies_set :
       and ValidBodyPrePost: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
       and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
     shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) (initial_vcg_states_equi (t2a_ctxt ctxt \<Lambda>))
-            (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
+            (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
                (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"  
 proof (rule abstract_refines_total_verifies_set[OF _ Typed])
   let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
