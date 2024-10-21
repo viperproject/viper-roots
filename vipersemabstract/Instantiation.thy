@@ -162,10 +162,9 @@ fun atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> (field_name 
 fun sat_set :: "('a, 'a virtual_state) ValueAndBasicState.interp \<Rightarrow> (field_name \<rightharpoonup> vtyp)
      \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" ("\<langle>_, _\<rangle> \<Turnstile> ((\<langle>_\<rangle>))" [0,0,0] 84) where
   "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Atomic A\<rangle> = atomic_assert \<Delta> F A (Some True)"
-| "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Imp b A\<rangle> = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes> (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp))"
-| "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>CondAssert b A B\<rangle>) = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes>
-     (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp) \<otimes> 
-     (if v = VBool False then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>) else emp) )"
+| "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Imp b A\<rangle> = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val (VBool v)) \<otimes> (if v = True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp))"
+| "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>CondAssert b A B\<rangle>) = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val (VBool v)) \<otimes>
+     (if v = True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>)))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A && B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) \<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A --* B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) --\<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 (* | "\<Delta> \<Turnstile> \<langle>ForAll ty A\<rangle> \<longleftrightarrow> (\<forall>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v\<rangle>)" *)
