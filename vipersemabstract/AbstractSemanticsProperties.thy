@@ -2043,6 +2043,37 @@ lemma monotonicity_verifiesE:
     shows "verifies \<Delta> C \<omega>'"
   using assms monotonicityE unfolding verifies_def by blast
 
+
+definition atrue_typed where
+  "atrue_typed \<Delta> = { \<omega>. typed \<Delta> (stabilize \<omega>)}"
+
+lemma good_atrue_typed[simp]:
+  "semi_typed \<Delta> (atrue_typed \<Delta>)"
+  "self_framing (atrue_typed \<Delta>)"
+  unfolding semi_typed_def atrue_typed_def apply blast
+  apply (rule self_framingI)
+  by (simp add: already_stable)
+
+
+lemma Viper_implies_SL_proof_atrue:
+  assumes "verifies_set \<Delta> A C"
+      and "wf_abs_stmt \<Delta> C"
+      and "self_framing A"
+      and "semi_typed \<Delta> A"
+      and "mono_custom \<Delta>"
+      and "no_assert_assume C"
+    shows "\<exists>B. \<Delta> \<turnstile> [A \<otimes> atrue_typed \<Delta>] C [B]"
+  apply (rule Viper_implies_SL_proof)
+     defer
+     apply (simp add: assms(2))
+    apply (rule self_framing_actual_star)
+  apply (simp_all add: assms)
+   apply (simp add: assms(4) semi_typed_star)
+  apply (rule verifies_setI)
+  using monotonicity_verifiesE[OF assms(2) assms(5-6)]
+  by (metis (no_types, opaque_lifting) already_stable assms(1) assms(3) assms(4) core_stabilize_mono(2) in_set_sum self_framingE semi_typed_def stabilize_is_stable verifies_set_def)
+
+
 lemma inhale_c_exhale_verifies_simplifies:
   assumes "\<And>\<omega>. sep_algebra_class.stable \<omega> \<Longrightarrow> typed \<Delta> \<omega> \<Longrightarrow> |\<omega>| \<in> A"
       and "verifies_set \<Delta> P (Inhale A;; C;; Exhale B)"
@@ -2094,17 +2125,6 @@ proof -
   ultimately show "x' \<in> {\<omega>} \<otimes> P"
     unfolding add_set_def by blast
 qed
-
-
-definition atrue_typed where
-  "atrue_typed \<Delta> = { \<omega>. typed \<Delta> (stabilize \<omega>)}"
-
-lemma good_atrue_typed:
-  "semi_typed \<Delta> (atrue_typed \<Delta>)"
-  "self_framing (atrue_typed \<Delta>)"
-  unfolding semi_typed_def atrue_typed_def apply blast
-  apply (rule self_framingI)
-  by (simp add: already_stable)
 
 
 lemma entailment_2:
