@@ -924,6 +924,22 @@ lemma rel_stable_assertionE:
   using assms Stable_def[of "{\<omega>} \<otimes> A"]
   by (smt (verit) in_Stabilize local.is_in_set_sum local.x_elem_set_product rel_stable_assertion_def singletonD subsetD)
 
+lemma in_starE:
+  assumes "x \<in> A \<otimes> B"
+      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
+    shows "P"
+  by (meson assms(1) assms(2) x_elem_set_product)
+
+lemma self_framing_actual_star:
+  assumes "self_framing A"
+      and "self_framing B"
+    shows "self_framing (A \<otimes> B)"
+  apply (rule self_framingI)
+  apply rule
+   apply (erule in_starE)
+   apply (meson assms(1) assms(2) local.stabilize_sum local.x_elem_set_product self_framingE)
+  apply (erule in_starE)
+  by (smt (verit, ccfv_SIG) assms(1) in_Stabilize local.pure_larger_stabilize local.pure_larger_stabilize_same local.pure_larger_sum local.x_elem_set_product self_framing_eq)
 
 lemma self_framing_star:
   assumes "self_framing A"
@@ -1104,11 +1120,6 @@ lemma in_singleton_star:
   using assms local.x_elem_set_product by auto
 
 
-lemma in_starE:
-  assumes "x \<in> A \<otimes> B"
-      and "\<And>a b. a \<in> A \<Longrightarrow> b \<in> B \<Longrightarrow> Some x = a \<oplus> b \<Longrightarrow> P"
-    shows "P"
-  by (meson assms(1) assms(2) x_elem_set_product)
 
 end
 
