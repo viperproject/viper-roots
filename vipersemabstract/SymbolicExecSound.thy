@@ -773,7 +773,7 @@ next
         apply (rule allI) subgoal for \<omega>'
           apply (clarsimp)
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
-          apply (case_tac "x = VBool b"; simp)
+          apply (case_tac "x = b"; simp)
           apply (case_tac "b"; simp)
           subgoal
             by (drule Imp.IH[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
@@ -801,7 +801,7 @@ next
         apply (rule allI) subgoal for \<omega>'
           apply (clarsimp)
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
-          apply (case_tac "x = VBool b"; clarsimp split:bool_to_assertion_splits)
+          apply (case_tac "x = b"; clarsimp split:bool_to_assertion_splits)
           apply (case_tac "b"; simp)
           subgoal
             by (drule CondAssert.IH(1)[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
@@ -958,7 +958,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp)
+         apply (rule exI[of _ "True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -969,7 +969,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp del: Product_Type.split_paired_Ex)
+         apply (rule exI[of _ "False"]; simp del: Product_Type.split_paired_Ex)
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
          apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
         apply (simp)
@@ -991,7 +991,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp)
+         apply (rule exI[of _ "True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1004,7 +1004,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp)
+         apply (rule exI[of _ "False"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
