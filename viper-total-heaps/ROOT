@@ -9,6 +9,7 @@ session TotalViper = ViperCommon +
     TotalSemantics
     TotalSemProperties
     TotalUtil
+	TraceIndepProperty
     ViperBoogieAbsValueInst
     ViperBoogieBasicRel
     ViperBoogieFunctionInst

@@ -1,5 +1,5 @@
 theory AbstractRefinesTotal
-  imports ViperAbstract.Instantiation TotalViper.TotalSemantics ViperAbstract.EquiSemAuxLemma ViperAbstract.AbstractSemanticsProperties
+  imports ViperAbstract.Instantiation TotalViper.TraceIndepProperty ViperAbstract.EquiSemAuxLemma ViperAbstract.AbstractSemanticsProperties
 begin
 
 section \<open>general lemmas and definitions\<close>
@@ -35,21 +35,6 @@ lemma get_trace_in_star :
   assumes "\<omega>' \<in> {\<omega>} \<otimes> A"
   shows "get_trace \<omega>' = get_trace \<omega>"
   using assms abs_state_star_singletonE by blast
-
-(* TODO: remove? *)
-lemma abs_state_defined:
-  "a ## b \<longleftrightarrow> get_store a = get_store b \<and> get_trace a = get_trace b \<and> get_state a ## get_state b"
-  by (simp add: ag_comp ag_the_ag_same comp_prod get_store_def get_trace_def get_state_def)
-
-(* TODO: remove? *)
-lemma get_vh_Some_defined_eq :
-  assumes "\<phi>1 ## \<phi>2"
-  assumes "get_vh \<phi>1 hl = Some v1"
-  assumes "get_vh \<phi>2 hl = Some v2"
-  shows "v1 = v2"
-  using assms
-  apply (clarsimp simp add:defined_def)
-  by (smt (verit, best) option.discI plus_funE plus_option.simps(3) plus_val_def vstate_add_iff)
 
 section \<open>Separation logic basics\<close>
 
@@ -202,12 +187,6 @@ inductive_simps red_exhale_simps :
   "red_exhale ctxt R \<omega>1 (Wand A1 A2) \<omega>2 r"
   "red_exhale ctxt R \<omega>1 (ForAll ty A) \<omega>2 r"
   "red_exhale ctxt R \<omega>1 (Exists ty A) \<omega>2 r"
-
-(* TODO: remove ? *)
-inductive_simps red_atomic_assert_simps :
-  "red_atomic_assert \<Delta> (Pure e) \<omega> b"
-  "red_atomic_assert \<Delta> (Acc e f ep) \<omega> b"
-  "red_atomic_assert \<Delta> (AccPredicate P es ep) \<omega> b"
 
 inductive_simps th_result_rel_RFailure [simp] :
   "th_result_rel b1 b2 W RFailure"
@@ -895,7 +874,7 @@ lemma t2a_virtual_state_get_vm[simp] :
 section \<open>abstract state to total state\<close>
 
 definition ctxt_to_interp :: "'a total_context \<Rightarrow> ('a, 'a virtual_state) ValueAndBasicState.interp" where
-"ctxt_to_interp ctxt = undefined\<lparr>domains := absval_interp_total ctxt, funs := (\<lambda> _ _ _. None) \<rparr>"
+  "ctxt_to_interp ctxt = \<lparr>domains = absval_interp_total ctxt, predicates = Map.empty, funs = (\<lambda> _ _ _. None) \<rparr>"
 
 lemma ctxt_to_interp_domains [simp] :
   "domains (ctxt_to_interp ctxt) = absval_interp_total ctxt"
@@ -2273,14 +2252,14 @@ next
     subgoal for b
       apply (rule Stable_ex)
       apply (simp only: add_set_asso[symmetric] red_pure_assert_elim ctxt_to_interp_funs assms(1))
-      apply (case_tac "x = VBool b"; clarsimp simp add:up_close_core_sum Stable_up_close_core_eq)
+      apply (case_tac "x = b"; clarsimp simp add:up_close_core_sum Stable_up_close_core_eq)
       apply (insert Imp.IH[of \<omega>])
       by (simp add:assertion_typing_simps assms(1))
     apply (clarsimp)
     subgoal for b \<omega>' \<omega>\<^sub>t' x
       apply (simp add:red_inhale_set_ImpI assms(1))
       apply (simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum  assms(1))
-      apply (case_tac "x = VBool b"; clarsimp)
+      apply (case_tac "x = b"; clarsimp)
       apply (case_tac "b"; simp)
       apply (insert Imp.IH[of \<omega>])
       by (auto simp add:assertion_typing_simps assms(1))
@@ -2295,14 +2274,14 @@ next
     subgoal for b
       apply (rule Stable_ex)
       apply (simp only: add_set_asso[symmetric] red_pure_assert_elim ctxt_to_interp_funs assms(1))
-      apply (case_tac "x = VBool b"; clarsimp simp add:up_close_core_sum Stable_up_close_core_eq)
+      apply (case_tac "x = b"; clarsimp simp add:up_close_core_sum Stable_up_close_core_eq)
       apply (insert CondAssert.IH[of \<omega>])
       by (simp add:assertion_typing_simps assms(1) split:if_splits)
     apply (clarsimp)
     subgoal for b \<omega>' \<omega>\<^sub>t' x
       apply (simp add:red_inhale_set_CondAssertI assms(1))
       apply (simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum assms(1))
-      apply (case_tac "x = VBool b"; clarsimp)
+      apply (case_tac "x = b"; clarsimp)
       apply (case_tac "b"; simp)
       apply (insert CondAssert.IH[of \<omega>])
       by (auto simp add:assertion_typing_simps assms(1))
@@ -2377,8 +2356,8 @@ lemma red_inhale_is_stable :
   assumes "valid_a2t_assert A"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   shows "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>) \<Longrightarrow>
-         rel_stable_assertion \<omega> (make_semantic_assertion_untyped \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A)"
-  apply (simp add: make_semantic_assertion_gen_def rel_stable_assertion_def)
+         rel_stable_assertion \<omega> (make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A)"
+  apply (simp add: make_semantic_assertion_def rel_stable_assertion_def)
   using assms red_inhale_refines by blast
 
 lemma inhale_refines :
@@ -2388,13 +2367,13 @@ lemma inhale_refines :
   assumes "\<Delta> = ctxt_to_interp ctxt"
   assumes "red_inhale_set_ok ctxt (\<lambda> _. True) A (a2t_states ctxt \<omega>)"
   assumes "stable \<omega>'"
-  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion_untyped \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A"
+  assumes "\<omega>' \<in> {\<omega>} \<otimes> make_semantic_assertion \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) A"
   assumes "\<omega>\<^sub>t' \<in> a2t_states ctxt \<omega>'"
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_assert A"
   shows  "\<exists>\<omega>\<^sub>t. \<omega>\<^sub>t \<in> a2t_states ctxt \<omega> \<and> red_inhale ctxt (\<lambda> _. True) A \<omega>\<^sub>t (RNormal \<omega>\<^sub>t')"
   using assms
-  apply (simp add: make_semantic_assertion_gen_def)
+  apply (simp add: make_semantic_assertion_def)
   using red_inhale_refines
   by (smt (verit, ccfv_SIG) abs_state_to_from_record mem_Collect_eq red_inhale_set_def subsetD)
 
@@ -2547,7 +2526,7 @@ next
       apply (rule exI[of _ "\<up>_"])
       apply (simp add:add_set_ex_comm_r add_set_asso[symmetric])
       apply (rule)
-       apply (rule exI[of _ "VBool True"]; simp)
+       apply (rule exI[of _ "True"]; simp)
        apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
@@ -2557,7 +2536,7 @@ next
       apply (rule exI[of _ "\<up>_"])
       apply (simp add:add_set_ex_comm_r add_set_asso[symmetric])
       apply (rule)
-       apply (rule exI[of _ "VBool False"]; simp)
+       apply (rule exI[of _ "False"]; simp)
        apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
        apply (simp)
@@ -2575,7 +2554,7 @@ next
       apply (rule exI[of _ "\<up>_"])
       apply (simp add:add_set_ex_comm_r add_set_asso[symmetric])
       apply (rule)
-       apply (rule exI[of _ "VBool True"]; simp)
+       apply (rule exI[of _ "True"]; simp)
        apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
@@ -2586,7 +2565,7 @@ next
       apply (rule exI[of _ "\<up>_"])
       apply (simp add:add_set_ex_comm_r add_set_asso[symmetric])
       apply (rule)
-       apply (rule exI[of _ "VBool False"]; simp)
+       apply (rule exI[of _ "False"]; simp)
        apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
        apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
@@ -2747,7 +2726,7 @@ theorem abstract_refines_total :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   \<comment>\<open>We don't need store_typing in the post condition because red_stmt_total preserves store-typing\<close>
-  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
+  shows "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>
        (a2t_states ctxt -`\<^sub>s (red_stmt_total_set ctxt R \<Lambda> C (a2t_states ctxt \<omega>)))"
   \<comment>\<open>We could also use ` instead of `\<forall>, which would be a weaker (easier to prove) statement for most cases, but for
      sequential composition, it requires showing that red_stmt_total creates a set that is closed under
@@ -2772,7 +2751,7 @@ next
     subgoal for \<omega>'
       apply (rule concrete_post_Exhale[where ?\<omega>'="\<down>\<omega>'"])
         apply (assumption)
-      subgoal by (clarsimp simp add:make_semantic_assertion_gen_def)
+      subgoal by (clarsimp simp add:make_semantic_assertion_def)
       apply (simp add:red_stmt_total_set_ExhaleI)
       apply (insert havoc_locs_state_a2t[of ctxt \<Lambda> "\<down>\<omega>'"])
       apply (drule red_exhale_set_preserves_typing_a2t; assumption?; (simp add:get_trace_in_star)?)
@@ -2813,7 +2792,7 @@ next
   proof (rule concrete_post_If)
     from calc show "make_semantic_bexp \<Delta> e \<omega> = Some b" by (simp; blast)
   next
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (if b then compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1 else compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>
         (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.If e C1 C2) (a2t_states ctxt \<omega>))"
 (* Why does presburger solve this and non of the other solvers? *)
       using calc apply (clarsimp)
@@ -2831,13 +2810,13 @@ next
     apply (rule concrete_post_Seq)
     apply (rule concrete_red_stmt_post_stable_wf) using calc apply (solves \<open>simp\<close>) using calc apply (solves \<open>simp\<close>)
   proof (rule concrete_red_stmt_post_impl)
-    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
+    show "concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C1) \<omega>
        (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>))"
       using calc by simp
   next
     show "a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> C1 (a2t_states ctxt \<omega>) \<subseteq> {\<omega>''.
         sep_algebra_class.stable \<omega>'' \<longrightarrow> a2t_state_wf ctxt (get_trace \<omega>'') \<longrightarrow> \<omega>'' \<in> {\<omega>''.
-        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile False \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
+        concrete_red_stmt_post (t2a_ctxt ctxt \<Lambda>) (compile \<Delta> (\<Lambda>, declared_fields (program_total ctxt)) C2) \<omega>''
          (a2t_states ctxt -`\<^sub>s red_stmt_total_set ctxt R \<Lambda> (stmt.Seq C1 C2) (a2t_states ctxt \<omega>))}}"
       apply (rule subsetI)
       subgoal for \<omega>'
@@ -2867,9 +2846,6 @@ next
     apply (clarsimp simp add:red_stmt_total_set_LocalAssignI[where \<Delta>="\<Delta>"] assms(2))
     (* The state here would have xa in the goal if we use the different formulation. *)
     apply (drule a2t_states_set_store)
-    (* apply (rule exI, rule conjI, assumption) *)
-    (* apply (rule exI, rule conjI, assumption) *)
-    (* apply (rule conjI, rule) *)
     apply (auto simp add:a2t_states_in_stable)
     done
 next
@@ -2949,7 +2925,7 @@ theorem abstract_refines_total_verifies :
   assumes "a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies (t2a_ctxt ctxt \<Lambda>)
-     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C) \<omega>"
   using assms
   apply (simp add:ConcreteSemantics.verifies_def)
   using abstract_refines_total
@@ -2958,16 +2934,255 @@ theorem abstract_refines_total_verifies :
 theorem abstract_refines_total_verifies_set :
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> red_stmt_total_set_ok ctxt (\<lambda> _. True) \<Lambda> C (a2t_states ctxt \<omega>)"
   assumes "stmt_typing (program_total ctxt) \<Lambda> C"
-  (* TODO: This should be provable *)
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> typed (t2a_ctxt ctxt \<Lambda>) \<omega> \<Longrightarrow> abs_state_typing ctxt \<Lambda> \<omega>"
-  (* TODO: This should follow from the fact that traces are empty in A. *)
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> a2t_state_wf ctxt (get_trace \<omega>)"
   assumes "valid_a2t_stmt C"
   shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) A
-     (compile False (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
+     (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) C)"
   using assms
   apply (simp add:ConcreteSemantics.verifies_set_def)
   using abstract_refines_total_verifies
   by blast
+
+
+section \<open>Theorem VCG back-end to ViperCore operational semantics\<close>
+
+text \<open>In this section, we lift @{thm abstract_refines_total_verifies_set} to a lemma that can be connected
+to the formal results proved for the VCG back-end, which are phrased in terms of a Viper method instead of
+just a Viper statement.\<close>
+
+
+text\<open>The following definition represents a Hoare triple {P} C {Q} to be verified in Viper as a method.
+\<^term>\<open>tys\<close> represents the variables that appear in the triple (as a list of types \<longrightarrow> variable i is represented
+by the i-th type in the list). In the resulting method, the statement is inhale P; C; exhale Q, where 
+\<^term>\<open>tys\<close> represents the return variables of the method (a method body can write to these). 
+
+Note that We cannot encode P as a Viper precondition, because then \<^term>\<open>tys\<close> would be the method arguments, 
+but Viper does not allow modifications to method arguments. That's why we encode the precondition directly in the 
+method via an inhale (we could have encoded Q as the method postcondition, but chose not to)\<close>
+
+definition triple_as_method_decl :: "vtyp list \<Rightarrow> ViperLang.assertion \<Rightarrow> stmt \<Rightarrow> ViperLang.assertion \<Rightarrow> method_decl"
+  where "triple_as_method_decl tys P C Q \<equiv> \<lparr> method_decl.args = [], 
+                                         rets = tys, 
+                                         pre = Atomic (Pure (ELit (LBool True))), 
+                                         post = Atomic (Pure (ELit (LBool True))), 
+                                         body = Some (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))\<rparr>"
+
+definition is_initial_vcg_state
+  where "is_initial_vcg_state ctxt \<Lambda> \<omega> \<equiv> 
+             total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>) \<and>
+             is_empty_total_full \<omega> \<and>
+             (\<forall>x t. \<Lambda> x = Some t \<longrightarrow> (\<exists>v. get_store_total \<omega> x = Some v \<and> get_type (absval_interp_total ctxt) v = t))"
+
+lemma valid_a2t_exp_to_core:
+  assumes "valid_a2t_exp e"
+  shows "exp_in_core_subset e"
+  using assms
+  by (induction e) simp_all
+
+lemma valid_a2t_atomic_assert_todo:
+  assumes "valid_a2t_atomic_assert atm"
+  shows "atomic_assert_in_core_subset atm"
+  using assms
+proof (induction atm)
+  case (Acc e f e_p)
+  then show ?case
+    by (cases e_p) (simp_all add: valid_a2t_exp_to_core)
+qed (simp_all add: valid_a2t_exp_to_core)
+  
+lemma valid_a2t_assert_to_core:
+  assumes "valid_a2t_assert A"
+  shows "assertion_in_core_subset A"
+  using assms
+  by (induction A)
+     (simp_all add: valid_a2t_atomic_assert_todo valid_a2t_exp_to_core)
+
+lemma valid_a2t_stmt_to_core:
+  assumes "valid_a2t_stmt C"
+  shows "stmt_in_core_subset C"
+  using assms
+  apply (induction C)
+  by (simp_all add: valid_a2t_assert_to_core valid_a2t_exp_to_core)
+
+lemma vpr_method_correct_red_stmt_total_set_ok:
+  assumes MethodCorrect:
+          "vpr_method_correct_total (ctxt :: 'a total_context) (\<lambda>_. True) (triple_as_method_decl tys P C Q)"
+      and "\<Lambda> = nth_option tys"
+      and ValidStmt: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
+    shows "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+  unfolding red_stmt_total_set_ok_def
+proof (rule allI, rule impI, rule notI, simp)
+  fix \<omega> :: "'a full_total_state"
+  assume Init: "is_initial_vcg_state ctxt \<Lambda> \<omega>"
+     and Red: "red_stmt_total ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) \<omega> RFailure"
+
+  let ?mdecl = "triple_as_method_decl tys P C Q"
+
+  show False
+  proof (rule vpr_method_correct_totalE[OF MethodCorrect])
+    from Init[simplified is_initial_vcg_state_def]
+    show "vpr_store_well_typed (absval_interp_total ctxt) (nth_option (method_decl.args (triple_as_method_decl tys P C Q) @ rets (triple_as_method_decl tys P C Q)))
+     (get_store_total \<omega>)"
+      unfolding triple_as_method_decl_def vpr_store_well_typed_def \<open>\<Lambda> = _\<close>
+      by simp
+  next
+    show "red_inhale ctxt (\<lambda>_. True) (method_decl.pre (triple_as_method_decl tys P C Q)) \<omega> (RNormal \<omega>)"
+      unfolding triple_as_method_decl_def
+      apply simp
+      apply (rule inh_pure_normal)
+      using RedLit
+      by (metis val_of_lit.simps(1))
+  next
+    assume BodyCorrect: "vpr_method_body_correct ctxt (\<lambda>_. True) (triple_as_method_decl tys P C Q) \<omega>"
+
+    show False
+    proof (rule BodyCorrect[simplified vpr_method_body_correct_def, THEN allE[where ?x=RFailure], THEN impE], assumption,
+           simp add: triple_as_method_decl_def)
+      show "red_stmt_total ctxt (\<lambda>_. True) (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (stmt.Exhale (Atomic (Pure (ELit (LBool True))))))
+     (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
+      proof (rule RedSeqFailureOrMagic)
+        have InSubset: "stmt_in_core_subset (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+          apply (rule valid_a2t_stmt_to_core)
+          using ValidStmt
+          by simp
+
+        show "red_stmt_total ctxt (\<lambda>_. True) (nth_option tys) (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))
+     (\<omega>\<lparr>get_trace_total := [old_label \<mapsto> get_total_full \<omega>]\<rparr>) RFailure"
+          using red_stmt_trace_indep[OF Red InSubset]
+          unfolding \<open>\<Lambda> = _\<close> 
+          by auto
+      qed (simp)
+    qed simp
+  qed  (insert Init[simplified is_initial_vcg_state_def], auto simp: triple_as_method_decl_def)
+qed
+
+
+definition initial_vcg_states_equi where 
+      "initial_vcg_states_equi \<Delta> \<equiv> {\<omega> :: 'a equi_state. stable \<omega> \<and> 
+                                    typed \<Delta> \<omega> \<and> 
+                                    get_trace \<omega> = Map.empty \<and> (\<forall>l. get_m \<omega> l = 0)
+                                  }"
+
+text \<open>The following lemma shows that the correctness of a Viper method encoding a Hoare triple
+(w.r.t. VCGSem) implies the correctness of \<open>inhale P; C; exhale Q\<close> w.r.t ViperCore's
+operational semantics. This lemma can be directly connected to formal results proved for the VCG 
+back-end.
+
+In this lemma, \<^term>\<open>triple_as_method_decl tys P C Q\<close> is the Viper method that encodes \<open>inhale P; C; exhale Q\<close>.
+Its body is \<open>inhale P; C; exhale Q\<close> and the variables considered in the method are represented by 
+the list of types \<^term>\<open>tys\<close> (variable i has the i-th type in \<^term>\<open>tys\<close>).
+\<^term>\<open>vpr_method_correct_total ctxt (\<lambda>_ :: 'a full_total_state. True) (triple_as_method_decl tys P C Q)\<close> 
+expresses when the method is correct w.r.t. VCGSem.
+\<close>
+
+corollary VCG_to_verifies_set :                             
+  assumes MethodCorrect: "vpr_method_correct_total ctxt (\<lambda>_ :: 'a full_total_state. True) (triple_as_method_decl tys P C Q)"
+      and "\<Lambda> = nth_option tys"
+      and Typed: "stmt_typing (program_total ctxt) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+      and ValidBodyPrePost: "valid_a2t_stmt C \<and> valid_a2t_assert P \<and> valid_a2t_assert Q"
+      and AbsTypeWf: "abs_type_wf (absval_interp_total ctxt)"
+    shows "ConcreteSemantics.verifies_set (t2a_ctxt ctxt \<Lambda>) (initial_vcg_states_equi (t2a_ctxt ctxt \<Lambda>))
+            (compile (ctxt_to_interp ctxt) (\<Lambda>, declared_fields (program_total ctxt)) 
+               (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)))"  
+proof (rule abstract_refines_total_verifies_set[OF _ Typed])
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
+
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>"
+  hence "stable \<omega>" and "typed (t2a_ctxt ctxt \<Lambda>) \<omega>" and "get_trace \<omega> = Map.empty" and 
+        EmptyMask: "\<forall>l. get_m \<omega> l = 0"
+    unfolding initial_vcg_states_equi_def
+    by auto
+
+  from MethodCorrect \<open>\<Lambda> = _\<close>
+  have "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> 
+          ((stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))) {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+    using vpr_method_correct_red_stmt_total_set_ok ValidBodyPrePost
+    by blast
+    
+  moreover have "a2t_states ctxt \<omega> \<subseteq> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"
+  proof 
+    fix \<omega>t
+    assume "\<omega>t \<in> a2t_states ctxt \<omega>"
+
+    show "\<omega>t \<in> {\<omega>. is_initial_vcg_state ctxt \<Lambda> \<omega>}"      
+    proof 
+      show "is_initial_vcg_state ctxt \<Lambda> \<omega>t"
+        unfolding is_initial_vcg_state_def
+      proof (intro conjI)
+        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: 
+          "well_typed_heap (custom_context (t2a_ctxt ctxt \<Lambda>)) (snd (get_abs_state \<omega>))"
+          unfolding TypedEqui.typed_def well_typed_def
+          by simp
+
+        thus "total_heap_well_typed (program_total ctxt) (absval_interp_total ctxt) (get_hh_total_full \<omega>t)"
+          using \<open>\<omega>t \<in> _\<close>
+          unfolding t2a_ctxt_def
+          by (simp add: heap_typing_total_heap_well_typed snd_get_abs_state)
+      next
+        show "is_empty_total_full \<omega>t"          
+          unfolding is_empty_total_full_def is_empty_total_def zero_mask_def
+          apply (rule conjI)
+          using EmptyMask \<open>\<omega>t \<in>  _\<close> 
+           apply fastforce
+          using a2t_states_mp_empty[OF \<open>\<omega>t \<in>  _\<close> ]
+          unfolding zero_mask_def
+          by simp
+      next
+        from \<open>typed ?\<Delta> \<omega>\<close> have StoreTyped: "store_typed (variables ?\<Delta>) (get_store \<omega>)"
+          unfolding TypedEqui.typed_def TypedEqui.typed_store_def
+          by blast
+
+        show "\<forall>x t. \<Lambda> x = Some t \<longrightarrow> (\<exists>v. get_store_total \<omega>t x = Some v \<and> get_type (absval_interp_total ctxt) v = t)"
+          using StoreTyped[simplified store_typed_def] t2a_ctxt_def sem_store_def
+          by (smt (verit, ccfv_SIG) StoreTyped \<open>\<omega>t \<in> a2t_states ctxt \<omega>\<close> get_store_a2t_states sem_vtyp_to_get_type store_typed_lookup t2a_ctxt_variables)
+      qed
+    qed
+  qed
+
+  ultimately show
+    "red_stmt_total_set_ok ctxt (\<lambda>_. True) \<Lambda> (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q)) (a2t_states ctxt \<omega>)"  
+    using red_stmt_total_set_ok_mono 
+    by blast
+next 
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
+
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>" 
+     and TypedState: "typed (t2a_ctxt ctxt \<Lambda>) \<omega>"
+
+  show "abs_state_typing ctxt \<Lambda> \<omega>"
+    unfolding abs_state_typing_def
+  proof (intro conjI)
+    from TypedState have "store_typed (variables (t2a_ctxt ctxt \<Lambda>)) (get_store \<omega>)"
+      unfolding TypedEqui.typed_def TypedEqui.typed_store_def
+      by blast
+
+    thus "store_typing ctxt \<Lambda> (get_store \<omega>)"
+      by (simp add: store_typing_def t2a_ctxt_def)
+  next
+    from TypedState have HeapTyped: "well_typed_heap (custom_context (t2a_ctxt ctxt \<Lambda>)) (snd (get_abs_state \<omega>))"
+      unfolding TypedEqui.typed_def well_typed_def
+      by blast
+    thus "well_typed_heap (sem_fields (absval_interp_total ctxt) (declared_fields (program_total ctxt))) (get_state \<omega>)"
+      by (simp add: snd_get_abs_state t2a_ctxt_def)
+  next
+    show "partial_trace_typing ctxt (get_trace \<omega>)"
+      using \<open>\<omega> \<in> _\<close>
+      by (simp add: partial_trace_typing_def initial_vcg_states_equi_def)
+  qed
+next
+  let ?\<Delta> = "(t2a_ctxt ctxt \<Lambda>)"
+
+  fix \<omega>
+  assume "\<omega> \<in> initial_vcg_states_equi ?\<Delta>"
+
+  thus "a2t_state_wf ctxt (get_trace \<omega>)"
+    unfolding a2t_state_wf_def initial_vcg_states_equi_def
+    by (simp add: AbsTypeWf)
+next
+  show "valid_a2t_stmt (stmt.Seq (stmt.Seq (stmt.Inhale P) C) (stmt.Exhale Q))"
+    by (simp add: ValidBodyPrePost)
+qed
 
 end

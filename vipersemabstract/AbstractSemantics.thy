@@ -200,33 +200,16 @@ datatype ('a, 'v, 'c) abs_stmt =
 | If "'a bexp" "('a, 'v, 'c) abs_stmt" "('a, 'v, 'c) abs_stmt"
 | Seq "('a, 'v, 'c) abs_stmt" "('a, 'v, 'c) abs_stmt" (infixl ";;" 60)
 
-\<comment>\<open>Assignments\<close>
+\<comment>\<open>Basic statements\<close>
 | LocalAssign var "('a, 'v) exp"
 | Havoc var
 
-(*
-| FieldAssign "('a, 'r) exp" "('a, 'v) exp"
-(* TODO: Probably should be a parameter of the locale! *)
-*)
 | Custom 'c
-
-(*
-\<comment>\<open>Misc\<close>
-| Label label (* Should this one be a parameter of the locale as well? *)
-*)
-
-(*
-| Scope "'v abs_vtyp" "('a, 'v, 'c) abs_stmt"
-*)
 | Skip
 
 record ('v, 'c) abs_type_context =
   variables :: "var \<rightharpoonup> 'v abs_vtyp"
   custom_context :: 'c
-
-(* Should also have a mapping from heap loc to abs_typ?
-Maybe should not...
- *)
 
 locale typed_state =
     fixes wf_custom_state :: "'c \<Rightarrow> ('a :: sep_algebra) \<Rightarrow> bool"
@@ -338,18 +321,18 @@ text \<open>Works only if (dom \<Delta>) is finite.\<close>
 definition at_least_two_elems:
   "at_least_two_elems S \<longleftrightarrow> (\<exists>a b. a \<in> S \<and> b \<in> S \<and> a \<noteq> b)"
 
-subsection \<open>wf_assertion \<Delta>\<close>
+subsection \<open>wf_assertion\<close>
 
-definition wf_assertion :: "('v, 'c) abs_type_context \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> bool" where
-  "wf_assertion \<Delta> A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
+definition wf_assertion :: "('v, 'a) abs_state assertion \<Rightarrow> bool" where
+  "wf_assertion A \<longleftrightarrow> (\<forall>x' x. pure_larger x' x \<and> x \<in> A \<longrightarrow> x' \<in> A)"
 
 lemma wf_assertionI:
   assumes "\<And>x' x. pure_larger x' x \<Longrightarrow> x \<in> A \<Longrightarrow> x' \<in> A"
-  shows "wf_assertion \<Delta> A"
+  shows "wf_assertion A"
   using assms wf_assertion_def by blast
 
 lemma wf_assertionE:
-  assumes "wf_assertion \<Delta> A"
+  assumes "wf_assertion A"
       and "pure_larger x' x"
       and "x \<in> A"
     shows "x' \<in> A"
@@ -467,9 +450,6 @@ inductive_cases red_stmt_Assign_elim[elim!]: "red_stmt \<Delta> (LocalAssign x e
 inductive_cases red_stmt_If_elim[elim!]: "red_stmt \<Delta> (If b C1 C2) \<omega> S"
 inductive_cases red_stmt_Assert_elim[elim!]: "red_stmt \<Delta> (Assert A) \<omega> S"
 inductive_cases red_stmt_Assume_elim[elim!]: "red_stmt \<Delta> (Assume A) \<omega> S"
-(*
-inductive_cases red_stmt_FieldAssign_elim[elim!]: "red_stmt \<Delta> (FieldAssign l e) \<omega> S"
-*)
 inductive_cases red_stmt_Custom_elim[elim!]: "red_stmt \<Delta> (Custom C) \<omega> S"
 
 
@@ -488,14 +468,14 @@ fun modif where
 | "modif (If _ C1 C2) = modif C1 \<union> modif C2"
 | "modif _ = {}"
 
-(* TODO:
-Remove well-typed requirements *)
-fun wf_abs_stmt where
+
+fun wf_abs_stmt :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> bool" 
+  where
   "wf_abs_stmt \<Delta> Skip \<longleftrightarrow> True"
-| "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Exhale A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Assert A) \<longleftrightarrow> wf_assertion \<Delta> A"
-| "wf_abs_stmt \<Delta> (Assume A) \<longleftrightarrow> wf_assertion \<Delta> A"
+| "wf_abs_stmt \<Delta> (Inhale A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Exhale A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Assert A) \<longleftrightarrow> wf_assertion A"
+| "wf_abs_stmt \<Delta> (Assume A) \<longleftrightarrow> wf_assertion A"
 | "wf_abs_stmt \<Delta> (If b C1 C2) \<longleftrightarrow> wf_exp b \<and> wf_abs_stmt \<Delta> C1 \<and> wf_abs_stmt \<Delta> C2"
 | "wf_abs_stmt \<Delta> (Seq C1 C2) \<longleftrightarrow> wf_abs_stmt \<Delta> C1 \<and> wf_abs_stmt \<Delta> C2"
 | "wf_abs_stmt \<Delta> (LocalAssign x e) \<longleftrightarrow> wf_exp e \<and> (\<exists>ty. variables \<Delta> x = Some ty \<and> typed_exp ty e)"
@@ -506,40 +486,7 @@ fun havoc_list where
   "havoc_list [] = Skip"
 | "havoc_list (t # q) = Seq (Havoc t) (havoc_list q)"
 
-
-subsection \<open>Assertion connectives\<close>
-
-(*
-definition astar :: "('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion"
- (infixl "&&" 60)
-  where
-  "(A && B) \<omega> \<longleftrightarrow> (\<exists>a b. Some \<omega> = a \<oplus> b \<and> A a \<and> B b)"
-
-
-definition aconj :: "('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion"
- (infixl "\<and>\<and>" 60)
-  where
-    "(A \<and>\<and> B) \<omega> \<longleftrightarrow> A \<omega> \<and> B \<omega>"
-
-definition adisj :: "('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion"
- (infixl "||" 60) where "(A || B) \<omega> \<longleftrightarrow> A \<omega> \<or> B \<omega>"
-*)
-
-section \<open>Minimal stuff\<close>
-
-(*
-definition points_to where
-  "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> has_write_perm_only (get_abs_state \<omega>) hl}"
-
-definition points_to_value where
-  "points_to_value r e = { \<omega> |\<omega> hl v. r \<omega> = Some hl \<and> e \<omega> = Some v \<and> has_write_perm_only (get_abs_state \<omega>) hl \<and> has_value (get_abs_state \<omega>) hl v}"
-*)
-(*
-definition atrue :: "('v, 'a) abs_state assertion" where
-  "atrue \<omega> \<longleftrightarrow> True"
-*)
-
-section \<open>Something else\<close>
+section \<open>Free variables\<close>
 
 definition dom_vars where
   "dom_vars \<omega> = dom (get_store \<omega>)"
@@ -548,91 +495,15 @@ abbreviation univ :: "'a \<Rightarrow> ('v, 'a) abs_state set" where
   "univ r \<equiv> UNIV \<times> {r}"
 
 
-
-\<comment> \<open>Hongyi defined these 3 functions for his thesis.
-\<^const>\<open>framed_by_exp\<close> doesn't fully characterize the property "assertion \<^term>\<open>A\<close> frames expression \<^term>\<open>e\<close>",
-in the sense that although \<^term>\<open>e (stabilize_state \<omega>)\<close> has value, it may not equal to \<^term>\<open>e \<omega>\<close>.
-In addition to "frame expression" property, it also excludes evaluation error case. For example,
-expression \<^term>\<open>1 / x\<close> is framed by any assertion, but atrue does not \<^const>\<open>framed_by_exp\<close>
-it by definition, as there is evaluation error when \<^prop>\<open>x = 0\<close> and it evaluates to \<^const>\<open>None\<close> then.
-Nevertheless, this additional characterization is also essential in defining LocalAssign rule when
-choosing to do substitution in post-condition: this LocalAssign statement must reduce every state
-satisfying pre-condition. As a result, every state satisfying pre-condition must evaluate the expression
-\<^term>\<open>e\<close> not to \<^const>\<open>None\<close>, which is exactly characterized by \<^const>\<open>framed_by_exp\<close>. Moreover,
-substitute_state should be used only when \<^prop>\<open>e \<omega> \<noteq> None\<close>. In SL rules, this is guaranteed by \<^const>\<open>framed_by_exp\<close>.
-\<close>
-
-(*
-definition assertion_frame_exp :: "('v, 'a) abs_state assertion \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> bool" where
-  "assertion_frame_exp A e \<longleftrightarrow> (\<forall>\<omega> \<in> A. e \<omega> = e (stabilize \<omega>))"
-*)
-
 definition substitute_var_state where
   "substitute_var_state x e \<omega> = assign_var_state x (e \<omega>) \<omega>"
 
 definition post_substitute_var_assert :: "var \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
   "post_substitute_var_assert x e A = substitute_var_state x e ` A"
 
-(*
-definition set_value_state :: "'r \<Rightarrow> 'v \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
-  "set_value_state l v \<omega> = ((Ag (get_store \<omega>), Ag (get_trace \<omega>)), set_value (get_abs_state \<omega>) l v)"
-*)
-
-(*
-definition substitute_field_state :: "(('v, 'a) abs_state \<rightharpoonup> 'r) \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> ('v, 'a) abs_state" where
-  "substitute_field_state r e \<omega> = set_abs_state \<omega> (set_value (get_abs_state \<omega>) (the (r \<omega>)) (the (e \<omega>)))"
-
-definition post_substitute_field_assert :: "(('v, 'a) abs_state \<rightharpoonup> 'r) \<Rightarrow> (('v, 'a) abs_state, 'v) exp \<Rightarrow> ('v, 'a) abs_state assertion \<Rightarrow> ('v, 'a) abs_state assertion" where
-  "post_substitute_field_assert r e A = { \<omega>' |\<omega>' \<omega>. \<omega> \<in> A \<and> \<omega>' = substitute_field_state r e \<omega>}"
-*)
 
 
-
-(*
-lemma assertion_frames_exp_eq:
-  assumes "wf_exp e"
-      and "self_framing A"
-      and "framed_by_exp A e"
-    shows "assertion_frame_exp A e"
-  unfolding assertion_frame_exp_def
-proof
-  fix \<omega> assume asm0: "\<omega> \<in> A"
-  then have "stabilize \<omega> \<in> A"
-    using assms(2) self_framing_def by auto
-  then obtain v where "e (stabilize \<omega>) = Some v"
-    by (metis assms(3) framed_by_exp_def option.collapse)
-  then show "e \<omega> = e (stabilize \<omega>)"
-    by (metis (no_types, lifting) assms(1) decompose_stabilize_pure greater_def wf_expE)
-qed
-*)
-
-
-
-section \<open>SL Proof\<close>
-
-(*
-definition depends_on_ag_store_only where
-  "depends_on_ag_store_only e \<longleftrightarrow> (\<forall>\<sigma> \<gamma> \<gamma>'. e (\<sigma>, \<gamma>) = e (\<sigma>, \<gamma>'))"
-*)
-(*
-set_abs_state \<omega> (set_value (get_abs_state \<omega>) (the (r \<omega>)) (the (e \<omega>)))"
-*)
-(*
-(* \<exists>l v. b[r \<rightarrow> v] \<inter> r = e[r \<rightarrow> v] 
-r and *r
-TODO TODO TODO
-*)
-
-*)
-
-(* What if r depends on e? b can also mention this! *)
-
-(* \<omega>' is the old state! *)
-(*
-definition pure_post_field_assign where
-  "pure_post_field_assign r e b = { \<omega> |\<omega> l v. let \<omega>' = set_abs_state \<omega> (set_value (get_abs_state \<omega>) l v) in
-  (b \<omega>' = Some True \<and> has_write_perm_only (get_abs_state \<omega>) (the (r \<omega>')) \<and> has_value (get_abs_state \<omega>) (the (r \<omega>')) (the (e \<omega>')))}"
-*)
+section \<open>Axiomatic Semantics\<close>
 
 definition purify where
   "purify b = { \<omega> |\<omega>. b \<omega> = Some True \<and> pure \<omega> }"
@@ -660,123 +531,15 @@ Because there is not frame rule, it can be used to express leak checks, or absen
 
 | RuleAssume: "self_framing A \<Longrightarrow> self_framing_on A P \<Longrightarrow> \<Delta> \<turnstile> [A] Assume P [A \<inter> P]"
 
-
 | RuleHavoc: "self_framing A \<Longrightarrow> \<Delta> \<turnstile> [A] Havoc x [exists_assert \<Delta> x A]"
 
-\<comment>\<open>Entails needed, because we lose information. The strongest post might be \<exists>x. A, but does not seem more useful.\<close>
-
-\<comment> \<open>
-| RuleFieldAssignHeapIndep:
-  "\<lbrakk> self_framing A; framed_by_exp A r; framed_by_exp A e; depends_on_ag_store_only r; depends_on_ag_store_only e \<rbrakk>
-  \<Longrightarrow> \<Delta> \<turnstile> [A && points_to r] FieldAssign r e [A && points_to_value r e]"
-Replaced by the new uniform one below in Hongyi's thesis.\<close>
-
- (* ; assertion_frame_exp (A \<otimes> points_to r) e *)
-(* Precondition should be A \<otimes> points_to_r e' for some e', framed_by A *)
-
-(* Cannot split acc(x.f) * acc(y.f) * x.f = y.f *)
-(* Needs a pure equation b on the side *)
-(* or entails... *)
-
-(*
-| RuleFieldAssignWithEntails: "\<lbrakk> entails B (A \<otimes> points_to r); self_framing A; framed_by_exp (A \<otimes> points_to r) b; framed_by_exp (A \<otimes> points_to r) e \<rbrakk>
-  \<Longrightarrow> _ \<turnstile> [B] FieldAssign r e [post_substitute_field_assert r e (A \<otimes> points_to r)]"
-*)
-
-
-(* Postcondition should be:
-A \<otimes> points_to r \<otimes> (\<exists>v. b[r \<rightarrow> v] \<inter> r = e[r \<rightarrow> v])
-*)
-
-
-(*
-| RuleFieldAssignOld: "\<lbrakk> self_framing (A \<otimes> points_to r); framed_by_exp (A \<otimes> points_to r) e \<rbrakk>
-  \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r] FieldAssign r e [post_substitute_field_assert r e (A \<otimes> points_to r)]"
-*)
-
-\<comment> \<open>Replaced to the new one above in Hongyi's thesis. The new one simply simulates reduction of this statement,
-  with assumptions ensuring the simulation doesn't cause error.
-| RuleFieldAssign: "\<lbrakk> self_framing (A && points_to_value r e') ; framed_by_exp (A && points_to r) e \<rbrakk>
-  \<Longrightarrow> \<Delta> \<turnstile> [A && points_to_value r e'] FieldAssign r e [A && points_to_value r e]"\<close>
-
-
-
-\<comment> \<open>
-| RuleLocalAssign: "\<lbrakk> self_framing A; framed_by_exp A e; x \<notin> free_vars \<Delta> A \<rbrakk> \<Longrightarrow>  \<Delta> \<turnstile> [A] LocalAssign x e [ A && var_equal_exp x e ]"
-Change to new one for Hongyi's thesis. The reason not to do substitution in precondition is that it is hard to express framing requirements.
-Intuitively, since \<^term>\<open>e\<close> is not evaluated in post-condition, it is not reasonable to express "post-condition \<^term>\<open>A\<close> frames \<^term>\<open>e\<close>".
-Assuming "A[x \<mapsto> e] frames e" makes the rule even more complicated than the one below.
-Moreover, \<^prop>\<open>framed_by_exp A e\<close> doesn't work here: assume we want to have rule as "\<turnstile> {A[x \<mapsto> e]} x := e {A}",
-then simply requiring \<^prop>\<open>framed_by_exp A e\<close> is wrong: due to the additional characterization of evaluation error case of \<^const>\<open>framed_by_exp\<close>,
-this rule cannot express "\<turnstile> {x \<noteq> 0} x := 0/x {x = 0}" (if \<^term>\<open>A\<close> is \<^prop>\<open>x = 0\<close>,
-then "0/x" always evaluates to \<^const>\<open>None\<close>, and \<^term>\<open>A\<close> can never \<^const>\<open>framed_by_exp\<close> "0/x").
-Explanation of assumptions:
-- To guarantee that \<^const>\<open>assign_var_state\<close> works under \<^prop>\<open>e \<omega> \<noteq> None\<close>, \<^prop>\<open>framed_by_exp A e\<close> is necessary.
-- To get self-framingness of post-condition, \<^prop>\<open>assertion_frame_exp A e\<close> is necessary.
-This rule is sound because: for every state \<^term>\<open>\<omega>\<close> satisfying \<^term>\<open>A\<close>. \<^term>\<open>e \<omega>\<close> evaluates to \<^term>\<open>Some v\<close>, and for the post-state \<^term>\<open>\<omega>'\<close>, the existence of \<^term>\<open>\<omega>\<close> makes it satisfy \<^term>\<open>post_substitute_assert x e A\<close>.
-This rule should be complete (maybe not yet): as long as the LocalAssign statement reduces for pre-condition \<^term>\<open>A\<close>, \<^term>\<open>e\<close> must evaluate to not \<^const>\<open>None\<close> for every state in \<^term>\<open>A\<close>, thus \<^prop>\<open>framed_by_exp A e\<close>. \<^prop>\<open>assertion_frame_exp A e\<close> is a framing requirement, and a correct reduction should satisfy it.
-\<close>
 | RuleLocalAssign: "\<lbrakk> self_framing A; framed_by_exp A e \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] LocalAssign x e [post_substitute_var_assert x e A]"
-
-\<comment>\<open>Like inhale and the if rule, needs to frame r and e.
-Interestingly, does not work if we only have
-- self_framing A
-- framed_by_exp A r.
-
-Moreover, points_to_r is actually not *precise* enough.
-Example: x.f.f \<mapsto> x.f
-
-x.f == x
-
-r := e
-
-1) A is self-framing
-2) A frames r
-3) the set of states is *exactly* described by A && r \<mapsto> _
-
-
-x.f := ...
---> "issue" if location of "x.f" depends on the value of x.f
---> Ok in Viper, because only depends on x, and x can be expressed through A self-framing
-
-[e] := ...
---> "issue" if location of "e" depends on the value of e
-
-x.f.f := ...
---> "issue" if location of "x.f.f" depends on the value of x.f.f
---> In Viper, location of "x.f.f" depends on the value of x.f
---> so, if x.f == x.f.f
-
-State acc(x.f) && x.f == x.f.f
-
-A fixes x
-x = 0 && x.f \<mapsto> x.f.f
-x = 0 && (\<exists>v. x.f \<mapsto> v /\ v
-
-(x = 0 && 0.f \<mapsto> 0.f.f)
-
-acc(x.f) && x.f = x
-[x.f.f := ...]
-
-Might need an entailment...\<close>
 
 | RuleSeq: "\<lbrakk> \<Delta> \<turnstile> [A] C1 [R] ; \<Delta> \<turnstile> [R] C2 [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Seq C1 C2 [B]"
 
 | RuleIf: "\<lbrakk> self_framing A; framed_by_exp A b; \<Delta> \<turnstile> [A \<otimes> purify b] C1 [B1] ; \<Delta> \<turnstile> [A \<otimes> purify (negate b)] C2 [B2] \<rbrakk>
   \<Longrightarrow> \<Delta> \<turnstile> [A] If b C1 C2 [B1 \<union> B2]"
 
-(*
-| RuleFrame: "self_framing F \<Longrightarrow> \<Delta> \<turnstile> [A] C [B] \<Longrightarrow> free_var F \<inter> modif C = {} \<Longrightarrow> \<Delta> \<turnstile> [astar A F] C [astar B F]"
-| RuleConsPre: "\<lbrakk> entails A' A ; self_framing A' ; \<Delta> \<turnstile> [A] C [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A'] C [B]"
-| RuleConsPost: "\<lbrakk> entails B B' ; self_framing B' ; \<Delta> \<turnstile> [A] C [B] \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] C [B']"
-| RuleEquiv: "\<lbrakk> equiv A' A ; self_framing A' ; \<Delta> \<turnstile> [A] C [B]; equiv B B'; self_framing B' \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A'] C [B']"
-*)
-
-(*
-| RuleFieldAssign: "\<lbrakk> self_framing A; framed_by_exp A r; framed_by_exp (A \<otimes> points_to r) b; wf_exp b;
-  framed_by_exp (A \<otimes> points_to r \<otimes> pure_Stabilize b) e \<rbrakk>
-  \<Longrightarrow> _ \<turnstile> [A \<otimes> points_to r \<otimes> pure_Stabilize b] FieldAssign r e [A \<otimes> pure_post_field_assign r e b]"
-*)
 | RuleCustom: "\<lbrakk> self_framing A; self_framing B; SL_Custom \<Delta> A C B \<rbrakk> \<Longrightarrow> \<Delta> \<turnstile> [A] Custom C [B]"
 
 inductive_cases SL_proof_Skip_elim[elim!]: "\<Delta> \<turnstile> [A] Skip [B]"
@@ -789,18 +552,10 @@ inductive_cases SL_proof_If_elim[elim!]: "\<Delta> \<turnstile> [A] If b C1 C2 [
 inductive_cases SL_proof_Custom_elim[elim!]: "\<Delta> \<turnstile> [A] Custom C [B]"
 inductive_cases SL_proof_LocalAssign_elim[elim!]: "\<Delta> \<turnstile> [A] LocalAssign x e [B]"
 
-(*
-inductive_cases SL_proof_FieldAssign_elim[elim!]: "\<Delta> \<turnstile> [A] FieldAssign r e [B]"
-*)
-
-
-
-
 
 definition verifies :: "('v, 'c) abs_type_context \<Rightarrow> (('v, 'a) abs_state, 'v, 's) abs_stmt \<Rightarrow> ('v, 'a) abs_state \<Rightarrow> bool" where
   "verifies \<Delta> C \<omega> \<longleftrightarrow> (\<exists>S. red_stmt \<Delta> C \<omega> S)"
 
-(* \<omega> is pure? *)
 definition verifies_set where
   "verifies_set \<Delta> A C \<longleftrightarrow> (\<forall>\<omega> \<in> A. stable \<omega> \<and> typed \<Delta> \<omega> \<longrightarrow> verifies \<Delta> C \<omega>)"
 

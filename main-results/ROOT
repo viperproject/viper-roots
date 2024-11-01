@@ -1,0 +1,8 @@
+session MainResults = ViperAbstract +
+  sessions
+    SimpleViperFrontEnd
+    ViperAbstractRefinesTotal
+  theories
+    PaperResults
+    VCGEndToEnd
+    SymbolicExecEndToEnd
