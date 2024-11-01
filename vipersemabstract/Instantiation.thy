@@ -11,13 +11,6 @@ definition make_semantic_bexp :: "('a, ('a virtual_state)) interp \<Rightarrow> 
 definition make_semantic_exp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> ('a equi_state, 'a val) exp" where
   "make_semantic_exp \<Delta> e \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v then Some (SOME v. \<Delta> \<turnstile> \<langle>e; \<omega>\<rangle> [\<Down>] Val v) else None)"
 
-(*
-definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> field_ident \<Rightarrow> ('a equi_state, address \<times> field_ident) exp" where
-  "make_semantic_rexp \<Delta> r f \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v))
-  then Some (SOME v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v)), f)
-  else None)"
-*)
-
 definition make_semantic_rexp :: "('a, ('a virtual_state)) interp \<Rightarrow> pure_exp \<Rightarrow> ('a equi_state, address) exp" where
   "make_semantic_rexp \<Delta> r \<omega> = (if \<exists>v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v))
   then Some (SOME v. \<Delta> \<turnstile> \<langle>r; \<omega>\<rangle> [\<Down>] Val (VRef (Address v)))
@@ -169,10 +162,9 @@ fun atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> (field_name 
 fun sat_set :: "('a, 'a virtual_state) ValueAndBasicState.interp \<Rightarrow> (field_name \<rightharpoonup> vtyp)
      \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" ("\<langle>_, _\<rangle> \<Turnstile> ((\<langle>_\<rangle>))" [0,0,0] 84) where
   "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Atomic A\<rangle> = atomic_assert \<Delta> F A (Some True)"
-| "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Imp b A\<rangle> = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes> (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp))"
-| "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>CondAssert b A B\<rangle>) = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val v) \<otimes>
-     (if v = VBool True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp) \<otimes> 
-     (if v = VBool False then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>) else emp) )"
+| "\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>Imp b A\<rangle> = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val (VBool v)) \<otimes> (if v = True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else emp))"
+| "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>CondAssert b A B\<rangle>) = (\<Union>v. (\<Delta> \<turnstile> \<langle>b\<rangle> [\<Down>] Val (VBool v)) \<otimes>
+     (if v = True then (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) else (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>)))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A && B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) \<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A --* B\<rangle>) = ((\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>) --\<otimes> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>))"
 (* | "\<Delta> \<Turnstile> \<langle>ForAll ty A\<rangle> \<longleftrightarrow> (\<forall>v \<in> set_from_type (domains \<Delta>) ty. \<Delta> \<Turnstile> \<langle>A; shift_and_add_equi_state \<omega> v\<rangle>)" *)
@@ -180,24 +172,6 @@ fun sat_set :: "('a, 'a virtual_state) ValueAndBasicState.interp \<Rightarrow> (
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>ImpureAnd A B\<rangle>) = \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<inter> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>"
 | "(\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>ImpureOr A B\<rangle>) = \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle> \<union> \<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>B\<rangle>"
 
-(*
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state \<Rightarrow> bool" where
-  "make_semantic_assertion \<Delta> F A \<omega> \<longleftrightarrow> \<omega> \<in> (\<langle>\<Delta>, F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-*)
-
-
-
-
-(*
-definition make_semantic_assertion :: "('a, 'a virtual_state) interp \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set" where
-  "make_semantic_assertion \<Delta> A = { \<omega> |\<omega>. \<Delta> \<Turnstile> \<langle>A; \<omega>\<rangle> }"
-*)
-
-(*
-TODO: Ignoring domains so far...
-record ('v, 'a) interp =
-  domains :: "'v \<Rightarrow> abs_type"
-*)
 
 datatype 'a custom =
   FieldAssign "('a equi_state, address) exp" field_ident "('a equi_state, 'a val) exp"
@@ -237,11 +211,6 @@ next
   then show ?thesis
     using Some by fastforce
 qed
-
-(*
-definition set_value :: "'a virtual_state \<Rightarrow> (address \<times> field_ident) \<Rightarrow> 'a val \<Rightarrow> 'a virtual_state" where
-  "set_value \<phi> hl v = Abs_virtual_state (get_vm \<phi>, (get_vh \<phi>)(hl := Some v))"
-*)
 
 
 definition owns_only where
@@ -284,18 +253,7 @@ proof -
   show "get_vm (get_state (remove_only \<omega> l)) = (get_vm (get_state \<omega>))(l := PosReal.pnone)"
     by (metis (mono_tags, lifting) Abs_virtual_state_inverse r get_state_set_state get_vm_def mem_Collect_eq prod.sel(1) remove_only_def)
 qed
-(*
-lemma remove_only_core:
-  "|remove_only \<omega> l| = |\<omega>|"
-proof (rule full_state_ext)
-  show "get_store |remove_only \<omega> l| = get_store |\<omega>|"
-    by (simp add: core_charact(1) remove_only_def)
-  show "get_trace |remove_only \<omega> l| = get_trace |\<omega>|"
-    by (metis get_trace_set_state remove_only_def set_state_core)
-  show "get_state |remove_only \<omega> l| = get_state |\<omega>|"
-    by (metis Rep_virtual_state_inverse agreement.exhaust_sel core_charact(2) core_def core_structure(1) core_structure(2) get_abs_state_def get_abs_state_set_abs_state get_state_def get_state_set_state get_state_set_trace get_vh_def get_vm_def prod.exhaust_sel remove_only_charact(1) set_abs_state_def set_trace_def)
-qed
-*)
+
 
 lemma remove_only_stabilize:
   "stabilize (remove_only \<omega> l) = remove_only (stabilize \<omega>) l"
@@ -329,26 +287,6 @@ qed (simp_all add: remove_only_def)
 
 definition points_to where
   "points_to r = { \<omega> |\<omega> hl. r \<omega> = Some hl \<and> owns_only \<omega> hl }"
-
-(*
-abbreviation well_typed_concrete_heap where
-  "well_typed_concrete_heap \<Gamma> h \<equiv> (\<forall>hl v. h hl = Some v \<longrightarrow> (\<exists>ty. \<Gamma> (snd hl) = Some ty \<and> v \<in> ty))"
-
-lemma well_typed_concrete_heap_update:
-  assumes "well_typed_concrete_heap \<Gamma> h"
-      and "\<Gamma> (snd hl) = Some ty"
-      and "v \<in> ty"
-    shows "well_typed_concrete_heap \<Gamma> (h(hl \<mapsto> v))"
-  using assms(1) assms(2) assms(3) by auto
-
-lemma well_typed_concrete_heap_remove:
-  assumes "well_typed_concrete_heap \<Gamma> h"
-    shows "well_typed_concrete_heap \<Gamma> (h(hl := None))"
-  using assms(1) by auto
-
-(* TODO: change this to "well_typed_heap \<Gamma> \<phi> \<longleftrightarrow> (heap_typed \<Gamma> (get_vh \<phi>))" *)
-*)
-
 
 abbreviation well_typed_heap where
   "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
@@ -498,11 +436,6 @@ definition pure_post_field_assign where
 definition well_typed :: "(field_ident \<rightharpoonup> 'a val set) \<Rightarrow> ('a ag_trace \<times> 'a virtual_state) \<Rightarrow> bool" where
   "well_typed \<Gamma> \<omega> \<longleftrightarrow> well_typed_heap \<Gamma> (snd \<omega>) \<and> (\<forall>l \<phi>. the_ag (fst \<omega>) l = Some \<phi> \<longrightarrow> well_typed_heap \<Gamma> \<phi>)"
 
-(* TODO:
-1. Adapt interpretation and prove rules
-2. Prove simpler rules for FieldAssign when heap independent
-3. Prove rule label?
-*)
 
 lemma well_typedI[intro]:
   assumes "well_typed_heap \<Gamma> (snd \<omega>)"
@@ -562,7 +495,7 @@ qed
 
 
 global_interpretation TypedEqui: typed_state well_typed
-proof
+proof                             
   fix x a b :: "('a ag_trace \<times> 'a virtual_state)"
   fix \<Gamma>
   show "Some x = a \<oplus> b \<Longrightarrow> well_typed \<Gamma> a \<Longrightarrow> well_typed \<Gamma> b \<Longrightarrow> well_typed \<Gamma> x"
@@ -577,7 +510,7 @@ qed
 fun wf_custom_stmt where
   "wf_custom_stmt \<Delta> (FieldAssign r f e) \<longleftrightarrow> sep_algebra_class.wf_exp r \<and> sep_algebra_class.wf_exp e
   \<and> (\<exists>ty. custom_context \<Delta> f = Some ty \<and> TypedEqui.typed_exp ty e)"
-(* | "wf_custom_stmt _ (Label _) \<longleftrightarrow> True" *)
+
 
 definition typed_value where
   "typed_value \<Delta> f v \<longleftrightarrow> (\<forall>ty. custom_context \<Delta> f = Some ty \<longrightarrow> v \<in> ty)"
@@ -592,8 +525,6 @@ definition update_value where
   "update_value \<Delta> A r f e =
   { \<omega>' |\<omega>' \<omega> l v. typed_value \<Delta> f v \<and>
  \<omega> \<in> A \<and> r \<omega> = Some l \<and> e \<omega> = Some v \<and> \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)}"
-
-(* TODO: Start from here *)
 
 lemma in_update_value:
   assumes "\<omega> \<in> A"
@@ -624,42 +555,7 @@ inductive SL_Custom :: "('a val, (field_ident \<rightharpoonup> 'a val set)) abs
 inductive_cases SL_custom_FieldAssign[elim!]: "SL_Custom \<Delta> A (FieldAssign r f e) B"
 (* inductive_cases SL_custom_Label[elim!]: "SL_Custom \<Delta> A (Label l) B" *)
 
-(*
-lemma typed_then_update_value_typed:
-  assumes "TypedEqui.typed_assertion \<Delta> A"
-  shows "TypedEqui.typed_assertion \<Delta> (update_value \<Delta> A r f e)"
-proof (rule TypedEqui.typed_assertionI)
-  fix \<omega>' assume asm0: "\<omega>' \<in> update_value \<Delta> A r f e"
-  then obtain \<omega> l v ty where "custom_context \<Delta> f = Some ty" "v \<in> ty"
- "\<omega> \<in> A" "r \<omega> = Some l" "e \<omega> = Some v" "\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)"
-    using update_valueE by blast
-  show "TypedEqui.typed \<Delta> \<omega>'"
-    unfolding TypedEqui.typed_def
-  proof
-    show "TypedEqui.typed_store \<Delta> (get_store \<omega>')"
-      by (metis TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<omega> \<in> A\<close> \<open>\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<close> assms get_store_set_state)
-    show "well_typed (custom_context \<Delta>) (get_abs_state \<omega>')"
-    proof (rule well_typedI)
-      show "\<And>l \<phi>. the_ag (fst (get_abs_state \<omega>')) l = Some \<phi> \<Longrightarrow> Instantiation.well_typed_heap (custom_context \<Delta>) \<phi>"
-        by (metis TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<omega> \<in> A\<close> \<open>\<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<close> assms get_abs_state_def get_trace_def get_trace_set_state well_typedE(2))
-      show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state \<omega>'))"
-      proof (rule well_typed_heapI)
-        fix hl v assume asm1: "get_vh (snd (get_abs_state \<omega>')) hl = Some v"
-        show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v \<in> ty"
-        proof (cases "fst hl = l")
-          case True
-          then show ?thesis
-            by (smt (verit, ccfv_SIG) TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<And>thesis. (\<And>\<omega> l v ty. \<lbrakk>custom_context \<Delta> f = Some ty; v \<in> ty; \<omega> \<in> A; r \<omega> = Some l; e \<omega> = Some v; \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> asm1 assms get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) snd_conv well_typedE(1) well_typed_concrete_heap_update well_typed_heapE)
-        next
-          case False
-          then show ?thesis
-            by (smt (verit, ccfv_SIG) TypedEqui.typed_assertion_def TypedEqui.typed_def \<open>\<And>thesis. (\<And>\<omega> l v ty. \<lbrakk>custom_context \<Delta> f = Some ty; v \<in> ty; \<omega> \<in> A; r \<omega> = Some l; e \<omega> = Some v; \<omega>' = set_state \<omega> (set_value (get_state \<omega>) (l, f) v)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> asm1 assms get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) snd_conv well_typedE(1) well_typed_concrete_heap_update well_typed_heapE)
-        qed
-      qed
-    qed
-  qed
-qed
-*)
+
 
 lemma set_state_value_inv:
   assumes "get_vh \<phi> l = Some v"
@@ -820,40 +716,6 @@ proof (rule self_framingI)
           qed
         qed
       qed (simp_all add: r)
-(*
-      moreover have "TypedEqui.typed \<Delta> ?x"
-        unfolding TypedEqui.typed_def
-      proof
-        show "TypedEqui.typed_store \<Delta> (get_store (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
-          sorry
-
-          by (metis TypedEqui.typed_def asm0(1) get_store_set_state)
-        show "well_typed (custom_context \<Delta>) (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))"
-        proof (rule well_typedI)
-          show "\<And>la \<phi>. the_ag (fst (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))) la = Some \<phi> \<Longrightarrow>
-       Instantiation.well_typed_heap (custom_context \<Delta>) \<phi>"
-            by (metis TypedEqui.typed_def asm0(1) get_abs_state_def get_trace_def get_trace_set_state well_typedE(2))
-          show "Instantiation.well_typed_heap (custom_context \<Delta>) (snd (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0))))"
-          proof (rule well_typed_heapI)
-            fix hl v' assume asm2: "get_vh (snd (get_abs_state (set_state \<omega>' (set_value (get_state \<omega>') (l, f) v0)))) hl = Some v'"
-            show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v' \<in> ty"
-              apply (cases "hl = (l, f)")
-              apply (metis (mono_tags, lifting) TypedEqui.typed_assertionE \<open>get_h \<omega> (l, f) = Some v0\<close> asm1(1) asm2 assms(7) get_abs_state_def get_state_def get_state_set_state get_vh_vm_set_value(1) map_upd_Some_unfold typed_get_vh)
-            proof -
-              assume "hl \<noteq> (l, f)"
-              then have "get_vh (set_value (get_state \<omega>') (l, f) v0) hl = Some v'"
-                by (metis get_abs_state_def get_state_def get_state_set_state asm2)
-              then have "get_vh (get_state \<omega>') hl = Some v'"
-                by (simp add: \<open>hl \<noteq> (l, f)\<close>)
-              then show "\<exists>ty. custom_context \<Delta> (snd hl) = Some ty \<and> v' \<in> ty"
-                using asm0 typed_get_vh by blast
-            qed
-          qed
-        qed
-      qed
-      ultimately show ?thesis by fast
-    qed
-*)
       ultimately show ?thesis by blast
     qed
     then have "\<exists>x. x \<in> A \<and> r x = Some l \<and> e x = Some v \<and> \<omega>' = set_state x (set_value (get_state x) (l, f) v)"
@@ -875,11 +737,7 @@ inductive red_custom_stmt :: "('a val, field_ident \<rightharpoonup> 'a val set)
 inductive_cases red_custom_stmt_FieldAssign[elim!]: "red_custom_stmt \<Delta> (FieldAssign r f e) \<omega> S"
 (* inductive_cases red_custom_stmt_Label[elim!]: "red_custom_stmt \<Delta> (Label l) \<omega> S" *)
 
-(*
-  assumes SL_proof_custom: "(\<forall>(\<omega> :: (('v, 'a) abs_state list \<times> ('v, 'a) abs_state)) \<in> SA.
-  red_custom_stmt \<Delta> C (snd \<omega>) (f \<omega>)) \<Longrightarrow> wf_custom_stmt \<Delta> C \<Longrightarrow> wf_set \<Delta> (snd ` SA)
-  \<Longrightarrow> SL_Custom \<Delta> (Stabilize (snd ` SA)) C (Stabilize (\<Union>\<omega>\<in>SA. f \<omega>))"
-*)
+
 lemma SL_proof_FieldAssign_easy:
   assumes "\<forall>\<omega>\<in>SA. red_custom_stmt \<Delta> (FieldAssign r g e) (snd \<omega>) (f \<omega>)"
       and "wf_custom_stmt \<Delta> (FieldAssign r g e)"
@@ -948,9 +806,6 @@ proof -
       then obtain \<alpha> where "\<alpha> \<in> SA" "stabilize \<omega>' \<in> f \<alpha>"
         by auto
 
-(* "TypedEqui.typed \<Delta> \<omega>'"
-        by (metis (no_types, lifting) TypedEqui.Stabilize_typed_def UN_E in_Stabilize member_filter)
-*)
 
       then obtain l v where "f \<alpha> = {set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)}"  "r (snd \<alpha>) = Some l" "e (snd \<alpha>) = Some v"
         using r[of \<alpha>] by blast
@@ -960,10 +815,7 @@ proof -
         by (simp add: \<open>\<alpha> \<in> SA\<close> assms(3))
       ultimately have "snd \<alpha> \<in> Stabilize (snd ` SA)"
         by (simp add: \<open>\<alpha> \<in> SA\<close> already_stable)
-(*
-      moreover have "TypedEqui.typed \<Delta> (stabilize \<omega>')"
-        by (simp add: TypedEqui.typed_state_then_stabilize_typed asm0(2))
-*)
+
       moreover have "stabilize \<omega>' \<in> ?B"
         using in_update_value[of _ _ r _ e, OF _ \<open>r (snd \<alpha>) = Some l\<close> \<open>e (snd \<alpha>) = Some v\<close>
             \<open>stabilize \<omega>' = set_state (snd \<alpha>) (set_value (get_state (snd \<alpha>)) (l, g) v)\<close>]
@@ -1104,16 +956,15 @@ qed
 abbreviation typed where
   "typed \<equiv> TypedEqui.typed"
 
+
 (* TODO: unify make_context_semantic, s2a_ctxt and t2a_ctxt? *)
-definition make_context_semantic where
+definition make_context_semantic  :: "('a, 'a virtual_state) interp \<Rightarrow> (nat \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option) \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
+  where
   "make_context_semantic \<Delta> F = \<lparr> variables = (sem_store (domains \<Delta>) (fst F)), custom_context = (sem_fields (domains \<Delta>) (snd F))  \<rparr>"
 
 definition well_typedly (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> 'a equi_state set \<Rightarrow> 'a equi_state set"*)
   where
     "well_typedly \<Delta> F A = Set.filter (typed (make_context_semantic \<Delta> F)) A"
-(*
-A \<inter> {\<omega> |\<omega>. typed (make_context_semantic \<Delta> F)}"
-*)
 
 lemma well_typedly_incl :
   shows "well_typedly \<Delta> F A \<subseteq> A"
@@ -1165,99 +1016,41 @@ lemma Stable_well_typedly :
   apply (simp add:Stable_def Stabilize_def well_typedly_def)
   using TypedEqui.typed_state_then_stabilize_typed by fastforce
 
-definition make_semantic_assertion_gen
-  :: "bool \<Rightarrow> ('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
+definition make_semantic_assertion
+  :: "('a, 'a virtual_state) interp \<Rightarrow> ((var \<rightharpoonup> vtyp) \<times> (field_name \<rightharpoonup> vtyp)) \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state set"
   where
-  "make_semantic_assertion_gen ta \<Delta> F A = (if ta then well_typedly \<Delta> F else (\<lambda> x. x)) (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  (*"make_semantic_assertion \<Delta> F A = \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>" *)
-
-abbreviation make_semantic_assertion where
- "make_semantic_assertion \<equiv> make_semantic_assertion_gen True"
-
-lemma make_semantic_assertion_def :
-  "make_semantic_assertion \<Delta> F A = well_typedly \<Delta> F (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  by (simp add:make_semantic_assertion_gen_def)
-
-abbreviation make_semantic_assertion_untyped where
- "make_semantic_assertion_untyped \<equiv> make_semantic_assertion_gen False"
-
-(*
-lemma well_behaved:
-  "TypedEqui.typed_assertion \<Delta> (Set.filter stable (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>))" oops
-*)
-
-(*
-
-
-typed (make_context_semantic \<Delta> F)
-*)
-
-lemma make_semantic_assertion_in_unfold :
-  shows "make_semantic_assertion \<Delta> F A \<subseteq> \<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>"
-  by (simp add:make_semantic_assertion_gen_def well_typedly_incl)
+  "make_semantic_assertion \<Delta> F A = (\<langle>\<Delta>, snd F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
 
 fun compile (* :: "('a, 'a virtual_state) interp \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Rightarrow> stmt \<Rightarrow> ('a equi_state, 'a val, 'a custom) abs_stmt" *)
   where
-  "compile ta \<Delta> F stmt.Skip = abs_stmt.Skip"
+  "compile \<Delta> F stmt.Skip = abs_stmt.Skip"
 
-| "compile ta \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
-| "compile ta \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile ta \<Delta> F C1) (compile ta \<Delta> F C2)"
+| "compile \<Delta> F (stmt.If b C1 C2) = abs_stmt.If (make_semantic_bexp \<Delta> b) (compile \<Delta> F C1) (compile \<Delta> F C2)"
+| "compile \<Delta> F (stmt.Seq C1 C2) = abs_stmt.Seq (compile \<Delta> F C1) (compile \<Delta> F C2)"
 
-| "compile ta \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
-| "compile ta \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
+| "compile \<Delta> F (stmt.Havoc x) = abs_stmt.Havoc x"
+| "compile \<Delta> F (stmt.LocalAssign x e) = abs_stmt.LocalAssign x (make_semantic_exp \<Delta> e)"
 
 
-| "compile ta \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion_gen ta \<Delta> F A)"
-| "compile ta \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion_gen ta \<Delta> F A)"
+| "compile \<Delta> F (stmt.Inhale A) = abs_stmt.Inhale (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Exhale A) = abs_stmt.Exhale (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Assert A) = abs_stmt.Assert (make_semantic_assertion \<Delta> F A)"
+| "compile \<Delta> F (stmt.Assume A) = abs_stmt.Assume (make_semantic_assertion \<Delta> F A)"
 
-| "compile ta \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
-| "compile ta \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Unfold _ _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Fold _ _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Package _ _) = abs_stmt.Skip"
+| "compile \<Delta> F (stmt.Apply _ _) = abs_stmt.Skip"
 
 (* TODO: We can take the program as input, and emit the encodings *)
-| "compile ta \<Delta> F (stmt.MethodCall _ _ _) = undefined"
-| "compile ta \<Delta> F (stmt.While b I C) = undefined"
-| "compile ta \<Delta> F (stmt.Scope _ _) = undefined"
-| "compile ta \<Delta> F (stmt.Label l) = undefined"
+| "compile \<Delta> F (stmt.MethodCall _ _ _) = undefined"
+| "compile \<Delta> F (stmt.While b I C) = undefined"
+| "compile \<Delta> F (stmt.Scope _ _) = undefined"
+| "compile \<Delta> F (stmt.Label l) = undefined"
 
-| "compile ta \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
-
-
+| "compile \<Delta> F (stmt.FieldAssign r f e) = abs_stmt.Custom (FieldAssign (make_semantic_rexp \<Delta> r) f (make_semantic_exp \<Delta> e))"
 
 
-
-(*
-definition viper_prog_verifies where
-  "viper_prog_verifies Pr \<Delta> ty C \<omega> \<longleftrightarrow> ConcreteSemantics.verifies ty (compile \<Delta> F C) \<omega>"
-  (* ty is a type-context *)
-*)
-
-
-
-
-
-
-
-
-
-
-
-
-(* TODO:
-
-*)
-
-
-
-(*
-
-lemma make_semantic_assertion_inh :
-  "\<langle>make_semantic_assertion \<Delta> F A\<rangle> = (\<langle>\<Delta>,F\<rangle> \<Turnstile> \<langle>A\<rangle>)"
-  by (simp add:ConcreteSemantics.inh_def make_semantic_assertion_def)
-*)
 
 
 section \<open>red_stmt with (overapproximating) postcondition\<close>

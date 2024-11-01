@@ -192,10 +192,6 @@ qed
 
 
 
-(*
-real_mult_permexpr does not seem to be defined...
-*)
-
 
 lemma real_mult_permexpr_case_split:
   assumes "p > 0"
@@ -638,17 +634,6 @@ next
     by (simp add: compatible_virtual_state_implies_pre_virtual_state_rev)
 qed
 
-(*
-lemma lambda_None_is_identity:
-  shows "\<And>t :: 'v trace. Some t = t \<oplus> (Ag Map.Emp)"
-proof -
-  fix t :: "'v trace"
-  have "\<And>l. Some (t l) = (t l) \<oplus> ((\<lambda>l. None) l)"
-    by (simp add: commutative)
-  then show "Some t = t \<oplus> (\<lambda>l. None)"
-    by (simp add: plus_funI)
-qed
-*)
 
 lemma zero_mask_identity:
   "Some x = x \<oplus> (zero_mask :: ('b, preal) abstract_mask)"
@@ -1185,7 +1170,7 @@ qed
 
 *)
 
-section \<open>Separealion Algebra Instantiations\<close>
+section \<open>Separation Algebra Instantiations\<close>
 
 subsection \<open>Instantiation of val and virtual_state as pcm_with_core\<close>
 
@@ -1544,15 +1529,9 @@ qed
 
 end
 
+
+
 (*
-lemma stable_rel_virtual_stateI:
-  assumes "\<And>hl :: heap_loc. get_vh (x :: 'v virtual_state) hl \<noteq> None \<Longrightarrow> get_vm x hl > 0 \<or> get_vm a hl > 0"
-  shows "stable_rel a x"
-proof (clarsimp simp add: stable_rel_def stable_virtual_state_def)
-*)
-
-
-
 lemma stable_rel_virtual_stateE:
   assumes "stable_rel a x"
       and "get_vh x hl = Some v"
@@ -1561,6 +1540,7 @@ lemma stable_rel_virtual_stateE:
 (* This does not hold! But it also should not hold. If there is a contradiction between a and x, all locations become stable. *)
   oops
   (* by (metis assms option.discI stable_rel_virtual_state_def) *)
+*)
 
 
 subsection \<open>heap_typed\<close>
@@ -1966,6 +1946,81 @@ next
   then show ?A
     using defined_def plus_prodIAlt by fastforce
 qed
+
+lemma greater_charact_equi:
+  "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_trace \<omega>' = get_trace \<omega>  \<and> get_state \<omega>' \<succeq> get_state \<omega>"
+  by (metis agreement.collapse get_abs_state_def get_state_def get_trace_def greater_charact greater_prod_eq greater_state_has_greater_parts(2) succ_refl)
+
+lemma val_greater_iff [simp] :
+  "(x :: 'a val) \<succeq> y \<longleftrightarrow> x = y"
+  by (simp add:greater_def plus_val_def)
+
+lemma preal_greater_iff [simp] :
+  "(x :: preal) \<succeq> y \<longleftrightarrow> x \<ge> y"
+  apply (simp add:greater_def plus_preal_def)
+  using pos_perm_class.sum_larger preal_gte_padd by auto
+
+lemma option_greater_SomeI :
+  assumes "x \<succeq> y"
+  shows "Some x \<succeq> Some y"
+  by (meson assms greater_def plus_optionI)
+
+lemma option_greater_None [simp] :
+  "x \<succeq> None"
+  by (simp add: greater_def)
+
+lemma greater_option_Some_r :
+  "(x :: ('a :: pcm_with_core) option) \<succeq> Some y \<longleftrightarrow> (\<exists> x'. x = Some x' \<and> x' \<succeq> y)"
+  apply (cases x; simp add:greater_def)
+   apply (smt (verit, ccfv_threshold) asso1 option.discI option_plus_None_r positivity)
+  apply (rule; clarsimp)
+  subgoal for a c
+    apply (cases "c"; simp)
+    subgoal apply (rule exI[of _ "|y|"]) by (simp add: core_is_smaller)
+    subgoal by (metis (full_types) option.discI option.sel)
+    done
+  subgoal for a c
+    apply (rule exI[of _ "Some c"]; simp)
+    by (metis (full_types) not_None_eq)
+  done
+
+lemma option_greater_iff :
+  "(x :: ('a :: pcm_with_core) option) \<succeq> y \<longleftrightarrow> (\<forall> y'. y = Some y' \<longrightarrow> (\<exists> x'. x = Some x' \<and> x' \<succeq> y'))"
+  by (cases "y"; simp add:greater_option_Some_r)
+
+lemma vstate_greater_charact1:
+  assumes "get_vm x \<succeq> get_vm y"
+  assumes "get_vh x \<succeq> get_vh y"
+  shows "x \<succeq> y"
+proof -
+  obtain cm where "Some (get_vm x) = get_vm y \<oplus> cm"
+    using assms unfolding greater_def by blast
+  moreover have "wf_pre_virtual_state (cm, get_vh x)"
+    apply (rule wf_pre_virtual_stateI)
+     apply (metis EquiViper.add_masks_def add.commute calculation gr_0_is_ppos leD pos_perm_class.sum_larger pperm_pnone_pgt vstate_wf_imp)
+    by (metis (no_types, lifting) EquiViper.add_masks_def calculation commutative get_vm_bound pgte_transitive pos_perm_class.sum_larger wf_mask_simple_def)
+  moreover obtain c where "get_vh c = get_vh x" "get_vm c = cm"
+    apply (simp add:get_vm_def get_vh_def)
+    using calculation Abs_virtual_state_inverse
+    by (metis fst_conv get_vh_def mem_Collect_eq snd_conv)
+  ultimately show "?thesis"
+    using assms(2)
+    apply (simp add: greater_def)
+    apply (rule exI[of _ c])
+    apply (simp add: vstate_add_iff)
+    by (smt (verit, ccfv_threshold) asso1 core_is_pure core_structure(2) vstate_add_iff)
+qed
+
+lemma vstate_greater_charact:
+  shows "x \<succeq> y \<longleftrightarrow> get_vm x \<succeq> get_vm y \<and> get_vh x \<succeq> get_vh y"
+  using vstate_greater_charact1 greater_def vstate_add_iff by metis
+
+lemma greater_uu :
+  "st \<succeq> uu"
+  apply (simp add:vstate_greater_charact uu_get)
+  by (meson empty_heap_identity greater_equiv zero_mask_identity)
+
+
 
 
 end

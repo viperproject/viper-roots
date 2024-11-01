@@ -10,14 +10,17 @@ setup_isabelle:
   script:
     - git submodule update --init --recursive
     - mkdir -p isabelle
-    - curl -L https://isabelle.in.tum.de/website-Isabelle2022/dist/Isabelle2022_linux.tar.gz -o isabelle.tar.gz
+    - curl -L https://isabelle.in.tum.de/website-Isabelle2024/dist/Isabelle2024_linux.tar.gz -o isabelle.tar.gz
     - tar -xzf isabelle.tar.gz -C isabelle --strip-components=1
     - ./isabelle/bin/isabelle components -u foundational_boogie/BoogieLang
     - ./isabelle/bin/isabelle components -u vipersemcommon
     - ./isabelle/bin/isabelle components -u viper-total-heaps
     - ./isabelle/bin/isabelle components -u vipersemabstract
+    - ./isabelle/bin/isabelle components -u viper-abstract-refines-total
+    - ./isabelle/bin/isabelle components -u simple-frontend
     # paper-results has viper-total-heaps as a parent session
     - ./isabelle/bin/isabelle build -j4 -D viper-total-heaps/paper-results
     - ./isabelle/bin/isabelle build -j4 -D vipersemabstract
     - ./isabelle/bin/isabelle build -j4 -D viper-abstract-refines-total
     - ./isabelle/bin/isabelle build -j4 -D simple-frontend
+    - ./isabelle/bin/isabelle build -j4 -D main-results

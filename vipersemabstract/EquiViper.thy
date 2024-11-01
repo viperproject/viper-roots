@@ -57,28 +57,9 @@ qed
 
 end
 
-
-(*
-text \<open>Heap permission mask\<close>
-type_synonym mask = "heap_loc \<Rightarrow> positive rational"
-
-text \<open>Partial heap\<close>
-type_synonym 'a partial_heap = "heap_loc \<rightharpoonup> 'a val"
-*)
-
-(*
-- mask (x, f) \<le> 1
-- If mask (x, f) > 0 \<Longrightarrow> heap (x, f) != None
-*)
-
 definition wf_pre_virtual_state :: "'a pre_virtual_state \<Rightarrow> bool" where
   "wf_pre_virtual_state st \<longleftrightarrow> (\<forall>hl. ppos (fst st hl) \<longrightarrow> snd st hl \<noteq> None) \<and> wf_mask_simple (fst st)"
 
-
-(*
-States are *unbounded*
-wf_mask_simple \<pi> \<and> 
-*)
 
 lemma wf_pre_virtual_stateI:
   assumes "\<And>hl. ppos (\<pi> hl) \<Longrightarrow> h hl \<noteq> None"
@@ -104,20 +85,6 @@ lemma pre_wf_plus_def:
   "(\<pi>' :: preal mask, h') ## (\<pi>, h) \<longleftrightarrow> h' ## h"
   by (simp add: comp_prod masks_can_always_be_added)
 
-(*
-fun pre_wf_plus :: "'a pre_virtual_state \<Rightarrow> 'a pre_virtual_state \<Rightarrow> bool" where
-  "pre_wf_plus (\<pi>', h') (\<pi>, h) \<longleftrightarrow> h' ## h"
-
-
-lemma pre_wf_plusI:
-  assumes "\<And>hl. compatible_options (h' hl) (h hl)"
-    shows "pre_wf_plus (\<pi>', h') (\<pi>, h)"
-  by (simp add: assms(1) compatible_heaps_def)
-
-text \<open>The result of the addition: (\<pi>', h') + (\<pi>, h) =
-- Mask: \<pi>' + \<pi>
-- Heap: h' ++ h\<close>
-*)
 
 
 subsection \<open>Virtual equi_states\<close>
@@ -135,7 +102,7 @@ proof (rule wf_pre_virtual_stateI)
 qed
 
 typedef 'a virtual_state = "{ \<phi> :: 'a pre_virtual_state |\<phi>. wf_pre_virtual_state \<phi> }"
-  using wf_uuu by blast
+  using wf_uuu by blast                       
 
 setup_lifting type_definition_virtual_state
 
@@ -149,12 +116,6 @@ lemma virtual_state_ext:
   by (metis Rep_virtual_state_inject assms(1) assms(2) get_vh_def get_vm_def prod.expand)
 
 
-(*
-definition set_vh where
-  "set_vh \<phi> h = Abs_virtual_state (get_vm \<phi>, h)"
-definition set_vm where
-  "set_vm \<phi> m = Abs_virtual_state (m, get_vh \<phi>)"
-*)
 
 lift_definition uu :: "'a virtual_state" is "uuu"
   using wf_uuu by (simp add: uuu_def)
@@ -163,13 +124,7 @@ lemma uu_get :
   shows "get_vm uu = zero_mask" "get_vh uu = empty_heap"
   by (simp_all add:get_vm_def get_vh_def uu.rep_eq uuu_def)
 
-(*
-lemma sum_wf_is_wf:
-  assumes "wf_pre_virtual_state a"
-      and "wf_pre_virtual_state b"
-      and "Some x = a \<oplus> b"
-    shows "wf_pre_virtual_state x"
-*)
+
 
 fun read_field :: "'a virtual_state \<Rightarrow> heap_loc \<Rightarrow> 'a val option"
   where "read_field \<phi> loc = get_vh \<phi> loc"
@@ -269,29 +224,8 @@ subsection \<open>Normal equi_states\<close>
 
 type_synonym 'a ag_trace = "(label \<rightharpoonup> 'a virtual_state) agreement"
 
-(* Normal equi_state *)
-
-(*
-type_synonym 'a store = "var \<rightharpoonup> 'a val" (* De Bruijn indices *)
-*)
-(*
-type_synonym 'a trace = "label \<rightharpoonup> 'a virtual_state"
-*)
 type_synonym 'a equi_state = "('a val, ('a ag_trace \<times> 'a virtual_state)) abs_state"
-                                    
-(*
-= 'a val ag_store \<times> ('a virtual_state \<times> 'a trace)"
-'a val ag_store = (var \<rightharpoonup> 'a val) agreement"
-*)
 
-(*
-fun get_store :: "'a equi_state \<Rightarrow> (var \<rightharpoonup> 'a val)" where "get_store \<omega> = get_store \<omega>"
-fun get_t :: "'a equi_state \<Rightarrow> 'a trace" where "get_t \<omega> = fst (snd \<omega>)"
-*)
-(*
-definition get_trace :: "('v, 'a) abs_state \<Rightarrow> (label \<rightharpoonup> 'a)" where "get_trace \<omega> = the_ag (snd (fst \<omega>))"
-
-*)
 definition get_state :: "'a equi_state \<Rightarrow> 'a virtual_state" where "get_state \<omega> = snd (snd \<omega>)"
 definition get_trace :: "'a equi_state \<Rightarrow> (label \<rightharpoonup> 'a virtual_state)" where "get_trace \<omega> = the_ag (fst (snd \<omega>))"
 definition set_state :: "'a equi_state \<Rightarrow> 'a virtual_state \<Rightarrow> 'a equi_state" where
@@ -335,11 +269,6 @@ lemma fst_get_abs_state :
   "the_ag (fst (get_abs_state \<omega>)) = get_trace \<omega>"
   by (simp add: get_abs_state_def get_trace_def)
 
-(*
-(* TODO vipersemabstract/EquiSemAuxLemma.thy *)
-
-
-*)
 
 abbreviation get_h where "get_h \<omega> \<equiv> get_vh (get_state \<omega>)"
 abbreviation get_m where "get_m \<omega> \<equiv> get_vm (get_state \<omega>)"
@@ -638,9 +567,6 @@ lemma no_old_indep_trace:
   
 *)
 
-(*
-inductive red_atomic_assert :: "('v, ('v virtual_state)) interp \<Rightarrow> pure_exp atomic_assert \<Rightarrow> 'v equi_state \<Rightarrow> bool option \<Rightarrow> bool" where
-*)
 
 fun sat :: "('a, 'a virtual_state) interp
      \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a equi_state \<Rightarrow> bool"
@@ -669,10 +595,6 @@ section \<open>Restrictions\<close>
 
 fun all_predicate_have_bodies where
   "all_predicate_have_bodies Pr \<longleftrightarrow> (\<forall>P decl. program.predicates Pr P = Some decl \<longrightarrow> predicate_decl.body decl \<noteq> None)"
-(*
-fun wf_exp where
-  "wf_exp _ = undefined"
-*)
 
 fun wf_assert where
   "wf_assert Pr (AccPredicate P arg p) \<longleftrightarrow> (program.predicates Pr P \<noteq> None)"
@@ -715,10 +637,6 @@ lemma predicate_body_good_case:
 
 subsection \<open>Normal states\<close>
 
-(* TODO: rename get_ into abs_? *)
-(* TODO: Should state be renamed to heap? get_state on abs_state sounds like the identity *)
-(* TODO: define this via record instead of getter and setter functions? This would require proving the
-class instances for the record (via isomorphism?), but one would get nice getters and setters automatically *)
 
 lemma full_state_ext:
   assumes "get_store a = get_store b"

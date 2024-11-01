@@ -2,36 +2,15 @@ theory ParImp
   imports ViperCommon.SepAlgebra ViperCommon.SepLogic ViperAbstract.Instantiation VHelper
 begin
 
-(* Maybe adapt state model to instantiation, just remove mask... *)
-
 definition field_val :: "string" where
   "field_val = ''val''"
 
-term "x :: int equi_state"
-(*
-  :: "(nat \<Rightarrow> int val option) agreement \<times> (char list \<Rightarrow> int virtual_state option) agreement \<times> int virtual_state"
-*)
 
-(*
-type_synonym val = int
-type_synonym var = nat
-type_synonym heap_loc = int
-type_synonym heap = "heap_loc \<rightharpoonup> val" (* concrete heap *)
-type_synonym stack = "var \<Rightarrow> val"
-*)
-type_synonym stack = "var \<rightharpoonup> int val"
-type_synonym heap = "int partial_heap"
+type_synonym 'a stack = "var \<rightharpoonup> 'a val"
+type_synonym 'a heap = "'a partial_heap"
 (* address are nat here... *)
-type_synonym state = "stack \<times> heap"
+type_synonym 'a state = "'a stack \<times> 'a heap"
 
-(*
-datatype binop =
-  Add | Sub | Mult | IntDiv | PermDiv | Mod
-| Eq | Neq
-| Gt | Gte | Lt | Lte
-| Or | BImp | And
-
-*)
 datatype int_binop = Add | Sub | Mult
 
 fun interp_int_binop :: "int_binop \<Rightarrow> int \<Rightarrow> int \<Rightarrow> int" where
@@ -65,25 +44,21 @@ datatype cmd =
 | Cwhile bexp "(pure_exp, pure_exp atomic_assert) assert" cmd
 
 
-primrec edenot :: "exp \<Rightarrow> stack \<Rightarrow> int"
+primrec edenot :: "exp \<Rightarrow> 'a stack \<Rightarrow> int"
   where
   "edenot (Evar v) s = the_int (the (s v))"
 | "edenot (Elit n) s = n"
 | "edenot (Ebinop e1 op e2) s = interp_int_binop op (edenot e1 s) (edenot e2 s)"
 
 primrec
-  bdenot :: "bexp \<Rightarrow> stack \<Rightarrow> bool" where
+  bdenot :: "bexp \<Rightarrow> 'a stack \<Rightarrow> bool" where
   "bdenot (Beq e1 e2) s = (edenot e1 s = edenot e2 s)"
 | "bdenot (Band b1 b2) s = (bdenot b1 s \<and> bdenot b2 s)"
 | "bdenot (Bnot b) s = (\<not> bdenot b s)"
 
-(*
-| RedLocalAssign: "\<lbrakk>variables \<Delta> x = Some ty; e \<omega> = Some v; v \<in> ty \<rbrakk> \<Longrightarrow>
-   red_stmt \<Delta> (LocalAssign x e) \<omega> ({assign_var_state x (Some v) \<omega>})"
-*)
-term "TypedEqui.assign_var_state"
+
                    
-inductive red :: "cmd \<Rightarrow> state \<Rightarrow> cmd \<Rightarrow> state \<Rightarrow> bool"
+inductive red :: "cmd \<Rightarrow> 'a state \<Rightarrow> cmd \<Rightarrow> 'a state \<Rightarrow> bool"
   ("\<langle>_, _\<rangle> \<rightarrow> \<langle>_, _\<rangle>" [51,0] 81)
   where
   red_Seq1[intro]: "\<langle>Cseq Cskip C, \<sigma>\<rangle> \<rightarrow> \<langle>C, \<sigma>\<rangle>"
@@ -125,7 +100,7 @@ lemma get_address_simp[simp]:
   by (simp add: get_address_def)
 
 primrec
-  accesses :: "cmd \<Rightarrow> stack \<Rightarrow> address set"
+  accesses :: "cmd \<Rightarrow> 'a stack \<Rightarrow> address set"
 where
     "accesses Cskip            s = {}"
   | "accesses (Cassign x E)    s = {}"
@@ -139,7 +114,7 @@ where
   | "accesses (Cwhile B I C)     s = {}"
 
 primrec
-  writes :: "cmd \<Rightarrow> stack \<Rightarrow> address set"
+  writes :: "cmd \<Rightarrow> 'a stack \<Rightarrow> address set"
 where
     "writes Cskip            s = {}"
   | "writes (Cassign x E)    s = {}"
@@ -153,7 +128,7 @@ where
   | "writes (Cwhile B I C)     s = {}"
 
 inductive
-  aborts :: "cmd \<Rightarrow> state \<Rightarrow> bool"
+  aborts :: "cmd \<Rightarrow> 'a state \<Rightarrow> bool"
 where
   aborts_Seq[intro]:   "aborts C1 \<sigma> \<Longrightarrow> aborts (Cseq C1 C2) \<sigma>" 
 | aborts_Par1[intro]:  "aborts C1 \<sigma> \<Longrightarrow> aborts ({_} C1 {_} || {_} C2 {_}) \<sigma>" 
@@ -407,7 +382,8 @@ lemma aborts_agrees[rule_format]:
 proof (induct rule: aborts.induct)
   case (aborts_Race1 C1 \<sigma> C2)
   then show ?case
-    using aborts.aborts_Race1 accesses_agrees writes_agrees by fastforce
+    using aborts.aborts_Race1 accesses_agrees writes_agrees
+    by (metis agrees_simps(4) fst_conv fvC.simps(8))
 next
   case (aborts_Race2 C1 \<sigma> C2)
   then show ?case
@@ -442,88 +418,105 @@ definition vints where
 definition vrefs where
   "vrefs = { VRef v |v. True }"
 
-fun well_typed_cmd_aux where
-  "well_typed_cmd_aux _ Cskip \<longleftrightarrow> True"
-| "well_typed_cmd_aux \<Delta> (Cseq C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> (Cassign x e) \<longleftrightarrow> variables \<Delta> x = Some vints"
-| "well_typed_cmd_aux \<Delta> (Cread x r) \<longleftrightarrow> variables \<Delta> x = Some vints \<and> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cwrite r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Calloc r e) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cfree r) \<longleftrightarrow> variables \<Delta> r = Some vrefs"
-| "well_typed_cmd_aux \<Delta> (Cif _ C1 C2) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C1 \<and> well_typed_cmd_aux \<Delta> C2"
-| "well_typed_cmd_aux \<Delta> (Cwhile _ _ C) \<longleftrightarrow> well_typed_cmd_aux \<Delta> C"
-
-(*
-lemma update_store_typed:
-  assumes "TypedEqui.typed_store \<Delta> s"
-      and "variables \<Delta> x = Some V"
-      and "v \<in> V"
-    shows "TypedEqui.typed_store \<Delta> (s(x \<mapsto> v))"
-  sledgehammer
-*)
-
-lemma red_keeps_typed_store:
-  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-      and "TypedEqui.typed_store \<Delta> (fst \<sigma>)"
-      and "well_typed_cmd_aux \<Delta> C"
-    shows "TypedEqui.typed_store \<Delta> (fst \<sigma>')"
-  using assms
-proof (induct rule: red.induct)
-  case (red_Assign \<sigma> s h \<sigma>' x e)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Assign(3), of x vints "VInt (edenot e s)"]
-    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(3))
-next
-  case (red_Alloc \<sigma> s h l \<sigma>' x e)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Alloc(4), of x vrefs "VRef (Address l)"]
-    by (metis (mono_tags, lifting) CollectI fst_eqD vrefs_def well_typed_cmd_aux.simps(6))
-next
-  case (red_Read \<sigma> s h r l v \<sigma>' x)
-  then show ?case
-    using TypedEqui.typed_store_update[OF red_Read(5), of x vints "VInt v"]
-    by (metis (mono_tags, lifting) CollectI fstI vints_def well_typed_cmd_aux.simps(4))
-qed (simp_all)
 
 
 definition type_ctxt_heap where
   "type_ctxt_heap f = (if f = field_val then Some vints else None)"
 
+
 definition type_ctxt_store where
-  "type_ctxt_store x = (if x < undefined then if x mod 2 = 0 then Some vints else Some vrefs else None)"
+  "type_ctxt_store \<Delta> tys x = (if x < length tys then Some (set_from_type (domains \<Delta>) (tys ! x)) else None )"
 
-definition type_ctxt_front_end where
-  "type_ctxt_front_end = \<lparr> variables = type_ctxt_store, custom_context = type_ctxt_heap \<rparr>"
 
-definition type_ctxt_front_end_syntactic :: "(var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+definition type_ctxt_front_end :: "('a, 'a virtual_state) interp \<Rightarrow> vtyp list \<Rightarrow> ('a val, char list \<Rightarrow> 'a val set option) abs_type_context"
   where
-  "type_ctxt_front_end_syntactic = ( (\<lambda>x. if x < undefined then if x mod 2 = 0 then Some TInt else Some TRef else None), (\<lambda>f. if f = field_val then Some TInt else None) )"
+  "type_ctxt_front_end \<Delta> tys = \<lparr> variables = type_ctxt_store \<Delta> tys, custom_context = type_ctxt_heap \<rparr>"
 
-(*
-definition make_context_semantic where
-  "make_context_semantic \<Delta> F = \<lparr> variables = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (fst F), custom_context = (map_option (make_semantic_vtyp \<Delta>)) \<circ> (snd F)  \<rparr>"
-*)
+abbreviation tcfe where
+  "tcfe \<equiv> type_ctxt_front_end"
+
+definition type_ctxt_front_end_syntactic :: "vtyp list \<Rightarrow> (var \<Rightarrow> vtyp option) \<times> (char list \<Rightarrow> vtyp option)"
+  where
+  "type_ctxt_front_end_syntactic tys =
+  ( nth_option tys, (\<lambda>f. if f = field_val then Some TInt else None) )"
+
+abbreviation tcfes where
+  "tcfes \<equiv> type_ctxt_front_end_syntactic"
+
 
 lemma make_context_semantic_type_ctxt[simp]:
-  "make_context_semantic \<Delta> type_ctxt_front_end_syntactic = type_ctxt_front_end"
-proof -
-  have "variables (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = variables type_ctxt_front_end"
-    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
-    apply (rule ext)
-    by (simp add:vints_def vrefs_def)
-  moreover have "custom_context (make_context_semantic \<Delta> type_ctxt_front_end_syntactic) = custom_context type_ctxt_front_end"
-    unfolding make_context_semantic_def type_ctxt_front_end_syntactic_def type_ctxt_front_end_def type_ctxt_store_def type_ctxt_heap_def
-    apply (rule ext)
-    by (simp add:vints_def vrefs_def)
-  ultimately show ?thesis
-    by (simp add: type_ctxt_front_end_def)
-qed
+  "make_context_semantic \<Delta> (tcfes tys) = tcfe \<Delta> tys"
+  unfolding make_context_semantic_def type_ctxt_front_end_def
+  apply rule
+  apply simp
+  apply (rule conjI)
+  unfolding sem_store_def sem_fields_def type_ctxt_store_def type_ctxt_front_end_syntactic_def type_ctxt_heap_def vints_def vrefs_def map_comp_def
+   apply simp_all
+   apply (rule ext)
+   apply simp
+   apply (rule ext)
+  by simp
 
-(*
-abbreviation well_typed_heap where
-  "well_typed_heap \<Gamma> \<phi> \<equiv> heap_typed \<Gamma> (get_vh \<phi>)"
-*)
+
+fun typed_exp where
+  "typed_exp tys (Elit l) \<longleftrightarrow> True"
+| "typed_exp tys (Evar x) \<longleftrightarrow> (x < length tys \<and> tys ! x = TInt)"
+| "typed_exp tys (Ebinop e1 op e2) \<longleftrightarrow> typed_exp tys e1 \<and> typed_exp tys e2"
+
+fun typed_bexp where
+  "typed_bexp tys (Beq e1 e2) \<longleftrightarrow> typed_exp tys e1 \<and> typed_exp tys e2"
+| "typed_bexp tys (Band b1 b2) \<longleftrightarrow> typed_bexp tys b1 \<and> typed_bexp tys b2"
+| "typed_bexp tys (Bnot b) \<longleftrightarrow> typed_bexp tys b"
+
+abbreviation has_type_var where
+  "has_type_var tys x ty \<equiv> x < length tys \<and> tys ! x = ty"
+
+fun well_typed_cmd where
+  "well_typed_cmd _ Cskip \<longleftrightarrow> True"
+| "well_typed_cmd tys (Cseq C1 C2) \<longleftrightarrow> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys (Cassign x e) \<longleftrightarrow> has_type_var tys x TInt \<and> typed_exp tys e"
+| "well_typed_cmd tys (Cread x r) \<longleftrightarrow> has_type_var tys x TInt \<and> has_type_var tys r TRef"
+| "well_typed_cmd tys (Cwrite r e) \<longleftrightarrow> has_type_var tys r TRef \<and> typed_exp tys e"
+| "well_typed_cmd tys (Calloc r e) \<longleftrightarrow> has_type_var tys r TRef \<and> typed_exp tys e"
+| "well_typed_cmd tys (Cfree r) \<longleftrightarrow> has_type_var tys r TRef"
+| "well_typed_cmd tys (Cif b C1 C2) \<longleftrightarrow> typed_bexp tys b \<and> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys ({_} C1 {_} || {_} C2 {_}) \<longleftrightarrow> well_typed_cmd tys C1 \<and> well_typed_cmd tys C2"
+| "well_typed_cmd tys (Cwhile b _ C) \<longleftrightarrow> typed_bexp tys b \<and> well_typed_cmd tys C"
+
+
+thm TypedEqui.typed_store_update
+
+lemma VInt_in_vints[simp]:
+  "VInt v \<in> vints"
+  unfolding vints_def by blast
+
+lemma red_keeps_typed_store:
+  assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
+      and "store_typed (type_ctxt_store \<Delta> tys) (fst \<sigma>)"
+      and "well_typed_cmd tys C"
+    shows "store_typed (type_ctxt_store \<Delta> tys) (fst \<sigma>')"
+  using assms
+proof (induct rule: red.induct)
+  case (red_Assign \<sigma> s h \<sigma>' x e)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Assign(3), of x vints "VInt (edenot e s)"]
+    unfolding type_ctxt_store_def
+    by (metis (no_types, lifting) VInt_in_vints fstI set_from_type.simps(1) vints_def well_typed_cmd.simps(3))
+next
+  case (red_Alloc \<sigma> s h l \<sigma>' x e)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Alloc(4), of x vrefs "VRef (Address l)"]
+    unfolding type_ctxt_store_def
+    by (metis (no_types, lifting) fst_conv sem_vtyp_simps(4) set_from_type.simps(4) vrefs_def well_typed_cmd.simps(6))
+next
+  case (red_Read \<sigma> s h r l v \<sigma>' x)
+  then show ?case
+    using TypedEqui.store_typed_update[OF red_Read(5), of x vints "VInt v"]
+    unfolding type_ctxt_store_def
+    by (metis (no_types, lifting) VInt_in_vints set_from_type.simps(1) split_pairs vints_def well_typed_cmd.simps(4))
+qed (simp_all)
+
+
 
 lemma red_keeps_well_typed_cmd:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
@@ -548,8 +541,8 @@ qed (auto)
 
 lemma well_typed_cmd_red:
   assumes "\<langle>C, \<sigma>\<rangle> \<rightarrow> \<langle>C', \<sigma>'\<rangle>"
-      and "well_typed_cmd_aux \<Delta> C"
-    shows "well_typed_cmd_aux \<Delta> C'"
+      and "well_typed_cmd tys C"
+    shows "well_typed_cmd tys C'"
   using assms
   by (induct rule: red.induct) (auto)
 

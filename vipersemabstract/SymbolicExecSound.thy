@@ -2,79 +2,6 @@ theory SymbolicExecSound
   imports Instantiation EquiSemAuxLemma ViperAbstract.AbstractSemanticsProperties SymbolicExecDef ViperCommon.ViperUtil
 begin
 
-lemma greater_charact_equi:
-  "\<omega>' \<succeq> \<omega> \<longleftrightarrow> get_store \<omega> = get_store \<omega>' \<and> get_trace \<omega>' = get_trace \<omega>  \<and> get_state \<omega>' \<succeq> get_state \<omega>"
-  by (metis agreement.collapse get_abs_state_def get_state_def get_trace_def greater_charact greater_prod_eq greater_state_has_greater_parts(2) succ_refl)
-
-lemma val_greater_iff [simp] :
-  "(x :: 'a val) \<succeq> y \<longleftrightarrow> x = y"
-  by (simp add:greater_def plus_val_def)
-
-lemma preal_greater_iff [simp] :
-  "(x :: preal) \<succeq> y \<longleftrightarrow> x \<ge> y"
-  apply (simp add:greater_def plus_preal_def)
-  using pos_perm_class.sum_larger preal_gte_padd by auto
-
-lemma option_greater_SomeI :
-  assumes "x \<succeq> y"
-  shows "Some x \<succeq> Some y"
-  by (meson assms greater_def plus_optionI)
-
-lemma option_greater_None [simp] :
-  "x \<succeq> None"
-  by (simp add: greater_def)
-
-lemma greater_option_Some_r :
-  "(x :: ('a :: pcm_with_core) option) \<succeq> Some y \<longleftrightarrow> (\<exists> x'. x = Some x' \<and> x' \<succeq> y)"
-  apply (cases x; simp add:greater_def)
-   apply (smt (verit, ccfv_threshold) asso1 option.discI option_plus_None_r positivity)
-  apply (rule; clarsimp)
-  subgoal for a c
-    apply (cases "c"; simp)
-    subgoal apply (rule exI[of _ "|y|"]) by (simp add: core_is_smaller)
-    subgoal by (metis (full_types) option.discI option.sel)
-    done
-  subgoal for a c
-    apply (rule exI[of _ "Some c"]; simp)
-    by (metis (full_types) not_None_eq)
-  done
-
-lemma option_greater_iff :
-  "(x :: ('a :: pcm_with_core) option) \<succeq> y \<longleftrightarrow> (\<forall> y'. y = Some y' \<longrightarrow> (\<exists> x'. x = Some x' \<and> x' \<succeq> y'))"
-  by (cases "y"; simp add:greater_option_Some_r)
-
-lemma vstate_greater_charact1:
-  assumes "get_vm x \<succeq> get_vm y"
-  assumes "get_vh x \<succeq> get_vh y"
-  shows "x \<succeq> y"
-proof -
-  obtain cm where "Some (get_vm x) = get_vm y \<oplus> cm"
-    using assms unfolding greater_def by blast
-  moreover have "wf_pre_virtual_state (cm, get_vh x)"
-    apply (rule wf_pre_virtual_stateI)
-     apply (metis EquiViper.add_masks_def add.commute calculation gr_0_is_ppos leD pos_perm_class.sum_larger pperm_pnone_pgt vstate_wf_imp)
-    by (metis (no_types, lifting) EquiViper.add_masks_def calculation commutative get_vm_bound pgte_transitive pos_perm_class.sum_larger wf_mask_simple_def)
-  moreover obtain c where "get_vh c = get_vh x" "get_vm c = cm"
-    apply (simp add:get_vm_def get_vh_def)
-    using calculation Abs_virtual_state_inverse
-    by (metis fst_conv get_vh_def mem_Collect_eq snd_conv)
-  ultimately show "?thesis"
-    using assms(2)
-    apply (simp add: greater_def)
-    apply (rule exI[of _ c])
-    apply (simp add: vstate_add_iff)
-    by (smt (verit, ccfv_threshold) asso1 core_is_pure core_structure(2) vstate_add_iff)
-qed
-
-lemma vstate_greater_charact:
-  shows "x \<succeq> y \<longleftrightarrow> get_vm x \<succeq> get_vm y \<and> get_vh x \<succeq> get_vh y"
-  using vstate_greater_charact1 greater_def vstate_add_iff by metis
-
-lemma greater_uu :
-  "st \<succeq> uu"
-  apply (simp add:vstate_greater_charact uu_get)
-  by (meson empty_heap_identity greater_equiv zero_mask_identity)
-
 
 definition s2a_heap_typed :: "(field_ident \<rightharpoonup> vtyp) \<Rightarrow> 'a partial_heap \<Rightarrow> bool" where
 "s2a_heap_typed F = heap_typed_syn def_domains F"
@@ -446,7 +373,7 @@ proof -
   using Hch by (clarsimp simp add:concretize_chunk_eq_Some)
 
   have Hch0 : "get_vm ch0 = (get_vm chh)((a, chunk_field c) := get_vm chh (a, chunk_field c) + Abs_preal p)"
-              "get_vh ch0 = get_vh chh((a, chunk_field c) \<mapsto> v)"
+              "get_vh ch0 = (get_vh chh)((a, chunk_field c) \<mapsto> v)"
     subgoal using Hch Hc by (clarsimp simp add:acc_virt_plus preal_to_real inf.absorb2)
     subgoal using Hch Hc by (clarsimp simp add:acc_virt_plus)
     done
@@ -846,7 +773,7 @@ next
         apply (rule allI) subgoal for \<omega>'
           apply (clarsimp)
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
-          apply (case_tac "x = VBool b"; simp)
+          apply (case_tac "x = b"; simp)
           apply (case_tac "b"; simp)
           subgoal
             by (drule Imp.IH[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
@@ -874,7 +801,7 @@ next
         apply (rule allI) subgoal for \<omega>'
           apply (clarsimp)
           apply (clarsimp simp add: add_set_asso[symmetric] red_pure_assert_elim up_close_core_sum)
-          apply (case_tac "x = VBool b"; clarsimp split:bool_to_assertion_splits)
+          apply (case_tac "x = b"; clarsimp split:bool_to_assertion_splits)
           apply (case_tac "b"; simp)
           subgoal
             by (drule CondAssert.IH(1)[of "(sym_cond_add \<sigma>' t)"]; assumption?; (simp del: Product_Type.split_paired_All)?)
@@ -1031,7 +958,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp)
+         apply (rule exI[of _ "True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1042,7 +969,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp del: Product_Type.split_paired_Ex)
+         apply (rule exI[of _ "False"]; simp del: Product_Type.split_paired_Ex)
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
          apply (rule red_pure_assert_intro) apply (assumption) apply (solves \<open>simp\<close>)
         apply (simp)
@@ -1064,7 +991,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool True"]; simp)
+         apply (rule exI[of _ "True"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1077,7 +1004,7 @@ next
         apply (simp add:add_set_ex_comm_r add_set_asso[symmetric] del: Product_Type.split_paired_Ex)
         apply (rule exI)+
         apply (rule conjI)
-         apply (rule exI[of _ "VBool False"]; simp)
+         apply (rule exI[of _ "False"]; simp)
          defer 1 apply fastforce
         apply (simp add:add_set_commm[of _ "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
         apply (simp add:add_set_asso[of "_ \<turnstile> \<langle>e\<rangle> [\<Down>] _"])
@@ -1119,13 +1046,13 @@ theorem sexec_sound :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile False def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
+  shows "concrete_red_stmt_post (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega> {\<omega>'.
     \<exists> V' \<sigma>'. \<omega>' \<succeq> s2a_state V' (sym_store \<sigma>') (sym_heap \<sigma>') \<and> s2a_state_wf \<Lambda> F V' \<sigma>' \<and> Q \<sigma>'}"
   using assms
 proof (induction C arbitrary: \<sigma> \<omega> V Q)
   case (Inhale A)
   then show ?case
-    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_gen_def)
+    apply (clarsimp simp add:stmt_typing_simps make_semantic_assertion_def)
     apply (drule (3) sproduce_sound)
     apply (clarsimp)
     apply (rule concrete_post_Inhale)
@@ -1140,7 +1067,7 @@ next
       apply (clarsimp)
       apply (rule concrete_post_Exhale[where \<omega>'=\<omega>'])
         apply (solves \<open>simp\<close>)
-      subgoal  by (clarsimp simp add:make_semantic_assertion_gen_def)
+      subgoal  by (clarsimp simp add:make_semantic_assertion_def)
       apply (erule (2) sym_stabilize_soundE)
       by blast
     done
@@ -1232,7 +1159,7 @@ theorem sexec_verifies :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "s2a_state_wf \<Lambda> F V \<sigma>"
   assumes "sexec \<sigma> C Q"
-  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile False def_interp (\<Lambda>, F) C) \<omega>"
+  shows "ConcreteSemantics.verifies (s2a_ctxt F \<Lambda>) (compile def_interp (\<Lambda>, F) C) \<omega>"
   using assms
   apply (simp add: ConcreteSemantics.verifies_def)
   using sexec_sound concrete_red_stmt_post_def by blast
@@ -1242,7 +1169,7 @@ theorem sexec_verifies_set :
     \<exists> \<sigma> V. \<omega> \<succeq> s2a_state V (sym_store \<sigma>) (sym_heap \<sigma>) \<and>
       s2a_state_wf \<Lambda> F V \<sigma> \<and> sexec \<sigma> C Q"
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
-  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile False def_interp (\<Lambda>, F) C)"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) A (compile def_interp (\<Lambda>, F) C)"
   using assms
   apply (simp add: ConcreteSemantics.verifies_set_def)
   using sexec_verifies by blast
@@ -1261,7 +1188,7 @@ lemma s2a_state_wf_empty :
 
 lemma sinit_sound :
   assumes "sinit tys F Q"
-  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<Lambda> = nth_option tys"
   assumes "get_trace \<omega> = Map.empty"
   assumes "store_typed (sem_store def_domains \<Lambda>) (get_store \<omega>)"
   assumes "\<And> \<sigma> V.
@@ -1305,14 +1232,14 @@ qed
 theorem sinit_sexec_verifies_set :
   assumes "stmt_typing (fields_to_prog F) \<Lambda> C"
   assumes "sinit tys F (\<lambda> \<sigma> :: 'a sym_state. sexec \<sigma> C Q)"
-  (* TODO: replace with nth_option from TotalUtil? *)
-  assumes "\<Lambda> = (\<lambda> v. if v < length tys then Some (tys ! v) else None)"
+  assumes "\<Lambda> = nth_option tys"
   assumes "\<And> \<omega>. \<omega> \<in> A \<Longrightarrow> get_trace \<omega> = Map.empty"
-  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile False def_interp (\<Lambda>, F) C)"
+  shows "ConcreteSemantics.verifies_set (s2a_ctxt F \<Lambda>) (A :: 'a equi_state set) (compile def_interp (\<Lambda>, F) C)"
   apply (rule sexec_verifies_set[where Q=Q]; (rule assms)?)
   using assms apply -
   subgoal for \<omega>
     apply (erule (1) sinit_sound[where \<omega>=\<omega>])
     by (auto simp add:TypedEqui.typed_def TypedEqui.typed_store_def s2a_ctxt_def)
   done
+
 end

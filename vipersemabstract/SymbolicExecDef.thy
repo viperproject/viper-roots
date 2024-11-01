@@ -77,62 +77,12 @@ lemma eval_binop_Lte_perm_r_eq_True :
   by (cases v1; auto)
 
 section \<open>def\<close>
-(*
-look into https://arxiv.org/pdf/2311.07559
-look into http://malte.schwerhoff.de/docs/phd_thesis.pdf
-look at featherweight verifast
-
-idea: 
-- use the symbolic execution from gradual viper paper
-- add permissions and wildcards, inhale statements (just not part of their syntax)
-- remove predicates
-- define it as a relation in Isabelle
-  - can be executed in the prover with simp
-  - can leave decision procedures open/parametric/semantic
-  - can have a semantic state consolidation algorithm 
-      (the gradual viper paper does not have one since they only have 1 or 0 permission, so their heap chunks are disjoint)
-
-notes on symbolic execution from gradual viper paper:
-- I don't understand how exactly their formalization of symbolic execution works. I thought that the
-  symbolic execution would construct a derivation of their rules and one would prove that if one has
-  such a derivation, then the program is safe or so. But their non-determinism is the wrong way around
-  for that. In particular, branching on conditionals is handled with non-deterministic rules, so if
-  the symbolic execution could pick the non-determinism it could determine the branching of conditionals
-  which does not make sense. Instead it seems like they construct a derivation of their symbolic execution
-  rules in their soundness proof.
-- On trick to make this work is that they complete their derivation with failure steps like SConsumeAccFailure, which
-  allows them to prove e.g. lemma 46. In their case, verification failure is denoted by always failing runtime checks (see 3.3)
-- I am not sure if one can extend their setup to permissions since in this case the symbolic execution would need to
-  handle all possible ways how a permission can be removed from the heap. Also already for the case where
-  heap fragments are non-disjoint, their setup becomes weird (they mention that they prove disjointness of heap fragments).
-- I am not sure if one can extend their setting to cases where one wants to give more flexibility to the symbolic execution.
-  In particular, we might want to allow an arbitrary state consolidation algorithm. But this would need a different
-  kind of non-determinism than the non-determinism from branching \<rightarrow> dual non-det to the rescue!
-
-plan for function:
-- add symbolic values to expressions to get symbolic expressions? Or hijack var constructor for symbolic values?
-- state: 
-  + path condition: boolean valued symbolic expression
-  + store: maps vars to symbolic expressions
-  + heap: 
-    * permissions: map from heap locations to symbolic expressions representing permissions
-    * heap: total (?) map from heap locations to symbolic expressions
-  + trace: Ignore?
-  + counter for generating fresh names for new symbolic expressions
-
-questions:
-- how to handle havocing of the heap when one does not have permission anymore?
-
-type: recursive function that takes a program and a state and generates a new state and a list of sideconditions
- *)
-
 
 subsection \<open>basic definitions\<close>
 
 definition def_domains :: "'a \<Rightarrow> abs_type" where
 "def_domains = undefined"
 
-(* C of https://arxiv.org/pdf/2311.07559 *)
 subsection \<open>symbolic expressions\<close>
 type_synonym sym_val = var
 type_synonym 'a valuation = "sym_val \<rightharpoonup> 'a val"
@@ -514,9 +464,9 @@ fun sexec :: "'a sym_state \<Rightarrow> stmt \<Rightarrow> ('a sym_state \<Righ
     sexec_exp \<sigma> e (\<lambda> \<sigma> t. sexec (sym_cond_add \<sigma> t) s1 Q \<and> sexec (sym_cond_add \<sigma> (\<not>\<^sub>s t)) s2 Q)"
 | "sexec \<sigma> (stmt.Seq s1 s2) Q = sexec \<sigma> s1 (\<lambda> \<sigma>. sexec \<sigma> s2 Q)"
 | "sexec \<sigma> (stmt.LocalAssign v e) Q = (sym_store \<sigma> v \<noteq> None \<and> 
-    sexec_exp \<sigma> e (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := sym_store \<sigma>(v \<mapsto> t) \<rparr>)))"
+    sexec_exp \<sigma> e (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := (sym_store \<sigma>)(v \<mapsto> t) \<rparr>)))"
 | "sexec \<sigma> (stmt.Havoc v) Q = (\<exists> ty. sym_store_type \<sigma> v = Some ty \<and>
-    sym_gen_fresh \<sigma> ty (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := sym_store \<sigma>(v \<mapsto> (SVar t)) \<rparr>)))"
+    sym_gen_fresh \<sigma> ty (\<lambda> \<sigma> t. Q (\<sigma>\<lparr>sym_store := (sym_store \<sigma>)(v \<mapsto> (SVar t)) \<rparr>)))"
 | "sexec \<sigma> (stmt.FieldAssign e f e2) Q = sexec_exp \<sigma> e (\<lambda> \<sigma> t. sexec_exp \<sigma> e2 (\<lambda> \<sigma> t2. 
     sym_heap_extract \<sigma> t f (Some (SPerm 1)) (\<lambda> \<sigma> c.
 \<comment> \<open>We need to ensure that there are no chunks for t with permission 0 left.
@@ -542,140 +492,4 @@ fun sinit :: "vtyp list \<Rightarrow> (field_name \<rightharpoonup> vtyp) \<Righ
      \<lparr> sym_store := shift_and_add (sym_store \<sigma>) (SVar v),
        sym_store_type := shift_and_add (sym_store_type \<sigma>) ty \<rparr>)))"
 
-(* old
-(* C of https://arxiv.org/pdf/2311.07559 *)
-type_synonym sym_val = var
-type_synonym 'a valuation = "sym_val \<rightharpoonup> 'a val"
-
-(* We define sym_exp semantically such that = is semantic equality (important for rewriting). *)
-(* TODO: Should this be total or partial? The gradual typing paper defines it as partial, but then later treats it as total. *)
-type_synonym 'a sym_exp = "'a valuation \<rightharpoonup> 'a val"
-
-definition SLit :: "lit \<Rightarrow> 'a sym_exp" where
-"SLit l _ = Some (val_of_lit l)"
-abbreviation SBool where "SBool b \<equiv> SLit (LBool b)"
-abbreviation SInt where "SInt n \<equiv> SLit (LInt n)"
-abbreviation SPerm where "SPerm p \<equiv> SLit (LPerm p)"
-
-definition SVal :: "sym_val \<Rightarrow> 'a sym_exp" where
-"SVal v V = V v"
-definition SUnop :: "unop \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_exp" where
-"SUnop op t V = Option.bind (t V) (\<lambda> v. binop_result_to_option (eval_unop op v))"
-abbreviation SNot ("\<not>\<^sub>s _" [40]40) where "SNot \<equiv> \<lambda> t1. SUnop Not t1"
-
-definition SBinop :: "'a sym_exp \<Rightarrow> binop \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_exp" where
-"SBinop t1 op t2 V = Option.bind (t1 V) (\<lambda> v1. Option.bind (t2 V) (\<lambda> v2.
-   binop_result_to_option (eval_binop v1 op v2)))"
-abbreviation SAnd (infixr "\<and>\<^sub>s" 35) where "SAnd \<equiv> \<lambda> t1 t2. SBinop t1 And t2"
-abbreviation SEq (infixl "=\<^sub>s" 50) where "SEq \<equiv> \<lambda> t1 t2. SBinop t1 Eq t2"
-abbreviation SLt (infix "<\<^sub>s" 50) where "SLt \<equiv> \<lambda> t1 t2. SBinop t1 Lt t2"
-abbreviation SLte (infix "\<le>\<^sub>s" 50) where "SLte \<equiv> \<lambda> t1 t2. SBinop t1 Lte t2"
-abbreviation SImp (infixr "\<longrightarrow>\<^sub>s" 25) where "SImp \<equiv> \<lambda> t1 t2. SBinop t1 BImp t2"
-abbreviation SSub (infixl "-\<^sub>s" 65) where "SSub \<equiv> \<lambda> t1 t2. SBinop t1 Sub t2"
-
-definition SCondExp :: "'a sym_exp \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_exp" where
-"SCondExp t1 t2 t3 V = Option.bind (t1 V) (\<lambda> v1. case v1 of VBool b \<Rightarrow> if b then t2 V else t3 V | _ \<Rightarrow> None)"
-
-(* TODO: total or partial? *)
-type_synonym 'a sym_store = "var \<Rightarrow> 'a sym_exp"
-type_synonym 'a path_cond = "'a sym_exp"
-
-record 'a chunk =
-  chunk_field :: field_name
-  chunk_recv :: "'a sym_exp"
-  chunk_perm :: "'a sym_exp"
-  chunk_val :: "'a sym_exp"
-
-type_synonym 'a sym_heap = "'a chunk multiset"
-
-record 'a sym_state =
-  sym_cond :: "'a path_cond"
-  sym_heap :: "'a sym_heap"
-  sym_store :: "'a sym_store"
-  sym_used :: "sym_val list" (* list to make clear that it is finite *)
-
-definition sym_fresh :: "'a sym_state \<Rightarrow> sym_val" where
-"sym_fresh \<sigma> = (SOME v. v \<notin> set (sym_used \<sigma>))"
-
-definition sym_fresh_next :: "'a sym_state \<Rightarrow> 'a sym_state" where
-"sym_fresh_next \<sigma> = \<sigma>\<lparr>sym_used := sym_fresh \<sigma> # sym_used \<sigma>\<rparr>"
-
-definition sym_valid :: "'a sym_exp \<Rightarrow> bool" ("\<turnstile>\<^sub>s _" 10) where
-"sym_valid t = (\<forall> V. t V = Some (VBool True))"
-
-inductive seval_exp :: "'a sym_state \<Rightarrow> pure_exp \<Rightarrow> 'a sym_exp \<Rightarrow> 'a sym_state \<Rightarrow> bool"
-  ("_ \<turnstile> _ [\<Down>] _ \<stileturn> _" [51,0,0,51] 81)
-  where
-  SEvalLit: "\<sigma> \<turnstile> ELit l [\<Down>] SLit l \<stileturn> \<sigma>"
-| SEvalVar: "\<sigma> \<turnstile> Var x [\<Down>] sym_store \<sigma> x \<stileturn> \<sigma>"
-| SEvalUnop: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Unop op e [\<Down>] SUnop op t \<stileturn> \<sigma>'"
-| SEvalBinopLazyEq: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1 \<stileturn> \<sigma>'; binop_lazy_bool op = Some bres \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Binop e1 op e2 [\<Down>] SBool (snd bres) \<stileturn> \<sigma>'\<lparr>sym_cond := sym_cond \<sigma>' \<and>\<^sub>s t1 =\<^sub>s SBool (fst bres) \<rparr>"
-| SEvalBinopLazyNotEq: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1 \<stileturn> \<sigma>'; binop_lazy_bool op = Some bres; \<sigma>'\<lparr>sym_cond := sym_cond \<sigma>' \<and>\<^sub>s t1 =\<^sub>s SBool (\<not> (fst bres)) \<rparr> \<turnstile> e2 [\<Down>] t2 \<stileturn> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Binop e1 op e2 [\<Down>] t2 \<stileturn> \<sigma>''"
-| SEvalBinop: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1 \<stileturn> \<sigma>'; binop_lazy_bool op = None; \<sigma>' \<turnstile> e2 [\<Down>] t2 \<stileturn> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Binop e1 op e2 [\<Down>] SBinop t1 op t2 \<stileturn> \<sigma>''"
-(* TODO: Does this make sense? This is like in the paper, but I am it makes sense as it forces the symbolic execution to choose a path instead of allowing to verify both paths*)
-| SEvalCondExpTrue: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1 \<stileturn> \<sigma>'; \<sigma>'\<lparr>sym_cond := sym_cond \<sigma>' \<and>\<^sub>s t1 \<rparr>  \<turnstile> e2 [\<Down>] t2 \<stileturn> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> CondExp e1 e2 e3 [\<Down>] t2 \<stileturn> \<sigma>''"
-| SEvalCondExpFalse: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1 \<stileturn> \<sigma>'; \<sigma>'\<lparr>sym_cond := sym_cond \<sigma>' \<and>\<^sub>s \<not>\<^sub>s t1 \<rparr>  \<turnstile> e3 [\<Down>] t3 \<stileturn> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> CondExp e1 e2 e3 [\<Down>] t3 \<stileturn> \<sigma>''"
-| SEvalField: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> \<sigma>'; c \<in># sym_heap \<sigma>'; chunk_field c = f; \<turnstile>\<^sub>s sym_cond \<sigma>' \<longrightarrow>\<^sub>s SPerm 0 <\<^sub>s (chunk_perm c) \<and>\<^sub>s t =\<^sub>s chunk_recv c \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> FieldAcc e f [\<Down>] chunk_val c \<stileturn> \<sigma>'"
-(* TODO: old expressions *)
-
-inductive seval_exp_det :: "'a sym_state \<Rightarrow> pure_exp \<Rightarrow> 'a sym_exp \<Rightarrow> bool"
- ("_ \<turnstile> _ [\<Down>] _" [51,0,51] 81)
-  where
-  SEvalDetLit: "\<sigma> \<turnstile> ELit l [\<Down>] SLit l"
-| SEvalDetVar: "\<sigma> \<turnstile> Var x [\<Down>] sym_store \<sigma> x"
-| SEvalDetUnop: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Unop op e [\<Down>] SUnop op t"
-| SEvalDetBinop: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1; \<sigma>' \<turnstile> e2 [\<Down>] t2 \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Binop e1 op e2 [\<Down>] SBinop t1 op t2"
-| SEvalDetCondExp: "\<lbrakk> \<sigma> \<turnstile> e1 [\<Down>] t1; \<sigma> \<turnstile> e2 [\<Down>] t2; \<sigma> \<turnstile> e3 [\<Down>] t3 \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> CondExp e1 e2 e3 [\<Down>] SCondExp t1 t2 t3"
-| SEvalDetField: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t; c \<in># sym_heap \<sigma>; chunk_field c = f; \<turnstile>\<^sub>s sym_cond \<sigma> \<longrightarrow>\<^sub>s SPerm 0 <\<^sub>s chunk_perm c \<and>\<^sub>s t =\<^sub>s chunk_recv c \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> FieldAcc e f [\<Down>] chunk_val c"
-(* TODO: old expressions *)
-
-inductive sproduce :: "'a sym_state \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a sym_state \<Rightarrow> bool"
- ("_ \<turnstile> _ \<Zdres> _" [51,0,51] 81)
-  where
-  SProducePure: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> _ \<rbrakk> \<Longrightarrow> \<sigma> \<turnstile> Atomic (Pure e) \<Zdres> \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s t \<rparr>"
-| SProduceAccPure: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] te \<stileturn> _; \<sigma> \<turnstile> ep [\<Down>] tep \<stileturn> _ \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Atomic (Acc e f (PureExp ep)) \<Zdres> (sym_fresh_next \<sigma>)\<lparr> sym_heap := sym_heap \<sigma> \<union># {# chunk.make f te tep (SVal (sym_fresh \<sigma>)) #}  \<rparr>"
-(* TODO: How to produce wildcards? *)
-| SProduceImpTrue: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> _; \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s t\<rparr> \<turnstile> A \<Zdres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Imp e A \<Zdres> \<sigma>' "
-| SProduceImpFalse: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> _ \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Imp e A \<Zdres> \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s \<not>\<^sub>s t\<rparr>"
-| SProduceCondTrue: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> _; \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s t\<rparr> \<turnstile> A1 \<Zdres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> CondAssert e A1 A2 \<Zdres> \<sigma>'"
-| SProduceCondFalse: "\<lbrakk> \<sigma> \<turnstile> e [\<Down>] t \<stileturn> _; \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s \<not>\<^sub>s t\<rparr> \<turnstile> A2 \<Zdres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> CondAssert e A1 A2 \<Zdres> \<sigma>'"
-| SProduceStar: "\<lbrakk> \<sigma> \<turnstile> A1 \<Zdres> \<sigma>'; \<sigma>' \<turnstile> A2 \<Zdres> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma> \<turnstile> Star A1 A2 \<Zdres> \<sigma>''"
-
-
-inductive sconsume :: "'a sym_state \<Rightarrow> 'a sym_state \<Rightarrow> (pure_exp, pure_exp atomic_assert) assert \<Rightarrow> 'a sym_state \<Rightarrow> bool"
- ("_, _ \<turnstile> _ \<Zrres> _" [51, 0,0,51] 81)
-  where
-  SConsumePure: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] t; \<turnstile>\<^sub>s sym_cond \<sigma> \<longrightarrow>\<^sub>s t \<rbrakk> \<Longrightarrow> \<sigma>, \<sigma>E \<turnstile> Atomic (Pure e) \<Zrres> \<sigma>"
-| SConsumeAccPure: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] te; \<sigma>E \<turnstile> ep [\<Down>] tep; sym_heap \<sigma> = h' \<union># {# c #};
-    \<turnstile>\<^sub>s sym_cond \<sigma> \<longrightarrow>\<^sub>s tep \<le>\<^sub>s chunk_perm c \<and>\<^sub>s te =\<^sub>s chunk_recv c  \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> Atomic (Acc e f (PureExp ep)) \<Zrres> \<sigma>\<lparr> sym_heap := h' \<union># {# c\<lparr>chunk_perm := chunk_perm c -\<^sub>s tep\<rparr> #}  \<rparr>"
-(* TODO: How to consume wildcards? *)
-| SConsumeImpTrue: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] t; g' = (sym_cond \<sigma> \<and>\<^sub>s t); \<sigma>\<lparr>sym_cond := g\<rparr>, \<sigma>E\<lparr>sym_cond := g\<rparr> \<turnstile> A \<Zrres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> Imp e A \<Zrres> \<sigma>' "
-| SConsumeImpFalse: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] t \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> Imp e A \<Zrres> \<sigma>\<lparr> sym_cond := sym_cond \<sigma> \<and>\<^sub>s \<not>\<^sub>s t\<rparr>"
-| SConsumeCondTrue: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] t; g' = (sym_cond \<sigma> \<and>\<^sub>s t); \<sigma>\<lparr>sym_cond := g\<rparr>, \<sigma>E\<lparr>sym_cond := g\<rparr> \<turnstile> A1 \<Zrres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> CondAssert e A1 A2 \<Zrres>  \<sigma>'"
-| SConsumeCondFalse: "\<lbrakk> \<sigma>E \<turnstile> e [\<Down>] t; g' = (sym_cond \<sigma> \<and>\<^sub>s \<not>\<^sub>s t); \<sigma>\<lparr>sym_cond := g\<rparr>, \<sigma>E\<lparr>sym_cond := g\<rparr> \<turnstile> A2 \<Zrres> \<sigma>' \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> CondAssert e A1 A2 \<Zrres>  \<sigma>'"
-| SConsumeStar: "\<lbrakk> \<sigma>, \<sigma>E \<turnstile> A1 \<Zrres> \<sigma>'; \<sigma>', \<sigma>E\<lparr>sym_cond := sym_cond \<sigma>'\<rparr> \<turnstile> A2 \<Zrres> \<sigma>'' \<rbrakk> \<Longrightarrow>
-   \<sigma>, \<sigma>E \<turnstile> Star A1 A2 \<Zrres> \<sigma>''"
- *)
 end

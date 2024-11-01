@@ -416,9 +416,6 @@ class pcm_with_core = pcm +
       and cancellative: "Some a = b \<oplus> x \<Longrightarrow> Some a = b \<oplus> y \<Longrightarrow> |x| = |y| \<Longrightarrow> x = y"
 begin
 
-definition minus :: "'a \<Rightarrow> 'a \<Rightarrow> 'a" (infixl "\<ominus>" 63)
-  where "b \<ominus> a = (THE_default b (\<lambda>x. Some b = a \<oplus> x \<and> x \<succeq> |b| ))"
-
 lemma succ_antisym:
   assumes "a \<succeq> b"
       and "b \<succeq> a"
@@ -443,7 +440,7 @@ proof -
       by (metis calculation(2) splus.elims splus.simps(3))
     then have "|a| \<succeq> rab" 
       by (metis calculation(1) core_max greater_def splus.simps(3))
-    then have "pure rab" 
+    then have "pure rab"
       using core_is_pure pure_def pure_smaller by blast
     moreover have "rab \<succeq> ra \<and> rab \<succeq> rb" 
       using \<open>Some rab = ra \<oplus> rb\<close> greater_def greater_equiv by blast
@@ -457,6 +454,10 @@ proof -
   ultimately show ?thesis 
     by (metis \<open>Some b = a \<oplus> rb\<close> option.inject pure_def splus.simps(3)   splus_asso)
 qed
+
+
+definition minus :: "'a \<Rightarrow> 'a \<Rightarrow> 'a" (infixl "\<ominus>" 63)
+  where "b \<ominus> a = (THE_default b (\<lambda>x. Some b = a \<oplus> x \<and> x \<succeq> |b| ))"
 
 lemma succ_refl:
   "a \<succeq> a"

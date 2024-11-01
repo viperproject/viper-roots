@@ -59,4 +59,7 @@ lemma less_None [simp]: "None < Some a"
 lemma less_Some [simp]: "a < b \<Longrightarrow> Some a < Some b"
   by (simp add: less_option_def)
 
+fun nth_option :: "'a list => nat => 'a option"
+  where "nth_option xs n = (if n < length xs then Some (nth xs n) else None)"
+
 end
