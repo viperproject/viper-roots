@@ -807,7 +807,7 @@ lemma exhale_acc_normal_red_exhale:
 lemma exhale_rel_field_acc_general:
   assumes WfSubexp:  "exprs_wf_rel (\<lambda>\<omega>def \<omega> ns. R \<omega>def \<omega> ns \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<omega>def \<omega>) ctxt_vpr StateCons P ctxt [e_rcv_vpr, e_p] \<gamma> \<gamma>2"
       and CorrectPermRel:  
-            "\<And>r p. rel_general (uncurry R) (R' r p)
+            "\<And>r p. rel_general (\<lambda>\<omega>def_\<omega> ns. (uncurry R \<omega>def_\<omega> ns) \<and> Q (Atomic (Acc e_rcv_vpr f (PureExp e_p))) (fst \<omega>def_\<omega>) (snd \<omega>def_\<omega>))  (R' r p)
                   (\<lambda> \<omega>0_\<omega> \<omega>0_\<omega>'. \<omega>0_\<omega> = \<omega>0_\<omega>' \<and> 
                                   exhale_field_acc_rel_assms ctxt_vpr StateCons e_rcv_vpr f e_p r p (fst \<omega>0_\<omega>) (snd \<omega>0_\<omega>)  \<and>
                                   exhale_field_acc_rel_perm_success ctxt_vpr StateCons (snd \<omega>0_\<omega>) r p f)
@@ -839,7 +839,7 @@ proof (rule exhale_rel_intro_2)
     have BasicAssms: "exhale_field_acc_rel_assms ctxt_vpr StateCons e_rcv_vpr f e_p r p \<omega>0 \<omega>"
         unfolding exhale_field_acc_rel_assms_def
         using ExhAcc
-        by blast
+        by blast      
 
     show ?thesis
     proof (rule rel_vpr_aux_intro)
@@ -853,7 +853,7 @@ proof (rule exhale_rel_intro_2)
         using \<open>mh = _\<close> \<open>a = _\<close> pgte.rep_eq Abs_preal_inverse
         by auto
       from this obtain ns3 where Red3: "red_ast_bpl P ctxt (\<gamma>, Normal ns) (\<gamma>3, Normal ns3)" and R3: "R' r p (\<omega>0, \<omega>) ns3"
-        using BasicAssms rel_success_elim[OF CorrectPermRel R2_conv] red_ast_bpl_transitive[OF Red2]
+        using BasicAssms rel_success_elim[OF CorrectPermRel] R2_conv \<open>Q _ \<omega>0 \<omega>\<close> red_ast_bpl_transitive[OF Red2]
         by (metis fst_eqD snd_eqD)
 
       from ExhAcc BasicAssms PermSuccess \<open>res = RNormal \<omega>'\<close> have
@@ -871,7 +871,7 @@ proof (rule exhale_rel_intro_2)
       with ExhAcc have PermCorrect: "\<not> (0 \<le> p \<and> (if (r = Null) then (p = 0) else (pgte (mh (a, f)) (Abs_preal p))))"
         using exh_if_total_failure by fastforce \<comment>\<open>using exh_if_total_normal seems to be surprisingly slower\<close>
       thus "\<exists>c'. red_ast_bpl P ctxt (\<gamma>, Normal ns) c' \<and> snd c' = Failure"
-        using ExhAcc BasicAssms rel_failure_elim[OF CorrectPermRel R2_conv] red_ast_bpl_transitive[OF Red2]
+        using ExhAcc BasicAssms rel_failure_elim[OF CorrectPermRel] R2_conv \<open>Q _ \<omega>0 \<omega>\<close> red_ast_bpl_transitive[OF Red2]
               Abs_preal_inverse pgte.rep_eq
         unfolding exhale_field_acc_rel_perm_success_def        
         by (metis fst_conv mem_Collect_eq snd_conv)
@@ -900,8 +900,12 @@ lemma exhale_rel_field_acc:
                       (\<lambda>_. False) 
                       P ctxt \<gamma>3 \<gamma>'"
     shows "exhale_rel R R Q ctxt_vpr StateCons P ctxt (Atomic (Acc e_rcv_vpr f (PureExp e_p))) \<gamma> \<gamma>'"
-  using assms
-  by (rule exhale_rel_field_acc_general)
+  apply (rule exhale_rel_field_acc_general)
+    apply (rule WfSubexp)
+   apply (rule rel_general_conseq_input[OF CorrectPermRel])
+   apply simp
+  apply (rule UpdExhRel)
+  done
 
 lemma exhale_rel_field_acc_upd_rel:
 assumes StateRel: "\<And> \<omega>0_\<omega> ns. R \<omega>0_\<omega> ns \<Longrightarrow>                            
