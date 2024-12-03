@@ -7,8 +7,8 @@ The formalization is done using the [Isabelle theorem prover](https://isabelle.i
 ## Installation
 
 To check and explore the formalization, you need to download the Isabelle theorem prover.
-The formalization has been tested on Isabelle 2024 (which is not the latest one), 
-which you can download from [here](https://isabelle.in.tum.de/website-Isabelle2022/dist/)
+The formalization has been tested on Isabelle 2024, 
+which you can download from [here](https://isabelle.in.tum.de/website-Isabelle2024/dist/)
 (there are executables for Linux, Mac, Windows).
 
 This repository is split into separate subpackages linked via Isabelle sessions. To setup the development, you have to register these sessions with Isabelle 
