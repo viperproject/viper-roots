@@ -229,8 +229,7 @@ proof(rule exp_rel_vpr_bpl_intro)
     by blast
 
   hence LookupRcv:"red_expr_bpl ctxt e_rcv_bpl ns (AbsV (ARef (Address a)))"
-    using exp_rel_vpr_bpl_elim[OF RcvRel] RedVpr \<open>e_bpl = _\<close> HeapReadWf
-    unfolding heap_read_wf_def
+    using exp_rel_vpr_bpl_elim[OF RcvRel] RedVpr \<open>e_bpl = _\<close> 
     by (metis R val_rel_vpr_bpl.simps(3))
   from FieldTy FieldRel StateRel0[OF R] have 
     LookupField:"lookup_var (var_context ctxt) ns f_tr = Some (AbsV (AField (NormalField f_tr \<tau>)))"
