@@ -21,7 +21,7 @@ jobs:
 
       - name: Download and install Isabelle
         run: |
-          wget --quiet https://isabelle.in.tum.de/website-Isabelle2024/dist/Isabelle2024_linux.tar.gz -O isabelle.tar.gz
+          wget --quiet https://www.cl.cam.ac.uk/research/hvg/Isabelle/dist/Isabelle2024_linux.tar.gz -O isabelle.tar.gz
           mkdir -p isabelle
           tar -xzf isabelle.tar.gz -C isabelle --strip-components=1
           rm isabelle.tar.gz
