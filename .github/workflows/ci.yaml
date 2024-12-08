@@ -30,7 +30,7 @@ jobs:
 
       - name: Setup Isabelle sessions
         run: |
-          isabelle components -u foundational_boogie/BoogieLang
+          isabelle components -u foundational-boogie/BoogieLang
           isabelle components -u vipersemcommon
           isabelle components -u viper-total-heaps
           isabelle components -u vipersemabstract
