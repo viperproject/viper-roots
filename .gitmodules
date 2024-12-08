@@ -1,4 +1,4 @@
 [submodule "foundational-boogie"]
 	path = foundational-boogie
 	url = https://github.com/viperproject/foundational-boogie
-	branch = cfg_optimizations
+	branch = dissertation-gaurav
