@@ -14,7 +14,7 @@ which you can download from [here](https://isabelle.in.tum.de/website-Isabelle20
 This repository is split into separate subpackages linked via Isabelle sessions. To setup the development, you have to register these sessions with Isabelle 
 
 ```
-isabelle components -u foundational_boogie/BoogieLang
+isabelle components -u foundational-boogie/BoogieLang
 isabelle components -u vipersemcommon
 isabelle components -u viper-total-heaps
 isabelle components -u vipersemabstract
@@ -30,7 +30,7 @@ Alternatively, you can add the path to these sessions to the Isabelle `ROOTS` fi
 
 The repository contains 6 folders:
 
-foundational_boogie:
+foundational-boogie:
 - This is the formalization of the Boogie intermediate verification language, which is maintained in a separate repository. This formalization is a dependency of viper-total-heaps.
 
 vipersemcommon:
