@@ -38,8 +38,9 @@ vipersemcommon:
 
 viper-total-heaps:
 - A Viper semantics that at a high level reflects the verification condition generation (VCG) back-end of Viper.
+- Also contains the metatheory for [validating the existing Viper-to-Boogie implementation](https://github.com/viperproject/carbon-proofgen).
 
-vipeyrsemabstract:
+vipersemabstract:
 - Formalization of a generic intermediate verification language, which we call *CoreIVL*.
   Different instantiations of CoreIVL yield different IVLs.
   This formalization includes an operational and an axiomatic semantics for CoreIVL,
