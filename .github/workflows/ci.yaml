@@ -19,7 +19,7 @@ jobs:
       options: --user root # since container defines a separate user
     steps:
       - name: Isabelle version
-        run: isabelle version
+        run: /home/isabelle/Isabelle/bin/isabelle version
 
       - name: Git version
         run: git version 
