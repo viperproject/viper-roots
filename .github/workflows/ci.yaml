@@ -18,12 +18,15 @@ jobs:
       image: makarius/isabelle:Isabelle2024
       options: --user root # since container defines a separate user
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: 'true'
+      - name: Git version
+        run: git version 
 
       - name: Isabelle version
         run: isabelle version
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
 
       - name: Setup Isabelle sessions
         run: |
