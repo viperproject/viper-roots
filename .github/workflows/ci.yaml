@@ -14,7 +14,9 @@ jobs:
         os: [ubuntu-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
-    container: makarius/isabelle:Isabelle2024
+    container: 
+      image: makarius/isabelle:Isabelle2024
+      options: --user root # since container defines a separate user
     steps:
       - uses: actions/checkout@v2
         with:
