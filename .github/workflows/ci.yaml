@@ -25,7 +25,8 @@ jobs:
       # container does not contain Git
       - name: Git version
         run: |
-          apt install -y git
+          apt-get update
+          apt-get install -y git
           git version 
 
       - uses: actions/checkout@v4
