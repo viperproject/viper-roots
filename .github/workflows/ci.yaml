@@ -18,8 +18,10 @@ jobs:
       image: makarius/isabelle:Isabelle2024
       options: --user root # since container defines a separate user
     steps:
-      - name: Isabelle version
-        run: /home/isabelle/Isabelle/bin/isabelle version
+      - name: add Isabelle to path
+        run: echo "/home/isabelle/Isabelle/bin" >> $GITHUB_PATH
+      - name: Isabelle version and add to path
+        run: isabelle version
 
       # install Git since required by checkout action with submodule option and 
       # container does not contain Git
