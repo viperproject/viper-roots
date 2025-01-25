@@ -21,8 +21,12 @@ jobs:
       - name: Isabelle version
         run: /home/isabelle/Isabelle/bin/isabelle version
 
+      # install Git since required by checkout action with submodule option and 
+      # container does not contain Git
       - name: Git version
-        run: git version 
+        run: |
+          apt install -y git
+          git version 
 
       - uses: actions/checkout@v4
         with:
