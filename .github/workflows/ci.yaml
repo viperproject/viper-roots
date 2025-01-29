@@ -24,6 +24,9 @@ jobs:
         with: 
           isabelle-version: 2024
 
+      - name: Isabelle version
+        run: isabelle version
+
       - name: Set up Isabelle sessions
         run: |
           isabelle components -u foundational-boogie/BoogieLang
